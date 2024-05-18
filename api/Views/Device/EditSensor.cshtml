@@ -1,0 +1,128 @@
+﻿@model api.Models.DeviceView
+
+@{
+    ViewData["Title"] = "EditSensor";
+}
+
+<h1>Edit Sensor</h1>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="EditSensor">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group">
+                <input asp-for="Device.IDDevice" class="form-control" />
+                <span asp-validation-for="Device.IDDevice" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input asp-for="DeviceConfigSensor.IDDeviceConfigSensor" class="form-control" />
+                <span asp-validation-for="DeviceConfigSensor.IDDeviceConfigSensor" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigSensor.SensorBattery"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigSensor.SensorBattery,
+                         new SelectList(Model.DeviceTypeSensor.Where(item => item.Battery == 1).ToList(), "IDDeviceTypeSensor", "SensorName", Model.DeviceTypeSensor.First().IDDeviceTypeSensor),
+                         new { @class = "form-control" })
+            </div>
+
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigSensor.SensorTemp"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigSensor.SensorTemp,
+                         new SelectList(Model.DeviceTypeSensor.Where(item => item.Temperature == 1).ToList(), "IDDeviceTypeSensor", "SensorName", Model.DeviceTypeSensor.First().IDDeviceTypeSensor),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigSensor.SensorTempSoil"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigSensor.SensorTempSoil,
+                         new SelectList(Model.DeviceTypeSensor.Where(item => item.TemperatureSoil == 1).ToList(), "IDDeviceTypeSensor", "SensorName", Model.DeviceTypeSensor.First().IDDeviceTypeSensor),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigSensor.SensorHumid"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigSensor.SensorHumid,
+                         new SelectList(Model.DeviceTypeSensor.Where(item => item.Humidity == 1).ToList(), "IDDeviceTypeSensor", "SensorName", Model.DeviceTypeSensor.First().IDDeviceTypeSensor),
+                         new { @class = "form-control" })
+            </div>
+
+                        <div class="form-group">
+                <label asp-for="DeviceConfigSensor.SensorMoist"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigSensor.SensorMoist,
+                         new SelectList(Model.DeviceTypeSensor.Where(item => item.Moisture == 1).ToList(), "IDDeviceTypeSensor", "SensorName", Model.DeviceTypeSensor.First().IDDeviceTypeSensor),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigSensor.SensorLight"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigSensor.SensorLight,
+                         new SelectList(Model.DeviceTypeSensor.Where(item => item.Light == 1).ToList(), "IDDeviceTypeSensor", "SensorName", Model.DeviceTypeSensor.First().IDDeviceTypeSensor),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigSensor.SensorCo2"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigSensor.SensorCo2,
+                         new SelectList(Model.DeviceTypeSensor.Where(item => item.Co2 == 1).ToList(), "IDDeviceTypeSensor", "SensorName", Model.DeviceTypeSensor.First().IDDeviceTypeSensor),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigSensor.SensorTvoc"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigSensor.SensorTvoc,
+                         new SelectList(Model.DeviceTypeSensor.Where(item => item.Tvoc == 1).ToList(), "IDDeviceTypeSensor", "SensorName", Model.DeviceTypeSensor.First().IDDeviceTypeSensor),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigSensor.SensorBarometer"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigSensor.SensorBarometer,
+                         new SelectList(Model.DeviceTypeSensor.Where(item => item.Barometer == 1).ToList(), "IDDeviceTypeSensor", "SensorName", Model.DeviceTypeSensor.First().IDDeviceTypeSensor),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigSensor.SensorPH"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigSensor.SensorPH,
+                         new SelectList(Model.DeviceTypeSensor.Where(item => item.WaterPH == 1).ToList(), "IDDeviceTypeSensor", "SensorName", Model.DeviceTypeSensor.First().IDDeviceTypeSensor),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigSensor.SensorRainLevel"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigSensor.SensorRainLevel,
+                         new SelectList(Model.DeviceTypeSensor.Where(item => item.RainLevel == 1).ToList(), "IDDeviceTypeSensor", "SensorName", Model.DeviceTypeSensor.First().IDDeviceTypeSensor),
+                         new { @class = "form-control" })
+            </div>
+
+                        <div class="form-group">
+                <label asp-for="DeviceConfigSensor.SensorWaterLevel"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigSensor.SensorWaterLevel,
+                         new SelectList(Model.DeviceTypeSensor.Where(item => item.WaterTankLevel == 1).ToList(), "IDDeviceTypeSensor", "SensorName", Model.DeviceTypeSensor.First().IDDeviceTypeSensor),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigSensor.SensorWind"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigSensor.SensorWind,
+                         new SelectList(Model.DeviceTypeSensor.Where(item => item.Wind == 1).ToList(), "IDDeviceTypeSensor", "SensorName", Model.DeviceTypeSensor.First().IDDeviceTypeSensor),
+                         new { @class = "form-control" })
+            </div>
+
+
+            <div class="form-group">
+                <input type="submit" value="Save" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-action="Index">Back to List</a>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

@@ -1,0 +1,259 @@
+﻿@model api.Models.DeviceView
+
+@{
+    ViewData["Title"] = "EditController";
+}
+
+<h1>Edit Controller</h1>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="EditController">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group">
+                <h1>
+                    @Html.DisplayFor(model => model.Device.DeviceName)
+                </h1>
+            </div>
+            <div class="form-group">
+                <input asp-for="Device.IDDevice" class="form-control" />
+                <span asp-validation-for="Device.IDDevice" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input asp-for="DeviceConfigController.IDDeviceConfigController" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.IDDeviceConfigController" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.TempLow" class="control-label"></label>
+                <input asp-for="DeviceConfigController.TempLow" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.TempLow" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.TempHigh" class="control-label"></label>
+                <input asp-for="DeviceConfigController.TempHigh" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.TempHigh" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.HumidLow" class="control-label"></label>
+                <input asp-for="DeviceConfigController.HumidLow" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.HumidLow" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.HumidHigh" class="control-label"></label>
+                <input asp-for="DeviceConfigController.HumidHigh" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.HumidHigh" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.MoistLow" class="control-label"></label>
+                <input asp-for="DeviceConfigController.MoistLow" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.MoistLow" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.MoistHigh" class="control-label"></label>
+                <input asp-for="DeviceConfigController.MoistHigh" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.MoistHigh" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.LightLow" class="control-label"></label>
+                <input asp-for="DeviceConfigController.LightLow" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.LightLow" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.LightHigh" class="control-label"></label>
+                <input asp-for="DeviceConfigController.LightHigh" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.LightHigh" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.WaterLow" class="control-label"></label>
+                <input asp-for="DeviceConfigController.WaterLow" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.WaterLow" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.WaterHigh" class="control-label"></label>
+                <input asp-for="DeviceConfigController.WaterHigh" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.WaterHigh" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.VentilationIntervalEnabled" class="control-label">Ventilation interval</label>
+                <div class="btn-group" data-toggle="buttons" name="Enabled" style="float: right;">
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.DeviceConfigController.VentilationIntervalEnabled, "True", new { @name = "VentilationIntervalEnabled" }) Enabled
+                    </label>
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.DeviceConfigController.VentilationIntervalEnabled, "False", new { @name = "VentilationIntervalEnabled" }) Disabled
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.VentilationInterval" class="control-label"></label>
+                <input asp-for="DeviceConfigController.VentilationInterval" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.VentilationInterval" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.VentilationIntervalLenght" class="control-label"></label>
+                <input asp-for="DeviceConfigController.VentilationIntervalLenght" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.VentilationIntervalLenght" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.LightIntervalEnabled" class="control-label">Light interval</label>
+                <div class="btn-group" data-toggle="buttons" name="Enabled" style="float: right;">
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.DeviceConfigController.LightIntervalEnabled, "True", new { @name = "LightIntervalEnabled" }) Enabled
+                    </label>
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.DeviceConfigController.LightIntervalEnabled, "False", new { @name = "LightIntervalEnabled" }) Disabled
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.LightInterval" class="control-label"></label>
+                <input asp-for="DeviceConfigController.LightInterval" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.LightInterval" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.LightIntervalLenght" class="control-label"></label>
+                <input asp-for="DeviceConfigController.LightIntervalLenght" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.LightIntervalLenght" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.HeatingIntervalEnabled" class="control-label">Heating interval</label>
+                <div class="btn-group" data-toggle="buttons" name="Enabled" style="float: right;">
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.DeviceConfigController.HeatingIntervalEnabled, "True", new { @name = "HeatingIntervalEnabled" }) Enabled
+                    </label>
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.DeviceConfigController.HeatingIntervalEnabled, "False", new { @name = "HeatingIntervalEnabled" }) Disabled
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.HeatingInterval" class="control-label"></label>
+                <input asp-for="DeviceConfigController.HeatingInterval" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.HeatingInterval" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.HeatingIntervalLenght" class="control-label"></label>
+                <input asp-for="DeviceConfigController.HeatingIntervalLenght" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.HeatingIntervalLenght" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.WaterPumpIntervalEnabled" class="control-label">Water pump interval</label>
+                <div class="btn-group" data-toggle="buttons" name="Enabled" style="float: right;">
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.DeviceConfigController.WaterPumpIntervalEnabled, "True", new { @name = "WaterPumpIntervalEnabled" }) Enabled
+                    </label>
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.DeviceConfigController.WaterPumpIntervalEnabled, "False", new { @name = "WaterPumpIntervalEnabled" }) Disabled
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.WaterPumpInterval" class="control-label"></label>
+                <input asp-for="DeviceConfigController.WaterPumpInterval" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.WaterPumpInterval" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.WaterPumpIntervalLenght" class="control-label"></label>
+                <input asp-for="DeviceConfigController.WaterPumpIntervalLenght" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.WaterPumpIntervalLenght" class="text-danger"></span>
+            </div>
+
+
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.RelayEnabled" class="control-label">Relay</label>
+                <div class="btn-group" data-toggle="buttons" name="RelayEnabled" style="float: right;">
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.DeviceConfigController.RelayEnabled, "True", new { @name = "RelayEnabled" }) Enabled
+                    </label>
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.DeviceConfigController.RelayEnabled, "False", new { @name = "RelayEnabled" }) Disabled
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.Relay1"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigController.Relay1,
+                         new SelectList(Model.DeviceTypeRelay.ToList(), "IDDeviceTypeRelay", "RelayName", Model.DeviceTypeRelay.First().IDDeviceTypeRelay),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.Relay2"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigController.Relay2,
+                         new SelectList(Model.DeviceTypeRelay.ToList(), "IDDeviceTypeRelay", "RelayName", Model.DeviceTypeRelay.First().IDDeviceTypeRelay),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.Relay3"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigController.Relay3,
+                         new SelectList(Model.DeviceTypeRelay.ToList(), "IDDeviceTypeRelay", "RelayName", Model.DeviceTypeRelay.First().IDDeviceTypeRelay),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.Relay4"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigController.Relay4,
+                         new SelectList(Model.DeviceTypeRelay.ToList(), "IDDeviceTypeRelay", "RelayName", Model.DeviceTypeRelay.First().IDDeviceTypeRelay),
+                         new { @class = "form-control" })
+            </div>
+
+                        <div class="form-group">
+                <label asp-for="DeviceConfigController.Relay5"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigController.Relay5,
+                         new SelectList(Model.DeviceTypeRelay.ToList(), "IDDeviceTypeRelay", "RelayName", Model.DeviceTypeRelay.First().IDDeviceTypeRelay),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.Relay6"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigController.Relay6,
+                         new SelectList(Model.DeviceTypeRelay.ToList(), "IDDeviceTypeRelay", "RelayName", Model.DeviceTypeRelay.First().IDDeviceTypeRelay),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.Relay7"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigController.Relay7,
+                         new SelectList(Model.DeviceTypeRelay.ToList(), "IDDeviceTypeRelay", "RelayName", Model.DeviceTypeRelay.First().IDDeviceTypeRelay),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <label asp-for="DeviceConfigController.Relay8"></label>
+                @Html.DropDownListFor(m => m.DeviceConfigController.Relay8,
+                         new SelectList(Model.DeviceTypeRelay.ToList(), "IDDeviceTypeRelay", "RelayName", Model.DeviceTypeRelay.First().IDDeviceTypeRelay),
+                         new { @class = "form-control" })
+            </div>
+
+            <div class="form-group">
+                <input type="submit" value="Save" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-action="Index">Back to List</a>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

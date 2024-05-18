@@ -1,0 +1,13 @@
+﻿@using Microsoft.AspNetCore.Http;
+@inject IHttpContextAccessor HttpContextAccessor
+@{
+    ViewData["Title"] = "CookieInfo";
+}
+<h1>@ViewData["Title"]</h1>
+<div class="text-left">
+    <b>username:</b> @HttpContextAccessor?.HttpContext?.Request.Cookies["login-"]
+    <br />
+    <b>userId:</b> @HttpContextAccessor?.HttpContext?.Request.Cookies["userID-"]
+    <br />
+    <b>User Id:</b> @HttpContextAccessor?.HttpContext?.Request.Cookies["authorization-"]
+</div>

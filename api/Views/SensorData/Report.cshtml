@@ -1,0 +1,527 @@
+﻿@model api.Models.DeviceView
+
+@{
+    ViewData["Title"] = "Report";
+}
+
+<h1>Device name @Html.DisplayFor(model => model.Device.DeviceName)</h1>
+
+@using (Html.BeginForm("Report", "SensorData", FormMethod.Get))
+{
+    @Html.Hidden("idDevice", Model.Device.IDDevice, new { @id = "idDevice" })
+    @Html.DropDownList("idSensorDataReport",new SelectList(Model.SensorDataReport.ToList(), "IDSensorDataReport", "ReportName", Model.SensorDataReport.First().IDSensorDataReport),
+                                    new { @class = "form-control" })
+                                                                    
+    <br />
+    <button type="Index" class="btn btn-success">Load report data </button>
+}
+
+<hr />
+
+
+
+
+<div>
+    <div>
+        @Html.ActionLink("Back", "Index", "Device", new { idDevice = Model.Device.IDDevice }, new { @class = "btn btn-primary" })
+    </div>
+    <hr />
+    <dl class="row">
+        <dd class="col-sm-10">
+            @Html.HiddenFor(model => model.Device.IDDevice)
+        </dd>
+
+
+    </dl>
+</div>
+<div style="width:50%; display:inline-table;font-size:15px;float:left">
+    <div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <h2>Temperature</h2>
+        <canvas id="Temperature"></canvas>
+        <script>
+            var jsonfile = @Html.Raw(@Model.SensorDataJson);
+
+            var labels = jsonfile.sensorData.map(function (e) {
+                return e.dateCreated;
+            });
+            var data = jsonfile.sensorData.map(function (e) {
+                return e.temperature;
+            });
+
+            var ctx = Temperature.getContext('2d');
+            var config = {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Graph Line',
+                        data: data,
+                        backgroundColor: 'rgba(0, 119, 204, 0.3)'
+                    }]
+                },
+
+                options: {
+                    animation: {
+                        duration: 0
+                    },
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Horizontal Floating Bars'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const v = ctx.dataset.data[ctx.dataIndex];
+                                    return v[0] + ' - ' + v[1];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                parser: 'h:mm:ss',
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'HH:mm:ss'
+                                }
+                            },
+                            min: '00:00:00',
+                            max: '24:00:00'
+                        }
+                    }
+                }
+            };
+
+            var chart = new Chart(ctx, config);
+        </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <canvas id="Temperature"></canvas>
+
+    </div>
+
+    <div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <h2>Humidity</h2>
+        <canvas id="humidity"></canvas>
+        <script>
+            var jsonfile = @Html.Raw(@Model.SensorDataJson);
+
+            var labels = jsonfile.sensorData.map(function (e) {
+                return e.dateCreated;
+            });
+            var data = jsonfile.sensorData.map(function (e) {
+                return e.humidity;
+            });
+
+            var ctx = humidity.getContext('2d');
+            var config = {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Graph Line',
+                        data: data,
+                        backgroundColor: 'rgba(0, 119, 204, 0.3)'
+                    }]
+                },
+
+                options: {
+                    animation: {
+                        duration: 0
+                    },
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Horizontal Floating Bars'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const v = ctx.dataset.data[ctx.dataIndex];
+                                    return v[0] + ' - ' + v[1];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                parser: 'h:mm:ss',
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'HH:mm:ss'
+                                }
+                            },
+                            min: '00:00:00',
+                            max: '24:00:00'
+                        }
+                    }
+                }
+            };
+
+            var chart = new Chart(ctx, config);
+        </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <canvas id="humidity"></canvas>
+
+    </div>
+
+    <div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <h2>Barometer</h2>
+        <canvas id="barometer"></canvas>
+        <script>
+            var jsonfile = @Html.Raw(@Model.SensorDataJson);
+
+            var labels = jsonfile.sensorData.map(function (e) {
+                return e.dateCreated;
+            });
+            var data = jsonfile.sensorData.map(function (e) {
+                return e.barometer;
+            });
+
+            var ctx = barometer.getContext('2d');
+            var config = {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Graph Line',
+                        data: data,
+                        backgroundColor: 'rgba(0, 119, 204, 0.3)'
+                    }]
+                },
+
+                options: {
+                    animation: {
+                        duration: 0
+                    },
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Horizontal Floating Bars'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const v = ctx.dataset.data[ctx.dataIndex];
+                                    return v[0] + ' - ' + v[1];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                parser: 'h:mm:ss',
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'HH:mm:ss'
+                                }
+                            },
+                            min: '00:00:00',
+                            max: '24:00:00'
+                        }
+                    }
+                }
+            };
+
+            var chart = new Chart(ctx, config);
+        </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <canvas id="barometer"></canvas>
+
+    </div>
+
+    <div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <h2>Soil moisture</h2>
+        <canvas id="moist"></canvas>
+        <script>
+            var jsonfile = @Html.Raw(@Model.SensorDataJson);
+
+            var labels = jsonfile.sensorData.map(function (e) {
+                return e.dateCreated;
+            });
+            var data = jsonfile.sensorData.map(function (e) {
+                return e.moist;
+            });
+
+            var ctx = moist.getContext('2d');
+            var config = {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Graph Line',
+                        data: data,
+                        backgroundColor: 'rgba(0, 119, 204, 0.3)'
+                    }]
+                },
+
+                options: {
+                    animation: {
+                        duration: 0
+                    },
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Horizontal Floating Bars'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const v = ctx.dataset.data[ctx.dataIndex];
+                                    return v[0] + ' - ' + v[1];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                parser: 'h:mm:ss',
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'HH:mm:ss'
+                                }
+                            },
+                            min: '00:00:00',
+                            max: '24:00:00'
+                        }
+                    }
+                }
+            };
+
+            var chart = new Chart(ctx, config);
+        </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <canvas id="barometer"></canvas>
+
+    </div>
+
+</div>
+
+<div style="width:50%; display:inline-table;font-size:15px;float:left">
+    <div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <h2>Light</h2>
+        <canvas id="light"></canvas>
+        <script>
+            var jsonfile = @Html.Raw(@Model.SensorDataJson);
+
+            var labels = jsonfile.sensorData.map(function (e) {
+                return e.dateCreated;
+            });
+            var data = jsonfile.sensorData.map(function (e) {
+                return e.light;
+            });
+
+            var ctx = light.getContext('2d');
+            var config = {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Graph Line',
+                        data: data,
+                        backgroundColor: 'rgba(0, 119, 204, 0.3)'
+                    }]
+                },
+
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Horizontal Floating Bars'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const v = ctx.dataset.data[ctx.dataIndex];
+                                    return v[0] + ' - ' + v[1];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                parser: 'h:mm:ss',
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'HH:mm:ss'
+                                }
+                            },
+                            min: '00:00:00',
+                            max: '24:00:00'
+                        }
+                    }
+                }
+            };
+
+            var chart = new Chart(ctx, config);
+        </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <canvas id="light"></canvas>
+
+    </div>
+
+    <div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <h2>Co2</h2>
+        <canvas id="co2"></canvas>
+        <script>
+            var jsonfile = @Html.Raw(@Model.SensorDataJson);
+
+            var labels = jsonfile.sensorData.map(function (e) {
+                return e.dateCreated;
+            });
+            var data = jsonfile.sensorData.map(function (e) {
+                return e.co2;
+            });
+
+            var ctx = co2.getContext('2d');
+            var config = {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Graph Line',
+                        data: data,
+                        backgroundColor: 'rgba(0, 119, 204, 0.3)'
+                    }]
+                },
+
+                options: {
+                    animation: {
+                        duration: 0
+                    },
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Horizontal Floating Bars'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const v = ctx.dataset.data[ctx.dataIndex];
+                                    return v[0] + ' - ' + v[1];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                parser: 'h:mm:ss',
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'HH:mm:ss'
+                                }
+                            },
+                            min: '00:00:00',
+                            max: '24:00:00'
+                        }
+                    }
+                }
+            };
+
+            var chart = new Chart(ctx, config);
+        </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <canvas id="co2"></canvas>
+
+    </div>
+
+    <div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <h2>Water level</h2>
+        <canvas id="waterLevel"></canvas>
+        <script>
+            var jsonfile = @Html.Raw(@Model.SensorDataJson);
+
+            var labels = jsonfile.sensorData.map(function (e) {
+                return e.dateCreated;
+            });
+            var data = jsonfile.sensorData.map(function (e) {
+                return e.waterLevel;
+            });
+
+            var ctx = waterLevel.getContext('2d');
+            var config = {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Graph Line',
+                        data: data,
+                        backgroundColor: 'rgba(0, 119, 204, 0.3)'
+                    }]
+                },
+
+                options: {
+                    animation: {
+                        duration: 0
+                    },
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Horizontal Floating Bars'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const v = ctx.dataset.data[ctx.dataIndex];
+                                    return v[0] + ' - ' + v[1];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                parser: 'h:mm:ss',
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'HH:mm:ss'
+                                }
+                            },
+                            min: '00:00:00',
+                            max: '24:00:00'
+                        }
+                    }
+                }
+            };
+
+            var chart = new Chart(ctx, config);
+        </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.min.js"></script>
+        <canvas id="waterLevel"></canvas>
+
+    </div>
+</div>

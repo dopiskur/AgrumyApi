@@ -1,0 +1,46 @@
+﻿@model IEnumerable<api.Models.UserGroup>
+
+@{
+    ViewData["Title"] = "View";
+}
+
+<h1>Groups</h1>
+
+<p>
+    <a asp-action="Create" class="btn btn-info">Create New</a>
+</p>
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.IDUserGroup)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.GroupName)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.RoleName)
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr>
+            <td>
+                @Html.DisplayFor(modelItem => item.IDUserGroup)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.GroupName)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.RoleName)
+            </td>
+            <td>
+                    @Html.ActionLink("Details", "Details", new { idUserGroup = item.IDUserGroup }, new { @class = "btn btn-primary" })
+                    @Html.ActionLink("Delete", "Delete", new { idUserGroup = item.IDUserGroup }, new { @class = "btn btn-danger" })
+            </td>
+        </tr>
+}
+    </tbody>
+</table>

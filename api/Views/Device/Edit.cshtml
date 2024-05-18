@@ -1,0 +1,181 @@
+﻿@model api.Models.DeviceView
+
+@{
+    ViewData["Title"] = "Edit";
+}
+
+<h1>Edit</h1>
+
+<h4>Device</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="Edit">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group">
+                <input asp-for="Device.IDDevice" class="form-control" />
+                <span asp-validation-for="Device.IDDevice" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input asp-for="Device.TenantID" class="form-control" />
+                <span asp-validation-for="Device.TenantID" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Device.DeviceTypeID"></label>
+                @Html.DropDownListFor(m => m.Device.DeviceTypeID,
+                         new SelectList(Model.DeviceType.ToList(), "IDDeviceType", "DeviceTypeName", Model.DeviceType.First().IDDeviceType),
+                         new { @class = "form-control" })
+            </div>
+
+
+            <div class="form-group">
+                <input asp-for="Device.DeviceUnitID" class="form-control" />
+                <span asp-validation-for="Device.DeviceUnitID" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input asp-for="Device.DeviceUnitZoneID" class="form-control" />
+                <span asp-validation-for="Device.DeviceUnitZoneID" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input asp-for="Device.DeviceConfigSensorID" class="form-control" />
+                <span asp-validation-for="Device.DeviceConfigSensorID" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input asp-for="Device.DeviceConfigControllerID" class="form-control" />
+                <span asp-validation-for="Device.DeviceConfigControllerID" class="text-danger"></span>
+            </div>
+
+
+            <div class="form-group">
+                <label asp-for="Device.DeviceName" class="control-label"></label>
+                <input asp-for="Device.DeviceName" class="form-control" />
+                <span asp-validation-for="Device.DeviceName" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input asp-for="Device.MacAddress" class="form-control" />
+                <span asp-validation-for="Device.MacAddress" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Device.ApiId" class="control-label"></label>
+                <input asp-for="Device.ApiId" class="form-control" />
+                <span asp-validation-for="Device.ApiId" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Device.ApiKey" class="control-label"></label>
+                <input asp-for="Device.ApiKey" class="form-control" />
+                <span asp-validation-for="Device.ApiKey" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Device.ServicePoint" class="control-label"></label>
+                <input asp-for="Device.ServicePoint" class="form-control" />
+                <span asp-validation-for="Device.ServicePoint" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Device.DeviceTypeServiceID"></label>
+                @Html.DropDownListFor(m => m.Device.DeviceTypeServiceID,
+                         new SelectList(Model.DeviceTypeService.ToList(), "IDDeviceTypeService", "ServiceType", Model.DeviceTypeService.First().IDDeviceTypeService),
+                         new { @class = "form-control" })
+            </div>
+            <div class="form-group">
+                <label asp-for="Device.ServicePublicKey" class="control-label"></label>
+                <input asp-for="Device.ServicePublicKey" class="form-control" />
+                <span asp-validation-for="Device.ServicePublicKey" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Device.SleepSeconds" class="control-label"></label>
+                <input asp-for="Device.SleepSeconds" class="form-control" />
+                <span asp-validation-for="Device.SleepSeconds" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <input asp-for="Device.DeviceSensorEnabled" class="form-control" />
+                <span asp-validation-for="Device.DeviceSensorEnabled" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input asp-for="Device.DeviceControllerEnabled" class="form-control" />
+                <span asp-validation-for="Device.DeviceControllerEnabled" class="text-danger"></span>
+            </div>
+
+
+            <div class="form-group">
+                <label asp-for="Device.SleepDeepEnabled" class="control-label">SleepDeep</label>
+                <div class="btn-group" data-toggle="buttons" name="SleepDeepEnabled" style="float: right;">
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.Device.SleepDeepEnabled, "True", new { @name = "SleepDeepEnabled" }) Enabled
+                    </label>
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.Device.SleepDeepEnabled, "False", new { @name = "SleepDeepEnabled" }) Disabled
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Device.BatteryEnabled" class="control-label">Device battery</label>
+                <div class="btn-group" data-toggle="buttons" name="Enabled" style="float: right;">
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.Device.BatteryEnabled, "True", new { @name = "BatteryEnabled" }) Enabled
+                    </label>
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.Device.BatteryEnabled, "False", new { @name = "BatteryEnabled" }) Disabled
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Device.Debug" class="control-label"></label>
+                <div class="btn-group" data-toggle="buttons" name="Debug" style="float: right;">
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.Device.Debug, "True", new { @name = "Debug" }) Enabled
+                    </label>
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.Device.Debug, "False", new { @name = "Debug" }) Disabled
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Device.Enabled" class="control-label">Device</label>
+                <div class="btn-group" data-toggle="buttons" name="Enabled" style="float: right;">
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+
+                        @Html.RadioButtonFor(m => m.Device.Enabled, "True", new { @name = "Enabled" }) Enabled
+                                 
+                    </label>
+                    <label class="pdsa-radiobutton btn btn-primary">
+                        <span class="glyphicon glyphicon-unchecked"></span>
+                        @Html.RadioButtonFor(m => m.Device.Enabled, "False", new { @name = "Enabled"}) Disabled
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                @Html.HiddenFor(model => model.Device.ConfigVersion)
+            </div>
+            <div class="form-group">
+                <input type="submit" value="Save" class="btn btn-primary" />
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-action="Index">Back to List</a>
+</div>
+
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
+
+

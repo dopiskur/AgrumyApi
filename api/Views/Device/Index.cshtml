@@ -1,0 +1,53 @@
+﻿@model IEnumerable<api.Models.Device>
+
+@{
+    ViewData["Title"] = "View";
+    
+}
+
+<h1>Devices</h1>
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.DeviceName)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Enabled)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.DateCreated)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.DateModified)
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr>      
+            <td>
+                @Html.DisplayFor(modelItem => item.DeviceName)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Enabled)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.DateCreated)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.DateModified)
+            </td>
+            <td>
+                <div>
+                        @Html.ActionLink("Sensor data", "Index", "SensorData", new { idDevice = item.IDDevice }, new { @class = "btn btn-success" })
+                        @Html.ActionLink("Reports", "Report", "SensorData", new { idDevice = item.IDDevice }, new { @class = "btn btn-danger" })
+                        @Html.ActionLink("Details", "Details", new { idDevice = item.IDDevice }, new { @class = "btn btn-primary" })
+                </div>                
+            </td>
+                
+        </tr>
+}
+    </tbody>
+</table>
