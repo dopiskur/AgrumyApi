@@ -17,8 +17,8 @@ namespace api.Dal
 
         private static CacheItemPolicy GlobalCacheItemPolicy = new()
         {
-            AbsoluteExpiration = DateTimeOffset.Now.AddMinutes(120)
-            //SlidingExpiration = TimeSpan.FromMinutes(120) // u sekundama, brise item nakon 5min neaktivnosti
+            // AbsoluteExpiration = DateTimeOffset.Now.AddMinutes(10),
+            SlidingExpiration = TimeSpan.FromMinutes(5) // u sekundama, brise item nakon 5min neaktivnosti
         };
 
 
@@ -49,6 +49,16 @@ namespace api.Dal
             // koristimo set jer set radi insert ili update, bolje nego remove i add, ne ostavlja rupe u listi
             CacheDevice.Set(new CacheItem(key, deviceCache), GlobalCacheItemPolicy);
             
+        }
+
+        public void RemoveItem(string key)
+        {
+
+            if(CacheDevice.Contains(key))
+            {
+                CacheDevice.Remove(key);
+            }         
+
         }
     }
 }

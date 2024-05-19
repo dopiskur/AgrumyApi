@@ -82,6 +82,9 @@ namespace api.Security
                 return true;
             }
 
+            // Cleaning MemoryCache manually if item exists
+            // RepoFactory.GetCache().RemoveItem(apiId.ToString());
+
             return false;
         }
 

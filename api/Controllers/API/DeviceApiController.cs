@@ -275,6 +275,9 @@ namespace api.Controllers.API
                 if (AuthenticationHeaderValue.TryParse(Request.Headers["apiId"], out var apiId) && AuthenticationHeaderValue.TryParse(Request.Headers["apiKey"], out var apiKey))
                 {
 
+                    
+
+
                     if (AuthenticationProvider.VerifyDevice(apiId, apiKey))
                     {
                         Device device = RepoFactory.GetRepo().DeviceGet(0, null, apiId.ToString(), null); // Query for configVerion
