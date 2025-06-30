@@ -43,8 +43,8 @@ namespace api.Security
             //.Select(s => s[random.Next(s.Length)]).ToArray());
             int _min = 1000;
             int _max = 9999;
-            Random _rdm = new Random();
-            return _rdm.Next(_min, _max);
+            
+            return RandomNumberGenerator.GetInt32(_min, _max);
         }
 
         public static string GetGuid()

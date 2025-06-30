@@ -38,7 +38,7 @@ if (webViewEnabled)
     builder.Services.AddHttpContextAccessor(); // COOKIE MONSTER
                                                // HTTPClient
     builder.Services.AddHttpClient<IApi, ApiRepository>(
-        c => c.BaseAddress = new Uri("http://localhost:5151")); // dependency injection za IAPI
+        c => c.BaseAddress = new Uri("http://localhost:5000")); // dependency injection za IAPI
 }
 
 
@@ -49,13 +49,13 @@ if (webViewEnabled)
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
+// Logging
+builder.Services.AddLogging();
 
-
-
-
-
+// dependency injection
+builder.Services.AddScoped<IRepository, SqlRepository>();
+builder.Services.AddScoped<ICache, CacheRepository>();
 
 // CONFIGURE SWAGGER FOR JWT
 
@@ -97,26 +97,23 @@ builder.Services.AddSwaggerGen(option =>
 var app = builder.Build();
 
 // ALWAYS USE SWAGGER
-    app.UseSwagger();
-    app.UseSwaggerUI();
+app.UseSwagger();
+app.UseSwaggerUI();
 // END SWAGGER
 
+// Middleware order is important
+app.UseRouting();
 
 if (webViewEnabled)
 {
-    app.UseRouting();
     app.UseStaticFiles(); // ViewEnabled?
     app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}"); // ViewEnabled
-
-};
-
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-
-
 
 app.Run();
