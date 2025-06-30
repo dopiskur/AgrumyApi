@@ -1,8 +1,5 @@
 ﻿using api.Dal.Interface;
 using api.Models;
-using Google.Protobuf.WellKnownTypes;
-using Microsoft.AspNetCore.Cryptography.KeyDerivation;
-using System;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;

@@ -1,15 +1,8 @@
 ﻿using api.Dal.Interface;
 using api.Models;
 using api.Security;
-using Google.Protobuf.WellKnownTypes;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json.Linq;
-using System.Collections.Generic;
-using System.Security.Claims;
-using System.Security.Principal;
-using System.Text.Json;
+
 
 namespace api.Controllers.View
 {

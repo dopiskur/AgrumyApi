@@ -2,16 +2,9 @@
 using api.Models;
 using api.Security;
 using api.Utils;
-using Google.Protobuf.WellKnownTypes;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ModelBinding.Binders;
-using Mysqlx;
-using NuGet.Protocol;
 using System.Security.Claims;
-using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 

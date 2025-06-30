@@ -7,14 +7,15 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
-
 // Add services to the container.
-
 
 // Configure JWT security services
 var secureKey = builder.Configuration["JWT:SecureKey"];
-bool webViewEnabled = bool.Parse(builder.Configuration["WebView:Enabled"]);
+if (string.IsNullOrEmpty(secureKey))
+    throw new InvalidOperationException("JWT:SecureKey is missing in configuration.");
+
+bool webViewEnabled = bool.TryParse(builder.Configuration["WebView:Enabled"], out var enabled) && enabled;
+
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o => {
@@ -27,9 +28,6 @@ builder.Services
         };
     });
 
-
-
-
 builder.Services.AddControllers();
 
 if (webViewEnabled)
@@ -40,12 +38,6 @@ if (webViewEnabled)
     builder.Services.AddHttpClient<IApi, ApiRepository>(
         c => c.BaseAddress = new Uri("http://localhost:5000")); // dependency injection za IAPI
 }
-
-
-
-
-
-
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -58,7 +50,6 @@ builder.Services.AddScoped<IRepository, SqlRepository>();
 builder.Services.AddScoped<ICache, CacheRepository>();
 
 // CONFIGURE SWAGGER FOR JWT
-
 builder.Services.AddSwaggerGen(option =>
 {
     option.SwaggerDoc("v1",
@@ -91,7 +82,6 @@ builder.Services.AddSwaggerGen(option =>
             }
         });
 });
-
 
 // BUILD CONFIG
 var app = builder.Build();

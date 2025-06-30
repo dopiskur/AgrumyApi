@@ -1,23 +1,8 @@
 ﻿using api.Models;
 using MySql.Data.MySqlClient;
-
 using System.Reflection;
-using Humanizer;
-using System;
-using Org.BouncyCastle.Utilities;
-using Microsoft.AspNetCore.Razor.Language.Extensions;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Google.Protobuf.Compiler;
 using System.Text.Json.Nodes;
-using System.Collections.Generic;
-using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.BlazorIdentity.Pages.Manage;
-using System.Net.Mail;
-using System.CodeDom;
-using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow;
-using NuGet.Protocol;
-using System.Text;
 using api.Dal.Interface;
-using System.Data;
 
 
 namespace api.Dal

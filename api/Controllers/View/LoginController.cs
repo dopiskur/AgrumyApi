@@ -1,13 +1,7 @@
 ﻿using api.Dal.Interface;
 using api.Models;
-using api.Security;
-using api.Utils;
-using Google.Protobuf.WellKnownTypes;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using MySqlX.XDevAPI;
-using Org.BouncyCastle.Bcpg.OpenPgp;
-using System.Net;
+
 
 namespace api.Controllers.View
 {

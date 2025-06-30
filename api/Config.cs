@@ -1,7 +1,4 @@
-﻿using MySqlX.XDevAPI.Common;
-using System.Configuration;
-
-namespace api
+﻿namespace api
 {
     public class Config
     {

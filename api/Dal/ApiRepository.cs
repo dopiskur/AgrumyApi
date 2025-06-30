@@ -1,19 +1,10 @@
 ﻿using api.Dal.Interface;
 using api.Models;
 using api.Utils;
-using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.DotNet.MSIdentity.Shared;
-using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.BlazorIdentity.Pages.Manage;
-using MySqlX.XDevAPI;
 using Newtonsoft.Json;
-using Org.BouncyCastle.Asn1.Ocsp;
 using System.Net.Http.Headers;
-using System.Net.Mail;
 using System.Text;
-using System.Text.Json;
 using System.Web;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace api.Dal
 {

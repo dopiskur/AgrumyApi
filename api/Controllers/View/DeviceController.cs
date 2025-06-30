@@ -1,11 +1,7 @@
 ﻿using api.Dal.Interface;
 using api.Models;
 using api.Security;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using NuGet.Repositories;
-using System.Linq.Expressions;
 
 namespace api.Controllers.View
 {

@@ -1,7 +1,5 @@
 ﻿using api.Security;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.VisualStudio.Web.CodeGeneration.CommandLine;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 

@@ -1,7 +1,6 @@
 ﻿using api.Dal.Interface;
 using api.Models;
 using api.Security;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.View

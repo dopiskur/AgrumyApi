@@ -1,6 +1,4 @@
-﻿using api.Dal;
-
-namespace api.Models
+﻿namespace api.Models
 {
     public class UserView
     {
