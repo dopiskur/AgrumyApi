@@ -7,7 +7,7 @@
   },
   "AllowedHosts": "*",
   "ConnectionStrings": {
-    "DefaultConnection": "Server=invent.hr;Database=agrumapi;Uid=xxxxx;Pwd=xxxxxx;"
+    "DefaultConnection": "Server=invent.hr;Database=agrumy;Uid=xxxxx;Pwd=xxxxxx;"
 
   },
 
