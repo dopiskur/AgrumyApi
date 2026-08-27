@@ -17,8 +17,6 @@ namespace api.Controllers.API
 
     public class DeviceApiController : ControllerBase
     {
-        private const string GenericError = "An unexpected error occurred. Please try again later.";
-
         private readonly ILogger<DeviceApiController> _logger;
 
         public DeviceApiController(ILogger<DeviceApiController> logger)
@@ -226,7 +224,8 @@ namespace api.Controllers.API
             catch (Exception e)
             {
                 _logger.LogError(e, "DeviceRegistration failed");
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
 
 
@@ -309,7 +308,8 @@ namespace api.Controllers.API
             catch (Exception e)
             {
                 _logger.LogError(e, "ReqAuth failed");
-                return Ok("Authentication error");
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
         }
 

@@ -18,8 +18,6 @@ namespace api.Controllers.API
     {
         private static string? secureKey = Config.secureKey;
 
-        private const string GenericError = "An unexpected error occurred. Please try again later.";
-
         private readonly ILogger<UserApiController> _logger;
 
         public UserApiController(ILogger<UserApiController> logger)
@@ -89,7 +87,8 @@ namespace api.Controllers.API
                     return StatusCode(500, "username already registered");
                 }
 
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
 
         }
@@ -144,7 +143,8 @@ namespace api.Controllers.API
             catch (Exception ex)
             {
                 _logger.LogError(ex, "UserLogin failed");
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(ex);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
         }
 
@@ -200,7 +200,8 @@ namespace api.Controllers.API
             catch (Exception ex)
             {
                 _logger.LogError(ex, "UserSetPassword failed");
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(ex);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
         }
 
@@ -222,7 +223,8 @@ namespace api.Controllers.API
             catch (Exception e)
             {
                 _logger.LogError(e, "User read operation failed");
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
 
         }
@@ -245,7 +247,8 @@ namespace api.Controllers.API
             catch (Exception e)
             {
                 _logger.LogError(e, "User read operation failed");
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
 
         }
@@ -274,7 +277,8 @@ namespace api.Controllers.API
             catch (Exception e)
             {
                 _logger.LogError(e, "User read operation failed");
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
 
         }
@@ -325,7 +329,8 @@ namespace api.Controllers.API
                     return StatusCode(500, "username already registered");
                 }
 
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
 
         }
@@ -390,7 +395,8 @@ namespace api.Controllers.API
                     return StatusCode(500, "username already registered");
                 }
 
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
 
         }
@@ -419,7 +425,8 @@ namespace api.Controllers.API
             catch (Exception e)
             {
                 _logger.LogError(e, "User read operation failed");
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
 
         }
@@ -449,7 +456,8 @@ namespace api.Controllers.API
             catch (Exception e)
             {
                 _logger.LogError(e, "User read operation failed");
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
         }
 
@@ -465,7 +473,8 @@ namespace api.Controllers.API
             catch (Exception e)
             {
                 _logger.LogError(e, "User read operation failed");
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
         }
 

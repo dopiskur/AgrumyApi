@@ -1,3 +1,4 @@
+using api.Dal;
 using api.Dal.Interface;
 using api.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -15,8 +16,6 @@ namespace api.Controllers.API
     [ApiController]
     public class SensorDataController : ControllerBase
     {
-        private const string GenericError = "An unexpected error occurred. Please try again later.";
-
         private readonly ILogger<SensorDataController> _logger;
 
         public SensorDataController(ILogger<SensorDataController> logger)
@@ -42,7 +41,8 @@ namespace api.Controllers.API
             catch (Exception e)
             {
                 _logger.LogError(e, "SensorData Get failed for device {DeviceID}", deviceID);
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
         }
 
@@ -77,7 +77,8 @@ namespace api.Controllers.API
             catch (Exception e)
             {
                 _logger.LogError(e, "SensorData Post failed");
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
         }
 
@@ -99,7 +100,8 @@ namespace api.Controllers.API
             catch (Exception e)
             {
                 _logger.LogError(e, "SensorData Delete failed for device {DeviceID}", deviceID);
-                return StatusCode(500, GenericError);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
         }
 
