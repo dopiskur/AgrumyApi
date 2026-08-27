@@ -1,5 +1,9 @@
-﻿namespace api.Dal.Interface
+namespace api.Dal.Interface
 {
+    /// <summary>
+    /// Agrumy.Api variant: exposes the data-access and cache repositories only.
+    /// (The MVC/View app has its own RepoFactory that exposes the HTTP-backed IApi instead.)
+    /// </summary>
     public static class RepoFactory
     {
 
@@ -7,9 +11,7 @@
 
         private static readonly Lazy<ICache> cache = new(() => new CacheRepository());
 
-        private static readonly Lazy<IApi> api = new(() => new ApiRepository());
         public static IRepository GetRepo() => repository.Value;
         public static ICache GetCache() => cache.Value;
-        public static IApi GetApi() => api.Value;
     }
 }
