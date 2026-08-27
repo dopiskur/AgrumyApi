@@ -1,0 +1,24 @@
+{
+  "// WebView": "Settings for the MVC admin UI.",
+  "WebView": {
+    "// ApiService": "Base URL of the Agrumy.Api service the views call over HTTP. Must match the port Agrumy.Api listens on.",
+    "ApiService": "http://localhost:5000"
+  },
+
+  "// JWT": "Only SecureKey is used here - to validate the bearer token stored in the auth cookie (Security/JwtTokenProvider.ValidateToken).",
+  "JWT": {
+    "// SecureKey": "MUST be the exact same value as Agrumy.Api/appsettings.json JWT:SecureKey, otherwise cookie tokens fail validation and every page redirects to login.",
+    "SecureKey": "CHANGE_ME_TO_A_LONG_RANDOM_SECRET_AT_LEAST_32_CHARACTERS"
+  },
+
+  "// Logging": "Standard ASP.NET Core logging configuration.",
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+
+  "// AllowedHosts": "Host header filtering; '*' allows any host.",
+  "AllowedHosts": "*"
+}

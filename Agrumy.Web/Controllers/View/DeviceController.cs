@@ -7,51 +7,9 @@ namespace api.Controllers.View
 {
     public class DeviceController : Controller
     {
-        public static IEnumerable<DeviceType> deviceType = new List<DeviceType>();
-        public static IEnumerable<DeviceTypeService> deviceTypeService = new List<DeviceTypeService>();
-        public static IEnumerable<DeviceTypeRelay> deviceTypeRelay = new List<DeviceTypeRelay>();
-        public static IEnumerable<DeviceTypeSensor> deviceTypeSensor = new List<DeviceTypeSensor>();
-
-        private static IEnumerable<DeviceType> DeviceType() 
-        {
-            
-            if (deviceType == null) // Stavljeno je static da se ucita samo jednom, jer aplikacija ne omogucuje dodavanje rola, nije potrebno. Ali ostavljamo shemu za buducnost.
-            {
-                deviceType = RepoFactory.GetRepo().DeviceTypeGet();
-            }
-
-            return deviceType;
-        }
-        private static IEnumerable<DeviceTypeService> DeviceTypeService() 
-        {
-            
-            if(deviceTypeService == null)
-            {
-                deviceTypeService = RepoFactory.GetRepo().DeviceTypeServiceGet();
-            }
-            
-            return deviceTypeService;
-        }
-        private static IEnumerable<DeviceTypeRelay> DeviceTypeRelay() // Stavljeno je static da se ucita samo jednom, jer aplikacija ne omogucuje dodavanje rola, nije potrebno. Ali ostavljamo shemu za buducnost.
-        {
-            
-            if(deviceTypeRelay == null)
-            {
-                deviceTypeRelay = RepoFactory.GetRepo().DeviceTypeRelayGet();
-            }
-            
-            return deviceTypeRelay;
-        }
-        private static IEnumerable<DeviceTypeSensor> DeviceTypeSensor() // Stavljeno je static da se ucita samo jednom, jer aplikacija ne omogucuje dodavanje rola, nije potrebno. Ali ostavljamo shemu za buducnost.
-        {
-            
-            if (deviceTypeSensor == null)
-            {
-                deviceTypeSensor = RepoFactory.GetRepo().DeviceTypeSensorGet();
-            }
-
-            return deviceTypeSensor;
-        }
+        // NOTE: removed unused private static DeviceType()/DeviceTypeService()/DeviceTypeRelay()/
+        // DeviceTypeSensor() helpers (dead code, never called) - they were the only place the View
+        // layer touched RepoFactory.GetRepo() / the DAL directly.
 
         private static string roleName="";
 
