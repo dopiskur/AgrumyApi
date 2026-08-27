@@ -13,9 +13,6 @@ namespace api.Dal
     {
 
         private static string? sqlcon = Config.defaultSqlCon;
-        private static int nullIntVal; // solving problem with int.TryParse
-        private static double nullDoubleVal; // solving problem with double.TryParse
-        private static bool nullBoolVal; // solving problem with bool.TryParse
 
         // QUERY
 
@@ -97,17 +94,14 @@ namespace api.Dal
         public async Task<ServerConfig> ServerConfigGetAsync(int idServerConfig = 1)
         {
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "ServerConfigGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+            var existing = await connection.QuerySingleOrDefaultAsync<ServerConfig>(
+                "ServerConfigGet",
+                new { IDServerConfig = idServerConfig },
+                commandType: CommandType.StoredProcedure);
 
-            cmd.Parameters.AddWithValue(nameof(ServerConfig.IDServerConfig), idServerConfig);
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            if (await dr.ReadAsync())
+            if (existing != null)
             {
-                return ServerConfigRead(dr);
+                return existing;
             }
 
 
@@ -163,16 +157,6 @@ namespace api.Dal
 
             // CAN NOT CHANGE ConfigKey, that would distrupt passwords!
         }
-
-        private ServerConfig ServerConfigRead(MySqlDataReader dr) => new ServerConfig
-        {
-            IDServerConfig = (int)dr[nameof(ServerConfig.IDServerConfig)],
-            ServerConfigName = dr[nameof(ServerConfig.ServerConfigName)].ToString(),
-            ConfigKey = dr[nameof(ServerConfig.ConfigKey)].ToString(),
-            PortHTTP = (int)dr[nameof(ServerConfig.PortHTTP)],
-            PortHTTPS = (int)dr[nameof(ServerConfig.PortHTTPS)]
-        };
-
 
         // USER
         public async Task UserAddAsync(User user, UserSecret userSecret)
