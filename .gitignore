@@ -10,7 +10,10 @@
 *.userosscache
 *.sln.docstates
 
-# Configuration files with sensitive data
+# Configuration files with sensitive data (real secrets live only on the machine).
+# Bare filename => ignored in every project folder:
+#   Agrumy.Api/appsettings.json, Agrumy.Web/appsettings.json
+# Committed templates: Agrumy.Api/appsettings.json.example, Agrumy.Web/appsettings.json.example
 appsettings.json
 
 # User-specific files (MonoDevelop/Xamarin Studio)
@@ -366,5 +369,9 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # Ignore build output directories
-api/bin/
-api/obj/
+Agrumy.Api/bin/
+Agrumy.Api/obj/
+Agrumy.Web/bin/
+Agrumy.Web/obj/
+Agrumy.Shared/bin/
+Agrumy.Shared/obj/
