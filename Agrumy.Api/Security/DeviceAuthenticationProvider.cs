@@ -1,6 +1,8 @@
 using api.Dal.Interface;
 using api.Models;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace api.Security
 {
@@ -14,21 +16,27 @@ namespace api.Security
         {
 
             Device device = await RepoFactory.GetRepo().DeviceGetAsync(0, null, apiId.ToString(), null); //popravi tenant
-            if (device == null)
+            if (device == null || device.ApiKey is null)
             {
                 // upisi u log da device ne postoji
                 return false;
             }
 
-            if (apikey.ToString() == device.ApiKey)
+            // Constant-time comparison of the provided apiKey against the stored one.
+            byte[] providedKey = Encoding.UTF8.GetBytes(apikey.ToString());
+            byte[] storedKey = Encoding.UTF8.GetBytes(device.ApiKey);
+
+            // FixedTimeEquals requires equal-length inputs; a length mismatch is a non-match
+            // and must not throw or leak information.
+            if (providedKey.Length != storedKey.Length)
             {
-                return true;
+                return false;
             }
 
             // Cleaning MemoryCache manually if item exists
             // RepoFactory.GetCache().RemoveItem(apiId.ToString());
 
-            return false;
+            return CryptographicOperations.FixedTimeEquals(providedKey, storedKey);
         }
     }
 }

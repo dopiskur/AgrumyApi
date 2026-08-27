@@ -48,15 +48,25 @@ namespace api.Security
 
         public static bool VerifyHash(string? pwdHash, string? pwdSalt, string? password)
         {
-
-            if(pwdHash == (GetHash(password, pwdSalt)))
+            if (pwdHash is null || pwdSalt is null || password is null)
             {
-
-                return true;
+                return false;
             }
 
-            else { return false; }
+            // GetHash returns an upper-case hex string; compare it to the stored hash in
+            // constant time over the raw string bytes (behaviour is identical to the old
+            // case-sensitive `==`, just without the early-exit timing side channel).
+            byte[] storedBytes = Encoding.UTF8.GetBytes(pwdHash);
+            byte[] computedBytes = Encoding.UTF8.GetBytes(GetHash(password, pwdSalt));
 
+            // FixedTimeEquals requires equal-length inputs; a length mismatch is simply a
+            // non-match and must not throw or leak information.
+            if (storedBytes.Length != computedBytes.Length)
+            {
+                return false;
+            }
+
+            return CryptographicOperations.FixedTimeEquals(storedBytes, computedBytes);
         }
 
         // NOTE: device apiId/apiKey verification lives in api.Security.DeviceAuthenticationProvider
