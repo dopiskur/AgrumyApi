@@ -1,4 +1,5 @@
-﻿using api.Dal.Interface;
+﻿using api.Dal;
+using api.Dal.Interface;
 using api.Models;
 using api.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -15,6 +16,12 @@ namespace api.Controllers.API
 
     public class DeviceApiController : ControllerBase
     {
+        private readonly ILogger<DeviceApiController> _logger;
+
+        public DeviceApiController(ILogger<DeviceApiController> logger)
+        {
+            _logger = logger;
+        }
 
         #region websvc api
         [Authorize]
@@ -55,11 +62,12 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
-
-                return false;
+                _logger.LogError(e, "DeviceUpdate failed for device {ApiId}", device?.ApiId);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
         }
-        
+
         [Authorize(Roles = "admin")]
         [HttpDelete]
         public ActionResult<bool> DeviceDelete(int? idDevice)
@@ -72,8 +80,9 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
-
-                return false;
+                _logger.LogError(e, "DeviceDelete failed for device {IdDevice}", idDevice);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
         }
 

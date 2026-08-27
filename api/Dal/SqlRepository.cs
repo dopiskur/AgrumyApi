@@ -59,6 +59,29 @@ namespace api.Dal
             }
         }
 
+        public DbFailureKind ClassifyException(Exception ex)
+        {
+            // MySql error numbers: 1146 ER_NO_SUCH_TABLE, 1051 ER_BAD_TABLE_ERROR, 1305 SP_DOES_NOT_EXIST
+            if (ex is MySqlException mysqlEx)
+            {
+                switch (mysqlEx.Number)
+                {
+                    case 1146:
+                    case 1051:
+                    case 1305:
+                        return DbFailureKind.SchemaMissing;
+                }
+            }
+
+            if (ex.Message.Contains("doesn't exist", StringComparison.OrdinalIgnoreCase) ||
+                ex.Message.Contains("Unknown table", StringComparison.OrdinalIgnoreCase))
+            {
+                return DbFailureKind.SchemaMissing;
+            }
+
+            return DbFailureKind.ConnectionFailure;
+        }
+
         private static async Task<bool> TableExistsAsync(MySqlConnection connection, string tableName)
         {
             using var cmd = connection.CreateCommand();

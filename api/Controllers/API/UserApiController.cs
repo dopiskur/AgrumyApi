@@ -1,4 +1,5 @@
-﻿using api.Dal.Interface;
+﻿using api.Dal;
+using api.Dal.Interface;
 using api.Models;
 using api.Security;
 using api.Utils;
@@ -16,6 +17,13 @@ namespace api.Controllers.API
     public class UserApiController : ControllerBase
     {
         private static string? secureKey = Config.secureKey;
+
+        private readonly ILogger<UserApiController> _logger;
+
+        public UserApiController(ILogger<UserApiController> logger)
+        {
+            _logger = logger;
+        }
 
         // CONSTANTS
         private readonly int? DEFAULT_TENANTID = 0;
@@ -482,8 +490,9 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
-
-                return false;
+                _logger.LogError(e, "UserGroupAdd failed for group {GroupName}", userGroup?.GroupName);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
         }
 
@@ -498,8 +507,9 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
-
-                return false;
+                _logger.LogError(e, "UserGroupDelete failed for group {IdUserGroup}", idUserGroup);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
         }
 

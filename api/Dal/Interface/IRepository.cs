@@ -13,6 +13,9 @@ namespace api.Dal.Interface
         /// <summary>Ensures the schema exists: if the key table is missing, runs the batches from Schema/SchemaScripts.cs.</summary>
         Task EnsureSchemaAsync();
 
+        /// <summary>Classifies a database-layer exception so callers can return a consistent error response.</summary>
+        DbFailureKind ClassifyException(Exception ex);
+
         // Server Config
 
         ServerConfig ServerConfigGet(int idServerConfig);
