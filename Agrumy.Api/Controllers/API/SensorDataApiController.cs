@@ -15,6 +15,14 @@ namespace api.Controllers.API
     [ApiController]
     public class SensorDataController : ControllerBase
     {
+        private const string GenericError = "An unexpected error occurred. Please try again later.";
+
+        private readonly ILogger<SensorDataController> _logger;
+
+        public SensorDataController(ILogger<SensorDataController> logger)
+        {
+            _logger = logger;
+        }
         //public static CacheRepository CacheData = new();
         //public static AuthenticationProvider AuthValidator = new();
 
@@ -35,8 +43,8 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
-
-                return StatusCode(500, e.Message);
+                _logger.LogError(e, "SensorData Get failed for device {DeviceID}", deviceID);
+                return StatusCode(500, GenericError);
             }
         }
 
@@ -71,8 +79,8 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
-
-                return StatusCode(500, e.Message);
+                _logger.LogError(e, "SensorData Post failed");
+                return StatusCode(500, GenericError);
             }
         }
 
@@ -93,8 +101,8 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
-
-                return StatusCode(500, e.Message);
+                _logger.LogError(e, "SensorData Delete failed for device {DeviceID}", deviceID);
+                return StatusCode(500, GenericError);
             }
         }
 

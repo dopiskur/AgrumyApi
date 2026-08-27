@@ -18,6 +18,8 @@ namespace api.Controllers.API
     {
         private static string? secureKey = Config.secureKey;
 
+        private const string GenericError = "An unexpected error occurred. Please try again later.";
+
         private readonly ILogger<UserApiController> _logger;
 
         public UserApiController(ILogger<UserApiController> logger)
@@ -75,7 +77,9 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
+                _logger.LogError(e, "User write operation failed");
 
+                // Unique-constraint hits are a meaningful business response, not an internal detail.
                 if (e.Message.Contains("email_UNIQUE"))
                 {
                     return StatusCode(500, "email already registered");
@@ -86,10 +90,7 @@ namespace api.Controllers.API
                     return StatusCode(500, "username already registered");
                 }
 
-                //return StatusCode(500, "Unspecified error");
-                return StatusCode(500, e.Message);
-
-
+                return StatusCode(500, GenericError);
             }
 
         }
@@ -143,8 +144,8 @@ namespace api.Controllers.API
             }
             catch (Exception ex)
             {
-
-                return StatusCode(500, ex.Message);
+                _logger.LogError(ex, "UserLogin failed");
+                return StatusCode(500, GenericError);
             }
         }
 
@@ -199,7 +200,8 @@ namespace api.Controllers.API
             }
             catch (Exception ex)
             {
-                return StatusCode(500, ex.Message);
+                _logger.LogError(ex, "UserSetPassword failed");
+                return StatusCode(500, GenericError);
             }
         }
 
@@ -224,8 +226,8 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
-
-                return StatusCode(500, e.Message);
+                _logger.LogError(e, "User read operation failed");
+                return StatusCode(500, GenericError);
             }
 
         }
@@ -247,8 +249,8 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
-
-                return StatusCode(500, e.Message);
+                _logger.LogError(e, "User read operation failed");
+                return StatusCode(500, GenericError);
             }
 
         }
@@ -277,8 +279,8 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
-
-                return StatusCode(500, e.Message);
+                _logger.LogError(e, "User read operation failed");
+                return StatusCode(500, GenericError);
             }
 
         }
@@ -316,7 +318,9 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
+                _logger.LogError(e, "User write operation failed");
 
+                // Unique-constraint hits are a meaningful business response, not an internal detail.
                 if (e.Message.Contains("email_UNIQUE"))
                 {
                     return StatusCode(500, "email already registered");
@@ -327,10 +331,7 @@ namespace api.Controllers.API
                     return StatusCode(500, "username already registered");
                 }
 
-                //return StatusCode(500, "Unspecified error");
-                return StatusCode(500, e.Message);
-
-
+                return StatusCode(500, GenericError);
             }
 
         }
@@ -382,7 +383,9 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
+                _logger.LogError(e, "User write operation failed");
 
+                // Unique-constraint hits are a meaningful business response, not an internal detail.
                 if (e.Message.Contains("email_UNIQUE"))
                 {
                     return StatusCode(500, "email already registered");
@@ -393,10 +396,7 @@ namespace api.Controllers.API
                     return StatusCode(500, "username already registered");
                 }
 
-                //return StatusCode(500, "Unspecified error");
-                return StatusCode(500, e.Message);
-
-
+                return StatusCode(500, GenericError);
             }
 
         }
@@ -424,8 +424,8 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
-
-                return StatusCode(500, e.Message);
+                _logger.LogError(e, "User read operation failed");
+                return StatusCode(500, GenericError);
             }
 
         }
@@ -455,8 +455,8 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
-
-                return StatusCode(500, e.Message);
+                _logger.LogError(e, "User read operation failed");
+                return StatusCode(500, GenericError);
             }
         }
 
@@ -471,8 +471,8 @@ namespace api.Controllers.API
             }
             catch (Exception e)
             {
-
-                return StatusCode(500, e.Message);
+                _logger.LogError(e, "User read operation failed");
+                return StatusCode(500, GenericError);
             }
         }
 
