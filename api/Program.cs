@@ -14,6 +14,11 @@ var secureKey = builder.Configuration["JWT:SecureKey"];
 if (string.IsNullOrEmpty(secureKey))
     throw new InvalidOperationException("JWT:SecureKey is missing in configuration.");
 
+var jwtIssuer = builder.Configuration["JWT:Issuer"];
+var jwtAudience = builder.Configuration["JWT:Audience"];
+if (string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience))
+    throw new InvalidOperationException("JWT:Issuer and JWT:Audience are missing in configuration.");
+
 bool webViewEnabled = bool.TryParse(builder.Configuration["WebView:Enabled"], out var enabled) && enabled;
 
 builder.Services
@@ -22,8 +27,10 @@ builder.Services
         var Key = Encoding.UTF8.GetBytes(secureKey);
         o.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = false,
-            ValidateAudience = false,
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
             IssuerSigningKey = new SymmetricSecurityKey(Key)
         };
     });

@@ -19,6 +19,8 @@ namespace api.Security
             // Create a token descriptor (represents a token, kind of a "template" for token)
             var tokenDescriptor = new SecurityTokenDescriptor
             {
+                Issuer = Config.jwtIssuer,
+                Audience = Config.jwtAudience,
                 Expires = DateTime.UtcNow.AddMinutes(expiration),
                 SigningCredentials = new SigningCredentials(
                     new SymmetricSecurityKey(tokenKey),
