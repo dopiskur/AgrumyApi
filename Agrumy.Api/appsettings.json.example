@@ -1,5 +1,10 @@
 {
-  "// TLS / HTTPS": "The app always calls UseHttpsRedirection, and UseHsts outside Development. Production MUST terminate TLS - a certificate on Kestrel (Kestrel:Certificates:Default) or TLS at the reverse proxy in front of it. Separately, the AgrumyDevice firmware repo must change 'http://' to 'https://' in DeviceController.cpp - that is tracked as its own task, not part of this config.",
+  "// TLS / HTTPS": "With Security:EnforceHttps=true (default) the app calls UseHttpsRedirection, plus UseHsts outside Development - production MUST then terminate TLS (a certificate on Kestrel via Kestrel:Certificates:Default, or TLS at the reverse proxy in front of it). Set Security:EnforceHttps=false to run over plain HTTP with no redirect/HSTS, e.g. while the AgrumyDevice firmware still uses 'http://' in DeviceController.cpp (that firmware change is a separate task).",
+  "// Security": "App-level security switches.",
+  "Security": {
+    "// EnforceHttps": "true (default) = redirect HTTP->HTTPS and send HSTS outside Development. false = leave the API reachable over plain HTTP.",
+    "EnforceHttps": true
+  },
 
   "// ConnectionStrings": "Database connection strings read via IConfiguration.GetConnectionString(...).",
   "ConnectionStrings": {

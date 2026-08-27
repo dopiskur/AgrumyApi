@@ -72,7 +72,12 @@ builder.Services.AddEndpointsApiExplorer();
 // Logging
 builder.Services.AddLogging();
 
-// HSTS (Strict-Transport-Security) - only applied outside Development (see pipeline below).
+// HTTPS enforcement is opt-out: Security:EnforceHttps=false lets the API run over plain HTTP
+// (e.g. while the device firmware is still on http://). Defaults to true.
+bool enforceHttps = !bool.TryParse(builder.Configuration["Security:EnforceHttps"], out var eh) || eh;
+
+// HSTS (Strict-Transport-Security) - only applied when enforcing HTTPS and outside Development
+// (see pipeline below).
 builder.Services.AddHsts(options =>
 {
     options.MaxAge = TimeSpan.FromDays(365);
@@ -125,13 +130,17 @@ app.UseSwagger();
 app.UseSwaggerUI();
 // END SWAGGER
 
-// Enforce HTTPS. UseHsts only outside Development so local HTTP dev without a cert is not
-// disrupted; UseHttpsRedirection is always on (a no-op in dev when no https port is configured).
-if (!app.Environment.IsDevelopment())
+// Enforce HTTPS unless disabled via Security:EnforceHttps=false. UseHsts only outside
+// Development so local HTTP dev without a cert is not disrupted; UseHttpsRedirection is a
+// no-op in dev when no https port is configured.
+if (enforceHttps)
 {
-    app.UseHsts();
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHsts();
+    }
+    app.UseHttpsRedirection();
 }
-app.UseHttpsRedirection();
 
 // Middleware order is important
 app.UseRouting();
