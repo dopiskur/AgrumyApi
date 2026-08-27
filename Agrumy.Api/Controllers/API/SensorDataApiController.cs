@@ -2,6 +2,7 @@ using api.Dal.Interface;
 using api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Net.Http.Headers;
 using System.Text.Json.Nodes;
 
@@ -43,6 +44,7 @@ namespace api.Controllers.API
 
         //[HttpPost("SensorData")]
         [HttpPost]
+        [EnableRateLimiting("device-data")]
         public async Task<ActionResult<string>> Post([FromBody] JsonArray jsonArray)
         {
             try

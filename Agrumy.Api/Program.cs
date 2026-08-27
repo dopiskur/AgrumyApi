@@ -37,20 +37,33 @@ builder.Services
 
 builder.Services.AddControllers();
 
-// Rate limiting: "login" policy - 5 attempts per minute per client IP
+// Rate limiting - all policies are fixed-window, partitioned by client IP, reject with 429.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddPolicy("login", httpContext =>
+
+    static RateLimitPartition<string> IpFixedWindow(HttpContext httpContext, int permitLimit) =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5,
+                PermitLimit = permitLimit,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-            }));
+            });
+
+    // Human interactive login/registration - strict, this is the credential-stuffing target.
+    options.AddPolicy("login", httpContext => IpFixedWindow(httpContext, 5));
+
+    // Device onboarding / auth / config poll. A device wakes ~every SleepSeconds (default 60s)
+    // and does ~1 Authenticate + ~1 Config per wake => ~2 req/min per device. 20/min/IP leaves
+    // headroom for ~10 devices behind one NAT/public IP plus retries.
+    options.AddPolicy("device-auth", httpContext => IpFixedWindow(httpContext, 20));
+
+    // Device telemetry push (SensorData POST). ~1 push/min per device; higher ceiling for many
+    // devices sharing one NAT and for catch-up bursts after a device was offline.
+    options.AddPolicy("device-data", httpContext => IpFixedWindow(httpContext, 60));
 });
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

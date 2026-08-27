@@ -4,6 +4,7 @@ using api.Models;
 using api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Net.Http.Headers;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -139,6 +140,7 @@ namespace api.Controllers.API
 
         // Device point
         [HttpPost("Config")]
+        [EnableRateLimiting("device-auth")]
         public async Task<ActionResult<DeviceConfig>> GetConfig([FromBody] Device value) // mozdca ovo isto ubacitiu header?
         {
             if (AuthenticationHeaderValue.TryParse(Request.Headers["apiId"], out var apiId) && AuthenticationHeaderValue.TryParse(Request.Headers.Authorization, out var authKey))
@@ -173,6 +175,7 @@ namespace api.Controllers.API
         // POST api/<DeviceController>
 
         [HttpPost("Register")]
+        [EnableRateLimiting("device-auth")]
         public async Task<ActionResult<DeviceConfig>> DeviceRegistration([FromBody] DeviceRegistration value)
         {
             try
@@ -273,6 +276,7 @@ namespace api.Controllers.API
 
         // Device point
         [HttpPost("Authenticate")] // Request authentication
+        [EnableRateLimiting("device-auth")]
         public async Task<ActionResult<DeviceAuthentication>> ReqAuth() // private su metode koje se koriste interno, ali i dalaje mora imat httpget
         {
             try
