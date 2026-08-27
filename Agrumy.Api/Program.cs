@@ -72,6 +72,13 @@ builder.Services.AddEndpointsApiExplorer();
 // Logging
 builder.Services.AddLogging();
 
+// HSTS (Strict-Transport-Security) - only applied outside Development (see pipeline below).
+builder.Services.AddHsts(options =>
+{
+    options.MaxAge = TimeSpan.FromDays(365);
+    options.IncludeSubDomains = true;
+});
+
 // dependency injection
 builder.Services.AddScoped<IRepository, SqlRepository>();
 builder.Services.AddScoped<ICache, CacheRepository>();
@@ -117,6 +124,14 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 // END SWAGGER
+
+// Enforce HTTPS. UseHsts only outside Development so local HTTP dev without a cert is not
+// disrupted; UseHttpsRedirection is always on (a no-op in dev when no https port is configured).
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+app.UseHttpsRedirection();
 
 // Middleware order is important
 app.UseRouting();

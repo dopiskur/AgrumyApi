@@ -1,4 +1,6 @@
 {
+  "// TLS / HTTPS": "The app always calls UseHttpsRedirection, and UseHsts outside Development. Production MUST terminate TLS - a certificate on Kestrel (Kestrel:Certificates:Default) or TLS at the reverse proxy in front of it. Separately, the AgrumyDevice firmware repo must change 'http://' to 'https://' in DeviceController.cpp - that is tracked as its own task, not part of this config.",
+
   "// ConnectionStrings": "Database connection strings read via IConfiguration.GetConnectionString(...).",
   "ConnectionStrings": {
     "// DefaultConnection": "MySQL/MariaDB ADO.NET connection string used by SqlRepository (MySql.Data.MySqlClient). Put the real credentials only in appsettings.json (git-ignored).",
