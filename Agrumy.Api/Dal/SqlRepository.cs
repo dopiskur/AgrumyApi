@@ -1,8 +1,10 @@
 using api.Models;
 using MySql.Data.MySqlClient;
+using System.Data;
 using System.Text.Json.Nodes;
 using api.Dal.Interface;
 using api.Schema;
+using Dapper;
 
 
 namespace api.Dal
@@ -215,62 +217,23 @@ namespace api.Dal
         // All users
         public async Task<IList<User>> UsersGetAsync(int? tenantID)
         {
-            IList<User> list = new List<User>();
-
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "UsersGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-            cmd.Parameters.AddWithValue(nameof(User.TenantID), tenantID);
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            while (await dr.ReadAsync())
-            {
-                list.Add(UserRead(dr));
-            }
-
-            return list;
+            var rows = await connection.QueryAsync<User>(
+                "UsersGet",
+                new { TenantID = tenantID },
+                commandType: CommandType.StoredProcedure);
+            return rows.AsList();
         }
-        private User UserRead(MySqlDataReader dr) => new User
-        {
-            IDUser = int.TryParse(dr[nameof(User.IDUser)].ToString(), out nullIntVal) ? nullIntVal : null,
-            TenantID = int.TryParse(dr[nameof(User.TenantID)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Email = dr[nameof(User.Email)].ToString(),
-            Username = dr[nameof(User.Username)].ToString(),
-            DevicePin = int.TryParse(dr[nameof(User.DevicePin)].ToString(), out nullIntVal) ? nullIntVal : null,
-            FirstName = dr[nameof(User.FirstName)].ToString(),
-            LastName = dr[nameof(User.LastName)].ToString(),
-            Phone = dr[nameof(User.Phone)].ToString(),
-            UserGroupID = int.TryParse(dr[nameof(User.UserGroupID)].ToString(), out nullIntVal) ? nullIntVal : null,
-            UserRoleID = int.TryParse(dr[nameof(User.UserRoleID)].ToString(), out nullIntVal) ? nullIntVal : null,
-            GroupName = dr[nameof(User.GroupName)].ToString(),
-            Enabled = bool.TryParse(dr[nameof(User.Enabled)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-
-            DateCreated = (DateTime)dr[nameof(User.DateCreated)],
-            DateModified = (DateTime)dr[nameof(User.DateModified)]
-        };
         // Single user
         public async Task<User> UserGetAsync(int? idUser, string? email, string? username)
         {
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "UserGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+            var user = await connection.QuerySingleOrDefaultAsync<User>(
+                "UserGet",
+                new { IDUser = idUser, Email = email, Username = username },
+                commandType: CommandType.StoredProcedure);
 
-            cmd.Parameters.AddWithValue(nameof(User.IDUser), idUser);
-            cmd.Parameters.AddWithValue(nameof(User.Email), email);
-            cmd.Parameters.AddWithValue(nameof(User.Username), username);
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            if (await dr.ReadAsync())
-            {
-                return UserRead(dr);
-            }
-
-            throw new ArgumentException("Wrong id, no such person");
-
+            return user ?? throw new ArgumentException("Wrong id, no such person");
         }
 
         public async Task UserUpdateAsync(User user)
@@ -345,28 +308,11 @@ namespace api.Dal
 
         public async Task<IList<UserRole>> UserRoleGetAsync()
         {
-            IList<UserRole> userRoles = new List<UserRole>();
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "UserRoleGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            while (await dr.ReadAsync())
-            {
-                userRoles.Add(UserRoleRead(dr));
-            }
-
-            return userRoles;
-
+            var rows = await connection.QueryAsync<UserRole>(
+                "UserRoleGet", commandType: CommandType.StoredProcedure);
+            return rows.AsList();
         }
-        private UserRole UserRoleRead(MySqlDataReader dr) => new UserRole
-        {
-            IDUserRole = int.TryParse(dr[nameof(UserRole.IDUserRole)].ToString(), out nullIntVal) ? nullIntVal : null,
-            RoleName = dr[nameof(UserRole.RoleName)].ToString(),
-            RoleScopeID = int.TryParse(dr[nameof(UserRole.RoleScopeID)].ToString(), out nullIntVal) ? nullIntVal : null
-        };
 
 
 
