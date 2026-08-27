@@ -1,4 +1,6 @@
-﻿namespace api
+﻿using Microsoft.Extensions.Configuration;
+
+namespace api
 {
     public class Config
     {

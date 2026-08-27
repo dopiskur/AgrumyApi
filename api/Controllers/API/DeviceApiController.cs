@@ -283,7 +283,7 @@ namespace api.Controllers.API
                     
 
 
-                    if (AuthenticationProvider.VerifyDevice(apiId, apiKey))
+                    if (DeviceAuthenticationProvider.VerifyDevice(apiId, apiKey))
                     {
                         Device device = RepoFactory.GetRepo().DeviceGet(0, null, apiId.ToString(), null); // Query for configVerion
                         DeviceAuthentication? deviceAuthentication = new DeviceAuthentication();

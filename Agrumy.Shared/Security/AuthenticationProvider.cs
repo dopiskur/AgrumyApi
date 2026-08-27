@@ -1,7 +1,4 @@
-﻿using api.Dal.Interface;
-using api.Models;
-using System.Net.Http.Headers;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 
 namespace api.Security
@@ -59,32 +56,11 @@ namespace api.Security
             }
 
             else { return false; }
-            
+
         }
 
-
-        // DEVICE
-        public static bool VerifyDevice(AuthenticationHeaderValue apiId, AuthenticationHeaderValue apikey)
-        {
-
-            Device device = RepoFactory.GetRepo().DeviceGet(0,null,apiId.ToString(),null); //popravi tenant
-            if (device == null)
-            {
-                // upisi u log da device ne postoji
-                return false;
-            }
-
-            if (apikey.ToString() == device.ApiKey)
-            {
-                return true;
-            }
-
-            // Cleaning MemoryCache manually if item exists
-            // RepoFactory.GetCache().RemoveItem(apiId.ToString());
-
-            return false;
-        }
-
-
+        // NOTE: device apiId/apiKey verification lives in api.Security.DeviceAuthenticationProvider
+        // (Agrumy.Api) because it needs the data-access layer, which this shared assembly must not
+        // reference.
     }
 }
