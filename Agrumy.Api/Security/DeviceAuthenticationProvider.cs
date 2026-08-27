@@ -10,10 +10,10 @@ namespace api.Security
     /// </summary>
     public class DeviceAuthenticationProvider
     {
-        public static bool VerifyDevice(AuthenticationHeaderValue apiId, AuthenticationHeaderValue apikey)
+        public static async Task<bool> VerifyDeviceAsync(AuthenticationHeaderValue apiId, AuthenticationHeaderValue apikey)
         {
 
-            Device device = RepoFactory.GetRepo().DeviceGet(0, null, apiId.ToString(), null); //popravi tenant
+            Device device = await RepoFactory.GetRepo().DeviceGetAsync(0, null, apiId.ToString(), null); //popravi tenant
             if (device == null)
             {
                 // upisi u log da device ne postoji

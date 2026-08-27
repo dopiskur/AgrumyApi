@@ -1,4 +1,4 @@
-﻿using api.Dal.Interface;
+using api.Dal.Interface;
 using api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -24,12 +24,12 @@ namespace api.Controllers.API
         //[HttpGet("SensorData")]
         [HttpGet]
         [Authorize]
-        public ActionResult<SensorData> Get(int? deviceID, int? timeRange = 60, int? timeMDMY = 0, int? buildReport=0) // 0 minute, 1 days, 2 months, 3 years
+        public async Task<ActionResult<SensorData>> Get(int? deviceID, int? timeRange = 60, int? timeMDMY = 0, int? buildReport=0) // 0 minute, 1 days, 2 months, 3 years
         {
 
             try
             {
-                string sensorData = RepoFactory.GetRepo().SensorDataGet(0, deviceID, timeRange, timeMDMY, buildReport);
+                string sensorData = await RepoFactory.GetRepo().SensorDataGetAsync(0, deviceID, timeRange, timeMDMY, buildReport);
                 return Ok(sensorData);
             }
             catch (Exception e)
@@ -43,7 +43,7 @@ namespace api.Controllers.API
 
         //[HttpPost("SensorData")]
         [HttpPost]
-        public ActionResult<string> Post([FromBody] JsonArray jsonArray)
+        public async Task<ActionResult<string>> Post([FromBody] JsonArray jsonArray)
         {
             try
             {
@@ -59,7 +59,7 @@ namespace api.Controllers.API
 
                     if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-                    RepoFactory.GetRepo().SensorDataPush(jsonArray);
+                    await RepoFactory.GetRepo().SensorDataPushAsync(jsonArray);
 
                     DeviceCache? deviceCache = RepoFactory.GetCache().GetDeviceCache(apiId.ToString());
                     return Ok(deviceCache.ConfigVersion);
@@ -80,12 +80,12 @@ namespace api.Controllers.API
         // mozda cu koristit post za ovo, jer ne mogu dobit u body resposne koliko je redova obrisano, delete to ne podrzava
         [HttpDelete]
         [Authorize(Roles = "admin")]
-        public ActionResult Delete(int deviceID, int tenantID, int timeMDMY = 0, int timeRange = 0)
+        public async Task<ActionResult> Delete(int deviceID, int tenantID, int timeMDMY = 0, int timeRange = 0)
         {
 
             try
             {
-                RepoFactory.GetRepo().SensorDataDelete(deviceID, tenantID, timeMDMY, timeRange);
+                await RepoFactory.GetRepo().SensorDataDeleteAsync(deviceID, tenantID, timeMDMY, timeRange);
 
                 return Ok();
             }
@@ -101,10 +101,10 @@ namespace api.Controllers.API
 
         [HttpGet("Report")] // Request authentication
         [Authorize]
-        public ActionResult<IEnumerable<SensorData>> ReportGet(int? getData, int? idDevice, int? iDSensorDataReport)
+        public async Task<ActionResult<IEnumerable<SensorData>>> ReportGet(int? getData, int? idDevice, int? iDSensorDataReport)
         {
 
-            IEnumerable<SensorDataReport>? sensorDataResult = RepoFactory.GetRepo().SensorDataReportGet(getData, idDevice, iDSensorDataReport);
+            IEnumerable<SensorDataReport>? sensorDataResult = await RepoFactory.GetRepo().SensorDataReportGetAsync(getData, idDevice, iDSensorDataReport);
 
 
             return Ok(sensorDataResult);

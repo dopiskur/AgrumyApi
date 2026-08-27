@@ -1,6 +1,5 @@
-﻿using api.Models;
+using api.Models;
 using MySql.Data.MySqlClient;
-using System.Reflection;
 using System.Text.Json.Nodes;
 using api.Dal.Interface;
 using api.Schema;
@@ -95,18 +94,18 @@ namespace api.Dal
 
         // AUTHENTICATION
 
-        public ServerConfig ServerConfigGet(int idServerConfig = 1)
+        public async Task<ServerConfig> ServerConfigGetAsync(int idServerConfig = 1)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "ServerConfigGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(ServerConfig.IDServerConfig), idServerConfig);
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            if (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            if (await dr.ReadAsync())
             {
                 return ServerConfigRead(dr);
             }
@@ -123,19 +122,19 @@ namespace api.Dal
                 PortHTTPS = 443
             };
 
-            ServerConfigAdd(generatedConfig);
+            await ServerConfigAddAsync(generatedConfig);
             return generatedConfig;
 
             //throw new ArgumentException("Wrong id, no such server config");
         }
 
-        private void ServerConfigAdd(ServerConfig serverConfig)
+        private async Task ServerConfigAddAsync(ServerConfig serverConfig)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
 
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "ServerConfigAdd";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue(nameof(ServerConfig.IDServerConfig), serverConfig.IDServerConfig);
             cmd.Parameters.AddWithValue(nameof(ServerConfig.ServerConfigName), serverConfig.ServerConfigName);
@@ -144,23 +143,23 @@ namespace api.Dal
             cmd.Parameters.AddWithValue(nameof(ServerConfig.PortHTTPS), serverConfig.PortHTTPS);
 
 
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
         }
 
-        private void ServerConfigUpdate(ServerConfig serverConfig)
+        private async Task ServerConfigUpdateAsync(ServerConfig serverConfig)
         {
             using var connection = new MySqlConnection(sqlcon);
 
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "ServerConfigUpdate";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue(nameof(ServerConfig.ServerConfigName), serverConfig.ServerConfigName);
             cmd.Parameters.AddWithValue(nameof(ServerConfig.PortHTTP), serverConfig.PortHTTP);
             cmd.Parameters.AddWithValue(nameof(ServerConfig.PortHTTPS), serverConfig.PortHTTPS);
 
             cmd.Parameters.AddWithValue(nameof(ServerConfig.IDServerConfig), serverConfig.IDServerConfig);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
 
             // CAN NOT CHANGE ConfigKey, that would distrupt passwords!
         }
@@ -176,15 +175,14 @@ namespace api.Dal
 
 
         // USER
-        public void UserAdd(User user, UserSecret userSecret)
+        public async Task UserAddAsync(User user, UserSecret userSecret)
         {
 
-            //await connection.OpenAsync(); // ovo treba natjerati da radi!
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
 
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "UserAdd";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue(nameof(User.TenantID), user.TenantID);
             cmd.Parameters.AddWithValue(nameof(User.Email), user.Email);
@@ -198,39 +196,39 @@ namespace api.Dal
             cmd.Parameters.AddWithValue(nameof(User.UserGroupID), user.UserGroupID);
             cmd.Parameters.AddWithValue(nameof(User.Enabled), user.Enabled);
 
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
 
         }
-        public bool UserDelete(int? idUser)
+        public async Task<bool> UserDeleteAsync(int? idUser)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "UserDelete";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(User.IDUser), idUser);
 
-            long rows = (long)cmd.ExecuteScalar();
+            long rows = (long)(await cmd.ExecuteScalarAsync())!;
             //using MySqlDataReader dr = cmd.ExecuteReader();
 
             if (rows > 0) { return true; }
             return false;
         }
         // All users
-        public IList<User> UsersGet(int? tenantID)
+        public async Task<IList<User>> UsersGetAsync(int? tenantID)
         {
             IList<User> list = new List<User>();
 
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "UsersGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue(nameof(User.TenantID), tenantID);
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            while (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            while (await dr.ReadAsync())
             {
                 list.Add(UserRead(dr));
             }
@@ -256,20 +254,20 @@ namespace api.Dal
             DateModified = (DateTime)dr[nameof(User.DateModified)]
         };
         // Single user
-        public User UserGet(int? idUser, string? email, string? username)
+        public async Task<User> UserGetAsync(int? idUser, string? email, string? username)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "UserGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(User.IDUser), idUser);
             cmd.Parameters.AddWithValue(nameof(User.Email), email);
             cmd.Parameters.AddWithValue(nameof(User.Username), username);
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            if (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            if (await dr.ReadAsync())
             {
                 return UserRead(dr);
             }
@@ -278,13 +276,13 @@ namespace api.Dal
 
         }
 
-        public void UserUpdate(User user)
+        public async Task UserUpdateAsync(User user)
         {
             using var connection = new MySqlConnection(sqlcon);
 
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "UserUpdate";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue(nameof(User.IDUser), user.IDUser);
             cmd.Parameters.AddWithValue(nameof(User.TenantID), user.TenantID);
@@ -297,24 +295,24 @@ namespace api.Dal
             cmd.Parameters.AddWithValue(nameof(User.UserGroupID), user.UserGroupID);
             cmd.Parameters.AddWithValue(nameof(User.Enabled), user.Enabled);
 
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
 
         }
 
-        public bool UserSetPassword(string? email, UserSecret userSecret)
+        public async Task<bool> UserSetPasswordAsync(string? email, UserSecret userSecret)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
 
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "UserSetPassword";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue(nameof(User.Email), email);
             cmd.Parameters.AddWithValue(nameof(UserSecret.PwdHash), userSecret.PwdHash);
             cmd.Parameters.AddWithValue(nameof(UserSecret.PwdSalt), userSecret.PwdSalt);
 
 
-            long rows = (long)cmd.ExecuteScalar();
+            long rows = (long)(await cmd.ExecuteScalarAsync())!;
             //using MySqlDataReader dr = cmd.ExecuteReader();
 
             if (rows > 0) { return true; }
@@ -323,20 +321,20 @@ namespace api.Dal
 
 
         // UDRI OVDJE ZA PASSWORD
-        public UserSecret UserSecretGet(int? idUser, string? email, string? username)
+        public async Task<UserSecret> UserSecretGetAsync(int? idUser, string? email, string? username)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "UserSecretGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(User.IDUser), idUser);
             cmd.Parameters.AddWithValue(nameof(User.Email), email);
             cmd.Parameters.AddWithValue(nameof(User.Username), username);
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            if (dr.HasRows && dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            if (dr.HasRows && await dr.ReadAsync())
             {
                 UserSecret userSecret = new UserSecret();
                 userSecret.PwdHash = dr[nameof(UserSecret.PwdHash)].ToString();
@@ -350,17 +348,17 @@ namespace api.Dal
         }
 
 
-        public IList<UserRole> UserRoleGet()
+        public async Task<IList<UserRole>> UserRoleGetAsync()
         {
             IList<UserRole> userRoles = new List<UserRole>();
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "UserRoleGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            while (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            while (await dr.ReadAsync())
             {
                 userRoles.Add(UserRoleRead(dr));
             }
@@ -381,14 +379,13 @@ namespace api.Dal
 
 
         // Device
-        public void DeviceAdd(Device device)
+        public async Task DeviceAddAsync(Device device)
         {
-            //await connection.OpenAsync(); // ovo treba natjerati da radi!
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
 
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DeviceAdd";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(Device.TenantID), device.TenantID);
@@ -414,46 +411,46 @@ namespace api.Dal
             cmd.Parameters.AddWithValue(nameof(Device.Debug), device.Debug);
             cmd.Parameters.AddWithValue(nameof(Device.Enabled), device.Enabled);
 
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
         }
-        public void DeviceDelete(int? idDevice)
+        public async Task DeviceDeleteAsync(int? idDevice)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DeviceDelete";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(Device.IDDevice), idDevice);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
 
         }
-        public IList<Device> DevicesGet(int? tenantID)
+        public async Task<IList<Device>> DevicesGetAsync(int? tenantID)
         {
             IList<Device> list = new List<Device>();
 
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DevicesGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue(nameof(Device.TenantID), tenantID);
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            while (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            while (await dr.ReadAsync())
             {
                 list.Add(DeviceRead(dr));
             }
 
             return list;
         }
-        
-        public Device DeviceGet(int? tenantID, int? idDevice, string? apiId, string? macAddress)
+
+        public async Task<Device> DeviceGetAsync(int? tenantID, int? idDevice, string? apiId, string? macAddress)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DeviceGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(Device.TenantID), tenantID);
@@ -461,8 +458,8 @@ namespace api.Dal
             cmd.Parameters.AddWithValue(nameof(Device.ApiId), apiId);
             cmd.Parameters.AddWithValue(nameof(Device.MacAddress), macAddress);
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            if (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            if (await dr.ReadAsync())
             {
                 return DeviceRead(dr);
             }
@@ -515,15 +512,15 @@ namespace api.Dal
         };
 
         // DEVICE UPDATE
-        public void DeviceUpdate(Device? device)
+        public async Task DeviceUpdateAsync(Device? device)
         {
 
 
             using var connection = new MySqlConnection(sqlcon);
 
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DeviceUpdate";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue(nameof(Device.IDDevice), device.IDDevice);
             cmd.Parameters.AddWithValue(nameof(Device.TenantID), device.TenantID);
@@ -536,7 +533,7 @@ namespace api.Dal
             cmd.Parameters.AddWithValue(nameof(Device.ApiId), device.ApiId);
             cmd.Parameters.AddWithValue(nameof(Device.ApiKey), device.ApiKey);
 
-            cmd.Parameters.AddWithValue(nameof(Device.ServicePoint), device.ServicePoint);           
+            cmd.Parameters.AddWithValue(nameof(Device.ServicePoint), device.ServicePoint);
             cmd.Parameters.AddWithValue(nameof(Device.ServicePublicKey), device.ServicePublicKey);
 
             cmd.Parameters.AddWithValue(nameof(Device.SleepSeconds), device.SleepSeconds);
@@ -550,19 +547,19 @@ namespace api.Dal
             cmd.Parameters.AddWithValue(nameof(Device.Debug), device.Debug);
             cmd.Parameters.AddWithValue(nameof(Device.ConfigVersion), device.ConfigVersion);
 
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
 
         }
 
-        public void DeviceConfigControllerUpdate(int? idDevice, DeviceConfigController? deviceConfigController)
+        public async Task DeviceConfigControllerUpdateAsync(int? idDevice, DeviceConfigController? deviceConfigController)
         {
 
 
             using var connection = new MySqlConnection(sqlcon);
 
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DeviceConfigControllerUpdate";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue(nameof(Device.IDDevice), idDevice);
             cmd.Parameters.AddWithValue(nameof(DeviceConfigController.IDDeviceConfigController), deviceConfigController.IDDeviceConfigController);
@@ -603,19 +600,19 @@ namespace api.Dal
             cmd.Parameters.AddWithValue(nameof(DeviceConfigController.Relay8), deviceConfigController.Relay8);
 
 
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
 
         }
 
-        public void DeviceConfigSensorUpdate(int? idDevice, DeviceConfigSensor? deviceConfigSensor)
+        public async Task DeviceConfigSensorUpdateAsync(int? idDevice, DeviceConfigSensor? deviceConfigSensor)
         {
 
 
             using var connection = new MySqlConnection(sqlcon);
 
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DeviceConfigSensorUpdate";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(Device.IDDevice), idDevice);
@@ -636,22 +633,22 @@ namespace api.Dal
             cmd.Parameters.AddWithValue(nameof(DeviceConfigSensor.SensorWind), deviceConfigSensor.SensorWind);
 
 
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
 
         }
 
-        public bool DeviceCheckMacAddress(int? tenantID, string? macAddress)
+        public async Task<bool> DeviceCheckMacAddressAsync(int? tenantID, string? macAddress)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DeviceCheckMacAddress";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(Device.TenantID), tenantID);
             cmd.Parameters.AddWithValue(nameof(Device.MacAddress), macAddress);
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
             if (dr.HasRows)
             {
                 return true;
@@ -665,18 +662,18 @@ namespace api.Dal
             throw new ArgumentException("Wrong id, no such device");
         }
 
-        public DeviceConfigSensor? DeviceConfigSensorGet(int? deviceConfigSensorID)
+        public async Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DeviceConfigSensorGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(Device.DeviceConfigSensorID), deviceConfigSensorID);
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            if (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            if (await dr.ReadAsync())
             {
                 return DeviceConfigSensorRead(dr);
             }
@@ -707,18 +704,18 @@ namespace api.Dal
 
         };
 
-        public DeviceConfigController? DeviceConfigControllerGet(int? deviceConfigControllerID)
+        public async Task<DeviceConfigController?> DeviceConfigControllerGetAsync(int? deviceConfigControllerID)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DeviceConfigControllerGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(Device.DeviceConfigControllerID), deviceConfigControllerID);
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            if (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            if (await dr.ReadAsync())
             {
                 return DeviceConfigControllerRead(dr);
             }
@@ -770,20 +767,20 @@ namespace api.Dal
 
         };
 
-        
+
 
         // DEVICE TYPE LIST
-        public IList<DeviceType> DeviceTypeGet()
+        public async Task<IList<DeviceType>> DeviceTypeGetAsync()
         {
             IList<DeviceType> deviceType = new List<DeviceType>();
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DeviceTypeGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            while (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            while (await dr.ReadAsync())
             {
                 deviceType.Add(DeviceTypeRead(dr));
             }
@@ -799,17 +796,17 @@ namespace api.Dal
             ControllerEnabled = bool.TryParse(dr[nameof(DeviceType.ControllerEnabled)].ToString(), out nullBoolVal) ? nullBoolVal : null
         };
 
-        public IList<DeviceTypeService> DeviceTypeServiceGet()
+        public async Task<IList<DeviceTypeService>> DeviceTypeServiceGetAsync()
         {
             IList<DeviceTypeService> deviceTypeService = new List<DeviceTypeService>();
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DeviceTypeServiceGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            while (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            while (await dr.ReadAsync())
             {
                 deviceTypeService.Add(DeviceTypeServiceRead(dr));
             }
@@ -826,17 +823,17 @@ namespace api.Dal
 
 
         // TYPE RELAY
-        public IList<DeviceTypeRelay> DeviceTypeRelayGet()
+        public async Task<IList<DeviceTypeRelay>> DeviceTypeRelayGetAsync()
         {
             IList<DeviceTypeRelay> deviceTypeRelay = new List<DeviceTypeRelay>();
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DeviceTypeRelayGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            while (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            while (await dr.ReadAsync())
             {
                 deviceTypeRelay.Add(DeviceTypeRelayRead(dr));
             }
@@ -852,17 +849,17 @@ namespace api.Dal
 
 
         // TYPE SENSOR
-        public IList<DeviceTypeSensor> DeviceTypeSensorGet()
+        public async Task<IList<DeviceTypeSensor>> DeviceTypeSensorGetAsync()
         {
             IList<DeviceTypeSensor> deviceTypeSensor = new List<DeviceTypeSensor>();
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "DeviceTypeSensorGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            while (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            while (await dr.ReadAsync())
             {
                 deviceTypeSensor.Add(DeviceTypeSensorRead(dr));
             }
@@ -897,20 +894,19 @@ namespace api.Dal
 
         // SENSOR DATA START
         #region SensorData
-        public void SensorDataPush(JsonArray jsonArray) // SENSOR DATA START
+        public async Task SensorDataPushAsync(JsonArray jsonArray) // SENSOR DATA START
         {
-            //await connection.OpenAsync(); // ovo treba natjerati da radi!
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
 
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "SensorDataPush";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue("jsonData", jsonArray.ToString());
 
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
         }
-        public string SensorDataGet(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY, int? buildReport)
+        public async Task<string> SensorDataGetAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY, int? buildReport)
         {
 
             // IList<SensorData> sensorData = new List<SensorData>();
@@ -918,9 +914,9 @@ namespace api.Dal
 
 
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "SensorDataGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue("deviceID", deviceID);
             cmd.Parameters.AddWithValue("tenantID", tenantID);
@@ -928,9 +924,9 @@ namespace api.Dal
             cmd.Parameters.AddWithValue("timeMDMY", timeMDMY);
             cmd.Parameters.AddWithValue("buildReport", buildReport);
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
 
-            if (dr.Read())
+            if (await dr.ReadAsync())
             {
 
                 sensorDataResult = dr["sensorDataResult"].ToString();
@@ -942,14 +938,14 @@ namespace api.Dal
             return sensorDataResult="";
         }
 
-        public IList<SensorDataReport> SensorDataReportGet(int? getData, int? deviceID, int? reportID)
+        public async Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? getData, int? deviceID, int? reportID)
         {
             IList<SensorDataReport> sensorDataReport = new List<SensorDataReport>();
 
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "SensorDataReportGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue("getData", getData);
             cmd.Parameters.AddWithValue("deviceID", deviceID);
@@ -957,18 +953,18 @@ namespace api.Dal
 
 
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
 
             if (getData==0)
             {
-                while (dr.Read())
+                while (await dr.ReadAsync())
                 {
                     sensorDataReport.Add(SensorDataReportsRead(dr));
                 }
             }
             else
             {
-                while (dr.Read())
+                while (await dr.ReadAsync())
                 {
                     sensorDataReport.Add(SensorDataReportRead(dr));
                 }
@@ -998,13 +994,13 @@ namespace api.Dal
 
 
 
-        public void SensorDataDelete(int? tenantID, int? deviceID, int? timeMDMY, int? timeRange)
+        public async Task SensorDataDeleteAsync(int? tenantID, int? deviceID, int? timeMDMY, int? timeRange)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
 
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "SensorDataDelete";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue("deviceID", deviceID);
             cmd.Parameters.AddWithValue("tenantID", tenantID);
@@ -1012,24 +1008,24 @@ namespace api.Dal
             cmd.Parameters.AddWithValue("timeRange", timeRange);
 
 
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
         }
         #endregion
         // END SENSOR
 
 
         // TENANT
-        public bool TenantGet(string tenantName)
+        public async Task<bool> TenantGetAsync(string tenantName)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "TenantGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(Tenant.TenantName), tenantName);
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
             if (dr.HasRows)
             {
                 return true;
@@ -1043,21 +1039,20 @@ namespace api.Dal
             throw new ArgumentException("Wrong id, no such person");
 
         }
-        public int TenantAdd(string tenantName)
+        public async Task<int> TenantAddAsync(string tenantName)
         {
-            //await connection.OpenAsync(); // ovo treba natjerati da radi!
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
 
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "TenantAdd";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue(nameof(Tenant.TenantName), tenantName);
 
-            return Convert.ToInt32(cmd.ExecuteScalar()); // retreive single value from stored procedure
+            return Convert.ToInt32(await cmd.ExecuteScalarAsync()); // retreive single value from stored procedure
             /*using MySqlDataReader dr = cmd.ExecuteReader();
 
-            
+
             if (dr.HasRows)
             {
                 return dr.GetInt32(0); //0 is row index
@@ -1073,17 +1068,17 @@ namespace api.Dal
         // END TENANT
 
         #region Group
-        public IList<UserGroup> UserGroupsGet()
+        public async Task<IList<UserGroup>> UserGroupsGetAsync()
         {
             IList<UserGroup> deviceTypeRelay = new List<UserGroup>();
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "UserGroupsGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            while (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            while (await dr.ReadAsync())
             {
                 deviceTypeRelay.Add(UserGroupRead(dr));
             }
@@ -1092,18 +1087,18 @@ namespace api.Dal
         }
 
 
-        public UserGroup UserGroupGet(int? idUserGroup)
+        public async Task<UserGroup> UserGroupGetAsync(int? idUserGroup)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "UserGroupGet";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(UserGroup.IDUserGroup), idUserGroup);
 
-            using MySqlDataReader dr = cmd.ExecuteReader();
-            if (dr.Read())
+            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
+            if (await dr.ReadAsync())
             {
                 return UserGroupRead(dr);
             }
@@ -1122,32 +1117,31 @@ namespace api.Dal
             RoleName = dr[nameof(UserGroup.RoleName)].ToString(),
         };
 
-        public void UserGroupDelete(int? idUserGroup)
+        public async Task UserGroupDeleteAsync(int? idUserGroup)
         {
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "UserGroupDelete";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(UserGroup.IDUserGroup), idUserGroup);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
         }
 
-        public void UserGroupAdd(UserGroup userGroup)
+        public async Task UserGroupAddAsync(UserGroup userGroup)
         {
-            //await connection.OpenAsync(); // ovo treba natjerati da radi!
             using var connection = new MySqlConnection(sqlcon);
-            connection.Open();
+            await connection.OpenAsync();
             using MySqlCommand cmd = connection.CreateCommand();
 
-            cmd.CommandText = MethodBase.GetCurrentMethod()?.Name;
+            cmd.CommandText = "UserGroupAdd";
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(UserGroup.GroupName), userGroup.GroupName);
             cmd.Parameters.AddWithValue(nameof(UserGroup.UserRoleID), userGroup.UserRoleID);
 
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
         }
 
 

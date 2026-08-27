@@ -1,4 +1,4 @@
-﻿using api.Dal;
+using api.Dal;
 using api.Dal.Interface;
 using api.Models;
 using api.Security;
@@ -36,7 +36,7 @@ namespace api.Controllers.API
         // User registration
         [HttpPost("Register")]
         [EnableRateLimiting("login")]
-        public ActionResult<UserRegistration> UserRegistration([FromBody] UserRegistration value)
+        public async Task<ActionResult<UserRegistration>> UserRegistration([FromBody] UserRegistration value)
         {
             try
             {
@@ -60,15 +60,15 @@ namespace api.Controllers.API
 
 
                 // check tenant name
-                if (TENANT_ENABLED == true && !RepoFactory.GetRepo().TenantGet(value.TenantName))
+                if (TENANT_ENABLED == true && !await RepoFactory.GetRepo().TenantGetAsync(value.TenantName))
                 {
-                    user.TenantID = RepoFactory.GetRepo().TenantAdd(value.TenantName);
+                    user.TenantID = await RepoFactory.GetRepo().TenantAddAsync(value.TenantName);
                     user.UserGroupID = 0; // set as admin on new tenant
                     user.Enabled = true; // set as enabled user
                 }
 
 
-                RepoFactory.GetRepo().UserAdd(user, userSecret);
+                await RepoFactory.GetRepo().UserAddAsync(user, userSecret);
 
                 //return Ok("User created successfully: " + user.Email);
                 return Ok(user);
@@ -97,7 +97,7 @@ namespace api.Controllers.API
         // User login
         [HttpPost("Login")]
         [EnableRateLimiting("login")]
-        public ActionResult<UserLogin> UserLogin([FromBody] UserLogin value)
+        public async Task<ActionResult<UserLogin>> UserLogin([FromBody] UserLogin value)
         {
             //AuthProvider.VerifyPassword(value.Email,value.Password);
 
@@ -110,19 +110,19 @@ namespace api.Controllers.API
 
                 if (FieldValidator.IsValidEmail(value.Login))
                 {
-                    user = RepoFactory.GetRepo().UserGet(null, value.Login, null);
-                    userSecret = RepoFactory.GetRepo().UserSecretGet(null, value.Login, null);
+                    user = await RepoFactory.GetRepo().UserGetAsync(null, value.Login, null);
+                    userSecret = await RepoFactory.GetRepo().UserSecretGetAsync(null, value.Login, null);
                 }
                 else
                 {
-                    user = RepoFactory.GetRepo().UserGet(null, null, value.Login);
-                    userSecret = RepoFactory.GetRepo().UserSecretGet(null, null, value.Login);
+                    user = await RepoFactory.GetRepo().UserGetAsync(null, null, value.Login);
+                    userSecret = await RepoFactory.GetRepo().UserSecretGetAsync(null, null, value.Login);
                 }
 
                 if (AuthenticationProvider.VerifyHash(userSecret.PwdHash, userSecret.PwdSalt, value.Password))
                 {
 
-                    IList<UserRole> roles = RepoFactory.GetRepo().UserRoleGet();
+                    IList<UserRole> roles = await RepoFactory.GetRepo().UserRoleGetAsync();
                     string roleName = roles.First(m => m.IDUserRole == user.UserRoleID).RoleName;
 
                     var serializedToken = JwtTokenProvider.CreateToken(secureKey, 120, user.Email, roleName, user.TenantID.ToString());
@@ -150,7 +150,7 @@ namespace api.Controllers.API
 
         // Change password
         [HttpPost("ChangePassword")]
-        public ActionResult<UserSetPassword> UserSetPassword([FromBody] UserSetPassword value)
+        public async Task<ActionResult<UserSetPassword>> UserSetPassword([FromBody] UserSetPassword value)
         {
 
             try
@@ -167,13 +167,13 @@ namespace api.Controllers.API
 
                 if (FieldValidator.IsValidEmail(value.Login))
                 {
-                    user = RepoFactory.GetRepo().UserGet(null, value.Login, null);
-                    userSecret = RepoFactory.GetRepo().UserSecretGet(null, value.Login, null);
+                    user = await RepoFactory.GetRepo().UserGetAsync(null, value.Login, null);
+                    userSecret = await RepoFactory.GetRepo().UserSecretGetAsync(null, value.Login, null);
                 }
                 else
                 {
-                    user = RepoFactory.GetRepo().UserGet(null, null, value.Login);
-                    userSecret = RepoFactory.GetRepo().UserSecretGet(null, null, value.Login);
+                    user = await RepoFactory.GetRepo().UserGetAsync(null, null, value.Login);
+                    userSecret = await RepoFactory.GetRepo().UserSecretGetAsync(null, null, value.Login);
                 }
 
                 if (AuthenticationProvider.VerifyHash(userSecret.PwdHash, userSecret.PwdSalt, value.OldPassword))
@@ -181,7 +181,7 @@ namespace api.Controllers.API
                     userSecret.PwdSalt = AuthenticationProvider.GetSalt();
                     userSecret.PwdHash = AuthenticationProvider.GetHash(value.NewPassword, userSecret.PwdSalt);
 
-                    if (RepoFactory.GetRepo().UserSetPassword(user.Email, userSecret))
+                    if (await RepoFactory.GetRepo().UserSetPasswordAsync(user.Email, userSecret))
                     {
                         return Ok("Password changed successfully for: " + user.Email);
                     }
@@ -208,7 +208,7 @@ namespace api.Controllers.API
         [HttpGet("All")]
         //[Authorize(Roles = "admin")]
         [Authorize(Roles = "admin")]
-        public ActionResult<IList<User>> UsersGet()
+        public async Task<ActionResult<IList<User>>> UsersGet()
         {
 
             try
@@ -217,7 +217,7 @@ namespace api.Controllers.API
                 // int tenantID = int.Parse(identity.FindFirst("TenantID").Value.ToString());
 
                 IList<User> users = new List<User>();
-                users = RepoFactory.GetRepo().UsersGet(DEFAULT_TENANTID);
+                users = await RepoFactory.GetRepo().UsersGetAsync(DEFAULT_TENANTID);
 
                 return Ok(users);
 
@@ -235,13 +235,13 @@ namespace api.Controllers.API
         [HttpGet("Self")]
         [Authorize(Roles = "admin")]
         //[Authorize(Roles = "admin, user")]
-        public ActionResult<User> GetUserSelf()
+        public async Task<ActionResult<User>> GetUserSelf()
         {
             try
             {
                 var identity = HttpContext.User.Identity as ClaimsIdentity;
                 User user;
-                user = RepoFactory.GetRepo().UserGet(null, identity.Name, null);
+                user = await RepoFactory.GetRepo().UserGetAsync(null, identity.Name, null);
 
                 return Ok(user);
             }
@@ -257,11 +257,11 @@ namespace api.Controllers.API
         // get user by ID
         [HttpGet]
         [Authorize(Roles = "admin")]
-        public ActionResult<User> UserGet(int idUser)
+        public async Task<ActionResult<User>> UserGet(int idUser)
         {
             try
             {
-                
+
                 var identity = HttpContext.User.Identity as ClaimsIdentity;
 
                 if (!(identity.FindFirst(ClaimTypes.Role).Value == "admin"))
@@ -269,9 +269,9 @@ namespace api.Controllers.API
                     //user = RepositoryFactory.GetRepository().UserGet(null, identity.Name, null);
                     return Unauthorized();
                 }
-                
 
-                User user = RepoFactory.GetRepo().UserGet(idUser, null, null);
+
+                User user = await RepoFactory.GetRepo().UserGetAsync(idUser, null, null);
 
                 return Ok(user);
             }
@@ -287,7 +287,7 @@ namespace api.Controllers.API
         // Create user as admin
         [HttpPost]
         [Authorize(Roles = "admin")]
-        public ActionResult<UserAdd> UserAdd([FromBody] UserAdd? value)
+        public async Task<ActionResult<UserAdd>> UserAdd([FromBody] UserAdd? value)
         {
             try
             {
@@ -310,7 +310,7 @@ namespace api.Controllers.API
                 userSecret.PwdHash = AuthenticationProvider.GetHash(value.Password, userSecret.PwdSalt);
 
 
-                RepoFactory.GetRepo().UserAdd(user, userSecret);
+                await RepoFactory.GetRepo().UserAddAsync(user, userSecret);
 
                 return Ok("User created successfully: " + user.Email);
             }
@@ -335,10 +335,10 @@ namespace api.Controllers.API
 
         }
 
-        // Update users ad admin, or self as user 
+        // Update users ad admin, or self as user
         [HttpPut]
         [Authorize(Roles = "admin")]
-        public ActionResult<bool> UserUpdate([FromBody] UserUpdate value)
+        public async Task<ActionResult<bool>> UserUpdate([FromBody] UserUpdate value)
         {
             try
             {
@@ -346,7 +346,7 @@ namespace api.Controllers.API
                 if (!ModelState.IsValid) { return BadRequest(ModelState); }
                 var identity = HttpContext.User.Identity as ClaimsIdentity;
 
-                User user = RepoFactory.GetRepo().UserGet(value.IDUser, null, null);
+                User user = await RepoFactory.GetRepo().UserGetAsync(value.IDUser, null, null);
 
                 if (identity.FindFirst(ClaimTypes.Role).Value == "user" && value.Email != identity.Name) // if user, jwt token name must be equal to email identity
                 {
@@ -355,13 +355,13 @@ namespace api.Controllers.API
 
 
                 // check for password change
-                UserSecret userSecret = RepoFactory.GetRepo().UserSecretGet(value.IDUser, null, null);
+                UserSecret userSecret = await RepoFactory.GetRepo().UserSecretGetAsync(value.IDUser, null, null);
                 if (value.Password != null)
                 {
 
                     userSecret.PwdSalt = AuthenticationProvider.GetSalt();
                     userSecret.PwdHash = AuthenticationProvider.GetHash(value.Password, userSecret.PwdSalt);
-                    RepoFactory.GetRepo().UserSetPassword(user.Email, userSecret);
+                    await RepoFactory.GetRepo().UserSetPasswordAsync(user.Email, userSecret);
                 }
 
                 // if (value.TenantID != null) { user.TenantID = value.TenantID; } // ovo ostavljamo za iducu iteraciju
@@ -374,7 +374,7 @@ namespace api.Controllers.API
                 if (value.Enabled != null && identity.FindFirst(ClaimTypes.Role).Value == "admin") { user.Enabled = value.Enabled; } // can change enabled status only if admin
 
 
-                RepoFactory.GetRepo().UserUpdate(user);
+                await RepoFactory.GetRepo().UserUpdateAsync(user);
 
                 return Ok(result=true);
 
@@ -404,21 +404,21 @@ namespace api.Controllers.API
         // DELETE api/<UserController>/5
         [HttpDelete]
         [Authorize(Roles = "admin")]
-        public ActionResult<string> Delete(int? idUser)
+        public async Task<ActionResult<string>> Delete(int? idUser)
         {
             try
             {
 
-                
+
                 if (idUser > 1) // preventing deletion of admin
                 {
-                    if (RepoFactory.GetRepo().UserDelete(idUser))
+                    if (await RepoFactory.GetRepo().UserDeleteAsync(idUser))
                     {
                         return Ok("User deleted");
                     };
                     return NotFound("User not found");
                 }
-                
+
 
                 return Unauthorized("Deleting default user is not allowed");
             }
@@ -434,10 +434,10 @@ namespace api.Controllers.API
         // User Role List
         [HttpGet("Roles")]
         [Authorize(Roles = "admin")]
-        public ActionResult<string> UserRoleGet()
+        public async Task<ActionResult<string>> UserRoleGet()
         {
             IEnumerable<UserRole> userRoles = new List<UserRole>();
-            userRoles = RepoFactory.GetRepo().UserRoleGet();
+            userRoles = await RepoFactory.GetRepo().UserRoleGetAsync();
             return Ok(userRoles);
         }
 
@@ -445,12 +445,12 @@ namespace api.Controllers.API
         // User Role List
         [HttpGet("Group/All")]
         [Authorize(Roles = "admin")]
-        public ActionResult<string> UserGroupsGet()
+        public async Task<ActionResult<string>> UserGroupsGet()
         {
             try
             {
                 IEnumerable<UserGroup> userRoles = new List<UserGroup>();
-                userRoles = RepoFactory.GetRepo().UserGroupsGet();
+                userRoles = await RepoFactory.GetRepo().UserGroupsGetAsync();
                 return Ok(userRoles);
             }
             catch (Exception e)
@@ -462,11 +462,11 @@ namespace api.Controllers.API
 
         [HttpGet("Group")]
         [Authorize(Roles = "admin")]
-        public ActionResult<string> UserGroupGet(int? idUserGroup)
+        public async Task<ActionResult<string>> UserGroupGet(int? idUserGroup)
         {
             try
             {
-                UserGroup userGroup = RepoFactory.GetRepo().UserGroupGet(idUserGroup);
+                UserGroup userGroup = await RepoFactory.GetRepo().UserGroupGetAsync(idUserGroup);
                 return Ok(userGroup);
             }
             catch (Exception e)
@@ -480,12 +480,12 @@ namespace api.Controllers.API
 
         [HttpPost("Group")]
         [Authorize(Roles = "admin")]
-        public ActionResult<bool> UserGroupAdd(UserGroup userGroup)
+        public async Task<ActionResult<bool>> UserGroupAdd(UserGroup userGroup)
         {
 
             try
             {
-                RepoFactory.GetRepo().UserGroupAdd(userGroup);
+                await RepoFactory.GetRepo().UserGroupAddAsync(userGroup);
                 return true;
             }
             catch (Exception e)
@@ -498,11 +498,11 @@ namespace api.Controllers.API
 
         [HttpDelete("Group")]
         [Authorize(Roles = "admin")]
-        public ActionResult<bool> UserGroupDelete(int? idUserGroup)
+        public async Task<ActionResult<bool>> UserGroupDelete(int? idUserGroup)
         {
             try
             {
-            RepoFactory.GetRepo().UserGroupDelete(idUserGroup);
+            await RepoFactory.GetRepo().UserGroupDeleteAsync(idUserGroup);
             return true;
             }
             catch (Exception e)

@@ -1,4 +1,4 @@
-﻿using api.Dal;
+using api.Dal;
 using api.Dal.Interface;
 using api.Models;
 using api.Security;
@@ -26,32 +26,32 @@ namespace api.Controllers.API
         #region websvc api
         [Authorize]
         [HttpGet("All")]
-        public ActionResult<Device> DevicesGet()
+        public async Task<ActionResult<Device>> DevicesGet()
         { //0 day, 1 month, 2 year
 
             IEnumerable<Device> devices = new List<Device>();
-            devices = RepoFactory.GetRepo().DevicesGet(0);
+            devices = await RepoFactory.GetRepo().DevicesGetAsync(0);
 
             return Ok(devices);
         }
-        
+
         [Authorize]
         [HttpGet]
-        public ActionResult<Device> DeviceGet(int? idDevice)
+        public async Task<ActionResult<Device>> DeviceGet(int? idDevice)
         { //0 day, 1 month, 2 year
 
-            Device device = RepoFactory.GetRepo().DeviceGet(0, idDevice, null, null);
+            Device device = await RepoFactory.GetRepo().DeviceGetAsync(0, idDevice, null, null);
             return Ok(device);
         }
-        
+
         [Authorize(Roles = "admin")]
         [HttpPut]
-        public ActionResult<bool> DeviceUpdate([FromBody] Device device)
+        public async Task<ActionResult<bool>> DeviceUpdate([FromBody] Device device)
         {
 
             try
             {
-                RepoFactory.GetRepo().DeviceUpdate(device);
+                await RepoFactory.GetRepo().DeviceUpdateAsync(device);
 
                 // Updating configversion cache on update
                 DeviceCache deviceCache = new DeviceCache();
@@ -70,12 +70,12 @@ namespace api.Controllers.API
 
         [Authorize(Roles = "admin")]
         [HttpDelete]
-        public ActionResult<bool> DeviceDelete(int? idDevice)
+        public async Task<ActionResult<bool>> DeviceDelete(int? idDevice)
         {
 
             try
             {
-                RepoFactory.GetRepo().DeviceDelete(idDevice);
+                await RepoFactory.GetRepo().DeviceDeleteAsync(idDevice);
                 return true;
             }
             catch (Exception e)
@@ -88,28 +88,28 @@ namespace api.Controllers.API
 
         [Authorize]
         [HttpGet("Sensor")]
-        public ActionResult<Device> DeviceConfigSensorGet(int? deviceConfigSensorID)
+        public async Task<ActionResult<Device>> DeviceConfigSensorGet(int? deviceConfigSensorID)
         { //0 day, 1 month, 2 year
 
-            DeviceConfigSensor deviceConfigSensor = RepoFactory.GetRepo().DeviceConfigSensorGet(deviceConfigSensorID);
+            DeviceConfigSensor deviceConfigSensor = await RepoFactory.GetRepo().DeviceConfigSensorGetAsync(deviceConfigSensorID);
             return Ok(deviceConfigSensor);
         }
 
         [Authorize]
         [HttpGet("Controller")]
-        public ActionResult<Device> DeviceConfigControllerGet(int? deviceConfigControllerID)
+        public async Task<ActionResult<Device>> DeviceConfigControllerGet(int? deviceConfigControllerID)
         { //0 day, 1 month, 2 year
 
-            DeviceConfigController deviceConfigController = RepoFactory.GetRepo().DeviceConfigControllerGet(deviceConfigControllerID);
+            DeviceConfigController deviceConfigController = await RepoFactory.GetRepo().DeviceConfigControllerGetAsync(deviceConfigControllerID);
             return Ok(deviceConfigController);
         }
 
         [Authorize(Roles = "admin")]
         [HttpPut("Sensor")]
-        public ActionResult<bool> DeviceConfigSensorUpdate(DeviceUpdate? deviceUpdate)
+        public async Task<ActionResult<bool>> DeviceConfigSensorUpdate(DeviceUpdate? deviceUpdate)
         { //0 day, 1 month, 2 year
 
-            RepoFactory.GetRepo().DeviceConfigSensorUpdate(deviceUpdate.Device.IDDevice, deviceUpdate.Sensor);
+            await RepoFactory.GetRepo().DeviceConfigSensorUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Sensor);
 
             DeviceCache deviceCache = new DeviceCache();
             deviceCache.ConfigVersion = deviceUpdate.Device.ConfigVersion;
@@ -119,10 +119,10 @@ namespace api.Controllers.API
 
         [Authorize(Roles = "admin")]
         [HttpPut("Controller")]
-        public ActionResult<bool> DeviceConfigControllerUpdate(DeviceUpdate? deviceUpdate)
+        public async Task<ActionResult<bool>> DeviceConfigControllerUpdate(DeviceUpdate? deviceUpdate)
         { //0 day, 1 month, 2 year
 
-            RepoFactory.GetRepo().DeviceConfigControllerUpdate(deviceUpdate.Device.IDDevice, deviceUpdate.Controller);
+            await RepoFactory.GetRepo().DeviceConfigControllerUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Controller);
 
             DeviceCache deviceCache = new DeviceCache();
             deviceCache.ConfigVersion = deviceUpdate.Device.ConfigVersion;
@@ -139,7 +139,7 @@ namespace api.Controllers.API
 
         // Device point
         [HttpPost("Config")]
-        public ActionResult<DeviceConfig> GetConfig([FromBody] Device value) // mozdca ovo isto ubacitiu header?
+        public async Task<ActionResult<DeviceConfig>> GetConfig([FromBody] Device value) // mozdca ovo isto ubacitiu header?
         {
             if (AuthenticationHeaderValue.TryParse(Request.Headers["apiId"], out var apiId) && AuthenticationHeaderValue.TryParse(Request.Headers.Authorization, out var authKey))
             {
@@ -155,16 +155,16 @@ namespace api.Controllers.API
                 if (value.ConfigVersion != deviceCache.ConfigVersion)
                 {
 
-                    Device device = RepoFactory.GetRepo().DeviceGet(0, null, apiId.ToString(), null);
+                    Device device = await RepoFactory.GetRepo().DeviceGetAsync(0, null, apiId.ToString(), null);
 
-                    DeviceConfig deviceConfig = BuildDeviceConfig(device);
+                    DeviceConfig deviceConfig = await BuildDeviceConfigAsync(device);
 
 
 
                     return Ok(deviceConfig);
                 }
 
-                return Ok();     // DEVICE DO NOTHING          
+                return Ok();     // DEVICE DO NOTHING
 
             }
             return StatusCode(401);
@@ -173,7 +173,7 @@ namespace api.Controllers.API
         // POST api/<DeviceController>
 
         [HttpPost("Register")]
-        public ActionResult<DeviceConfig> DeviceRegistration([FromBody] DeviceRegistration value)
+        public async Task<ActionResult<DeviceConfig>> DeviceRegistration([FromBody] DeviceRegistration value)
         {
             try
             {
@@ -185,7 +185,7 @@ namespace api.Controllers.API
                 DeviceConfigController deviceConfigController = new DeviceConfigController();
 
 
-                user = RepoFactory.GetRepo().UserGet(null, value.Email, null);
+                user = await RepoFactory.GetRepo().UserGetAsync(null, value.Email, null);
 
                 if (user.DevicePin != value.DevicePin)
                 {
@@ -193,7 +193,7 @@ namespace api.Controllers.API
                 }
 
 
-                device = RepoFactory.GetRepo().DeviceGet(user.TenantID, null, null, value.MacAddress);
+                device = await RepoFactory.GetRepo().DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
 
                 if (device.IDDevice == null)
                 {
@@ -208,11 +208,11 @@ namespace api.Controllers.API
                     device.DeviceSensorEnabled = false;
                     device.DeviceControllerEnabled = false;
 
-                    RepoFactory.GetRepo().DeviceAdd(device);
-                    device = RepoFactory.GetRepo().DeviceGet(user.TenantID, null, null, value.MacAddress);
+                    await RepoFactory.GetRepo().DeviceAddAsync(device);
+                    device = await RepoFactory.GetRepo().DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
                 }
 
-                DeviceConfig deviceConfig = BuildDeviceConfig(device);
+                DeviceConfig deviceConfig = await BuildDeviceConfigAsync(device);
 
 
                 return Ok(deviceConfig);
@@ -229,7 +229,7 @@ namespace api.Controllers.API
         }
 
         [HttpGet]
-        private DeviceConfig BuildDeviceConfig(Device device)
+        private async Task<DeviceConfig> BuildDeviceConfigAsync(Device device)
         {
             DeviceConfig deviceConfig = new DeviceConfig();
 
@@ -256,13 +256,13 @@ namespace api.Controllers.API
             // get config if enabled
             if (deviceConfig.DeviceSensorEnabled == true)
             {
-                deviceConfig.DeviceConfigSensor = RepoFactory.GetRepo().DeviceConfigSensorGet(device.DeviceConfigSensorID);
+                deviceConfig.DeviceConfigSensor = await RepoFactory.GetRepo().DeviceConfigSensorGetAsync(device.DeviceConfigSensorID);
 
             }
 
             if (deviceConfig.DeviceControllerEnabled == true)
             {
-                deviceConfig.DeviceConfigController = RepoFactory.GetRepo().DeviceConfigControllerGet(device.DeviceConfigControllerID);
+                deviceConfig.DeviceConfigController = await RepoFactory.GetRepo().DeviceConfigControllerGetAsync(device.DeviceConfigControllerID);
             }
 
             return deviceConfig;
@@ -273,19 +273,18 @@ namespace api.Controllers.API
 
         // Device point
         [HttpPost("Authenticate")] // Request authentication
-        public ActionResult<DeviceAuthentication> ReqAuth() // private su metode koje se koriste interno, ali i dalaje mora imat httpget
+        public async Task<ActionResult<DeviceAuthentication>> ReqAuth() // private su metode koje se koriste interno, ali i dalaje mora imat httpget
         {
             try
             {
                 if (AuthenticationHeaderValue.TryParse(Request.Headers["apiId"], out var apiId) && AuthenticationHeaderValue.TryParse(Request.Headers["apiKey"], out var apiKey))
                 {
 
-                    
 
 
-                    if (DeviceAuthenticationProvider.VerifyDevice(apiId, apiKey))
+                    if (await DeviceAuthenticationProvider.VerifyDeviceAsync(apiId, apiKey))
                     {
-                        Device device = RepoFactory.GetRepo().DeviceGet(0, null, apiId.ToString(), null); // Query for configVerion
+                        Device device = await RepoFactory.GetRepo().DeviceGetAsync(0, null, apiId.ToString(), null); // Query for configVerion
                         DeviceAuthentication? deviceAuthentication = new DeviceAuthentication();
                         deviceAuthentication.apiAuth = Guid.NewGuid().ToString();
                         DeviceCache deviceCache = new DeviceCache();
@@ -312,7 +311,7 @@ namespace api.Controllers.API
         [HttpGet]
         public static bool GetAuth(string apiId, string authKey) // private su metode koje se koriste interno, ali i dalje mora imat httpget
         {
-
+            // in-memory cache lookup only - stays synchronous
 
             DeviceCache? deviceCache = RepoFactory.GetCache().GetDeviceCache(apiId);
 
@@ -331,39 +330,39 @@ namespace api.Controllers.API
         // Device Types
         [HttpGet("Type")]
         [Authorize]
-        public ActionResult<string> DeviceTypeGet()
+        public async Task<ActionResult<string>> DeviceTypeGet()
         {
-            IEnumerable<DeviceType> deviceType = RepoFactory.GetRepo().DeviceTypeGet();
+            IEnumerable<DeviceType> deviceType = await RepoFactory.GetRepo().DeviceTypeGetAsync();
 
             return Ok(deviceType);
         }
 
         [HttpGet("TypeService")]
         [Authorize]
-        public ActionResult<string> DeviceTypeServiceGet()
+        public async Task<ActionResult<string>> DeviceTypeServiceGet()
         {
 
-            IEnumerable<DeviceTypeService> deviceTypeService = RepoFactory.GetRepo().DeviceTypeServiceGet();
+            IEnumerable<DeviceTypeService> deviceTypeService = await RepoFactory.GetRepo().DeviceTypeServiceGetAsync();
 
             return Ok(deviceTypeService);
         }
 
         [HttpGet("TypeRelay")]
         [Authorize]
-        public ActionResult<string> DeviceTypeRelayGet()
+        public async Task<ActionResult<string>> DeviceTypeRelayGet()
         {
 
-            IEnumerable<DeviceTypeRelay> deviceTypeRelay = RepoFactory.GetRepo().DeviceTypeRelayGet();
+            IEnumerable<DeviceTypeRelay> deviceTypeRelay = await RepoFactory.GetRepo().DeviceTypeRelayGetAsync();
 
             return Ok(deviceTypeRelay);
         }
 
         [HttpGet("TypeSensor")]
         [Authorize]
-        public ActionResult<string> DeviceTypeSensorGet()
+        public async Task<ActionResult<string>> DeviceTypeSensorGet()
         {
 
-            IEnumerable<DeviceTypeSensor> deviceTypeSensor = RepoFactory.GetRepo().DeviceTypeSensorGet();
+            IEnumerable<DeviceTypeSensor> deviceTypeSensor = await RepoFactory.GetRepo().DeviceTypeSensorGetAsync();
 
             return Ok(deviceTypeSensor);
         }

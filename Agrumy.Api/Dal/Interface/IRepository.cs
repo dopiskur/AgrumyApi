@@ -1,4 +1,4 @@
-﻿using api.Models;
+using api.Models;
 using System.Text.Json.Nodes;
 
 namespace api.Dal.Interface
@@ -13,67 +13,67 @@ namespace api.Dal.Interface
         /// <summary>Ensures the schema exists: if the key table is missing, runs the batches from Schema/SchemaScripts.cs.</summary>
         Task EnsureSchemaAsync();
 
-        /// <summary>Classifies a database-layer exception so callers can return a consistent error response.</summary>
+        /// <summary>Classifies a database-layer exception so callers can return a consistent error response. CPU-only, stays synchronous.</summary>
         DbFailureKind ClassifyException(Exception ex);
 
         // Server Config
 
-        ServerConfig ServerConfigGet(int idServerConfig);
+        Task<ServerConfig> ServerConfigGetAsync(int idServerConfig);
 
 
 
         // MANAGE USER
-        void UserAdd(User user, UserSecret userHash);
-        void UserUpdate(User user);
-        bool UserDelete(int? idUser);
-        User UserGet(int? idUser, string? email, string? username);
-        IList<User> UsersGet(int? tenantID);
-        UserSecret UserSecretGet(int? idUser, string? email, string? username);
+        Task UserAddAsync(User user, UserSecret userHash);
+        Task UserUpdateAsync(User user);
+        Task<bool> UserDeleteAsync(int? idUser);
+        Task<User> UserGetAsync(int? idUser, string? email, string? username);
+        Task<IList<User>> UsersGetAsync(int? tenantID);
+        Task<UserSecret> UserSecretGetAsync(int? idUser, string? email, string? username);
 
-        bool UserSetPassword(string? email, UserSecret userSecret);
+        Task<bool> UserSetPasswordAsync(string? email, UserSecret userSecret);
 
-        IList<UserRole> UserRoleGet();
+        Task<IList<UserRole>> UserRoleGetAsync();
 
         // MANAGE DEVICE
 
-        void DeviceAdd(Device device);
+        Task DeviceAddAsync(Device device);
 
-        void DeviceDelete(int? idDevice);
-        Device DeviceGet(int? tenantID, int? idDevice, string? apiId, string? macAddress);
-        IList<Device> DevicesGet(int? tenantID);
-        bool DeviceCheckMacAddress(int? tenantID, string? macAddress);
-        DeviceConfigSensor? DeviceConfigSensorGet(int? deviceConfigSensorID);
-        DeviceConfigController? DeviceConfigControllerGet(int? deviceConfigControllerID);
+        Task DeviceDeleteAsync(int? idDevice);
+        Task<Device> DeviceGetAsync(int? tenantID, int? idDevice, string? apiId, string? macAddress);
+        Task<IList<Device>> DevicesGetAsync(int? tenantID);
+        Task<bool> DeviceCheckMacAddressAsync(int? tenantID, string? macAddress);
+        Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID);
+        Task<DeviceConfigController?> DeviceConfigControllerGetAsync(int? deviceConfigControllerID);
 
         // Device UPDATE
-        void DeviceUpdate(Device? device);
-        void DeviceConfigControllerUpdate(int? idDevice, DeviceConfigController? deviceConfigController);
-        void DeviceConfigSensorUpdate(int? iDDevice, DeviceConfigSensor? deviceConfigSensor);
+        Task DeviceUpdateAsync(Device? device);
+        Task DeviceConfigControllerUpdateAsync(int? idDevice, DeviceConfigController? deviceConfigController);
+        Task DeviceConfigSensorUpdateAsync(int? iDDevice, DeviceConfigSensor? deviceConfigSensor);
 
         // Device fixed lists
-        IList<DeviceType> DeviceTypeGet();
-        IList<DeviceTypeService> DeviceTypeServiceGet();
-        IList<DeviceTypeRelay> DeviceTypeRelayGet();
-        IList<DeviceTypeSensor> DeviceTypeSensorGet();
+        Task<IList<DeviceType>> DeviceTypeGetAsync();
+        Task<IList<DeviceTypeService>> DeviceTypeServiceGetAsync();
+        Task<IList<DeviceTypeRelay>> DeviceTypeRelayGetAsync();
+        Task<IList<DeviceTypeSensor>> DeviceTypeSensorGetAsync();
 
 
 
         // SensorData
 
-        void SensorDataPush(JsonArray jsonArray);
-        string SensorDataGet(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY, int? buildReport);
-        IList<SensorDataReport> SensorDataReportGet(int? getData, int? deviceID, int? sensorDataReportID);
-        void SensorDataDelete(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY);
+        Task SensorDataPushAsync(JsonArray jsonArray);
+        Task<string> SensorDataGetAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY, int? buildReport);
+        Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? getData, int? deviceID, int? sensorDataReportID);
+        Task SensorDataDeleteAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY);
 
 
         // Tenant
-        public bool TenantGet(string tenantName);
-        int TenantAdd(string tenantName);
+        Task<bool> TenantGetAsync(string tenantName);
+        Task<int> TenantAddAsync(string tenantName);
 
         // Group
-        IList<UserGroup> UserGroupsGet();
-        UserGroup UserGroupGet(int? idUserGroup);
-        void UserGroupDelete(int? idUserGroup);
-        void UserGroupAdd(UserGroup userGroup);
+        Task<IList<UserGroup>> UserGroupsGetAsync();
+        Task<UserGroup> UserGroupGetAsync(int? idUserGroup);
+        Task UserGroupDeleteAsync(int? idUserGroup);
+        Task UserGroupAddAsync(UserGroup userGroup);
     }
 }
