@@ -3,6 +3,7 @@ using MySql.Data.MySqlClient;
 using System.Reflection;
 using System.Text.Json.Nodes;
 using api.Dal.Interface;
+using api.Schema;
 
 
 namespace api.Dal
@@ -17,7 +18,57 @@ namespace api.Dal
         private static double nullDoubleVal; // solving problem with double.TryParse
         private static bool nullBoolVal; // solving problem with bool.TryParse
 
-        // QUERY 
+        // QUERY
+
+        // STARTUP / HEALTH
+
+        public async Task<bool> TestConnectionAsync()
+        {
+            using var connection = new MySqlConnection(sqlcon);
+            await connection.OpenAsync();
+            return connection.State == System.Data.ConnectionState.Open;
+        }
+
+        public async Task EnsureSchemaAsync()
+        {
+            using var connection = new MySqlConnection(sqlcon);
+            await connection.OpenAsync();
+
+            if (await TableExistsAsync(connection, SchemaScripts.KeyTable))
+            {
+                return; // schema already provisioned
+            }
+
+            using (var fkOff = connection.CreateCommand())
+            {
+                fkOff.CommandText = "SET FOREIGN_KEY_CHECKS = 0";
+                await fkOff.ExecuteNonQueryAsync();
+            }
+
+            foreach (string batch in SchemaScripts.AllObjects)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = batch;
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            using (var fkOn = connection.CreateCommand())
+            {
+                fkOn.CommandText = "SET FOREIGN_KEY_CHECKS = 1";
+                await fkOn.ExecuteNonQueryAsync();
+            }
+        }
+
+        private static async Task<bool> TableExistsAsync(MySqlConnection connection, string tableName)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText =
+                "SELECT COUNT(*) FROM information_schema.tables " +
+                "WHERE table_schema = DATABASE() AND table_name = @tableName";
+            cmd.Parameters.AddWithValue("@tableName", tableName);
+            object? result = await cmd.ExecuteScalarAsync();
+            return result != null && Convert.ToInt64(result) > 0;
+        }
 
         // AUTHENTICATION
 

@@ -106,4 +106,33 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+// Startup DB health-check + optional schema auto-provisioning
+using (var scope = app.Services.CreateScope())
+{
+    var startupLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var repository = scope.ServiceProvider.GetRequiredService<IRepository>();
+    bool failFastOnDbCheck = bool.TryParse(builder.Configuration["Startup:FailFastOnDbCheck"], out var failFast) && failFast;
+
+    try
+    {
+        if (await repository.TestConnectionAsync())
+        {
+            startupLogger.LogInformation("Startup DB check: database connection OK.");
+            await repository.EnsureSchemaAsync();
+            startupLogger.LogInformation("Startup DB check: schema verified/provisioned.");
+        }
+        else
+        {
+            const string message = "Startup DB check: could not open a database connection.";
+            if (failFastOnDbCheck)
+                throw new InvalidOperationException(message);
+            startupLogger.LogError(message);
+        }
+    }
+    catch (Exception ex) when (!failFastOnDbCheck)
+    {
+        startupLogger.LogError(ex, "Startup DB check failed; continuing because Startup:FailFastOnDbCheck is false.");
+    }
+}
+
 app.Run();

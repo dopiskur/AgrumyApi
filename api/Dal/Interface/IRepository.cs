@@ -5,6 +5,14 @@ namespace api.Dal.Interface
 {
     public interface IRepository
     {
+        // Startup / health
+
+        /// <summary>Opens and immediately closes a database connection. Returns true if the connection could be opened.</summary>
+        Task<bool> TestConnectionAsync();
+
+        /// <summary>Ensures the schema exists: if the key table is missing, runs the batches from Schema/SchemaScripts.cs.</summary>
+        Task EnsureSchemaAsync();
+
         // Server Config
 
         ServerConfig ServerConfigGet(int idServerConfig);
