@@ -1,0 +1,42 @@
+{
+  "// ConnectionStrings": "Database connection strings read via IConfiguration.GetConnectionString(...).",
+  "ConnectionStrings": {
+    "// DefaultConnection": "MySQL/MariaDB ADO.NET connection string used by SqlRepository (MySql.Data.MySqlClient). Put the real credentials only in appsettings.json (git-ignored).",
+    "DefaultConnection": "server=localhost;port=3306;database=agrumy;user id=agrumy;password=CHANGE_ME;SslMode=Preferred;"
+  },
+
+  "// JWT": "JSON Web Token settings for bearer authentication (Program.cs) and token creation (Security/JwtTokenProvider.cs).",
+  "JWT": {
+    "// SecureKey": "Symmetric HMAC-SHA256 signing key. Use a long random secret (at least 32 characters / 256 bits). REQUIRED - the app throws on startup if this is missing.",
+    "SecureKey": "CHANGE_ME_TO_A_LONG_RANDOM_SECRET_AT_LEAST_32_CHARACTERS",
+    "// Issuer": "Expected token issuer. Written into every token that JwtTokenProvider.CreateToken issues and validated on every incoming token. REQUIRED once JWT hardening is enabled.",
+    "Issuer": "https://api.agrumy.com",
+    "// Audience": "Expected token audience. Written into every issued token and validated on every incoming token. REQUIRED once JWT hardening is enabled.",
+    "Audience": "agrumy-api"
+  },
+
+  "// WebView": "Optional server-rendered MVC UI that sits on top of the API.",
+  "WebView": {
+    "// Enabled": "true = map the MVC controllers/views and serve wwwroot static files; false = run as a pure JSON API.",
+    "Enabled": false,
+    "// ApiService": "Base URL the MVC views use to call back into the API (Dal/ApiRepository.cs).",
+    "ApiService": "http://localhost:5000"
+  },
+
+  "// Startup": "Behaviour of the startup database health-check / schema auto-provisioning (Program.cs).",
+  "Startup": {
+    "// FailFastOnDbCheck": "true = throw and stop the app if the connection test or schema provisioning fails; false = log the error and start anyway.",
+    "FailFastOnDbCheck": false
+  },
+
+  "// Logging": "Standard ASP.NET Core logging configuration.",
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+
+  "// AllowedHosts": "Host header filtering; '*' allows any host.",
+  "AllowedHosts": "*"
+}
