@@ -4,6 +4,7 @@ using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -26,6 +27,7 @@ namespace api.Controllers.API
 
         // User registration
         [HttpPost("Register")]
+        [EnableRateLimiting("login")]
         public ActionResult<UserRegistration> UserRegistration([FromBody] UserRegistration value)
         {
             try
@@ -86,6 +88,7 @@ namespace api.Controllers.API
 
         // User login
         [HttpPost("Login")]
+        [EnableRateLimiting("login")]
         public ActionResult<UserLogin> UserLogin([FromBody] UserLogin value)
         {
             //AuthProvider.VerifyPassword(value.Email,value.Password);

@@ -1,9 +1,11 @@
 using api.Dal;
 using api.Dal.Interface;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +38,22 @@ builder.Services
     });
 
 builder.Services.AddControllers();
+
+// Rate limiting: "login" policy - 5 attempts per minute per client IP
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("login", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            }));
+});
 
 if (webViewEnabled)
 {
@@ -100,6 +118,8 @@ app.UseSwaggerUI();
 
 // Middleware order is important
 app.UseRouting();
+
+app.UseRateLimiter();
 
 if (webViewEnabled)
 {
