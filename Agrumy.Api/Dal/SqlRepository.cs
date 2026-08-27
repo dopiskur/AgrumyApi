@@ -717,52 +717,23 @@ namespace api.Dal
         #region Group
         public async Task<IList<UserGroup>> UserGroupsGetAsync()
         {
-            IList<UserGroup> deviceTypeRelay = new List<UserGroup>();
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "UserGroupsGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            while (await dr.ReadAsync())
-            {
-                deviceTypeRelay.Add(UserGroupRead(dr));
-            }
-
-            return deviceTypeRelay;
+            var rows = await connection.QueryAsync<UserGroup>(
+                "UserGroupsGet", commandType: CommandType.StoredProcedure);
+            return rows.AsList();
         }
 
 
         public async Task<UserGroup> UserGroupGetAsync(int? idUserGroup)
         {
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "UserGroupGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+            var group = await connection.QuerySingleOrDefaultAsync<UserGroup>(
+                "UserGroupGet",
+                new { IDUserGroup = idUserGroup },
+                commandType: CommandType.StoredProcedure);
 
-            cmd.Parameters.AddWithValue(nameof(UserGroup.IDUserGroup), idUserGroup);
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            if (await dr.ReadAsync())
-            {
-                return UserGroupRead(dr);
-            }
-
-            throw new ArgumentException("Wrong id, no such person");
-
+            return group ?? throw new ArgumentException("Wrong id, no such person");
         }
-
-
-
-        private UserGroup UserGroupRead(MySqlDataReader dr) => new UserGroup
-        {
-            IDUserGroup = int.TryParse(dr[nameof(UserGroup.IDUserGroup)].ToString(), out nullIntVal) ? nullIntVal : null,
-            GroupName = dr[nameof(UserGroup.GroupName)].ToString(),
-            UserRoleID = int.TryParse(dr[nameof(UserGroup.UserRoleID)].ToString(), out nullIntVal) ? nullIntVal : null,
-            RoleName = dr[nameof(UserGroup.RoleName)].ToString(),
-        };
 
         public async Task UserGroupDeleteAsync(int? idUserGroup)
         {
