@@ -646,57 +646,15 @@ namespace api.Dal
 
         public async Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? getData, int? deviceID, int? reportID)
         {
-            IList<SensorDataReport> sensorDataReport = new List<SensorDataReport>();
-
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "SensorDataReportGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-            cmd.Parameters.AddWithValue("getData", getData);
-            cmd.Parameters.AddWithValue("deviceID", deviceID);
-            cmd.Parameters.AddWithValue("reportID", reportID);
-
-
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-
-            if (getData==0)
-            {
-                while (await dr.ReadAsync())
-                {
-                    sensorDataReport.Add(SensorDataReportsRead(dr));
-                }
-            }
-            else
-            {
-                while (await dr.ReadAsync())
-                {
-                    sensorDataReport.Add(SensorDataReportRead(dr));
-                }
-            }
-
-            return sensorDataReport;
+            // The proc returns different column sets for getData==0 vs getData>0; Dapper just
+            // maps whichever columns are present (SensorData stays null for the summary case).
+            var rows = await connection.QueryAsync<SensorDataReport>(
+                "SensorDataReportGet",
+                new { getData, deviceID, reportID },
+                commandType: CommandType.StoredProcedure);
+            return rows.AsList();
         }
-
-        private SensorDataReport SensorDataReportsRead(MySqlDataReader dr) => new SensorDataReport
-        {
-
-            IDSensorDataReport = int.TryParse(dr[nameof(SensorDataReport.IDSensorDataReport)].ToString(), out nullIntVal) ? nullIntVal : null,
-            DeviceID = int.TryParse(dr[nameof(SensorDataReport.DeviceID)].ToString(), out nullIntVal) ? nullIntVal : null,
-            ReportName = dr[nameof(SensorDataReport.ReportName)].ToString()
-
-        };
-
-        private SensorDataReport SensorDataReportRead(MySqlDataReader dr) => new SensorDataReport
-        {
-
-            IDSensorDataReport = int.TryParse(dr[nameof(SensorDataReport.IDSensorDataReport)].ToString(), out nullIntVal) ? nullIntVal : null,
-            DeviceID = int.TryParse(dr[nameof(SensorDataReport.DeviceID)].ToString(), out nullIntVal) ? nullIntVal : null,
-            ReportName = dr[nameof(SensorDataReport.ReportName)].ToString(),
-            SensorData = dr[nameof(SensorDataReport.SensorData)].ToString()
-
-        };
 
 
 
