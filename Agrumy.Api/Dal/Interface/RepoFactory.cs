@@ -1,3 +1,7 @@
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("Agrumy.Api.Tests")]
+
 namespace api.Dal.Interface
 {
     /// <summary>
@@ -11,7 +15,17 @@ namespace api.Dal.Interface
 
         private static readonly Lazy<ICache> cache = new(() => new CacheRepository());
 
-        public static IRepository GetRepo() => repository.Value;
-        public static ICache GetCache() => cache.Value;
+        private static IRepository? _repoOverride;
+        private static ICache? _cacheOverride;
+
+        public static IRepository GetRepo() => _repoOverride ?? repository.Value;
+        public static ICache GetCache() => _cacheOverride ?? cache.Value;
+
+        /// <summary>Test-only seam: swap in a mock IRepository / ICache. Pass null to restore the real one.</summary>
+        internal static void OverrideForTests(IRepository? repo = null, ICache? cacheImpl = null)
+        {
+            _repoOverride = repo;
+            _cacheOverride = cacheImpl;
+        }
     }
 }
