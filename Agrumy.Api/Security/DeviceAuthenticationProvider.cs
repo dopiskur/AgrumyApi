@@ -18,7 +18,6 @@ namespace api.Security
             Device device = await RepoFactory.GetRepo().DeviceGetAsync(0, null, apiId.ToString(), null); //popravi tenant
             if (device == null || device.ApiKey is null)
             {
-                // upisi u log da device ne postoji
                 return false;
             }
 
@@ -32,9 +31,6 @@ namespace api.Security
             {
                 return false;
             }
-
-            // Cleaning MemoryCache manually if item exists
-            // RepoFactory.GetCache().RemoveItem(apiId.ToString());
 
             return CryptographicOperations.FixedTimeEquals(providedKey, storedKey);
         }

@@ -143,7 +143,7 @@ namespace api.Controllers.API
         // Device point
         [HttpPost("Config")]
         [EnableRateLimiting("device-auth")]
-        public async Task<ActionResult<DeviceConfig>> GetConfig([FromBody] Device value) // mozdca ovo isto ubacitiu header?
+        public async Task<ActionResult<DeviceConfig>> GetConfig([FromBody] Device value)
         {
             if (AuthenticationHeaderValue.TryParse(Request.Headers["apiId"], out var apiId) && AuthenticationHeaderValue.TryParse(Request.Headers.Authorization, out var authKey))
             {

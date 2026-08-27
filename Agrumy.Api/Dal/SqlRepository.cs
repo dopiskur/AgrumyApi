@@ -7,8 +7,6 @@ using api.Schema;
 
 namespace api.Dal
 {
-    // COLLAPSE CTRL+M+O <-----
-
     internal class SqlRepository : IRepository
     {
 
@@ -210,7 +208,6 @@ namespace api.Dal
             cmd.Parameters.AddWithValue(nameof(User.IDUser), idUser);
 
             long rows = (long)(await cmd.ExecuteScalarAsync())!;
-            //using MySqlDataReader dr = cmd.ExecuteReader();
 
             if (rows > 0) { return true; }
             return false;
@@ -313,14 +310,12 @@ namespace api.Dal
 
 
             long rows = (long)(await cmd.ExecuteScalarAsync())!;
-            //using MySqlDataReader dr = cmd.ExecuteReader();
 
             if (rows > 0) { return true; }
             return false;
         }
 
 
-        // UDRI OVDJE ZA PASSWORD
         public async Task<UserSecret> UserSecretGetAsync(int? idUser, string? email, string? username)
         {
             using var connection = new MySqlConnection(sqlcon);
@@ -658,8 +653,6 @@ namespace api.Dal
             {
                 return false;
             }
-
-            throw new ArgumentException("Wrong id, no such device");
         }
 
         public async Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID)
@@ -1035,9 +1028,6 @@ namespace api.Dal
             {
                 return false;
             }
-
-            throw new ArgumentException("Wrong id, no such person");
-
         }
         public async Task<int> TenantAddAsync(string tenantName)
         {
@@ -1049,21 +1039,7 @@ namespace api.Dal
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue(nameof(Tenant.TenantName), tenantName);
 
-            return Convert.ToInt32(await cmd.ExecuteScalarAsync()); // retreive single value from stored procedure
-            /*using MySqlDataReader dr = cmd.ExecuteReader();
-
-
-            if (dr.HasRows)
-            {
-                return dr.GetInt32(0); //0 is row index
-
-            }
-            else
-            {
-                throw new ArgumentException("Failed to create new tenant");
-            }
-            */
-
+            return Convert.ToInt32(await cmd.ExecuteScalarAsync()); // retrieve single value from stored procedure
         }
         // END TENANT
 

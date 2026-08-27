@@ -23,8 +23,6 @@ namespace api.Controllers.API
         {
             _logger = logger;
         }
-        //public static CacheRepository CacheData = new();
-        //public static AuthenticationProvider AuthValidator = new();
 
         // GET: api/<SensorDataController>
 
@@ -63,7 +61,6 @@ namespace api.Controllers.API
 
                     if (!DeviceApiController.GetAuth(apiId.ToString(), authKey.ToString()))
                     {
-                        // DeviceCache? deviceCache2 = RepoFactory.GetCache().GetDeviceCache(apiId.ToString()); // test only
                         return StatusCode(401);
                     }
 

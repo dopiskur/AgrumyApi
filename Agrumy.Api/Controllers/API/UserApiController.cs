@@ -72,7 +72,6 @@ namespace api.Controllers.API
 
                 await RepoFactory.GetRepo().UserAddAsync(user, userSecret);
 
-                //return Ok("User created successfully: " + user.Email);
                 return Ok(user);
             }
             catch (Exception e)
@@ -208,16 +207,12 @@ namespace api.Controllers.API
 
         // Get all users, as admin
         [HttpGet("All")]
-        //[Authorize(Roles = "admin")]
         [Authorize(Roles = "admin")]
         public async Task<ActionResult<IList<User>>> UsersGet()
         {
 
             try
             {
-                // var identity = HttpContext.User.Identity as ClaimsIdentity;
-                // int tenantID = int.Parse(identity.FindFirst("TenantID").Value.ToString());
-
                 IList<User> users = new List<User>();
                 users = await RepoFactory.GetRepo().UsersGetAsync(DEFAULT_TENANTID);
 
@@ -268,7 +263,6 @@ namespace api.Controllers.API
 
                 if (!(identity.FindFirst(ClaimTypes.Role).Value == "admin"))
                 {
-                    //user = RepositoryFactory.GetRepository().UserGet(null, identity.Name, null);
                     return Unauthorized();
                 }
 
@@ -442,16 +436,15 @@ namespace api.Controllers.API
         }
 
         #region Group
-        // User Role List
         [HttpGet("Group/All")]
         [Authorize(Roles = "admin")]
         public async Task<ActionResult<string>> UserGroupsGet()
         {
             try
             {
-                IEnumerable<UserGroup> userRoles = new List<UserGroup>();
-                userRoles = await RepoFactory.GetRepo().UserGroupsGetAsync();
-                return Ok(userRoles);
+                IEnumerable<UserGroup> userGroups = new List<UserGroup>();
+                userGroups = await RepoFactory.GetRepo().UserGroupsGetAsync();
+                return Ok(userGroups);
             }
             catch (Exception e)
             {
