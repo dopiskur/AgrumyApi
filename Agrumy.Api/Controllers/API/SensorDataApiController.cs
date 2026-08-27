@@ -79,7 +79,7 @@ namespace api.Controllers.API
         //[HttpDelete("{id}")]
         // mozda cu koristit post za ovo, jer ne mogu dobit u body resposne koliko je redova obrisano, delete to ne podrzava
         [HttpDelete]
-        //[Authorize]
+        [Authorize(Roles = "admin")]
         public ActionResult Delete(int deviceID, int tenantID, int timeMDMY = 0, int timeRange = 0)
         {
 
