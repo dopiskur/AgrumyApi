@@ -368,89 +368,24 @@ namespace api.Dal
         }
         public async Task<IList<Device>> DevicesGetAsync(int? tenantID)
         {
-            IList<Device> list = new List<Device>();
-
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "DevicesGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-            cmd.Parameters.AddWithValue(nameof(Device.TenantID), tenantID);
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            while (await dr.ReadAsync())
-            {
-                list.Add(DeviceRead(dr));
-            }
-
-            return list;
+            var rows = await connection.QueryAsync<Device>(
+                "DevicesGet",
+                new { TenantID = tenantID },
+                commandType: CommandType.StoredProcedure);
+            return rows.AsList();
         }
 
         public async Task<Device> DeviceGetAsync(int? tenantID, int? idDevice, string? apiId, string? macAddress)
         {
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "DeviceGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+            var device = await connection.QuerySingleOrDefaultAsync<Device>(
+                "DeviceGet",
+                new { TenantID = tenantID, IDDevice = idDevice, ApiId = apiId, MacAddress = macAddress },
+                commandType: CommandType.StoredProcedure);
 
-            cmd.Parameters.AddWithValue(nameof(Device.TenantID), tenantID);
-            cmd.Parameters.AddWithValue(nameof(Device.IDDevice), idDevice);
-            cmd.Parameters.AddWithValue(nameof(Device.ApiId), apiId);
-            cmd.Parameters.AddWithValue(nameof(Device.MacAddress), macAddress);
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            if (await dr.ReadAsync())
-            {
-                return DeviceRead(dr);
-            }
-            else
-            {
-                Device device = new Device();
-                return device; // vracamo prazni device namjerno
-            }
-
+            return device ?? new Device(); // empty device on no row, kept intentionally
         }
-
-        private Device DeviceRead(MySqlDataReader dr) => new Device
-        {
-            ConfigVersion = int.TryParse(dr[nameof(Device.ConfigVersion)].ToString(), out nullIntVal) ? nullIntVal : null,
-
-            IDDevice = int.TryParse(dr[nameof(Device.IDDevice)].ToString(), out nullIntVal) ? nullIntVal : null,
-            TenantID = int.TryParse(dr[nameof(Device.TenantID)].ToString(), out nullIntVal) ? nullIntVal : null,
-            DeviceTypeID = int.TryParse(dr[nameof(Device.DeviceTypeID)].ToString(), out nullIntVal) ? nullIntVal : null,
-            DeviceUnitID = int.TryParse(dr[nameof(Device.DeviceUnitID)].ToString(), out nullIntVal) ? nullIntVal : null,
-            DeviceUnitZoneID = int.TryParse(dr[nameof(Device.DeviceUnitZoneID)].ToString(), out nullIntVal) ? nullIntVal : null,
-            DeviceConfigSensorID = int.TryParse(dr[nameof(Device.DeviceConfigSensorID)].ToString(), out nullIntVal) ? nullIntVal : null,
-            DeviceConfigControllerID = int.TryParse(dr[nameof(Device.DeviceConfigControllerID)].ToString(), out nullIntVal) ? nullIntVal : null,
-            DeviceTypeServiceID = int.TryParse(dr[nameof(Device.DeviceTypeServiceID)].ToString(), out nullIntVal) ? nullIntVal : null,
-
-            DeviceName = dr[nameof(Device.DeviceName)].ToString(),
-            MacAddress = dr[nameof(Device.MacAddress)].ToString(),
-
-            ApiId = dr[nameof(Device.ApiId)].ToString(),
-            ApiKey = dr[nameof(Device.ApiKey)].ToString(),
-            ServicePoint = dr[nameof(Device.ServicePoint)].ToString(),
-            ServicePublicKey = dr[nameof(Device.ServicePublicKey)].ToString(),
-
-            SleepSeconds = int.TryParse(dr[nameof(Device.SleepSeconds)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SleepDeepEnabled = bool.TryParse(dr[nameof(Device.SleepDeepEnabled)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-
-            DeviceSensorEnabled = bool.TryParse(dr[nameof(Device.DeviceSensorEnabled)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-            DeviceControllerEnabled = bool.TryParse(dr[nameof(Device.DeviceControllerEnabled)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-
-            BatteryEnabled = bool.TryParse(dr[nameof(Device.BatteryEnabled)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-
-            Debug = bool.TryParse(dr[nameof(Device.Debug)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-            Reboot = bool.TryParse(dr[nameof(Device.Reboot)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-            Reset = bool.TryParse(dr[nameof(Device.Reset)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-            FirmwareUpdate = bool.TryParse(dr[nameof(Device.FirmwareUpdate)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-
-            Enabled = bool.TryParse(dr[nameof(Device.Enabled)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-
-            DateCreated = (DateTime)dr[nameof(Device.DateCreated)],
-            DateModified = (DateTime)dr[nameof(Device.DateModified)]
-        };
 
         // DEVICE UPDATE
         public async Task DeviceUpdateAsync(Device? device)
@@ -604,227 +539,59 @@ namespace api.Dal
         public async Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID)
         {
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "DeviceConfigSensorGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-
-            cmd.Parameters.AddWithValue(nameof(Device.DeviceConfigSensorID), deviceConfigSensorID);
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            if (await dr.ReadAsync())
-            {
-                return DeviceConfigSensorRead(dr);
-            }
-            else
-            {
-                DeviceConfigSensor deviceConfigSensor = new DeviceConfigSensor();
-                return deviceConfigSensor; // vracamo prazni device namjerno
-            }
+            var config = await connection.QuerySingleOrDefaultAsync<DeviceConfigSensor>(
+                "DeviceConfigSensorGet",
+                new { DeviceConfigSensorID = deviceConfigSensorID },
+                commandType: CommandType.StoredProcedure);
+            return config ?? new DeviceConfigSensor(); // empty config on no row, kept intentionally
         }
-
-        private DeviceConfigSensor DeviceConfigSensorRead(MySqlDataReader dr) => new DeviceConfigSensor
-        {
-            IDDeviceConfigSensor = int.TryParse(dr[nameof(DeviceConfigSensor.IDDeviceConfigSensor)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorBattery = int.TryParse(dr[nameof(DeviceConfigSensor.SensorBattery)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorTemp = int.TryParse(dr[nameof(DeviceConfigSensor.SensorTemp)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorTempSoil = int.TryParse(dr[nameof(DeviceConfigSensor.SensorTempSoil)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorHumid = int.TryParse(dr[nameof(DeviceConfigSensor.SensorHumid)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorMoist = int.TryParse(dr[nameof(DeviceConfigSensor.SensorMoist)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorLight = int.TryParse(dr[nameof(DeviceConfigSensor.SensorLight)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorCo2 = int.TryParse(dr[nameof(DeviceConfigSensor.SensorCo2)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorTvoc = int.TryParse(dr[nameof(DeviceConfigSensor.SensorTvoc)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorBarometer = int.TryParse(dr[nameof(DeviceConfigSensor.SensorBarometer)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorPH = int.TryParse(dr[nameof(DeviceConfigSensor.SensorPH)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorRainLevel = int.TryParse(dr[nameof(DeviceConfigSensor.SensorRainLevel)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorWaterLevel = int.TryParse(dr[nameof(DeviceConfigSensor.SensorWaterLevel)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorWind = int.TryParse(dr[nameof(DeviceConfigSensor.SensorWind)].ToString(), out nullIntVal) ? nullIntVal : null
-
-
-        };
 
         public async Task<DeviceConfigController?> DeviceConfigControllerGetAsync(int? deviceConfigControllerID)
         {
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "DeviceConfigControllerGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-
-            cmd.Parameters.AddWithValue(nameof(Device.DeviceConfigControllerID), deviceConfigControllerID);
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            if (await dr.ReadAsync())
-            {
-                return DeviceConfigControllerRead(dr);
-            }
-            else
-            {
-                DeviceConfigController deviceConfigController = new DeviceConfigController();
-                return deviceConfigController; // vracamo prazni device namjerno
-                //throw new ArgumentException("Wrong id, no such person");
-
-            }
+            var config = await connection.QuerySingleOrDefaultAsync<DeviceConfigController>(
+                "DeviceConfigControllerGet",
+                new { DeviceConfigControllerID = deviceConfigControllerID },
+                commandType: CommandType.StoredProcedure);
+            return config ?? new DeviceConfigController(); // empty config on no row, kept intentionally
         }
-        private DeviceConfigController DeviceConfigControllerRead(MySqlDataReader dr) => new DeviceConfigController
-        {
-            IDDeviceConfigController = int.TryParse(dr[nameof(DeviceConfigController.IDDeviceConfigController)].ToString(), out nullIntVal) ? nullIntVal : null,
-
-            TempLow = double.TryParse(dr[nameof(DeviceConfigController.TempLow)].ToString(), out nullDoubleVal) ? nullDoubleVal : null,
-            TempHigh = double.TryParse(dr[nameof(DeviceConfigController.TempHigh)].ToString(), out nullDoubleVal) ? nullDoubleVal : null,
-            HumidLow = double.TryParse(dr[nameof(DeviceConfigController.HumidLow)].ToString(), out nullDoubleVal) ? nullDoubleVal : null,
-            HumidHigh = double.TryParse(dr[nameof(DeviceConfigController.HumidHigh)].ToString(), out nullDoubleVal) ? nullDoubleVal : null,
-            MoistLow = double.TryParse(dr[nameof(DeviceConfigController.MoistLow)].ToString(), out nullDoubleVal) ? nullDoubleVal : null,
-            MoistHigh = double.TryParse(dr[nameof(DeviceConfigController.MoistHigh)].ToString(), out nullDoubleVal) ? nullDoubleVal : null,
-            LightLow = double.TryParse(dr[nameof(DeviceConfigController.LightLow)].ToString(), out nullDoubleVal) ? nullDoubleVal : null,
-            LightHigh = double.TryParse(dr[nameof(DeviceConfigController.LightHigh)].ToString(), out nullDoubleVal) ? nullDoubleVal : null,
-            WaterLow = double.TryParse(dr[nameof(DeviceConfigController.WaterLow)].ToString(), out nullDoubleVal) ? nullDoubleVal : null,
-            WaterHigh = double.TryParse(dr[nameof(DeviceConfigController.WaterHigh)].ToString(), out nullDoubleVal) ? nullDoubleVal : null,
-
-            VentilationIntervalEnabled = bool.TryParse(dr[nameof(DeviceConfigController.VentilationIntervalEnabled)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-            VentilationInterval = int.TryParse(dr[nameof(DeviceConfigController.VentilationInterval)].ToString(), out nullIntVal) ? nullIntVal : null,
-            VentilationIntervalLenght = int.TryParse(dr[nameof(DeviceConfigController.VentilationIntervalLenght)].ToString(), out nullIntVal) ? nullIntVal : null,
-            LightIntervalEnabled = bool.TryParse(dr[nameof(DeviceConfigController.LightIntervalEnabled)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-            LightInterval = int.TryParse(dr[nameof(DeviceConfigController.LightInterval)].ToString(), out nullIntVal) ? nullIntVal : null,
-            LightIntervalLenght = int.TryParse(dr[nameof(DeviceConfigController.LightIntervalLenght)].ToString(), out nullIntVal) ? nullIntVal : null,
-            HeatingIntervalEnabled = bool.TryParse(dr[nameof(DeviceConfigController.HeatingIntervalEnabled)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-            HeatingInterval = int.TryParse(dr[nameof(DeviceConfigController.HeatingInterval)].ToString(), out nullIntVal) ? nullIntVal : null,
-            HeatingIntervalLenght = int.TryParse(dr[nameof(DeviceConfigController.HeatingIntervalLenght)].ToString(), out nullIntVal) ? nullIntVal : null,
-            WaterPumpIntervalEnabled = bool.TryParse(dr[nameof(DeviceConfigController.WaterPumpIntervalEnabled)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-            WaterPumpInterval = int.TryParse(dr[nameof(DeviceConfigController.WaterPumpInterval)].ToString(), out nullIntVal) ? nullIntVal : null,
-            WaterPumpIntervalLenght = int.TryParse(dr[nameof(DeviceConfigController.WaterPumpIntervalLenght)].ToString(), out nullIntVal) ? nullIntVal : null,
-
-            RelayEnabled = bool.TryParse(dr[nameof(DeviceConfigController.RelayEnabled)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-            Relay1 = int.TryParse(dr[nameof(DeviceConfigController.Relay1)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Relay2 = int.TryParse(dr[nameof(DeviceConfigController.Relay2)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Relay3 = int.TryParse(dr[nameof(DeviceConfigController.Relay3)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Relay4 = int.TryParse(dr[nameof(DeviceConfigController.Relay4)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Relay5 = int.TryParse(dr[nameof(DeviceConfigController.Relay5)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Relay6 = int.TryParse(dr[nameof(DeviceConfigController.Relay6)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Relay7 = int.TryParse(dr[nameof(DeviceConfigController.Relay7)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Relay8 = int.TryParse(dr[nameof(DeviceConfigController.Relay8)].ToString(), out nullIntVal) ? nullIntVal : null
-
-        };
 
 
 
         // DEVICE TYPE LIST
         public async Task<IList<DeviceType>> DeviceTypeGetAsync()
         {
-            IList<DeviceType> deviceType = new List<DeviceType>();
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "DeviceTypeGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            while (await dr.ReadAsync())
-            {
-                deviceType.Add(DeviceTypeRead(dr));
-            }
-
-            return deviceType;
+            var rows = await connection.QueryAsync<DeviceType>(
+                "DeviceTypeGet", commandType: CommandType.StoredProcedure);
+            return rows.AsList();
         }
-
-        private DeviceType DeviceTypeRead(MySqlDataReader dr) => new DeviceType
-        {
-            IDDeviceType = int.TryParse(dr[nameof(DeviceType.IDDeviceType)].ToString(), out nullIntVal) ? nullIntVal : null,
-            DeviceTypeName = dr[nameof(DeviceType.DeviceTypeName)].ToString(),
-            SensorEnabled = bool.TryParse(dr[nameof(DeviceType.SensorEnabled)].ToString(), out nullBoolVal) ? nullBoolVal : null,
-            ControllerEnabled = bool.TryParse(dr[nameof(DeviceType.ControllerEnabled)].ToString(), out nullBoolVal) ? nullBoolVal : null
-        };
 
         public async Task<IList<DeviceTypeService>> DeviceTypeServiceGetAsync()
         {
-            IList<DeviceTypeService> deviceTypeService = new List<DeviceTypeService>();
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "DeviceTypeServiceGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            while (await dr.ReadAsync())
-            {
-                deviceTypeService.Add(DeviceTypeServiceRead(dr));
-            }
-
-            return deviceTypeService;
+            var rows = await connection.QueryAsync<DeviceTypeService>(
+                "DeviceTypeServiceGet", commandType: CommandType.StoredProcedure);
+            return rows.AsList();
         }
-
-        private DeviceTypeService DeviceTypeServiceRead(MySqlDataReader dr) => new DeviceTypeService
-        {
-            IDDeviceTypeService = int.TryParse(dr[nameof(DeviceTypeService.IDDeviceTypeService)].ToString(), out nullIntVal) ? nullIntVal : null,
-            ServiceType = dr[nameof(DeviceTypeService.ServiceType)].ToString(),
-        };
-
-
 
         // TYPE RELAY
         public async Task<IList<DeviceTypeRelay>> DeviceTypeRelayGetAsync()
         {
-            IList<DeviceTypeRelay> deviceTypeRelay = new List<DeviceTypeRelay>();
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "DeviceTypeRelayGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            while (await dr.ReadAsync())
-            {
-                deviceTypeRelay.Add(DeviceTypeRelayRead(dr));
-            }
-
-            return deviceTypeRelay;
+            var rows = await connection.QueryAsync<DeviceTypeRelay>(
+                "DeviceTypeRelayGet", commandType: CommandType.StoredProcedure);
+            return rows.AsList();
         }
-
-        private DeviceTypeRelay DeviceTypeRelayRead(MySqlDataReader dr) => new DeviceTypeRelay
-        {
-            IDDeviceTypeRelay = int.TryParse(dr[nameof(DeviceTypeRelay.IDDeviceTypeRelay)].ToString(), out nullIntVal) ? nullIntVal : null,
-            RelayName = dr[nameof(DeviceTypeRelay.RelayName)].ToString(),
-        };
-
 
         // TYPE SENSOR
         public async Task<IList<DeviceTypeSensor>> DeviceTypeSensorGetAsync()
         {
-            IList<DeviceTypeSensor> deviceTypeSensor = new List<DeviceTypeSensor>();
             using var connection = new MySqlConnection(sqlcon);
-            await connection.OpenAsync();
-            using MySqlCommand cmd = connection.CreateCommand();
-            cmd.CommandText = "DeviceTypeSensorGet";
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-
-            using var dr = (MySqlDataReader)await cmd.ExecuteReaderAsync();
-            while (await dr.ReadAsync())
-            {
-                deviceTypeSensor.Add(DeviceTypeSensorRead(dr));
-            }
-
-            return deviceTypeSensor;
+            var rows = await connection.QueryAsync<DeviceTypeSensor>(
+                "DeviceTypeSensorGet", commandType: CommandType.StoredProcedure);
+            return rows.AsList();
         }
-
-        private DeviceTypeSensor DeviceTypeSensorRead(MySqlDataReader dr) => new DeviceTypeSensor
-        {
-            IDDeviceTypeSensor = int.TryParse(dr[nameof(DeviceTypeSensor.IDDeviceTypeSensor)].ToString(), out nullIntVal) ? nullIntVal : null,
-            SensorName = dr[nameof(DeviceTypeSensor.SensorName)].ToString(),
-            SensorDescription = dr[nameof(DeviceTypeSensor.SensorDescription)].ToString(),
-            Battery = int.TryParse(dr[nameof(DeviceTypeSensor.Battery)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Temperature = int.TryParse(dr[nameof(DeviceTypeSensor.Temperature)].ToString(), out nullIntVal) ? nullIntVal : null,
-            TemperatureSoil = int.TryParse(dr[nameof(DeviceTypeSensor.TemperatureSoil)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Humidity = int.TryParse(dr[nameof(DeviceTypeSensor.Humidity)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Moisture = int.TryParse(dr[nameof(DeviceTypeSensor.Moisture)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Light = int.TryParse(dr[nameof(DeviceTypeSensor.Light)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Co2 = int.TryParse(dr[nameof(DeviceTypeSensor.Co2)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Tvoc = int.TryParse(dr[nameof(DeviceTypeSensor.Tvoc)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Barometer = int.TryParse(dr[nameof(DeviceTypeSensor.Barometer)].ToString(), out nullIntVal) ? nullIntVal : null,
-            WaterPH = int.TryParse(dr[nameof(DeviceTypeSensor.WaterPH)].ToString(), out nullIntVal) ? nullIntVal : null,
-            WaterTankLevel = int.TryParse(dr[nameof(DeviceTypeSensor.WaterTankLevel)].ToString(), out nullIntVal) ? nullIntVal : null,
-            RainLevel = int.TryParse(dr[nameof(DeviceTypeSensor.RainLevel)].ToString(), out nullIntVal) ? nullIntVal : null,
-            Wind = int.TryParse(dr[nameof(DeviceTypeSensor.Wind)].ToString(), out nullIntVal) ? nullIntVal : null,
-        };
         // END DEVICE
 
 
