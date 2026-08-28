@@ -1,54 +1,158 @@
-﻿<!DOCTYPE html>
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    Func<string, string> navActive = c => string.Equals(c, currentController, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    HttpContextAccessor.HttpContext!.Request.Cookies.TryGetValue("login", out var currentUserEmail);
+}
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - api</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" />
-</head>
-<body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">api</a>
-                <button class="navbar-toggler" type="button" data-toggle="collapse" data-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Device" asp-action="Index">Devices</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="User" asp-action="Index">Users</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Group" asp-action="Index">Groups</a>
-                        </li>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+    <title>@ViewData["Title"] - Agrumy</title>
 
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Login" asp-action="Logout">Logout</a>
+    <!-- Applies the visitor's saved light/dark preference before first paint, avoiding a flash of the wrong theme. -->
+    <script>
+        (() => {
+            'use strict';
+            const root = document.documentElement;
+            const STORAGE_KEY = 'lte-theme';
+            let stored = null;
+            try { stored = localStorage.getItem(STORAGE_KEY); } catch { }
+            const resolved = (stored === 'dark' || stored === 'light')
+                ? stored
+                : (globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            root.setAttribute('data-bs-theme', resolved);
+            root.style.colorScheme = resolved;
+        })();
+    </script>
+
+    <link rel="stylesheet" href="~/lib/adminlte/plugins/bootstrap-icons/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/lib/adminlte/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/adminlte/css/adminlte.min.css" />
+</head>
+<body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
+    <div class="app-wrapper">
+        <!--begin::Header-->
+        <nav class="app-header navbar navbar-expand bg-body">
+            <div class="container-fluid">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button" aria-label="Toggle sidebar">
+                            <i class="bi bi-list"></i>
+                        </a>
+                    </li>
+                </ul>
+
+                <ul class="navbar-nav ms-auto align-items-center">
+                    @if (!string.IsNullOrEmpty(currentUserEmail))
+                    {
+                        <li class="nav-item d-none d-sm-block me-2 text-secondary">
+                            <i class="bi bi-person-circle me-1"></i>@currentUserEmail
                         </li>
-                    </ul>
-                </div>
+                    }
+                    <li class="nav-item dropdown">
+                        <a class="nav-link" href="#" id="lte-theme-toggle" aria-label="Toggle color scheme" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-sun-fill" data-lte-theme-icon="light"></i>
+                            <i class="bi bi-moon-fill d-none" data-lte-theme-icon="dark"></i>
+                            <i class="bi bi-circle-half d-none" data-lte-theme-icon="auto"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="lte-theme-toggle">
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light">
+                                    <i class="bi bi-sun-fill me-2"></i>Light
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark">
+                                    <i class="bi bi-moon-fill me-2"></i>Dark
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="auto">
+                                    <i class="bi bi-circle-half me-2"></i>Auto
+                                </button>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
             </div>
         </nav>
-    </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
+        <!--end::Header-->
+        <!--begin::Sidebar-->
+        <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
+            <div class="sidebar-brand">
+                <a asp-area="" asp-controller="Home" asp-action="Index" class="brand-link">
+                    <i class="bi bi-flower1 fs-4 ms-1 me-2"></i>
+                    <span class="brand-text fw-bold">Agrumy</span>
+                </a>
+            </div>
+            <div class="sidebar-wrapper">
+                <nav class="mt-2" aria-label="Main navigation">
+                    <ul class="nav sidebar-menu flex-column" id="navigation">
+                        <li class="nav-item">
+                            <a asp-area="" asp-controller="Device" asp-action="Index" class="nav-link @navActive("Device")">
+                                <i class="nav-icon bi bi-hdd-network"></i>
+                                <p>Devices</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a asp-area="" asp-controller="User" asp-action="Index" class="nav-link @navActive("User")">
+                                <i class="nav-icon bi bi-people"></i>
+                                <p>Users</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a asp-area="" asp-controller="Group" asp-action="Index" class="nav-link @navActive("Group")">
+                                <i class="nav-icon bi bi-diagram-3"></i>
+                                <p>Groups</p>
+                            </a>
+                        </li>
+                        <li class="nav-item mt-2 border-top border-secondary border-opacity-25 pt-2">
+                            <a asp-area="" asp-controller="Login" asp-action="Logout" class="nav-link">
+                                <i class="nav-icon bi bi-box-arrow-right"></i>
+                                <p>Logout</p>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </aside>
+        <!--end::Sidebar-->
+        <!--begin::App Main-->
+        <main class="app-main">
+            <div class="app-content-header">
+                <div class="container-fluid">
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <h1 class="mb-0 fs-3">@ViewData["Title"]</h1>
+                        </div>
+                        <div class="col-sm-6">
+                            <nav aria-label="breadcrumb">
+                                <ol class="breadcrumb float-sm-end">
+                                    <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+                                    <li class="breadcrumb-item active" aria-current="page">@ViewData["Title"]</li>
+                                </ol>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="app-content">
+                <div class="container-fluid">
+                    @RenderBody()
+                </div>
+            </div>
         </main>
+        <!--end::App Main-->
+        <footer class="app-footer">
+            <strong>&copy; 2024-2026 <a asp-controller="Home" asp-action="Privacy" class="text-decoration-none">Agrumy</a>.</strong> All rights reserved.
+        </footer>
     </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2024 - api - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-        </div>
-    </footer>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/adminlte/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/adminlte/js/adminlte.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
