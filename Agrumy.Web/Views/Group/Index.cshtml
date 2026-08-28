@@ -1,46 +1,66 @@
-﻿@model IEnumerable<api.Models.UserGroup>
+@model IEnumerable<api.Models.UserGroup>
 
 @{
     ViewData["Title"] = "View";
 }
 
-<h1>Groups</h1>
-
-<p>
-    <a asp-action="Create" class="btn btn-info">Create New</a>
-</p>
-<table class="table">
-    <thead>
-        <tr>
-            <th>
-                @Html.DisplayNameFor(model => model.IDUserGroup)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.GroupName)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.RoleName)
-            </th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Groups</h3>
+        <div class="card-tools">
+            <a asp-action="Create" class="btn btn-sm btn-info">Create New</a>
+        </div>
+    </div>
+    <div class="card-body table-responsive p-0">
+        <table id="groupsTable" class="table table-hover text-nowrap">
+            <thead>
+                <tr>
+                    <th>
+                        @Html.DisplayNameFor(model => model.IDUserGroup)
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.GroupName)
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.RoleName)
+                    </th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
 @foreach (var item in Model) {
-        <tr>
-            <td>
-                @Html.DisplayFor(modelItem => item.IDUserGroup)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.GroupName)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.RoleName)
-            </td>
-            <td>
-                    @Html.ActionLink("Details", "Details", new { idUserGroup = item.IDUserGroup }, new { @class = "btn btn-primary" })
-                    @Html.ActionLink("Delete", "Delete", new { idUserGroup = item.IDUserGroup }, new { @class = "btn btn-danger" })
-            </td>
-        </tr>
+                <tr>
+                    <td>
+                        @Html.DisplayFor(modelItem => item.IDUserGroup)
+                    </td>
+                    <td>
+                        @Html.DisplayFor(modelItem => item.GroupName)
+                    </td>
+                    <td>
+                        @Html.DisplayFor(modelItem => item.RoleName)
+                    </td>
+                    <td>
+                        @Html.ActionLink("Details", "Details", new { idUserGroup = item.IDUserGroup }, new { @class = "btn btn-sm btn-primary" })
+                        @Html.ActionLink("Delete", "Delete", new { idUserGroup = item.IDUserGroup }, new { @class = "btn btn-sm btn-danger" })
+                    </td>
+                </tr>
 }
-    </tbody>
-</table>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.min.js"></script>
+    <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.bootstrap5.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            new DataTable('#groupsTable', {
+                paging: true,
+                searching: true,
+                order: [[0, 'asc']],
+                columnDefs: [{ orderable: false, targets: -1 }]
+            });
+        });
+    </script>
+}
