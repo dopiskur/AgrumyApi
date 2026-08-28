@@ -364,6 +364,16 @@ namespace api.Controllers.API
                     return Unauthorized();
                 }
 
+                if (value.Enabled != null || value.UserGroupID != null)
+                {
+                    var callerTenantClaim = identity.FindFirst("TenantID");
+                    int? callerTenantId = callerTenantClaim != null && int.TryParse(callerTenantClaim.Value, out var parsedTenantId) ? parsedTenantId : null;
+                    if (user.TenantID != callerTenantId)
+                    {
+                        return StatusCode(403, "Target user belongs to a different tenant");
+                    }
+                }
+
 
                 // check for password change
                 UserSecret userSecret = await RepoFactory.GetRepo().UserSecretGetAsync(value.IDUser, null, null);
