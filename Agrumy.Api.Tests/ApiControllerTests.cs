@@ -109,6 +109,52 @@ public class ApiControllerTests : IDisposable
         _repo.Verify(r => r.DeviceDeleteAsync(It.IsAny<int?>(), It.IsAny<int?>()), Times.Never);
     }
 
+    // ---- UserApiController.UserRegistration (TENANT_ENABLED = true) ---------------------------
+
+    [Fact]
+    public async Task UserRegistration_NewTenantName_CreatesTenantAndBecomesAdmin()
+    {
+        _repo.Setup(r => r.TenantGetAsync("Acme")).ReturnsAsync(false);
+        _repo.Setup(r => r.TenantAddAsync("Acme")).ReturnsAsync(42);
+
+        User? capturedUser = null;
+        _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>()))
+             .Callback<User, UserSecret>((u, s) => capturedUser = u)
+             .Returns(Task.CompletedTask);
+
+        var controller = new UserApiController(NullLogger<UserApiController>.Instance);
+        var value = new UserRegistration { Email = "owner@acme.local", Username = "owner", Password = "pw", TenantName = "Acme" };
+        var result = await controller.UserRegistration(value);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.NotNull(capturedUser);
+        Assert.Equal(42, capturedUser!.TenantID);
+        Assert.Equal(0, capturedUser.UserGroupID); // admin on a brand new tenant
+        Assert.True(capturedUser.Enabled);
+    }
+
+    [Fact]
+    public async Task UserRegistration_ExistingTenantName_JoinsAsDisabledRegularUser()
+    {
+        _repo.Setup(r => r.TenantGetAsync("Acme")).ReturnsAsync(true);
+        _repo.Setup(r => r.TenantGetIdAsync("Acme")).ReturnsAsync(42);
+
+        User? capturedUser = null;
+        _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>()))
+             .Callback<User, UserSecret>((u, s) => capturedUser = u)
+             .Returns(Task.CompletedTask);
+
+        var controller = new UserApiController(NullLogger<UserApiController>.Instance);
+        var value = new UserRegistration { Email = "member@acme.local", Username = "member", Password = "pw", TenantName = "Acme" };
+        var result = await controller.UserRegistration(value);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.NotNull(capturedUser);
+        Assert.Equal(42, capturedUser!.TenantID); // joins the existing tenant, no new one created
+        Assert.Equal(1, capturedUser.UserGroupID); // DEFAULT_ROLEID - regular user, not admin
+        Assert.False(capturedUser.Enabled); // waits for that tenant's admin to enable them
+    }
+
     // ---- UserApiController.UserLogin ---------------------------------------------------------
 
     [Fact]
