@@ -1,0 +1,73 @@
+@model api.Models.DeviceView
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Temperature</h3></div>
+            <div class="card-body">
+                <div id="chart-temperature" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Humidity</h3></div>
+            <div class="card-body">
+                <div id="chart-humidity" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Barometer</h3></div>
+            <div class="card-body">
+                <div id="chart-barometer" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Soil moisture</h3></div>
+            <div class="card-body">
+                <div id="chart-moist" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Light</h3></div>
+            <div class="card-body">
+                <div id="chart-light" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">CO2</h3></div>
+            <div class="card-body">
+                <div id="chart-co2" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Water level</h3></div>
+            <div class="card-body">
+                <div id="chart-waterLevel" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="~/lib/echarts/echarts.min.js"></script>
+<script src="~/js/sensor-charts.js"></script>
+<script>
+    const sensorPayload = @Html.Raw(Model.SensorDataJson);
+    renderSensorChart('chart-temperature', sensorPayload, 'temperature', 'Temperature');
+    renderSensorChart('chart-humidity', sensorPayload, 'humidity', 'Humidity');
+    renderSensorChart('chart-barometer', sensorPayload, 'barometer', 'Barometer');
+    renderSensorChart('chart-moist', sensorPayload, 'moisture', 'Soil moisture');
+    renderSensorChart('chart-light', sensorPayload, 'light', 'Light');
+    renderSensorChart('chart-co2', sensorPayload, 'co2', 'CO2');
+    renderSensorChart('chart-waterLevel', sensorPayload, 'waterLevel', 'Water level');
+</script>
