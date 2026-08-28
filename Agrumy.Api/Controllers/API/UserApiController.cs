@@ -234,7 +234,7 @@ namespace api.Controllers.API
             try
             {
                 IList<User> users = new List<User>();
-                users = await RepoFactory.GetRepo().UsersGetAsync(DEFAULT_TENANTID);
+                users = await RepoFactory.GetRepo().UsersGetAsync(GetCallerTenantId());
 
                 return Ok(users);
 
