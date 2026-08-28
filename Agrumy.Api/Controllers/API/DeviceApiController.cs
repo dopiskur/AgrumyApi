@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 
 
 namespace api.Controllers.API
@@ -21,6 +22,14 @@ namespace api.Controllers.API
         public DeviceApiController(ILogger<DeviceApiController> logger)
         {
             _logger = logger;
+        }
+
+        /// <summary>TenantID claim set at login (JwtTokenProvider.CreateToken) - null only if the claim is somehow missing.</summary>
+        private int? GetCallerTenantId()
+        {
+            var identity = HttpContext.User.Identity as ClaimsIdentity;
+            var claim = identity?.FindFirst("TenantID");
+            return claim != null && int.TryParse(claim.Value, out var tenantId) ? tenantId : null;
         }
 
         #region websvc api
@@ -51,6 +60,19 @@ namespace api.Controllers.API
 
             try
             {
+                Device existingDevice = await RepoFactory.GetRepo().DeviceGetByIdAsync(device.IDDevice);
+                if (existingDevice.IDDevice == null)
+                {
+                    return NotFound();
+                }
+
+                if (existingDevice.TenantID != GetCallerTenantId())
+                {
+                    return StatusCode(403, "Device belongs to a different tenant");
+                }
+
+                device.TenantID = existingDevice.TenantID; // payload cannot move a device to another tenant
+
                 await RepoFactory.GetRepo().DeviceUpdateAsync(device);
 
                 // Updating configversion cache on update

@@ -40,6 +40,9 @@ namespace api.Dal.Interface
 
         Task DeviceDeleteAsync(int? idDevice);
         Task<Device> DeviceGetAsync(int? tenantID, int? idDevice, string? apiId, string? macAddress);
+
+        /// <summary>Fetches a device by id only, with no tenant filter - used only to check device ownership before an authorized write, never to serve data directly to a caller.</summary>
+        Task<Device> DeviceGetByIdAsync(int? idDevice);
         Task<IList<Device>> DevicesGetAsync(int? tenantID);
         Task<bool> DeviceCheckMacAddressAsync(int? tenantID, string? macAddress);
         Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID);

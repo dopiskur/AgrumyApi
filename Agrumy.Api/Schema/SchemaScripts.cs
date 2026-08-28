@@ -958,6 +958,17 @@ END IF;
 END
 """;
 
+        private const string P_DeviceGetById =
+"""
+CREATE OR REPLACE PROCEDURE `DeviceGetById`(
+	idDevice int
+)
+BEGIN
+-- No tenant filter by design - used only for ownership checks before an authorized write.
+select * from agrumy.device where device.IDDevice = idDevice Limit 1;
+END
+""";
+
         private const string P_DevicesGet =
 """
 CREATE OR REPLACE PROCEDURE `DevicesGet`(
@@ -1523,6 +1534,7 @@ END
             P_DeviceConfigSensorUpdate,
             P_DeviceDelete,
             P_DeviceGet,
+            P_DeviceGetById,
             P_DevicesGet,
             P_DeviceTypeGet,
             P_DeviceTypeRelayGet,

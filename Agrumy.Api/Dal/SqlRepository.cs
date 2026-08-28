@@ -375,6 +375,19 @@ namespace api.Dal
             return device ?? new Device(); // empty device on no row, kept intentionally
         }
 
+        public async Task<Device> DeviceGetByIdAsync(int? idDevice)
+        {
+            // No tenant filter by design - callers use this only to look up a device's real
+            // TenantID for an ownership check, before deciding whether to allow the request.
+            using var connection = new MySqlConnection(sqlcon);
+            var device = await connection.QuerySingleOrDefaultAsync<Device>(
+                "DeviceGetById",
+                new { IDDevice = idDevice },
+                commandType: CommandType.StoredProcedure);
+
+            return device ?? new Device();
+        }
+
         // DEVICE UPDATE
         public async Task DeviceUpdateAsync(Device? device)
         {
