@@ -558,6 +558,28 @@ namespace api.Dal
             return config ?? new DeviceConfigController(); // empty config on no row, kept intentionally
         }
 
+        public async Task<Device> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID)
+        {
+            // No tenant filter by design - used only to look up the owning device's TenantID
+            // for an ownership check before returning the config to the caller.
+            using var connection = new MySqlConnection(sqlcon);
+            var device = await connection.QuerySingleOrDefaultAsync<Device>(
+                "DeviceGetByDeviceConfigSensorId",
+                new { DeviceConfigSensorID = deviceConfigSensorID },
+                commandType: CommandType.StoredProcedure);
+            return device ?? new Device();
+        }
+
+        public async Task<Device> DeviceGetByDeviceConfigControllerIdAsync(int? deviceConfigControllerID)
+        {
+            using var connection = new MySqlConnection(sqlcon);
+            var device = await connection.QuerySingleOrDefaultAsync<Device>(
+                "DeviceGetByDeviceConfigControllerId",
+                new { DeviceConfigControllerID = deviceConfigControllerID },
+                commandType: CommandType.StoredProcedure);
+            return device ?? new Device();
+        }
+
 
 
         // DEVICE TYPE LIST

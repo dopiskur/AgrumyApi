@@ -48,6 +48,10 @@ namespace api.Dal.Interface
         Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID);
         Task<DeviceConfigController?> DeviceConfigControllerGetAsync(int? deviceConfigControllerID);
 
+        /// <summary>Fetches the device that owns this sensor/controller config id, with no tenant filter - used only for ownership checks before returning config data.</summary>
+        Task<Device> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID);
+        Task<Device> DeviceGetByDeviceConfigControllerIdAsync(int? deviceConfigControllerID);
+
         // Device UPDATE
         Task DeviceUpdateAsync(Device? device);
         Task DeviceConfigControllerUpdateAsync(int? idDevice, DeviceConfigController? deviceConfigController);

@@ -125,6 +125,16 @@ namespace api.Controllers.API
         public async Task<ActionResult<Device>> DeviceConfigSensorGet(int? deviceConfigSensorID)
         { //0 day, 1 month, 2 year
 
+            Device owner = await RepoFactory.GetRepo().DeviceGetByDeviceConfigSensorIdAsync(deviceConfigSensorID);
+            if (owner.IDDevice == null)
+            {
+                return NotFound();
+            }
+            if (owner.TenantID != GetCallerTenantId())
+            {
+                return StatusCode(403, "Sensor config belongs to a different tenant");
+            }
+
             DeviceConfigSensor deviceConfigSensor = await RepoFactory.GetRepo().DeviceConfigSensorGetAsync(deviceConfigSensorID);
             return Ok(deviceConfigSensor);
         }
@@ -134,6 +144,16 @@ namespace api.Controllers.API
         public async Task<ActionResult<Device>> DeviceConfigControllerGet(int? deviceConfigControllerID)
         { //0 day, 1 month, 2 year
 
+            Device owner = await RepoFactory.GetRepo().DeviceGetByDeviceConfigControllerIdAsync(deviceConfigControllerID);
+            if (owner.IDDevice == null)
+            {
+                return NotFound();
+            }
+            if (owner.TenantID != GetCallerTenantId())
+            {
+                return StatusCode(403, "Controller config belongs to a different tenant");
+            }
+
             DeviceConfigController deviceConfigController = await RepoFactory.GetRepo().DeviceConfigControllerGetAsync(deviceConfigControllerID);
             return Ok(deviceConfigController);
         }
@@ -142,6 +162,16 @@ namespace api.Controllers.API
         [HttpPut("Sensor")]
         public async Task<ActionResult<bool>> DeviceConfigSensorUpdate(DeviceUpdate? deviceUpdate)
         { //0 day, 1 month, 2 year
+
+            Device existingDevice = await RepoFactory.GetRepo().DeviceGetByIdAsync(deviceUpdate.Device.IDDevice);
+            if (existingDevice.IDDevice == null)
+            {
+                return NotFound();
+            }
+            if (existingDevice.TenantID != GetCallerTenantId())
+            {
+                return StatusCode(403, "Device belongs to a different tenant");
+            }
 
             await RepoFactory.GetRepo().DeviceConfigSensorUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Sensor);
 
@@ -155,6 +185,16 @@ namespace api.Controllers.API
         [HttpPut("Controller")]
         public async Task<ActionResult<bool>> DeviceConfigControllerUpdate(DeviceUpdate? deviceUpdate)
         { //0 day, 1 month, 2 year
+
+            Device existingDevice = await RepoFactory.GetRepo().DeviceGetByIdAsync(deviceUpdate.Device.IDDevice);
+            if (existingDevice.IDDevice == null)
+            {
+                return NotFound();
+            }
+            if (existingDevice.TenantID != GetCallerTenantId())
+            {
+                return StatusCode(403, "Device belongs to a different tenant");
+            }
 
             await RepoFactory.GetRepo().DeviceConfigControllerUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Controller);
 

@@ -792,6 +792,28 @@ BEGIN
 END
 """;
 
+        private const string P_DeviceGetByDeviceConfigSensorId =
+"""
+CREATE OR REPLACE PROCEDURE `DeviceGetByDeviceConfigSensorId`(
+	deviceConfigSensorID int
+)
+BEGIN
+-- No tenant filter by design - used only for ownership checks before returning config data.
+select * from agrumy.device where device.DeviceConfigSensorID = deviceConfigSensorID Limit 1;
+END
+""";
+
+        private const string P_DeviceGetByDeviceConfigControllerId =
+"""
+CREATE OR REPLACE PROCEDURE `DeviceGetByDeviceConfigControllerId`(
+	deviceConfigControllerID int
+)
+BEGIN
+-- No tenant filter by design - used only for ownership checks before returning config data.
+select * from agrumy.device where device.DeviceConfigControllerID = deviceConfigControllerID Limit 1;
+END
+""";
+
         private const string P_DeviceConfigControllerUpdate =
 """
 CREATE OR REPLACE PROCEDURE `DeviceConfigControllerUpdate`(
@@ -1533,6 +1555,8 @@ END
             P_DeviceConfigControllerUpdate,
             P_DeviceConfigSensorGet,
             P_DeviceConfigSensorUpdate,
+            P_DeviceGetByDeviceConfigSensorId,
+            P_DeviceGetByDeviceConfigControllerId,
             P_DeviceDelete,
             P_DeviceGet,
             P_DeviceGetById,
