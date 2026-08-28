@@ -68,6 +68,7 @@ namespace api.Dal.Interface
 
         // Tenant
         Task<bool> TenantGetAsync(string tenantName);
+        Task<int?> TenantGetIdAsync(string tenantName);
         Task<int> TenantAddAsync(string tenantName);
 
         // Group

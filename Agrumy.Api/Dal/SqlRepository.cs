@@ -688,6 +688,17 @@ namespace api.Dal
                 return false;
             }
         }
+        public async Task<int?> TenantGetIdAsync(string tenantName)
+        {
+            using var connection = new MySqlConnection(sqlcon);
+            // Reuses the same TenantGet proc as TenantGetAsync (it already selects IDTenant),
+            // just reads the id back instead of only checking whether a row exists.
+            var tenant = await connection.QuerySingleOrDefaultAsync<Tenant>(
+                "TenantGet",
+                new { TenantName = tenantName },
+                commandType: CommandType.StoredProcedure);
+            return tenant?.IDTenant;
+        }
         public async Task<int> TenantAddAsync(string tenantName)
         {
             using var connection = new MySqlConnection(sqlcon);

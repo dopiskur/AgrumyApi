@@ -59,11 +59,23 @@ namespace api.Controllers.API
 
 
                 // check tenant name
-                if (TENANT_ENABLED == true && !await RepoFactory.GetRepo().TenantGetAsync(value.TenantName))
+                if (TENANT_ENABLED == true)
                 {
-                    user.TenantID = await RepoFactory.GetRepo().TenantAddAsync(value.TenantName);
-                    user.UserGroupID = 0; // set as admin on new tenant
-                    user.Enabled = true; // set as enabled user
+                    if (!await RepoFactory.GetRepo().TenantGetAsync(value.TenantName))
+                    {
+                        user.TenantID = await RepoFactory.GetRepo().TenantAddAsync(value.TenantName);
+                        user.UserGroupID = 0; // set as admin on new tenant
+                        user.Enabled = true; // set as enabled user
+                    }
+                    else
+                    {
+                        // Tenant already exists: join it as a regular, disabled user instead of
+                        // silently falling through to DEFAULT_TENANTID (0) - that would have
+                        // merged unrelated tenants' users into the same "default" tenant bucket.
+                        user.TenantID = await RepoFactory.GetRepo().TenantGetIdAsync(value.TenantName);
+                        user.UserGroupID = DEFAULT_ROLEID; // regular user, not admin
+                        user.Enabled = DEFAULT_USER_ENABLED; // waits for that tenant's admin to enable them
+                    }
                 }
 
 
