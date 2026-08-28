@@ -48,7 +48,7 @@ namespace api.Controllers.View
             }
             catch (Exception e)
             {
-
+                ModelState.AddModelError(string.Empty, "Invalid email/username or password.");
                 return View(userLogin);
             }
         }
