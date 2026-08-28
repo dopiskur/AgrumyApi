@@ -121,7 +121,7 @@ namespace api.Controllers.API
         public async Task<ActionResult<IEnumerable<SensorData>>> ReportGet(int? getData, int? idDevice, int? iDSensorDataReport)
         {
 
-            IEnumerable<SensorDataReport>? sensorDataResult = await RepoFactory.GetRepo().SensorDataReportGetAsync(getData, idDevice, iDSensorDataReport);
+            IEnumerable<SensorDataReport>? sensorDataResult = await RepoFactory.GetRepo().SensorDataReportGetAsync(GetCallerTenantId(), getData, idDevice, iDSensorDataReport);
 
 
             return Ok(sensorDataResult);

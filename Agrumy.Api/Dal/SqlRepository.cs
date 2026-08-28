@@ -668,14 +668,14 @@ namespace api.Dal
             return sensorDataResult="";
         }
 
-        public async Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? getData, int? deviceID, int? reportID)
+        public async Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? tenantID, int? getData, int? deviceID, int? reportID)
         {
             using var connection = new MySqlConnection(sqlcon);
             // The proc returns different column sets for getData==0 vs getData>0; Dapper just
             // maps whichever columns are present (SensorData stays null for the summary case).
             var rows = await connection.QueryAsync<SensorDataReport>(
                 "SensorDataReportGet",
-                new { getData, deviceID, reportID },
+                new { tenantID, getData, deviceID, reportID },
                 commandType: CommandType.StoredProcedure);
             return rows.AsList();
         }

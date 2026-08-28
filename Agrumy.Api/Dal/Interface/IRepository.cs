@@ -69,7 +69,7 @@ namespace api.Dal.Interface
 
         Task SensorDataPushAsync(JsonArray jsonArray);
         Task<string> SensorDataGetAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY, int? buildReport);
-        Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? getData, int? deviceID, int? sensorDataReportID);
+        Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? tenantID, int? getData, int? deviceID, int? sensorDataReportID);
         Task SensorDataDeleteAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY);
 
 

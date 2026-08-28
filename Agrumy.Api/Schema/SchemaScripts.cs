@@ -1470,16 +1470,25 @@ END
         private const string P_SensorDataReportGet =
 """
 CREATE OR REPLACE PROCEDURE `SensorDataReportGet`(
+	tenantID int,
 	getData int,
     deviceID int,
     reportID int
 )
 BEGIN
+-- sensorDataReport has no TenantID column of its own, only DeviceID - join to device to scope
+-- results to the caller's tenant.
 CASE
 	WHEN getData = 0 THEN
-		select IDSensorDataReport, DeviceID, ReportName, DateGenerated from sensorDataReport where sensorDataReport.DeviceID = deviceID;
+		select sensorDataReport.IDSensorDataReport, sensorDataReport.DeviceID, sensorDataReport.ReportName, sensorDataReport.DateGenerated
+        from sensorDataReport
+        join device on device.IDDevice = sensorDataReport.DeviceID
+        where sensorDataReport.DeviceID = deviceID and device.TenantID = tenantID;
     WHEN getData > 0 THEN
-		select * from sensorDataReport where sensorDataReport.IDSensorDataReport = reportID;
+		select sensorDataReport.*
+        from sensorDataReport
+        join device on device.IDDevice = sensorDataReport.DeviceID
+        where sensorDataReport.IDSensorDataReport = reportID and device.TenantID = tenantID;
 END CASE;
 END
 """;
