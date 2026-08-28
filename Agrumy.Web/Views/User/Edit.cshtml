@@ -1,92 +1,83 @@
-﻿@model api.Models.UserView
+@model api.Models.UserView
 
 @{
     ViewData["Title"] = "Edit";
 }
 
-<h1>Edit User</h1>
-<hr />
-<div class="row">
-    <div class="col-md-4">
-
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Edit User</h3>
+    </div>
+    <div class="card-body">
         <form asp-action="Edit">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <div class="form-group">
+            <div class="mb-3">
                 <input asp-for="UserUpdate.IDUser" class="form-control" />
                 <span asp-validation-for="UserUpdate.IDUser" class="text-danger"></span>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <input asp-for="UserUpdate.TenantID" class="form-control" />
                 <span asp-validation-for="UserUpdate.TenantID" class="text-danger"></span>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label asp-for="UserUpdate.Email" class="control-label"></label>
                 <input asp-for="UserUpdate.Email" class="form-control" />
                 <span asp-validation-for="UserUpdate.Email" class="text-danger"></span>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label asp-for="UserUpdate.Password" class="control-label"></label>
                 <input asp-for="UserUpdate.Password" class="form-control" />
                 <span asp-validation-for="UserUpdate.Password" class="text-danger"></span>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label asp-for="UserUpdate.DevicePin" class="control-label"></label>
                 <input asp-for="UserUpdate.DevicePin" class="form-control" />
                 <span asp-validation-for="UserUpdate.DevicePin" class="text-danger"></span>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label asp-for="UserUpdate.Username" class="control-label"></label>
                 <input asp-for="UserUpdate.Username" class="form-control" />
                 <span asp-validation-for="UserUpdate.Username" class="text-danger"></span>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label asp-for="UserUpdate.FirstName" class="control-label"></label>
                 <input asp-for="UserUpdate.FirstName" class="form-control" />
                 <span asp-validation-for="UserUpdate.FirstName" class="text-danger"></span>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label asp-for="UserUpdate.LastName" class="control-label"></label>
                 <input asp-for="UserUpdate.LastName" class="form-control" />
                 <span asp-validation-for="UserUpdate.LastName" class="text-danger"></span>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label asp-for="UserUpdate.Phone" class="control-label"></label>
                 <input asp-for="UserUpdate.Phone" class="form-control" />
                 <span asp-validation-for="UserUpdate.Phone" class="text-danger"></span>
             </div>
 
-            <div class="form-group">
+            <div class="mb-3">
                 <label asp-for="UserUpdate.UserGroupID" class="control-label"></label>
                 @Html.DropDownListFor(m => m.UserUpdate.UserGroupID,
                          new SelectList(Model.UserGroups.ToList(), "IDUserGroup", "GroupName", Model.UserGroups.First().IDUserGroup),
                          new { @class = "form-control" })
             </div>
 
-            <div class="form-group">
-                <label asp-for="UserUpdate.Enabled" class="control-label">Account</label>
-                <div class="btn-group" data-toggle="buttons" name="UserEnabled" style="float: right;">
-                    <label class="pdsa-radiobutton btn btn-primary">
-                        <span class="glyphicon glyphicon-unchecked"></span>
-                        @Html.RadioButtonFor(m => m.UserUpdate.Enabled, "True", new { @name = "UserEnabled" }) Enabled
-                    </label>
-                    <label class="pdsa-radiobutton btn btn-primary">
-                        <span class="glyphicon glyphicon-unchecked"></span>
-                        @Html.RadioButtonFor(m => m.UserUpdate.Enabled, "False", new { @name = "UserEnabled" }) Disabled
-                    </label>
+            <div class="mb-3 d-flex justify-content-between align-items-center">
+                <label asp-for="UserUpdate.Enabled" class="control-label mb-0">Account</label>
+                <div class="btn-group" role="group">
+                    @Html.RadioButtonFor(m => m.UserUpdate.Enabled, "True", new { @name = "UserEnabled", @class = "btn-check", id = "UserEnabled_True" })
+                    <label class="btn btn-outline-success" for="UserEnabled_True">Enabled</label>
+                    @Html.RadioButtonFor(m => m.UserUpdate.Enabled, "False", new { @name = "UserEnabled", @class = "btn-check", id = "UserEnabled_False" })
+                    <label class="btn btn-outline-danger" for="UserEnabled_False">Disabled</label>
                 </div>
             </div>
 
-
-
-            <div class="form-group">
+            <div class="mb-0">
                 <input type="submit" value="Save" class="btn btn-primary" />
+                <a asp-action="Index" class="btn btn-outline-secondary">Back to List</a>
             </div>
         </form>
     </div>
-</div>
-
-<div>
-    <a asp-action="Index">Back to List</a>
 </div>
 
 @section Scripts {

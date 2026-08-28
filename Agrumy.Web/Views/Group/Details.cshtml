@@ -1,35 +1,36 @@
-﻿@model api.Models.UserGroup
+@model api.Models.UserGroup
 
 @{
     ViewData["Title"] = "Details";
 }
 
-<h1>Details</h1>
-
-<div>
-    <h4>UserGroup</h4>
-    <hr />
-    <dl class="row">
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.IDUserGroup)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.IDUserGroup)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.GroupName)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.GroupName)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.RoleName)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.RoleName)
-        </dd>
-    </dl>
-</div>
-<div>
-    <a asp-action="Index">Back to List</a>
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Group</h3>
+    </div>
+    <div class="card-body">
+        <dl class="row">
+            <dt class = "col-sm-3">
+                @Html.DisplayNameFor(model => model.IDUserGroup)
+            </dt>
+            <dd class = "col-sm-9">
+                @Html.DisplayFor(model => model.IDUserGroup)
+            </dd>
+            <dt class = "col-sm-3">
+                @Html.DisplayNameFor(model => model.GroupName)
+            </dt>
+            <dd class = "col-sm-9">
+                @Html.DisplayFor(model => model.GroupName)
+            </dd>
+            <dt class = "col-sm-3">
+                @Html.DisplayNameFor(model => model.RoleName)
+            </dt>
+            <dd class = "col-sm-9">
+                @Html.DisplayFor(model => model.RoleName)
+            </dd>
+        </dl>
+    </div>
+    <div class="card-footer">
+        <a asp-action="Index" class="btn btn-outline-secondary">Back to List</a>
+    </div>
 </div>
