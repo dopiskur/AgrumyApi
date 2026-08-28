@@ -446,6 +446,13 @@ namespace api.Controllers.API
 
                 if (idUser > 1) // preventing deletion of admin
                 {
+                    User targetUser = await RepoFactory.GetRepo().UserGetAsync(idUser, null, null);
+
+                    if (targetUser.TenantID != GetCallerTenantId())
+                    {
+                        return StatusCode(403, "Target user belongs to a different tenant");
+                    }
+
                     if (await RepoFactory.GetRepo().UserDeleteAsync(idUser))
                     {
                         return Ok("User deleted");
