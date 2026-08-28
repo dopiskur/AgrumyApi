@@ -30,6 +30,14 @@ namespace api.Controllers.API
         private readonly bool? DEFAULT_USER_ENABLED = false;
         private readonly bool? TENANT_ENABLED = false;
 
+        /// <summary>TenantID claim set at login (JwtTokenProvider.CreateToken) - null only if the claim is somehow missing.</summary>
+        private int? GetCallerTenantId()
+        {
+            var identity = HttpContext.User.Identity as ClaimsIdentity;
+            var claim = identity?.FindFirst("TenantID");
+            return claim != null && int.TryParse(claim.Value, out var tenantId) ? tenantId : null;
+        }
+
 
 
         // User registration
@@ -282,6 +290,11 @@ namespace api.Controllers.API
 
 
                 User user = await RepoFactory.GetRepo().UserGetAsync(idUser, null, null);
+
+                if (user.TenantID != GetCallerTenantId())
+                {
+                    return StatusCode(403, "Target user belongs to a different tenant");
+                }
 
                 return Ok(user);
             }
