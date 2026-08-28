@@ -153,6 +153,95 @@ public class ApiControllerTests : IDisposable
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(401, obj.StatusCode);
     }
+
+    // ---- UserApiController.UserGet ------------------------------------------------------------
+
+    [Fact]
+    public async Task UserGet_DifferentTenant_Returns403()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 99 });
+
+        var controller = new UserApiController(NullLogger<UserApiController>.Instance);
+        SetCaller(controller, "admin", 1);
+        var result = await controller.UserGet(50);
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+    }
+
+    // ---- UserApiController.UsersGet -----------------------------------------------------------
+
+    [Fact]
+    public async Task UsersGet_UsesCallerTenant_NotHardcodedDefault()
+    {
+        // Strict mock: if the controller still passed the hardcoded DEFAULT_TENANTID (0)
+        // instead of the caller's claim, this setup wouldn't match and the call would throw.
+        _repo.Setup(r => r.UsersGetAsync(7)).ReturnsAsync(new List<User> { new() { IDUser = 1, TenantID = 7 } });
+
+        var controller = new UserApiController(NullLogger<UserApiController>.Instance);
+        SetCaller(controller, "admin", 7);
+        var result = await controller.UsersGet();
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var users = Assert.IsAssignableFrom<IList<User>>(ok.Value);
+        Assert.Single(users);
+    }
+
+    // ---- UserApiController.UserAdd ------------------------------------------------------------
+
+    [Fact]
+    public async Task UserAdd_IgnoresPayloadTenantID_UsesCallersTenant()
+    {
+        User? capturedUser = null;
+        _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>()))
+             .Callback<User, UserSecret>((u, s) => capturedUser = u)
+             .Returns(Task.CompletedTask);
+
+        var controller = new UserApiController(NullLogger<UserApiController>.Instance);
+        SetCaller(controller, "admin", 24);
+        var value = new UserAdd { TenantID = 999, Email = "x@test.local", Username = "x", Password = "pw", UserGroupID = 1, Enabled = true };
+        var result = await controller.UserAdd(value);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.NotNull(capturedUser);
+        Assert.Equal(24, capturedUser!.TenantID); // not 999 from the payload
+    }
+
+    // ---- UserApiController.Delete (user) ------------------------------------------------------
+
+    [Fact]
+    public async Task UserDelete_DifferentTenant_Returns403AndDoesNotCallDelete()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 99 });
+
+        var controller = new UserApiController(NullLogger<UserApiController>.Instance);
+        SetCaller(controller, "admin", 1);
+        var result = await controller.Delete(50);
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+        _repo.Verify(r => r.UserDeleteAsync(It.IsAny<int?>()), Times.Never);
+    }
+
+    // ---- UserApiController.UserUpdate ---------------------------------------------------------
+
+    [Fact]
+    public async Task UserUpdate_DifferentTenant_Returns403_EvenForEmailOnlyChange()
+    {
+        // Regression guard: the tenant check used to only fire for Enabled/UserGroupID changes,
+        // letting an admin edit a different tenant's user's Email/Name/Phone unchecked.
+        _repo.Setup(r => r.UserGetAsync(50, null, null))
+             .ReturnsAsync(new User { IDUser = 50, TenantID = 99, Email = "target@test.local" });
+
+        var controller = new UserApiController(NullLogger<UserApiController>.Instance);
+        SetCaller(controller, "admin", 1);
+        var value = new UserUpdate { IDUser = 50, Email = "hijacked@evil.local" };
+        var result = await controller.UserUpdate(value);
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+        _repo.Verify(r => r.UserUpdateAsync(It.IsAny<User>()), Times.Never);
+    }
 }
 
 /// <summary>
