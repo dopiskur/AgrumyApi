@@ -1,0 +1,48 @@
+@{
+    var boxClass = ViewData["AuthBoxClass"] as string ?? "login-box";
+    var bodyClass = ViewData["AuthBodyClass"] as string ?? "login-page";
+    var logoClass = boxClass == "register-box" ? "register-logo" : "login-logo";
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+    <title>@ViewData["Title"] - Agrumy</title>
+
+    <!-- Applies the visitor's saved light/dark preference before first paint, avoiding a flash of the wrong theme. -->
+    <script>
+        (() => {
+            'use strict';
+            const root = document.documentElement;
+            const STORAGE_KEY = 'lte-theme';
+            let stored = null;
+            try { stored = localStorage.getItem(STORAGE_KEY); } catch { }
+            const resolved = (stored === 'dark' || stored === 'light')
+                ? stored
+                : (globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            root.setAttribute('data-bs-theme', resolved);
+            root.style.colorScheme = resolved;
+        })();
+    </script>
+
+    <link rel="stylesheet" href="~/lib/adminlte/plugins/bootstrap-icons/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/lib/adminlte/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/adminlte/css/adminlte.min.css" />
+</head>
+<body class="@bodyClass bg-body-secondary">
+    <main class="@boxClass">
+        <h1 class="@logoClass">
+            <i class="bi bi-flower1 me-2"></i><b>Agrumy</b>
+        </h1>
+        <div class="card">
+            @RenderBody()
+        </div>
+    </main>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/adminlte/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/adminlte/js/adminlte.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
