@@ -47,9 +47,14 @@
                          new SelectList(Model.UserGroups.ToList(), "IDUserGroup", "GroupName", Model.UserGroups.First().IDUserGroup),
                          new { @class = "form-control" })
             </div>
-            <div class="mb-3">
-                @Html.LabelFor(model => model.UserAdd.Enabled, htmlAttributes: new { @class = "control-label" })
-                @Html.EditorFor(model => model.UserAdd.Enabled, new { htmlAttributes = new { @class = "form-control" } })
+            <div class="mb-3 d-flex justify-content-between align-items-center">
+                @Html.LabelFor(model => model.UserAdd.Enabled, htmlAttributes: new { @class = "control-label mb-0" })
+                <div class="btn-group" role="group">
+                    @Html.RadioButtonFor(m => m.UserAdd.Enabled, "True", new { @name = "Enabled", @class = "btn-check", id = "UserAdd_Enabled_True" })
+                    <label class="btn btn-outline-success" for="UserAdd_Enabled_True">Enabled</label>
+                    @Html.RadioButtonFor(m => m.UserAdd.Enabled, "False", new { @name = "Enabled", @class = "btn-check", id = "UserAdd_Enabled_False" })
+                    <label class="btn btn-outline-danger" for="UserAdd_Enabled_False">Disabled</label>
+                </div>
                 @Html.ValidationMessageFor(model => model.UserAdd.Enabled, "", new { @class = "text-danger" })
             </div>
 
