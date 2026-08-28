@@ -682,7 +682,7 @@ namespace api.Dal
 
 
 
-        public async Task SensorDataDeleteAsync(int? tenantID, int? deviceID, int? timeMDMY, int? timeRange)
+        public async Task SensorDataDeleteAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY)
         {
             using var connection = new MySqlConnection(sqlcon);
             await connection.OpenAsync();

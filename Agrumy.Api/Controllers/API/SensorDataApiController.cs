@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 using System.Text.Json.Nodes;
 
 
@@ -20,6 +21,14 @@ namespace api.Controllers.API
         public SensorDataController(ILogger<SensorDataController> logger)
         {
             _logger = logger;
+        }
+
+        /// <summary>TenantID claim set at login (JwtTokenProvider.CreateToken) - null only if the claim is somehow missing.</summary>
+        private int? GetCallerTenantId()
+        {
+            var identity = HttpContext.User.Identity as ClaimsIdentity;
+            var claim = identity?.FindFirst("TenantID");
+            return claim != null && int.TryParse(claim.Value, out var tenantId) ? tenantId : null;
         }
 
         // GET: api/<SensorDataController>
@@ -87,12 +96,12 @@ namespace api.Controllers.API
         // mozda cu koristit post za ovo, jer ne mogu dobit u body resposne koliko je redova obrisano, delete to ne podrzava
         [HttpDelete]
         [Authorize(Roles = "admin")]
-        public async Task<ActionResult> Delete(int deviceID, int tenantID, int timeMDMY = 0, int timeRange = 0)
+        public async Task<ActionResult> Delete(int deviceID, int timeMDMY = 0, int timeRange = 0)
         {
 
             try
             {
-                await RepoFactory.GetRepo().SensorDataDeleteAsync(deviceID, tenantID, timeMDMY, timeRange);
+                await RepoFactory.GetRepo().SensorDataDeleteAsync(GetCallerTenantId(), deviceID, timeRange, timeMDMY);
 
                 return Ok();
             }
