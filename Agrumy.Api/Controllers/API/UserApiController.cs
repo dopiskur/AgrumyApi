@@ -28,7 +28,7 @@ namespace api.Controllers.API
         private readonly int? DEFAULT_TENANTID = 0;
         private readonly int? DEFAULT_ROLEID = 1;
         private readonly bool? DEFAULT_USER_ENABLED = false;
-        private readonly bool? TENANT_ENABLED = false;
+        private readonly bool? TENANT_ENABLED = true;
 
         /// <summary>TenantID claim set at login (JwtTokenProvider.CreateToken) - null only if the claim is somehow missing.</summary>
         private int? GetCallerTenantId()
