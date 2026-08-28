@@ -97,7 +97,19 @@ namespace api.Controllers.API
 
             try
             {
-                await RepoFactory.GetRepo().DeviceDeleteAsync(idDevice);
+                Device existingDevice = await RepoFactory.GetRepo().DeviceGetByIdAsync(idDevice);
+                if (existingDevice.IDDevice == null)
+                {
+                    return NotFound();
+                }
+
+                int? callerTenantId = GetCallerTenantId();
+                if (existingDevice.TenantID != callerTenantId)
+                {
+                    return StatusCode(403, "Device belongs to a different tenant");
+                }
+
+                await RepoFactory.GetRepo().DeviceDeleteAsync(idDevice, callerTenantId);
                 return true;
             }
             catch (Exception e)

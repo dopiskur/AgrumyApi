@@ -342,7 +342,7 @@ namespace api.Dal
 
             await cmd.ExecuteNonQueryAsync();
         }
-        public async Task DeviceDeleteAsync(int? idDevice)
+        public async Task DeviceDeleteAsync(int? idDevice, int? tenantID)
         {
             using var connection = new MySqlConnection(sqlcon);
             await connection.OpenAsync();
@@ -351,6 +351,7 @@ namespace api.Dal
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
 
             cmd.Parameters.AddWithValue(nameof(Device.IDDevice), idDevice);
+            cmd.Parameters.AddWithValue(nameof(Device.TenantID), tenantID);
             await cmd.ExecuteNonQueryAsync();
 
         }

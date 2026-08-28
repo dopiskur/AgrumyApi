@@ -910,18 +910,19 @@ END
         private const string P_DeviceDelete =
 """
 CREATE OR REPLACE PROCEDURE `DeviceDelete`(
-	idDevice int
+	idDevice int,
+    tenantID int
 )
 BEGIN
     SELECT DeviceConfigSensorID
 	INTO @DeviceConfigSensorID
-	FROM device where device.IDDevice=idDevice;
+	FROM device where device.IDDevice=idDevice AND device.TenantID=tenantID;
 
     SELECT DeviceConfigControllerID
 	INTO @DeviceConfigControllerID
-	FROM device where device.IDDevice=idDevice;
+	FROM device where device.IDDevice=idDevice AND device.TenantID=tenantID;
 
-	delete from device where device.IDDevice=idDevice;
+	delete from device where device.IDDevice=idDevice AND device.TenantID=tenantID;
 	delete from deviceConfigSensor where deviceConfigSensor.IDdeviceConfigSensor = @DeviceConfigSensorID ;
     delete from deviceConfigController where deviceConfigController.IDdeviceConfigController = @DeviceConfigControllerID;
 

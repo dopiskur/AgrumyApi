@@ -38,7 +38,7 @@ namespace api.Dal.Interface
 
         Task DeviceAddAsync(Device device);
 
-        Task DeviceDeleteAsync(int? idDevice);
+        Task DeviceDeleteAsync(int? idDevice, int? tenantID);
         Task<Device> DeviceGetAsync(int? tenantID, int? idDevice, string? apiId, string? macAddress);
 
         /// <summary>Fetches a device by id only, with no tenant filter - used only to check device ownership before an authorized write, never to serve data directly to a caller.</summary>

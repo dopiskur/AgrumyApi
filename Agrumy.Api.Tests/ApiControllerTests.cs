@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Security.Claims;
 using System.Text.Json;
 using api.Controllers.API;
 using api.Dal;
@@ -28,6 +29,20 @@ public class ApiControllerTests : IDisposable
 
     public void Dispose() => RepoFactory.OverrideForTests(null, null);
 
+    /// <summary>Gives a bare (non-DI-constructed) controller the JWT claims an [Authorize] action reads via HttpContext.User.</summary>
+    private static void SetCaller(ControllerBase controller, string role, int? tenantId)
+    {
+        var identity = new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.Role, role),
+            new Claim("TenantID", tenantId.ToString() ?? "")
+        });
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) }
+        };
+    }
+
     // ---- DeviceApiController.DeviceGet ----------------------------------------------------
 
     [Fact]
@@ -48,10 +63,12 @@ public class ApiControllerTests : IDisposable
     [Fact]
     public async Task DeviceDelete_WhenRepoThrows_Returns503WithDbErrorResponse()
     {
-        _repo.Setup(r => r.DeviceDeleteAsync(It.IsAny<int?>())).ThrowsAsync(new InvalidOperationException("db down"));
+        _repo.Setup(r => r.DeviceGetByIdAsync(7)).ReturnsAsync(new Device { IDDevice = 7, TenantID = 0 });
+        _repo.Setup(r => r.DeviceDeleteAsync(7, 0)).ThrowsAsync(new InvalidOperationException("db down"));
         _repo.Setup(r => r.ClassifyException(It.IsAny<Exception>())).Returns(DbFailureKind.ConnectionFailure);
 
         var controller = new DeviceApiController(NullLogger<DeviceApiController>.Instance);
+        SetCaller(controller, "admin", 0);
         var result = await controller.DeviceDelete(7);
 
         var obj = Assert.IsType<ObjectResult>(result.Result);
@@ -65,15 +82,31 @@ public class ApiControllerTests : IDisposable
     [Fact]
     public async Task DeviceDelete_WhenRepoThrows_SchemaMissing_ClassifiedAccordingly()
     {
-        _repo.Setup(r => r.DeviceDeleteAsync(It.IsAny<int?>())).ThrowsAsync(new Exception("Table 'x' doesn't exist"));
+        _repo.Setup(r => r.DeviceGetByIdAsync(7)).ReturnsAsync(new Device { IDDevice = 7, TenantID = 0 });
+        _repo.Setup(r => r.DeviceDeleteAsync(7, 0)).ThrowsAsync(new Exception("Table 'x' doesn't exist"));
         _repo.Setup(r => r.ClassifyException(It.IsAny<Exception>())).Returns(DbFailureKind.SchemaMissing);
 
         var controller = new DeviceApiController(NullLogger<DeviceApiController>.Instance);
+        SetCaller(controller, "admin", 0);
         var result = await controller.DeviceDelete(7);
 
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, obj.StatusCode);
         Assert.Contains("schema_missing", JsonSerializer.Serialize(obj.Value));
+    }
+
+    [Fact]
+    public async Task DeviceDelete_DifferentTenant_Returns403AndDoesNotCallDelete()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(7)).ReturnsAsync(new Device { IDDevice = 7, TenantID = 99 });
+
+        var controller = new DeviceApiController(NullLogger<DeviceApiController>.Instance);
+        SetCaller(controller, "admin", 1);
+        var result = await controller.DeviceDelete(7);
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+        _repo.Verify(r => r.DeviceDeleteAsync(It.IsAny<int?>(), It.IsAny<int?>()), Times.Never);
     }
 
     // ---- UserApiController.UserLogin ---------------------------------------------------------
