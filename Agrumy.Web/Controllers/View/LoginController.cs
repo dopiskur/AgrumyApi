@@ -33,6 +33,8 @@ namespace api.Controllers.View
                 UserLoginResult? result = RepoFactory.GetApi().UserLogin(userLogin).Result;
 
                 // login result mora vratiti ID, EMAIL, TOKEN!
+                // HttpOnly keeps the JWT out of reach of any injected script (unlike localStorage,
+                // which page JS - including a successful XSS payload - can read outright).
                 CookieOptions options = new CookieOptions();
                 options.Expires = DateTime.Now.AddDays(7);
                 options.HttpOnly = true;

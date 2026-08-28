@@ -30,9 +30,13 @@ namespace api.Dal
             using var connection = new MySqlConnection(sqlcon);
             await connection.OpenAsync();
 
+            // The CREATE TABLE IF NOT EXISTS / CREATE OR REPLACE statements below are safe to
+            // rerun on their own, but there's no reason to pay that cost - or toggle
+            // FOREIGN_KEY_CHECKS off against a database that may have live traffic - on every
+            // single startup once the schema is already there.
             if (await TableExistsAsync(connection, SchemaScripts.KeyTable))
             {
-                return; // schema already provisioned
+                return;
             }
 
             using (var fkOff = connection.CreateCommand())
