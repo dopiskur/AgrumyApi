@@ -37,6 +37,8 @@ namespace api.Controllers.View
                 CookieOptions options = new CookieOptions();
                 options.Expires = DateTime.Now.AddDays(7);
                 options.HttpOnly = true;
+                options.Secure = true;
+                options.SameSite = SameSiteMode.Strict;
                 Response.Cookies.Append(CookieUserId, result.IDUser.ToString(), options);
                 Response.Cookies.Append(CookieLogin, result.Email.ToString(), options);
                 Response.Cookies.Append(CookieAuthorization, result.Token.ToString(), options);
