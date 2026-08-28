@@ -1,6 +1,6 @@
 # Agrumy
 
-ASP.NET Core 9 solution, split into three projects inside `agrumy.sln`:
+ASP.NET Core 10 solution, split into three projects inside `agrumy.sln`:
 
 | Project | Type | What it is |
 | --- | --- | --- |
@@ -54,7 +54,7 @@ dotnet run --project Agrumy.Web     # http://localhost:5001
 `Agrumy.Web/appsettings.json` -> `WebView:ApiService` must match the port `Agrumy.Api`
 listens on (5000 by default, set in `Agrumy.Api/Properties/launchSettings.json`).
 
-> Requires the .NET 9 runtime. If only a newer runtime is installed, run with
+> Requires the .NET 10 runtime. If only a newer runtime is installed, run with
 > `DOTNET_ROLL_FORWARD=LatestMajor` or retarget the projects.
 
 ## Build
@@ -62,3 +62,29 @@ listens on (5000 by default, set in `Agrumy.Api/Properties/launchSettings.json`)
 ```
 dotnet build agrumy.sln
 ```
+
+## Deployment
+
+Each deployable project has its own GitHub Actions workflow under
+`.github/workflows/`, since they deploy to separate Azure Web Apps:
+
+| Workflow | Deploys | Azure Web App |
+| --- | --- | --- |
+| `master_agrumy_api.yml` | `Agrumy.Api` | existing `agrumy` app - already set up, no action needed |
+| `master_agrumy_web.yml` | `Agrumy.Web` | **new** app that must be created manually - see below |
+
+Both trigger on push to `master` (and manually via `workflow_dispatch`).
+
+**Before `master_agrumy_web.yml` can deploy successfully for the first time:**
+
+1. Create the new Azure Web App in the portal and put its real name in
+   `master_agrumy_web.yml`'s `app-name` (currently the placeholder `agrumy-web`).
+2. Set up an app registration/federated credential for it (same pattern as the
+   existing `agrumy` app) and add its client-id/tenant-id/subscription-id as
+   GitHub repo secrets `AZUREAPPSERVICE_CLIENTID_WEB`,
+   `AZUREAPPSERVICE_TENANTID_WEB`, `AZUREAPPSERVICE_SUBSCRIPTIONID_WEB`
+   (Settings > Secrets and variables > Actions).
+3. On the deployed `Agrumy.Web` app, set `WebView:ApiService` to the **public**
+   URL where `Agrumy.Api` is reachable after deployment (e.g.
+   `https://agrumy.azurewebsites.net`) - not `http://localhost:5000`, which is
+   only correct for local dev.
