@@ -9,10 +9,10 @@
         <h3 class="card-title">@ViewData["Title"]</h3>
     </div>
     <div class="card-body">
-        <b>username:</b> @HttpContextAccessor?.HttpContext?.Request.Cookies["login-"]
+        <b>username:</b> @HttpContextAccessor?.HttpContext?.Request.Cookies["login"]
         <br />
-        <b>userId:</b> @HttpContextAccessor?.HttpContext?.Request.Cookies["userID-"]
+        <b>userId:</b> @HttpContextAccessor?.HttpContext?.Request.Cookies["userID"]
         <br />
-        <b>User Id:</b> @HttpContextAccessor?.HttpContext?.Request.Cookies["authorization-"]
+        <b>User Id:</b> @HttpContextAccessor?.HttpContext?.Request.Cookies["authorization"]
     </div>
 </div>
