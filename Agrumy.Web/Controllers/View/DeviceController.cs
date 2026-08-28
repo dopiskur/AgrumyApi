@@ -14,10 +14,8 @@ namespace api.Controllers.View
         private static string roleName="";
 
 
-        // GET: DeviceViewController
         public ActionResult Index()
         {
-            //HANDLE SESSION
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
@@ -35,7 +33,6 @@ namespace api.Controllers.View
             }
         }
 
-        // GET: DeviceViewController/Details/5
         public ActionResult Details(int? idDevice)
         {
             try
@@ -58,7 +55,6 @@ namespace api.Controllers.View
 
 
 
-        // GET: DeviceViewController/Edit/5
         public ActionResult Edit(int? idDevice)
         {
 
@@ -76,7 +72,6 @@ namespace api.Controllers.View
             return View(deviceView);
         }
 
-        // POST: DeviceViewController/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
         public ActionResult Edit(DeviceView? deviceView)
@@ -93,7 +88,6 @@ namespace api.Controllers.View
 
                 if (ModelState.IsValid)
                 {
-                    // change DeviceType
                     switch (deviceView.Device.DeviceTypeID)
                     {
                         case 0:
@@ -113,12 +107,13 @@ namespace api.Controllers.View
                             device.DeviceControllerEnabled = true;
                             break;
                         default:
-                            // code block
                             break;
                     }
 
                     RepoFactory.GetApi().DeviceUpdate(jwtKey,device);
-                    device = RepoFactory.GetApi().DeviceGet(jwtKey, device.IDDevice, null, null).Result; // Sinkroniziram config verziju s bazom u view zbog skaliranja
+                    // Re-fetch rather than trust the posted model, so ConfigVersion reflects what
+                    // the database actually stored (kept in mind for scaling to multiple instances).
+                    device = RepoFactory.GetApi().DeviceGet(jwtKey, device.IDDevice, null, null).Result;
 
                 }
 
@@ -133,7 +128,6 @@ namespace api.Controllers.View
 
 
 
-        // GET: UserViewController1/Delete/5
         public ActionResult Delete(int? idDevice)
         {
             HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
@@ -144,7 +138,6 @@ namespace api.Controllers.View
             return View(device);
         }
 
-        // Post: DELETE
         [HttpPost]
         [ValidateAntiForgeryToken]
         public ActionResult DeleteConfirm(int? idDevice)
@@ -165,7 +158,6 @@ namespace api.Controllers.View
             }
         }
 
-        // POST: EditSensor
         public ActionResult EditSensor(int? idDevice)
         {
             try
@@ -217,7 +209,6 @@ namespace api.Controllers.View
         }
 
 
-        // POST: EditController
         public ActionResult EditController(int? idDevice)
         {
             try

@@ -18,7 +18,6 @@ namespace api.Controllers
         public IActionResult Index()
         {
 
-            //HANDLE SESSION
             var cookie = "";
             HttpContext.Request.Cookies.TryGetValue("authorization", out cookie);
             if (cookie == null || JwtTokenProvider.ValidateToken(cookie) == null) { return RedirectToAction("Index", "Login"); }

@@ -7,7 +7,6 @@ namespace api.Controllers.View
 {
     public class GroupController : Controller
     {
-        // GET: Group
         public ActionResult Index()
         {
 
@@ -21,7 +20,6 @@ namespace api.Controllers.View
             return View(userGroup);
         }
 
-        // GET: Group/Details/5
         public ActionResult Details(int idUserGroup)
         {
             string? roleName;
@@ -34,7 +32,6 @@ namespace api.Controllers.View
             return View(userGroup);
         }
 
-        // GET: Group/Create
         public ActionResult Create()
         {
             string? roleName;
@@ -48,7 +45,6 @@ namespace api.Controllers.View
             return View(groupView);
         }
 
-        // POST: Group/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
         public ActionResult Create(UserGroup userGroup)
@@ -73,7 +69,6 @@ namespace api.Controllers.View
         }
 
 
-        // GET: Group/Delete/5
         public ActionResult Delete(int idUserGroup)
         {
             string? roleName;
@@ -85,7 +80,6 @@ namespace api.Controllers.View
             return View(userGroup);
         }
 
-        // POST: Group/Delete/5
         [HttpPost]
         [ValidateAntiForgeryToken]
         public ActionResult DeleteConfirm(int? idUserGroup)

@@ -9,9 +9,6 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
-// Configure JWT security services
 var secureKey = builder.Configuration["JWT:SecureKey"];
 if (string.IsNullOrEmpty(secureKey))
     throw new InvalidOperationException("JWT:SecureKey is missing in configuration.");
@@ -66,10 +63,8 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("device-data", httpContext => IpFixedWindow(httpContext, 60));
 });
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 
-// Logging
 builder.Services.AddLogging();
 
 // HTTPS enforcement is opt-out: Security:EnforceHttps=false lets the API run over plain HTTP
@@ -84,11 +79,9 @@ builder.Services.AddHsts(options =>
     options.IncludeSubDomains = true;
 });
 
-// dependency injection
 builder.Services.AddScoped<IRepository, SqlRepository>();
 builder.Services.AddScoped<ICache, CacheRepository>();
 
-// CONFIGURE SWAGGER FOR JWT
 builder.Services.AddSwaggerGen(option =>
 {
     option.SwaggerDoc("v1",
@@ -122,13 +115,10 @@ builder.Services.AddSwaggerGen(option =>
         });
 });
 
-// BUILD CONFIG
 var app = builder.Build();
 
-// ALWAYS USE SWAGGER
 app.UseSwagger();
 app.UseSwaggerUI();
-// END SWAGGER
 
 // Enforce HTTPS unless disabled via Security:EnforceHttps=false. UseHsts only outside
 // Development so local HTTP dev without a cert is not disrupted; UseHttpsRedirection is a
@@ -142,7 +132,6 @@ if (enforceHttps)
     app.UseHttpsRedirection();
 }
 
-// Middleware order is important
 app.UseRouting();
 
 app.UseRateLimiter();
@@ -151,7 +140,10 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Startup DB health-check + optional schema auto-provisioning
+// Runs here, before the app starts accepting traffic, rather than lazily on the first request -
+// a misconfigured connection string surfaces immediately in the deploy logs instead of as the
+// first user's 500. Whether that failure stops startup or just logs a warning is controlled by
+// "Startup:FailFastOnDbCheck".
 using (var scope = app.Services.CreateScope())
 {
     var startupLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();

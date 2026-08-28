@@ -12,7 +12,6 @@ namespace api.Controllers.View
     {
 
         private static string roleName = "";
-        // Initialize HTTP CLIENT
 
         private readonly IApi _service;
         public UserController(IApi service)
@@ -20,8 +19,9 @@ namespace api.Controllers.View
             _service = service ?? throw new ArgumentNullException(nameof(service));
         }
 
-        // Pregenerated List
-        private IEnumerable<UserGroup> UserGroups() // Stavljeno je static da se ucita samo jednom, jer aplikacija ne omogucuje dodavanje rola, nije potrebno. Ali ostavljamo shemu za buducnost.
+        // The app has no UI for adding roles, so this list never changes at runtime - no caching
+        // needed. Kept as its own method (rather than inlined) so that can change later if it does.
+        private IEnumerable<UserGroup> UserGroups()
         {
             try
             {
@@ -39,17 +39,15 @@ namespace api.Controllers.View
 
 
 
-        // GET: UserViewController1
         public ActionResult Index()
         {
             try
             {
-                // check if user logged in
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
-                IEnumerable<User> users = RepoFactory.GetApi().UsersGet(jwtKey).Result; // Mora biti result na kraju za Task
+                IEnumerable<User> users = RepoFactory.GetApi().UsersGet(jwtKey).Result;
 
                 return View(users);
             }
@@ -137,7 +135,6 @@ namespace api.Controllers.View
             }
         }
 
-        // GET: UserViewController1/Edit/5
         public ActionResult Edit(int? idUser)
         {
 
@@ -151,7 +148,6 @@ namespace api.Controllers.View
                 UserView? userView = new UserView();
                 User value = RepoFactory.GetApi().UserGet(jwtKey, idUser, null, null).Result;
 
-                // User populate
                 UserUpdate userUpdate = new UserUpdate();
                 userUpdate.IDUser = value.IDUser;
                 userUpdate.TenantID = value.TenantID;
@@ -164,11 +160,7 @@ namespace api.Controllers.View
                 userUpdate.UserGroupID = value.UserGroupID;
                 userUpdate.Enabled = value.Enabled ?? false;
 
-                // UPDATE model
                 userView.UserUpdate = userUpdate;
-
-
-                // Get Roles and update model
                 userView.UserGroups = UserGroups();
 
                 return View(userView);

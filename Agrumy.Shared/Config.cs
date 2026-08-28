@@ -16,14 +16,5 @@ namespace api
         public static string? jwtAudience = configuration.GetSection("JWT:Audience").Value;
 
         public static string? apiService = configuration.GetSection("WebView:ApiService").Value;
-
-
-
-
-        // Koristim konstante
-        // public static bool? tenantEnabled = bool.TryParse(configuration.GetSection("Tenant:Enabled").Value, out bool result);
-        //public static string? defaultTenantID = configuration.GetSection("DefaultUser:TenantID").Value;
-        //public static string? defaultRoleID = configuration.GetSection("DefaultUser:RoleID").Value;
-        //public static string? defaultEnabled = configuration.GetSection("DefaultUser:Enabled").Value;
     }
 }

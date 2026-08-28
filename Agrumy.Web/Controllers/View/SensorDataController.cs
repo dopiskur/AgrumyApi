@@ -11,11 +11,9 @@ namespace api.Controllers.View
 
 
 
-        // GET: SensorDataController
         public ActionResult Index(int? idDevice, int? timeRange=60, int? timeMDMY = 0, int? buildReport=0)
         {
 
-            //HANDLE SESSION
             HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
             if (jwtKey == null || JwtTokenProvider.ValidateToken(jwtKey) == null) { return RedirectToAction("Index", "Login"); }
 
@@ -50,7 +48,6 @@ namespace api.Controllers.View
         public ActionResult Report(int? idDevice, int? idSensorDataReport = 0)
         {
 
-            //HANDLE SESSION
             HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
             if (jwtKey == null || JwtTokenProvider.ValidateToken(jwtKey) == null) { return RedirectToAction("Index", "Login"); }
 

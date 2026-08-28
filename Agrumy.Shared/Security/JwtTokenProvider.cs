@@ -13,10 +13,8 @@ namespace api.Security
 
         public static string CreateToken(string secureKey, int expiration, string subject, string role, string tenantID)
         {
-            // Get secret key bytes
             var tokenKey = Encoding.UTF8.GetBytes(secureKey);
 
-            // Create a token descriptor (represents a token, kind of a "template" for token)
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Issuer = Config.jwtIssuer,
@@ -38,7 +36,6 @@ namespace api.Security
                 });
             }
 
-            // Create token using that descriptor, serialize it and return it
             var tokenHandler = new JwtSecurityTokenHandler();
             var token = tokenHandler.CreateToken(tokenDescriptor);
             var serializedToken = tokenHandler.WriteToken(token);
@@ -76,7 +73,6 @@ namespace api.Security
             }
             catch
             {
-                // return null if validation fails
                 return null;
             }
         }

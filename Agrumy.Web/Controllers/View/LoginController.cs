@@ -13,7 +13,6 @@ namespace api.Controllers.View
         const string CookieLogin = "login";
         const string CookieAuthorization = "authorization";
 
-        // GET: LoginController
         public ActionResult Index()
         {
 
@@ -53,7 +52,6 @@ namespace api.Controllers.View
             }
         }
 
-        // GET: LoginController/Details/5
         public ActionResult Logout()
         {
             // Delete the cookie from the browser.
@@ -81,7 +79,6 @@ namespace api.Controllers.View
 
 
 
-        // POST: LoginController/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
         public ActionResult Register(IFormCollection collection)
