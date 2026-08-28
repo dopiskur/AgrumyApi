@@ -319,7 +319,7 @@ namespace api.Controllers.API
 
                 User user = new User();
 
-                user.TenantID = value.TenantID;
+                user.TenantID = GetCallerTenantId(); // payload's TenantID is ignored - an admin can only create users in their own tenant
                 user.UserGroupID = value.UserGroupID;
                 user.Email = value.Email;
                 user.Username = value.Username;
