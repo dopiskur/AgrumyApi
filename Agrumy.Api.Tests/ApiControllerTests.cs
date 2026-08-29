@@ -69,7 +69,7 @@ public class ApiControllerTests
     [Fact]
     public async Task DeviceUpdate_UnknownDevice_Returns404AndDoesNotUpdate()
     {
-        _repo.Setup(r => r.DeviceGetByIdAsync(99)).ReturnsAsync(new Device()); // IDDevice == null
+        _repo.Setup(r => r.DeviceGetByIdAsync(99)).ReturnsAsync((Device?)null);
 
         var controller = NewDeviceController();
         SetCaller(controller, "admin", 1);
@@ -77,6 +77,18 @@ public class ApiControllerTests
 
         Assert.IsType<NotFoundResult>(result.Result);
         _repo.Verify(r => r.DeviceUpdateAsync(It.IsAny<Device>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeviceGet_UnknownId_Returns404()
+    {
+        _repo.Setup(r => r.DeviceGetAsync(1, 99, null, null)).ReturnsAsync((Device?)null);
+
+        var controller = NewDeviceController();
+        SetCaller(controller, "user", 1);
+        var result = await controller.DeviceGet(99);
+
+        Assert.IsType<NotFoundResult>(result.Result);
     }
 
     [Fact]

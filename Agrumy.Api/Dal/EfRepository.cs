@@ -256,7 +256,7 @@ namespace api.Dal
             }
             else
             {
-                return null; // no lookup key - the proc's IF/ELSE chain returned no result set
+                throw new ArgumentException("Provide an id, email, or username to look a user up by.");
             }
 
             var hit = await q.FirstOrDefaultAsync();
@@ -292,7 +292,7 @@ namespace api.Dal
             }
             else
             {
-                return null; // no lookup key
+                throw new ArgumentException("Provide an id, email, or username to look a secret up by.");
             }
 
             return await q.Select(u => new UserSecret { PwdHash = u.PwdHash, PwdSalt = u.PwdSalt })
@@ -379,7 +379,7 @@ namespace api.Dal
             await tx.CommitAsync();
         }
 
-        public async Task<Device> DeviceGetAsync(int? tenantID, int? idDevice, string? apiId, string? macAddress)
+        public async Task<Device?> DeviceGetAsync(int? tenantID, int? idDevice, string? apiId, string? macAddress)
         {
             await using var db = Db();
             IQueryable<DeviceRow> q = db.Devices.AsNoTracking().Where(d => d.TenantID == tenantID);
@@ -398,25 +398,25 @@ namespace api.Dal
             }
             else
             {
-                return new Device(); // proc's IF/ELSE chain returns nothing
+                return null; // no lookup key
             }
 
             var row = await q.FirstOrDefaultAsync();
-            return row == null ? new Device() : ToDto(row);
+            return row == null ? null : ToDto(row);
         }
 
-        public async Task<Device> DeviceGetByIdAsync(int? idDevice)
+        public async Task<Device?> DeviceGetByIdAsync(int? idDevice)
         {
             await using var db = Db();
             var row = await db.Devices.AsNoTracking().FirstOrDefaultAsync(d => d.IDDevice == idDevice);
-            return row == null ? new Device() : ToDto(row);
+            return row == null ? null : ToDto(row);
         }
 
-        public async Task<Device> DeviceGetByApiIdAsync(string? apiId)
+        public async Task<Device?> DeviceGetByApiIdAsync(string? apiId)
         {
             await using var db = Db();
             var row = await db.Devices.AsNoTracking().FirstOrDefaultAsync(d => d.ApiId == apiId);
-            return row == null ? new Device() : ToDto(row);
+            return row == null ? null : ToDto(row);
         }
 
         public async Task<IList<Device>> DevicesGetAsync(int? tenantID)
@@ -438,7 +438,7 @@ namespace api.Dal
             await using var db = Db();
             var row = await db.DeviceConfigSensors.AsNoTracking()
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigSensor == deviceConfigSensorID);
-            return row == null ? new DeviceConfigSensor() : ToDto(row);
+            return row == null ? null : ToDto(row);
         }
 
         public async Task<DeviceConfigController?> DeviceConfigControllerGetAsync(int? deviceConfigControllerID)
@@ -446,23 +446,23 @@ namespace api.Dal
             await using var db = Db();
             var row = await db.DeviceConfigControllers.AsNoTracking()
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigController == deviceConfigControllerID);
-            return row == null ? new DeviceConfigController() : ToDto(row);
+            return row == null ? null : ToDto(row);
         }
 
-        public async Task<Device> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID)
+        public async Task<Device?> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID)
         {
             await using var db = Db();
             var row = await db.Devices.AsNoTracking()
                 .FirstOrDefaultAsync(d => d.DeviceConfigSensorID == deviceConfigSensorID);
-            return row == null ? new Device() : ToDto(row);
+            return row == null ? null : ToDto(row);
         }
 
-        public async Task<Device> DeviceGetByDeviceConfigControllerIdAsync(int? deviceConfigControllerID)
+        public async Task<Device?> DeviceGetByDeviceConfigControllerIdAsync(int? deviceConfigControllerID)
         {
             await using var db = Db();
             var row = await db.Devices.AsNoTracking()
                 .FirstOrDefaultAsync(d => d.DeviceConfigControllerID == deviceConfigControllerID);
-            return row == null ? new Device() : ToDto(row);
+            return row == null ? null : ToDto(row);
         }
 
         public async Task<DeviceFirmware?> DeviceFirmwareLatestGetAsync(int? deviceTypeID)

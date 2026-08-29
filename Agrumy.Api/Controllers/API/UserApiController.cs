@@ -123,7 +123,12 @@ namespace api.Controllers.API
         [Authorize]
         public async Task<ActionResult<User>> GetUserSelf()
         {
-            User? user = await Repo.UserGetAsync(null, User.Identity?.Name, null);
+            string? name = User.Identity?.Name;
+            if (string.IsNullOrEmpty(name))
+            {
+                return Unauthorized();
+            }
+            User? user = await Repo.UserGetAsync(null, name, null);
             return user is null ? NotFound() : Ok(user);
         }
 
@@ -192,10 +197,14 @@ namespace api.Controllers.API
 
             if (value.Password != null)
             {
-                var secret = await Repo.UserSecretGetAsync(value.IDUser, null, null) ?? new UserSecret();
-                secret.PwdSalt = AuthenticationProvider.GetSalt();
-                secret.PwdHash = AuthenticationProvider.GetHash(value.Password, secret.PwdSalt);
-                await Repo.UserSetPasswordAsync(user.Email, secret);
+                // Admin/self edit - no old-password check here, so the fresh salt+hash fully
+                // replace whatever was there; no need to read the current secret first.
+                string salt = AuthenticationProvider.GetSalt();
+                await Repo.UserSetPasswordAsync(user.Email, new UserSecret
+                {
+                    PwdSalt = salt,
+                    PwdHash = AuthenticationProvider.GetHash(value.Password, salt),
+                });
             }
 
             if (value.Email != null) { user.Email = value.Email; }

@@ -43,21 +43,23 @@ namespace api.Dal.Interface
         Task DeviceAddAsync(Device device);
 
         Task DeviceDeleteAsync(int? idDevice, int? tenantID);
-        Task<Device> DeviceGetAsync(int? tenantID, int? idDevice, string? apiId, string? macAddress);
 
-        /// <summary>Fetches a device by id only, with no tenant filter - used only to check device ownership before an authorized write, never to serve data directly to a caller.</summary>
-        Task<Device> DeviceGetByIdAsync(int? idDevice);
+        /// <summary>The device matched by id / apiId / macAddress within the tenant, or null if none matches (or no key was given).</summary>
+        Task<Device?> DeviceGetAsync(int? tenantID, int? idDevice, string? apiId, string? macAddress);
 
-        /// <summary>Fetches a device by its globally unique ApiId, with no tenant filter - the device-communication endpoints authenticate by ApiId/ApiKey and have no tenant context of their own.</summary>
-        Task<Device> DeviceGetByApiIdAsync(string? apiId);
+        /// <summary>The device with this id (no tenant filter) - used only for ownership checks before an authorized write - or null if none.</summary>
+        Task<Device?> DeviceGetByIdAsync(int? idDevice);
+
+        /// <summary>The device with this globally unique ApiId (no tenant filter), or null if none. Device-comm endpoints authenticate by ApiId/ApiKey and have no tenant context.</summary>
+        Task<Device?> DeviceGetByApiIdAsync(string? apiId);
         Task<IList<Device>> DevicesGetAsync(int? tenantID);
         Task<bool> DeviceCheckMacAddressAsync(int? tenantID, string? macAddress);
         Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID);
         Task<DeviceConfigController?> DeviceConfigControllerGetAsync(int? deviceConfigControllerID);
 
-        /// <summary>Fetches the device that owns this sensor/controller config id, with no tenant filter - used only for ownership checks before returning config data.</summary>
-        Task<Device> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID);
-        Task<Device> DeviceGetByDeviceConfigControllerIdAsync(int? deviceConfigControllerID);
+        /// <summary>The device owning this sensor/controller config id (no tenant filter) - for ownership checks before returning config data - or null if none.</summary>
+        Task<Device?> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID);
+        Task<Device?> DeviceGetByDeviceConfigControllerIdAsync(int? deviceConfigControllerID);
 
         /// <summary>Newest published firmware for a device type (by DateAdded), or null if none. Roadmap #3 (OTA).</summary>
         Task<DeviceFirmware?> DeviceFirmwareLatestGetAsync(int? deviceTypeID);

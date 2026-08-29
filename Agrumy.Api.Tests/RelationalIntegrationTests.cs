@@ -176,7 +176,9 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             DeviceControllerEnabled = true,
         };
         await _repo.DeviceAddAsync(d);
-        return await _repo.DeviceGetAsync(tenantId, null, d.ApiId, null);
+        var saved = await _repo.DeviceGetAsync(tenantId, null, d.ApiId, null);
+        Assert.NotNull(saved);
+        return saved;
     }
 
     // ---- schema -------------------------------------------------------------
@@ -264,11 +266,11 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task User_Get_NoMatch_ReturnsNull(DbProviderKind provider)
+    public async Task User_Get_NoMatch_ReturnsNull_NoKey_Throws(DbProviderKind provider)
     {
         Use(provider);
-        Assert.Null(await _repo.UserGetAsync(null, "nope_" + U() + "@x.com", null));
-        Assert.Null(await _repo.UserGetAsync(null, null, null)); // no lookup key
+        Assert.Null(await _repo.UserGetAsync(null, "nope_" + U() + "@x.com", null)); // no match -> null
+        await Assert.ThrowsAsync<ArgumentException>(() => _repo.UserGetAsync(null, null, null)); // no key -> throw
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -371,8 +373,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.NotNull(d.DeviceConfigControllerID);
         Assert.NotNull(await _repo.DeviceConfigSensorGetAsync(d.DeviceConfigSensorID));
         Assert.NotNull(await _repo.DeviceConfigControllerGetAsync(d.DeviceConfigControllerID));
-        Assert.Equal(d.IDDevice, (await _repo.DeviceGetByDeviceConfigSensorIdAsync(d.DeviceConfigSensorID)).IDDevice);
-        Assert.Equal(d.IDDevice, (await _repo.DeviceGetByDeviceConfigControllerIdAsync(d.DeviceConfigControllerID)).IDDevice);
+        Assert.Equal(d.IDDevice, (await _repo.DeviceGetByDeviceConfigSensorIdAsync(d.DeviceConfigSensorID))!.IDDevice);
+        Assert.Equal(d.IDDevice, (await _repo.DeviceGetByDeviceConfigControllerIdAsync(d.DeviceConfigControllerID))!.IDDevice);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -382,14 +384,14 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (tenantId, _, _) = await MakeUser(t);
         var d = await MakeDevice(t, tenantId);
 
-        Assert.Equal(d.IDDevice, (await _repo.DeviceGetAsync(tenantId, d.IDDevice, null, null)).IDDevice);
-        Assert.Equal(d.IDDevice, (await _repo.DeviceGetAsync(tenantId, null, d.ApiId, null)).IDDevice);
-        Assert.Equal(d.IDDevice, (await _repo.DeviceGetAsync(tenantId, null, null, d.MacAddress)).IDDevice);
-        Assert.Null((await _repo.DeviceGetAsync(tenantId + 12345, null, d.ApiId, null)).IDDevice);
-        Assert.Equal(d.IDDevice, (await _repo.DeviceGetByIdAsync(d.IDDevice)).IDDevice);
+        Assert.Equal(d.IDDevice, (await _repo.DeviceGetAsync(tenantId, d.IDDevice, null, null))!.IDDevice);
+        Assert.Equal(d.IDDevice, (await _repo.DeviceGetAsync(tenantId, null, d.ApiId, null))!.IDDevice);
+        Assert.Equal(d.IDDevice, (await _repo.DeviceGetAsync(tenantId, null, null, d.MacAddress))!.IDDevice);
+        Assert.Null(await _repo.DeviceGetAsync(tenantId + 12345, null, d.ApiId, null));
+        Assert.Equal(d.IDDevice, (await _repo.DeviceGetByIdAsync(d.IDDevice))!.IDDevice);
         // DeviceGetByApiIdAsync has no tenant filter (device-comm endpoints have no tenant context).
-        Assert.Equal(d.IDDevice, (await _repo.DeviceGetByApiIdAsync(d.ApiId)).IDDevice);
-        Assert.Null((await _repo.DeviceGetByApiIdAsync("no-such-api-id-" + U())).IDDevice);
+        Assert.Equal(d.IDDevice, (await _repo.DeviceGetByApiIdAsync(d.ApiId))!.IDDevice);
+        Assert.Null(await _repo.DeviceGetByApiIdAsync("no-such-api-id-" + U()));
         Assert.Single(await _repo.DevicesGetAsync(tenantId));
         Assert.True(await _repo.DeviceCheckMacAddressAsync(tenantId, d.MacAddress));
         Assert.False(await _repo.DeviceCheckMacAddressAsync(tenantId, "no_" + U()));
@@ -407,6 +409,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await _repo.DeviceUpdateAsync(d);
 
         var back = await _repo.DeviceGetByIdAsync(d.IDDevice);
+        Assert.NotNull(back);
         Assert.Equal("renamed", back.DeviceName);
         Assert.Equal(41, back.ConfigVersion);
     }
@@ -417,19 +420,20 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var d = await MakeDevice(t, tenantId);
-        int v0 = (await _repo.DeviceGetByIdAsync(d.IDDevice)).ConfigVersion!.Value;
+        int v0 = (await _repo.DeviceGetByIdAsync(d.IDDevice))!.ConfigVersion!.Value;
 
         await _repo.DeviceConfigSensorUpdateAsync(d.IDDevice, new DeviceConfigSensor
         {
             IDDeviceConfigSensor = d.DeviceConfigSensorID, SensorTemp = 1, SensorHumid = 1, SensorCo2 = 1,
         });
-        Assert.Equal(v0 + 1, (await _repo.DeviceGetByIdAsync(d.IDDevice)).ConfigVersion);
+        Assert.Equal(v0 + 1, (await _repo.DeviceGetByIdAsync(d.IDDevice))!.ConfigVersion);
 
         await _repo.DeviceConfigControllerUpdateAsync(d.IDDevice, new DeviceConfigController
         {
             IDDeviceConfigController = d.DeviceConfigControllerID, TempLow = 5.5, TempHigh = 30.25, RelayEnabled = true, Relay1 = 2,
         });
         var back = await _repo.DeviceGetByIdAsync(d.IDDevice);
+        Assert.NotNull(back);
         Assert.Equal(v0 + 2, back.ConfigVersion);
 
         var ctrl = await _repo.DeviceConfigControllerGetAsync(d.DeviceConfigControllerID);
@@ -448,7 +452,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
         await _repo.DeviceDeleteAsync(d.IDDevice, tenantId);
 
-        Assert.Null((await _repo.DeviceGetByIdAsync(d.IDDevice)).IDDevice);
+        Assert.Null(await _repo.DeviceGetByIdAsync(d.IDDevice));
         await using var db = _fx.NewContext(t);
         Assert.False(await db.DeviceConfigSensors.AnyAsync(c => c.IDDeviceConfigSensor == d.DeviceConfigSensorID));
         Assert.False(await db.DeviceConfigControllers.AnyAsync(c => c.IDDeviceConfigController == d.DeviceConfigControllerID));

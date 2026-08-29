@@ -19,8 +19,11 @@ namespace api.Controllers.API
 
         [Authorize]
         [HttpGet]
-        public async Task<ActionResult<Device>> DeviceGet(int? idDevice) =>
-            Ok(await Repo.DeviceGetAsync(CallerTenantId, idDevice, null, null));
+        public async Task<ActionResult<Device>> DeviceGet(int? idDevice)
+        {
+            Device? device = await Repo.DeviceGetAsync(CallerTenantId, idDevice, null, null);
+            return device is null ? NotFound() : Ok(device);
+        }
 
         [Authorize(Roles = "admin")]
         [HttpPut]
@@ -130,10 +133,10 @@ namespace api.Controllers.API
         /// no device matches, (device, 403) on a tenant mismatch, or (device, null) when it is owned.
         /// </summary>
         private async Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(
-            Func<Task<Device>> lookup, string ownerLabel)
+            Func<Task<Device?>> lookup, string ownerLabel)
         {
-            Device device = await lookup();
-            if (device.IDDevice == null)
+            Device? device = await lookup();
+            if (device is null)
             {
                 return (null, NotFound());
             }
@@ -151,8 +154,8 @@ namespace api.Controllers.API
         /// </summary>
         private async Task RefreshConfigVersionCacheAsync(int? idDevice)
         {
-            Device updated = await Repo.DeviceGetByIdAsync(idDevice);
-            if (updated.ApiId == null)
+            Device? updated = await Repo.DeviceGetByIdAsync(idDevice);
+            if (updated?.ApiId == null)
             {
                 return;
             }
@@ -180,35 +183,46 @@ namespace api.Controllers.API
                 return Ok(); // device is up to date - do nothing
             }
 
-            Device device = await Repo.DeviceGetByApiIdAsync(apiId);
-            return Ok(await BuildDeviceConfigAsync(device));
+            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            return device is null ? NotFound() : Ok(await BuildDeviceConfigAsync(device));
         }
 
         [HttpPost("Register")]
         [EnableRateLimiting("device-auth")]
         public async Task<ActionResult<DeviceConfig>> DeviceRegistration([FromBody] DeviceRegistration value)
         {
+            if (string.IsNullOrWhiteSpace(value.MacAddress))
+            {
+                return BadRequest("macAddress is required.");
+            }
+
             User? user = await Repo.UserGetAsync(null, value.Email, null);
             if (user is null || user.DevicePin != value.DevicePin)
             {
                 return StatusCode(401, "Wrong user or pin");
             }
 
-            Device device = await Repo.DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
-            if (device.IDDevice == null)
+            Device? device = await Repo.DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
+            if (device is null)
             {
-                device.ConfigVersion = 1;
-                device.TenantID = user.TenantID;
-                device.DeviceName = "Agrumy_" + value.MacAddress.ToUpper();
-                device.MacAddress = value.MacAddress;
-                device.ApiId = Guid.NewGuid().ToString();
-                device.ApiKey = Guid.NewGuid().ToString();
-                device.ServicePoint = value.ServicePoint;
-                device.DeviceSensorEnabled = false;
-                device.DeviceControllerEnabled = false;
+                await Repo.DeviceAddAsync(new Device
+                {
+                    ConfigVersion = 1,
+                    TenantID = user.TenantID,
+                    DeviceName = "Agrumy_" + value.MacAddress.ToUpper(),
+                    MacAddress = value.MacAddress,
+                    ApiId = Guid.NewGuid().ToString(),
+                    ApiKey = Guid.NewGuid().ToString(),
+                    ServicePoint = value.ServicePoint,
+                    DeviceSensorEnabled = false,
+                    DeviceControllerEnabled = false,
+                });
 
-                await Repo.DeviceAddAsync(device);
                 device = await Repo.DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
+                if (device is null)
+                {
+                    return StatusCode(500, "Device registration did not persist.");
+                }
             }
 
             return Ok(await BuildDeviceConfigAsync(device));
@@ -269,7 +283,11 @@ namespace api.Controllers.API
         public async Task<ActionResult<DeviceAuthentication>> ReqAuth()
         {
             string apiId = HttpContext.DeviceApiId()!;
-            Device device = await Repo.DeviceGetByApiIdAsync(apiId);
+            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            if (device is null)
+            {
+                return NotFound();
+            }
 
             var deviceAuthentication = new DeviceAuthentication { apiAuth = Guid.NewGuid().ToString() };
             Cache.SetItem(apiId, new DeviceCache

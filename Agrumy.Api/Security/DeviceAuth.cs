@@ -69,8 +69,8 @@ namespace api.Security
                 return;
             }
 
-            Device device = await repo.DeviceGetByApiIdAsync(apiId);
-            if (DeviceAuth.ConstantTimeEquals(apiKey, device.ApiKey))
+            Device? device = await repo.DeviceGetByApiIdAsync(apiId);
+            if (device is not null && DeviceAuth.ConstantTimeEquals(apiKey, device.ApiKey))
             {
                 http.Items[DeviceAuth.ApiIdItemKey] = apiId;
                 context.Succeed(requirement);
