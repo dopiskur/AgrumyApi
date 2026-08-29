@@ -85,7 +85,7 @@ public sealed class RelationalIntegrationFixture
     public AgrumyDbContext NewContext(Target t) => new(DbOptionsFactory.Build(t.Provider, t.ConnectionString));
 }
 
-[Collection("RepoFactory")] // shares the process-wide EfRepository / RepoFactory static state
+[Collection("RepoFactory")] // shares the process-wide EfRepository.ProviderOverride / ConnectionStringOverride seams
 public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegrationFixture>, IDisposable
 {
     private readonly RelationalIntegrationFixture _fx;

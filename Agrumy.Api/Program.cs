@@ -1,5 +1,6 @@
 using api.Dal;
 using api.Dal.Interface;
+using api.Filters;
 using api.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -44,7 +45,11 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddScoped<IAuthorizationHandler, DeviceApiKeyHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, DeviceSessionHandler>();
 
-builder.Services.AddControllers();
+builder.Services.AddScoped<IRepository, EfRepository>();
+builder.Services.AddScoped<ICache, CacheRepository>();
+builder.Services.AddScoped<DbExceptionFilter>();
+
+builder.Services.AddControllers(options => options.Filters.AddService<DbExceptionFilter>());
 
 // Rate limiting - all policies are fixed-window, partitioned by client IP, reject with 429.
 builder.Services.AddRateLimiter(options =>
@@ -90,9 +95,6 @@ builder.Services.AddHsts(options =>
     options.MaxAge = TimeSpan.FromDays(365);
     options.IncludeSubDomains = true;
 });
-
-builder.Services.AddScoped<IRepository, EfRepository>();
-builder.Services.AddScoped<ICache, CacheRepository>();
 
 builder.Services.AddSwaggerGen(option =>
 {

@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Agrumy.Api.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Remove="appsettings.json" />
     <None Include="appsettings.json" Condition="Exists('appsettings.json')" />
   </ItemGroup>

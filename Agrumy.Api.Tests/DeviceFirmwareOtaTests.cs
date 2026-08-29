@@ -1,9 +1,7 @@
 using api.Controllers.API;
-using api.Dal;
 using api.Dal.Interface;
 using api.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace Agrumy.Api.Tests;
@@ -13,14 +11,10 @@ namespace Agrumy.Api.Tests;
 /// DeviceApiController.BuildDeviceConfigAsync() through the public Register action
 /// (Config takes the same path). No database - IRepository is mocked.
 /// </summary>
-[Collection("RepoFactory")]
-public class DeviceFirmwareOtaTests : IDisposable
+public class DeviceFirmwareOtaTests
 {
     private readonly Mock<IRepository> _repo = new(MockBehavior.Strict);
     private readonly Mock<ICache> _cache = new();
-
-    public DeviceFirmwareOtaTests() => RepoFactory.OverrideForTests(_repo.Object, _cache.Object);
-    public void Dispose() => RepoFactory.OverrideForTests(null, null);
 
     private DeviceConfig RegisterAndGetConfig(Device device)
     {
@@ -29,7 +23,7 @@ public class DeviceFirmwareOtaTests : IDisposable
         _repo.Setup(r => r.DeviceGetAsync(device.TenantID, null, null, "AABBCCDDEEFF"))
              .ReturnsAsync(device); // IDDevice set => controller skips DeviceAddAsync
 
-        var controller = new DeviceApiController(NullLogger<DeviceApiController>.Instance);
+        var controller = new DeviceApiController(_repo.Object, _cache.Object);
         var result = controller.DeviceRegistration(new DeviceRegistration
         {
             Email = "owner@example.com",

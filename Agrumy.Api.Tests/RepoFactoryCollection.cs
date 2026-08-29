@@ -1,9 +1,9 @@
 namespace Agrumy.Api.Tests;
 
 /// <summary>
-/// Tests that swap a mock in through <c>RepoFactory.OverrideForTests</c> share one process-wide
-/// static, so they must not run in parallel with each other. Every such test class carries
-/// <c>[Collection("RepoFactory")]</c>.
+/// Tests that set the process-wide <c>EfRepository.ProviderOverride</c> /
+/// <c>ConnectionStringOverride</c> seams (the integration tests) must not run in parallel with
+/// each other, so they carry <c>[Collection("RepoFactory")]</c>.
 /// </summary>
 [CollectionDefinition("RepoFactory")]
 public class RepoFactoryCollection { }
