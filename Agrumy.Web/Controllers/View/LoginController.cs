@@ -2,6 +2,7 @@ using System.Security.Claims;
 using api.Dal.Interface;
 using api.Models;
 using api.Security;
+using api.Utils;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -66,10 +67,30 @@ namespace api.Controllers.View
             return RedirectToAction("Index", "Login");
         }
 
-        public ActionResult Register() => View();
+        public ActionResult Register() => View(new UserRegistration());
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult Register(IFormCollection collection) => RedirectToAction(nameof(Index));
+        public async Task<ActionResult> Register(UserRegistration value)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(value);
+            }
+
+            try
+            {
+                await api.UserRegister(value);
+            }
+            catch (ApiException ex)
+            {
+                // e.g. "email already registered" / "username already registered"
+                ModelState.AddModelError(string.Empty, ex.Body);
+                return View(value);
+            }
+
+            TempData["Message"] = "Account created. An administrator has to enable it before you can sign in.";
+            return RedirectToAction(nameof(Index));
+        }
     }
 }

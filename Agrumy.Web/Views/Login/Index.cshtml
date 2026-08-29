@@ -10,6 +10,11 @@
 <div class="card-body login-card-body">
     <p class="login-box-msg">Sign in to start your session</p>
 
+    @if (TempData["Message"] is string message)
+    {
+        <div class="alert alert-success">@message</div>
+    }
+
     <form asp-action="Index">
         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
         <div class="mb-3">

@@ -516,7 +516,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(3, arr[1].GetProperty("temperature").GetDouble());
 
         await using var db2 = _fx.NewContext(t);
-        Assert.True(await db2.SensorDataReports.AnyAsync(r => r.DeviceID == 1000038 && r.SensorData == json));
+        Assert.True(await db2.SensorDataReports.AnyAsync(r => r.DeviceID == d.IDDevice && r.SensorData == json));
 
         Assert.Equal("", await _repo.SensorDataGetAsync(tenantId, d.IDDevice, 10, 7, 0));
     }

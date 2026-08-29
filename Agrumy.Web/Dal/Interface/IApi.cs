@@ -18,6 +18,9 @@ namespace api.Dal.Interface
         [Post("/api/User/Login")]
         Task<UserLoginResult?> UserLogin([Body] UserLogin userLogin);
 
+        [Post("/api/User/Register")]
+        Task<User> UserRegister([Body] UserRegistration registration);
+
         [Post("/api/User")]
         Task UserAdd([Body] UserAdd user);
 

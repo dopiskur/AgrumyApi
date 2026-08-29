@@ -707,10 +707,11 @@ namespace api.Dal
 
             if (json.Length > 0 && buildReport > 0)
             {
-                // Kept verbatim from the proc: hard-coded deviceID 1000038, timestamp used as the name.
+                // The proc hard-coded deviceID 1000038 here - a bug: every saved report was
+                // attributed to one device. Save it against the device the report is actually for.
                 db.SensorDataReports.Add(new SensorDataReportRow
                 {
-                    DeviceID = 1000038,
+                    DeviceID = deviceID,
                     ReportName = now.ToString("yyyy-MM-dd HH:mm:ss"),
                     SensorData = json,
                 });

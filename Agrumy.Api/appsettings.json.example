@@ -6,9 +6,16 @@
     "EnforceHttps": true
   },
 
-  "// ConnectionStrings": "Database connection strings read via IConfiguration.GetConnectionString(...).",
+  "// Database": "Which EF Core provider to use for ConnectionStrings:DefaultConnection.",
+  "Database": {
+    "// Provider": "mysql / mariadb (Pomelo) or postgres / postgresql (Npgsql). Default: mysql. Also overridable with the AGRUMY_DB_PROVIDER env var.",
+    "Provider": "mysql"
+  },
+
+  "// ConnectionStrings": "Read via IConfiguration.GetConnectionString(...). Connection string for the engine chosen by Database:Provider. Put the real credentials only in appsettings.json (git-ignored).",
   "ConnectionStrings": {
-    "// DefaultConnection": "MySQL/MariaDB ADO.NET connection string used by SqlRepository (MySql.Data.MySqlClient). Put the real credentials only in appsettings.json (git-ignored).",
+    "// DefaultConnection (mysql)": "server=localhost;port=3306;database=agrumy;user id=agrumy;password=CHANGE_ME;SslMode=Preferred;",
+    "// DefaultConnection (postgres)": "Host=localhost;Port=5432;Database=agrumy;Username=agrumy;Password=CHANGE_ME",
     "DefaultConnection": "server=localhost;port=3306;database=agrumy;user id=agrumy;password=CHANGE_ME;SslMode=Preferred;"
   },
 
