@@ -1,103 +1,38 @@
 using api.Dal.Interface;
 using api.Models;
-using api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.View
 {
-    public class GroupController : Controller
+    [Authorize(Roles = "admin")]
+    public class GroupController(IApi api) : Controller
     {
-        private readonly IApi _api;
+        public async Task<ActionResult> Index() => View(await api.UserGroupsGet());
 
-        public GroupController(IApi api) => _api = api ?? throw new ArgumentNullException(nameof(api));
+        public async Task<ActionResult> Details(int idUserGroup) =>
+            View(await api.UserGroupGet(idUserGroup));
 
-        public async Task<ActionResult> Index()
-        {
-            string? roleName;
-            HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
-            if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
-            if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
-
-            IEnumerable<UserGroup> userGroup = await _api.UserGroupsGet(jwtKey);
-
-            return View(userGroup);
-        }
-
-        public async Task<ActionResult> Details(int idUserGroup)
-        {
-            string? roleName;
-            HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
-            if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
-            if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
-
-            UserGroup userGroup = await _api.UserGroupGet(jwtKey, idUserGroup);
-
-            return View(userGroup);
-        }
-
-        public async Task<ActionResult> Create()
-        {
-            string? roleName;
-            HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
-            if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
-            if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
-
-            GroupView? groupView = new GroupView();
-            groupView.UserRoles = await _api.UserRoleGet(jwtKey);
-
-            return View(groupView);
-        }
+        public async Task<ActionResult> Create() =>
+            View(new GroupView { UserRoles = await api.UserRoleGet() });
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> Create(UserGroup userGroup)
         {
-            try
-            {
-                string? roleName;
-                HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
-                if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
-                if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
-
-                await _api.UserGroupAdd(jwtKey, userGroup);
-
-                return RedirectToAction(nameof(Index));
-            }
-            catch
-            {
-                return View();
-            }
+            await api.UserGroupAdd(userGroup);
+            return RedirectToAction(nameof(Index));
         }
 
-        public async Task<ActionResult> Delete(int idUserGroup)
-        {
-            string? roleName;
-            HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
-            if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
-            if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
-
-            UserGroup userGroup = await _api.UserGroupGet(jwtKey, idUserGroup);
-            return View(userGroup);
-        }
+        public async Task<ActionResult> Delete(int idUserGroup) =>
+            View(await api.UserGroupGet(idUserGroup));
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> DeleteConfirm(int? idUserGroup)
         {
-            try
-            {
-                string? roleName;
-                HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
-                if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
-                if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
-
-                await _api.UserGroupDelete(jwtKey, idUserGroup);
-                return RedirectToAction(nameof(Index));
-            }
-            catch (Exception e)
-            {
-                return StatusCode(500, e.Message);
-            }
+            await api.UserGroupDelete(idUserGroup);
+            return RedirectToAction(nameof(Index));
         }
     }
 }

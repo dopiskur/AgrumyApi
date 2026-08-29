@@ -1,100 +1,75 @@
+using System.Security.Claims;
 using api.Dal.Interface;
 using api.Models;
+using api.Security;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
 
 namespace api.Controllers.View
 {
-    public class LoginController : Controller
+    [AllowAnonymous]
+    public class LoginController(IApi api) : Controller
     {
-        private const string CookieUserId = "userID";
-        private const string CookieLogin = "login";
-        private const string CookieAuthorization = "authorization";
-
-        private readonly IApi _api;
-
-        public LoginController(IApi api) => _api = api ?? throw new ArgumentNullException(nameof(api));
-
-        public ActionResult Index()
-        {
-            UserLogin userLogin = new UserLogin();
-            return View(userLogin);
-        }
+        public ActionResult Index() => View(new UserLogin());
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> Index(UserLogin userLogin)
         {
+            UserLoginResult? result;
+            string? role;
             try
             {
-                UserLoginResult? result = await _api.UserLogin(userLogin);
-                if (result?.Token == null)
-                {
-                    ModelState.AddModelError(string.Empty, "Invalid email/username or password.");
-                    return View(userLogin);
-                }
-
-                // HttpOnly keeps the JWT out of reach of any injected script (unlike localStorage,
-                // which page JS - including a successful XSS payload - can read outright).
-                CookieOptions options = new CookieOptions
-                {
-                    Expires = DateTime.Now.AddDays(7),
-                    HttpOnly = true,
-                    // Secure over HTTPS (production), but not over plain-HTTP dev on localhost -
-                    // browsers silently drop a Secure cookie set over HTTP, which would leave the
-                    // post-login redirect to /Device with no auth cookie (looks like login "does nothing").
-                    Secure = Request.IsHttps,
-                    SameSite = SameSiteMode.Strict,
-                };
-                Response.Cookies.Append(CookieUserId, result.IDUser.ToString() ?? "", options);
-                Response.Cookies.Append(CookieLogin, result.Email ?? "", options);
-                Response.Cookies.Append(CookieAuthorization, result.Token, options);
-
-                return RedirectToAction("Index", "Device");
+                result = await api.UserLogin(userLogin);
+                role = result?.Token is { } token ? JwtTokenProvider.ValidateToken(token) : null;
             }
             catch (Exception)
+            {
+                result = null;
+                role = null;
+            }
+
+            if (result?.Token is null || role is null)
             {
                 ModelState.AddModelError(string.Empty, "Invalid email/username or password.");
                 return View(userLogin);
             }
+
+            // HttpOnly, SameSite=Strict cookie holding an encrypted ticket - the raw JWT rides
+            // along as a stored token for BearerTokenHandler, never exposed to page script.
+            var identity = new ClaimsIdentity(
+                new[]
+                {
+                    new Claim(ClaimTypes.Name, result.Email ?? ""),
+                    new Claim(ClaimTypes.Role, role),
+                },
+                CookieAuthenticationDefaults.AuthenticationScheme);
+
+            var props = new AuthenticationProperties
+            {
+                IsPersistent = true,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7),
+            };
+            props.StoreTokens(new[] { new AuthenticationToken { Name = "access_token", Value = result.Token } });
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), props);
+
+            return RedirectToAction("Index", "Device");
         }
 
-        public ActionResult Logout()
+        public async Task<ActionResult> Logout()
         {
-            // Delete the cookie from the browser.
-            Response.Cookies.Delete(CookieUserId);
-            Response.Cookies.Delete(CookieLogin);
-            Response.Cookies.Delete(CookieAuthorization);
-
-            HttpContext.Response.Cookies.Append(CookieUserId, "");
-            HttpContext.Response.Cookies.Append(CookieLogin, "");
-            HttpContext.Response.Cookies.Append(CookieAuthorization, "");
-
-            return RedirectToAction("Index", "Home");
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction("Index", "Login");
         }
 
-        public ActionResult Register()
-        {
-            return View();
-        }
+        public ActionResult Register() => View();
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult Register(IFormCollection collection)
-        {
-            try
-            {
-                return RedirectToAction(nameof(Index));
-            }
-            catch
-            {
-                return View();
-            }
-        }
-
-        public ActionResult Cookie()
-        {
-            return View();
-        }
+        public ActionResult Register(IFormCollection collection) => RedirectToAction(nameof(Index));
     }
 }

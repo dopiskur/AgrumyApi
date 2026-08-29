@@ -1,72 +1,53 @@
 using api.Dal.Interface;
 using api.Models;
-using api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace api.Controllers.View
 {
-    public class SensorDataController : Controller
+    [Authorize]
+    public class SensorDataController(IApi api) : Controller
     {
-        private readonly IApi _api;
-
-        public SensorDataController(IApi api) => _api = api ?? throw new ArgumentNullException(nameof(api));
-
         public async Task<ActionResult> Index(int? idDevice, int? timeRange = 60, int? timeMDMY = 0, int? buildReport = 0)
         {
-            HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
-            if (jwtKey == null || JwtTokenProvider.ValidateToken(jwtKey) == null) { return RedirectToAction("Index", "Login"); }
-
-            // maximum minutes allowed are one day of data
             if (timeRange > 1440)
             {
-                timeRange = 1440;
+                timeRange = 1440; // cap at one day of minute-resolution data
             }
 
-            DeviceView? deviceView = new DeviceView();
-            deviceView.Device = await _api.DeviceGet(jwtKey, idDevice, null, null);
+            var deviceView = new DeviceView { Device = await api.DeviceGet(idDevice, null, null) };
+            deviceView.TimeRange!.Range = timeRange; // reflect the selected range back to the form
 
-            var timeRangeMDMY = from TimeRangeMDMY e in Enum.GetValues(typeof(TimeRangeMDMY))
-                                select new
-                                {
-                                    ID = (int)e,
-                                    Name = e.ToString()
-                                };
+            ViewBag.EnumList = new SelectList(
+                Enum.GetValues<TimeRangeMDMY>().Select(e => new { ID = (int)e, Name = e.ToString() }),
+                "ID", "Name");
 
-            ViewBag.EnumList = new SelectList(timeRangeMDMY, "ID", "Name");
-            deviceView.TimeRange.Range = 60; // default time range, one minute, one day, one month, one year
-
-            deviceView.SensorDataJson = await _api.SensorDataGet(jwtKey, idDevice, timeRange, timeMDMY, buildReport);
+            deviceView.SensorDataJson = await api.SensorDataGet(idDevice, timeRange, timeMDMY, buildReport);
 
             return View(deviceView);
         }
 
         public async Task<ActionResult> Report(int? idDevice, int? idSensorDataReport = 0)
         {
-            HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
-            if (jwtKey == null || JwtTokenProvider.ValidateToken(jwtKey) == null) { return RedirectToAction("Index", "Login"); }
-
-            DeviceView? deviceView = new DeviceView();
-            deviceView.Device = await _api.DeviceGet(jwtKey, idDevice, null, null);
-
-            deviceView.SensorDataReport = await _api.SensorDataReportGet(jwtKey, idDevice, idSensorDataReport, 0);
-
-            if (deviceView.SensorDataReport.Any() == false)
+            var deviceView = new DeviceView
             {
-                IList<SensorDataReport> emptyList = new List<SensorDataReport>();
-                SensorDataReport empty = new SensorDataReport();
-                empty.IDSensorDataReport = idSensorDataReport;
-                empty.DeviceID = idDevice;
-                empty.ReportName = "No reports";
-                emptyList.Add(empty);
+                Device = await api.DeviceGet(idDevice, null, null),
+                SensorDataReport = await api.SensorDataReportGet(idDevice, idSensorDataReport, 0),
+            };
 
-                deviceView.SensorDataReport = emptyList;
+            if (!deviceView.SensorDataReport.Any())
+            {
+                deviceView.SensorDataReport = new List<SensorDataReport>
+                {
+                    new() { IDSensorDataReport = idSensorDataReport, DeviceID = idDevice, ReportName = "No reports" },
+                };
             }
 
             if (idSensorDataReport > 0)
             {
-                IEnumerable<SensorDataReport> dataResult = await _api.SensorDataReportGet(jwtKey, idDevice, idSensorDataReport, 1);
-                deviceView.SensorDataJson = dataResult.First().SensorData;
+                var single = await api.SensorDataReportGet(idDevice, idSensorDataReport, 1);
+                deviceView.SensorDataJson = single.First().SensorData;
             }
 
             return View(deviceView);

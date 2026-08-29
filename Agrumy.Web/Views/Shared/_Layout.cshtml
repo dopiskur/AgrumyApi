@@ -1,8 +1,7 @@
-@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
     Func<string, string> navActive = c => string.Equals(c, currentController, StringComparison.OrdinalIgnoreCase) ? "active" : "";
-    HttpContextAccessor.HttpContext!.Request.Cookies.TryGetValue("login", out var currentUserEmail);
+    var currentUserEmail = User.Identity?.Name;
 }
 <!doctype html>
 <html lang="en">
@@ -97,18 +96,21 @@
                                 <p>Devices</p>
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a asp-area="" asp-controller="User" asp-action="Index" class="nav-link @navActive("User")">
-                                <i class="nav-icon bi bi-people"></i>
-                                <p>Users</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a asp-area="" asp-controller="Group" asp-action="Index" class="nav-link @navActive("Group")">
-                                <i class="nav-icon bi bi-diagram-3"></i>
-                                <p>Groups</p>
-                            </a>
-                        </li>
+                        @if (User.IsInRole("admin"))
+                        {
+                            <li class="nav-item">
+                                <a asp-area="" asp-controller="User" asp-action="Index" class="nav-link @navActive("User")">
+                                    <i class="nav-icon bi bi-people"></i>
+                                    <p>Users</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a asp-area="" asp-controller="Group" asp-action="Index" class="nav-link @navActive("Group")">
+                                    <i class="nav-icon bi bi-diagram-3"></i>
+                                    <p>Groups</p>
+                                </a>
+                            </li>
+                        }
                         <li class="nav-item mt-2 border-top border-secondary border-opacity-25 pt-2">
                             <a asp-area="" asp-controller="Login" asp-action="Logout" class="nav-link">
                                 <i class="nav-icon bi bi-box-arrow-right"></i>
