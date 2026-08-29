@@ -523,16 +523,21 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var d = await MakeDevice(t, tenantId);
-        var now = DateTime.Now;
+
+        // Anchor to mid-minute so the +/- second offsets below can never straddle a minute
+        // boundary (bucket mode 0 groups by minute).
+        DateTime n = DateTime.Now;
+        var thisMinute = new DateTime(n.Year, n.Month, n.Day, n.Hour, n.Minute, 30);
+        var prevMinute = thisMinute.AddMinutes(-1);
 
         await using (var db = _fx.NewContext(t))
         {
             db.SensorData.AddRange(
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 400, Temperature = 1, DateCreated = now.AddMinutes(-1).AddSeconds(-10) },
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 401, Temperature = 2, DateCreated = now.AddMinutes(-1) },
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 402, Temperature = 3, DateCreated = now.AddSeconds(-5) },
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = null, Temperature = 99, DateCreated = now.AddSeconds(-4) },
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 9000, Temperature = 88, DateCreated = now.AddSeconds(-3) });
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 400, Temperature = 1, DateCreated = prevMinute.AddSeconds(-5) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 401, Temperature = 2, DateCreated = prevMinute.AddSeconds(5) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 402, Temperature = 3, DateCreated = thisMinute.AddSeconds(-5) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = null, Temperature = 99, DateCreated = thisMinute.AddSeconds(-4) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 9000, Temperature = 88, DateCreated = thisMinute.AddSeconds(-3) });
             await db.SaveChangesAsync();
         }
 
