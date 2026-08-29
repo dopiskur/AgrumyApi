@@ -1,6 +1,6 @@
 namespace api.Dal.Entities
 {
-    internal class SensorDataRow
+    public class SensorDataRow
     {
         public int IDSensorData { get; set; }
         public int TenantID { get; set; }
@@ -23,7 +23,7 @@ namespace api.Dal.Entities
         public DateTime? DateCreated { get; set; }
     }
 
-    internal class SensorDataReportRow
+    public class SensorDataReportRow
     {
         public int IDSensorDataReport { get; set; }
         public int? DeviceID { get; set; }
@@ -32,7 +32,7 @@ namespace api.Dal.Entities
         public string? SensorData { get; set; }
     }
 
-    internal class EventDeviceRow
+    public class EventDeviceRow
     {
         public int IDEventDevice { get; set; }
         public int DeviceID { get; set; }
@@ -41,7 +41,7 @@ namespace api.Dal.Entities
         public string? Message { get; set; }
     }
 
-    internal class EventServiceRow
+    public class EventServiceRow
     {
         public int IDEventService { get; set; }
         public int ServiceID { get; set; }

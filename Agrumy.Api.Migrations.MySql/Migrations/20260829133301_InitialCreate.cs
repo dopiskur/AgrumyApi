@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace api.Migrations
+namespace Agrumy.Api.Migrations.MySql.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -38,7 +38,7 @@ namespace api.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     ServicePoint = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    ServicePublicKey = table.Column<string>(type: "text", nullable: true)
+                    ServicePublicKey = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     SleepSeconds = table.Column<int>(type: "int", nullable: true),
                     SleepDeepEnabled = table.Column<bool>(type: "tinyint(1)", nullable: true),
@@ -127,7 +127,7 @@ namespace api.Migrations
                     DeviceTypeID = table.Column<int>(type: "int", nullable: true),
                     Version = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Url = table.Column<string>(type: "text", nullable: true)
+                    Url = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     DateAdded = table.Column<DateTime>(type: "datetime(6)", nullable: true, defaultValueSql: "CURRENT_TIMESTAMP")
                 },
@@ -175,7 +175,7 @@ namespace api.Migrations
                     IDDeviceTypeSensor = table.Column<int>(type: "int", nullable: false),
                     SensorName = table.Column<string>(type: "varchar(128)", maxLength: 128, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    SensorDescription = table.Column<string>(type: "text", nullable: true)
+                    SensorDescription = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Battery = table.Column<int>(type: "int", nullable: true),
                     Temperature = table.Column<int>(type: "int", nullable: true),
@@ -219,7 +219,7 @@ namespace api.Migrations
                     DeviceUnitZoneID = table.Column<int>(type: "int", nullable: true),
                     DeviceUnitName = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    ZoneEnabled = table.Column<ulong>(type: "bit(1)", nullable: true)
+                    ZoneEnabled = table.Column<bool>(type: "tinyint(1)", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -250,7 +250,7 @@ namespace api.Migrations
                     DeviceID = table.Column<int>(type: "int", nullable: false),
                     EventID = table.Column<int>(type: "int", nullable: false),
                     Date = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    Message = table.Column<string>(type: "text", nullable: true)
+                    Message = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
@@ -268,7 +268,7 @@ namespace api.Migrations
                     ServiceID = table.Column<int>(type: "int", nullable: false),
                     EventID = table.Column<int>(type: "int", nullable: false),
                     Date = table.Column<DateTime>(type: "datetime(6)", nullable: true),
-                    Message = table.Column<string>(type: "text", nullable: true)
+                    Message = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
@@ -336,7 +336,7 @@ namespace api.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     ConfigKey = table.Column<string>(type: "varchar(128)", maxLength: 128, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    JWTKey = table.Column<string>(type: "text", nullable: true)
+                    JWTKey = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     PortHTTP = table.Column<int>(type: "int", nullable: true),
                     PortHTTPS = table.Column<int>(type: "int", nullable: true),
@@ -376,7 +376,7 @@ namespace api.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Username = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    PwdHash = table.Column<string>(type: "text", nullable: false)
+                    PwdHash = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     PwdSalt = table.Column<string>(type: "varchar(128)", maxLength: 128, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),

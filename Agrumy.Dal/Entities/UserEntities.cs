@@ -7,34 +7,34 @@ namespace api.Dal.Entities
     // Column/type/nullability spec: this used to live in Schema/SchemaScripts.cs (deleted with the
     // stored-procedure DAL); the EF baseline migration is now the source of truth.
 
-    internal class TenantRow
+    public class TenantRow
     {
         public int IDTenant { get; set; }
         public string TenantName { get; set; } = "";
         public DateTime? DateCreated { get; set; }
     }
 
-    internal class UserRoleScopeRow
+    public class UserRoleScopeRow
     {
         public int IDRoleScope { get; set; }
         public string? RoleScopeName { get; set; }
     }
 
-    internal class UserRoleRow
+    public class UserRoleRow
     {
         public int IDUserRole { get; set; }
         public string? RoleName { get; set; }
         public int? RoleScopeID { get; set; }
     }
 
-    internal class UserGroupRow
+    public class UserGroupRow
     {
         public int IDUserGroup { get; set; }
         public string? GroupName { get; set; }
         public int? UserRoleID { get; set; }
     }
 
-    internal class UserRow
+    public class UserRow
     {
         public int IDUser { get; set; }
         public int TenantID { get; set; }
@@ -52,7 +52,7 @@ namespace api.Dal.Entities
         public DateTime? DateModified { get; set; }
     }
 
-    internal class ServerConfigRow
+    public class ServerConfigRow
     {
         public int IDServerConfig { get; set; }
         public string? ServerConfigName { get; set; }

@@ -7,14 +7,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using MySqlConnector;
+using Npgsql;
 
 namespace api.Dal
 {
     /// <summary>
     /// EF Core implementation of <see cref="IRepository"/>. Replaces the Dapper +
-    /// <c>CommandType.StoredProcedure</c> <c>SqlRepository</c> (roadmap #42, Phase 1 - MySQL only).
+    /// <c>CommandType.StoredProcedure</c> <c>SqlRepository</c> (roadmap #42).
     ///
-    /// Every method reproduces the effect of the stored procedure it replaces; the reference for
+    /// Runs on MySQL/MariaDB (Pomelo) or PostgreSQL (Npgsql), chosen by <c>Database:Provider</c>.
+    /// Every method reproduces the effect of the stored procedure it replaced; the reference for
     /// that behaviour is the pre-#42 <c>Schema/SchemaScripts.cs</c> (git history). Persistence goes
     /// through <see cref="Entities"/> row types; results are projected onto the <see cref="api.Models"/>
     /// DTOs so the interface contract is unchanged.
@@ -27,20 +29,28 @@ namespace api.Dal
         /// </summary>
         internal static string? ConnectionStringOverride { get; set; }
 
-        // A fixed server version keeps context construction connection-free (ServerVersion.AutoDetect
-        // would open a socket during static init and turn a transient startup outage into a permanent
-        // TypeInitializationException). invent.hr runs MariaDB 11.x. Phase 2 makes this configurable.
+        /// <summary>Test-only seam: force the provider. Null =&gt; use <c>Database:Provider</c>.</summary>
+        internal static DbProviderKind? ProviderOverride { get; set; }
+
+        // Built once for the normal (appsettings-driven) path. Not cached when a test seam is set,
+        // so an integration test can point successive calls at different engines.
         private static DbContextOptions<AgrumyDbContext>? _options;
 
         private static AgrumyDbContext Db()
         {
-            _options ??= new DbContextOptionsBuilder<AgrumyDbContext>()
-                .UseMySql(
+            if (ConnectionStringOverride != null || ProviderOverride != null)
+            {
+                return new AgrumyDbContext(DbOptionsFactory.Build(
+                    ProviderOverride ?? DbProviderKindParser.Parse(Config.dbProvider),
                     ConnectionStringOverride
                         ?? Config.defaultSqlCon
-                        ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is missing."),
-                    new MariaDbServerVersion(new Version(11, 4, 0)))
-                .Options;
+                        ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is missing.")));
+            }
+
+            _options ??= DbOptionsFactory.Build(
+                DbProviderKindParser.Parse(Config.dbProvider),
+                Config.defaultSqlCon
+                    ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is missing."));
             return new AgrumyDbContext(_options);
         }
 
@@ -82,8 +92,21 @@ namespace api.Dal
                 }
             }
 
+            // PostgreSQL SQLSTATE: 42P01 undefined_table, 42703 undefined_column, 3F000 invalid_schema_name.
+            if (inner is PostgresException pgEx)
+            {
+                switch (pgEx.SqlState)
+                {
+                    case "42P01":
+                    case "42703":
+                    case "3F000":
+                        return DbFailureKind.SchemaMissing;
+                }
+            }
+
             if (DbErrorResponse.Mentions(ex, "doesn't exist") ||
-                DbErrorResponse.Mentions(ex, "Unknown table"))
+                DbErrorResponse.Mentions(ex, "Unknown table") ||
+                DbErrorResponse.Mentions(ex, "does not exist"))
             {
                 return DbFailureKind.SchemaMissing;
             }

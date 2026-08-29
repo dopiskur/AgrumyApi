@@ -1,39 +1,37 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.Extensions.Configuration;
 
 namespace api.Dal
 {
     /// <summary>
     /// Lets <c>dotnet ef</c> build an <see cref="AgrumyDbContext"/> without booting the web host.
-    /// Connection string resolution order: <c>--connection</c> arg passed to the ef tool, then the
-    /// <c>ConnectionStrings__DefaultConnection</c> / <c>DefaultConnection</c> environment variables,
-    /// then <c>appsettings.json</c> in the project directory. A real connection is only needed for
-    /// commands that touch the database (<c>database update</c>, <c>migrations script --idempotent</c>
-    /// against a live server); <c>migrations add</c> uses the pinned server version below.
+    ///
+    /// Provider (roadmap #42 Phase 2): <c>--provider mysql|postgres</c> ef arg, else
+    /// <c>AGRUMY_DB_PROVIDER</c> env var, else mysql.
+    /// Connection: <c>--connection</c> ef arg, else <c>ConnectionStrings__DefaultConnection</c> /
+    /// <c>DefaultConnection</c> env vars, else a localhost placeholder. Only commands that touch the
+    /// database need a real connection; <c>migrations add</c> uses the fixed provider versions.
+    ///
+    /// Add a migration:
+    ///   MySQL:    dotnet ef migrations add NAME -p Agrumy.Api.Migrations.MySql    -s Agrumy.Api -- --provider mysql
+    ///   Postgres: dotnet ef migrations add NAME -p Agrumy.Api.Migrations.Postgres -s Agrumy.Api -- --provider postgres
     /// </summary>
-    internal class AgrumyDbContextDesignTimeFactory : IDesignTimeDbContextFactory<AgrumyDbContext>
+    public class AgrumyDbContextDesignTimeFactory : IDesignTimeDbContextFactory<AgrumyDbContext>
     {
         public AgrumyDbContext CreateDbContext(string[] args)
         {
-            var config = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: true)
-                .AddEnvironmentVariables()
-                .Build();
+            var provider = DbProviderKindParser.Parse(
+                GetArg(args, "--provider")
+                ?? Environment.GetEnvironmentVariable("AGRUMY_DB_PROVIDER"));
 
-            string? conn =
+            string conn =
                 GetArg(args, "--connection")
                 ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
                 ?? Environment.GetEnvironmentVariable("DefaultConnection")
-                ?? config.GetConnectionString("DefaultConnection")
-                ?? "server=localhost;port=3306;database=agrumy;user id=root;password=;";
+                ?? (provider == DbProviderKind.Postgres
+                        ? "Host=localhost;Port=5432;Database=agrumyapi;Username=postgres;Password=postgres"
+                        : "server=localhost;port=3306;database=agrumyapi;user id=root;password=;");
 
-            var options = new DbContextOptionsBuilder<AgrumyDbContext>()
-                .UseMySql(conn, new MariaDbServerVersion(new Version(11, 4, 0)))
-                .Options;
-
-            return new AgrumyDbContext(options);
+            return new AgrumyDbContext(DbOptionsFactory.Build(provider, conn));
         }
 
         private static string? GetArg(string[] args, string name)

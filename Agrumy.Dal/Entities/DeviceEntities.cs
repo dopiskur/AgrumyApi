@@ -1,12 +1,12 @@
 namespace api.Dal.Entities
 {
-    internal class DeviceUnitZoneRow
+    public class DeviceUnitZoneRow
     {
         public int IDDeviceUnitZone { get; set; }
         public string? DeviceUnitZoneName { get; set; }
     }
 
-    internal class DeviceUnitRow
+    public class DeviceUnitRow
     {
         public int IDDeviceUnit { get; set; }
         public int? DeviceUnitZoneID { get; set; }
@@ -14,7 +14,7 @@ namespace api.Dal.Entities
         public bool? ZoneEnabled { get; set; }
     }
 
-    internal class DeviceTypeRow
+    public class DeviceTypeRow
     {
         public int IDDeviceType { get; set; }
         public string? DeviceTypeName { get; set; }
@@ -22,19 +22,19 @@ namespace api.Dal.Entities
         public bool? ControllerEnabled { get; set; }
     }
 
-    internal class DeviceTypeServiceRow
+    public class DeviceTypeServiceRow
     {
         public int IDDeviceTypeService { get; set; }
         public string? ServiceType { get; set; }
     }
 
-    internal class DeviceTypeRelayRow
+    public class DeviceTypeRelayRow
     {
         public int IDDeviceTypeRelay { get; set; }
         public string? RelayName { get; set; }
     }
 
-    internal class DeviceTypeSensorRow
+    public class DeviceTypeSensorRow
     {
         public int IDDeviceTypeSensor { get; set; }
         public string? SensorName { get; set; }
@@ -54,7 +54,7 @@ namespace api.Dal.Entities
         public int? Wind { get; set; }
     }
 
-    internal class DeviceConfigControllerRow
+    public class DeviceConfigControllerRow
     {
         public int IDDeviceConfigController { get; set; }
         public double? TempLow { get; set; }
@@ -78,7 +78,7 @@ namespace api.Dal.Entities
         public int? Relay8 { get; set; }
     }
 
-    internal class DeviceConfigSensorRow
+    public class DeviceConfigSensorRow
     {
         public int IDDeviceConfigSensor { get; set; }
         public int? SensorBattery { get; set; }
@@ -96,7 +96,7 @@ namespace api.Dal.Entities
         public int? SensorWind { get; set; }
     }
 
-    internal class DeviceRow
+    public class DeviceRow
     {
         public int IDDevice { get; set; }
         public int? TenantID { get; set; }
@@ -127,7 +127,7 @@ namespace api.Dal.Entities
         public DateTime? DateModified { get; set; }
     }
 
-    internal class DeviceFirmwareRow
+    public class DeviceFirmwareRow
     {
         public int IDDeviceFirmware { get; set; }
         public int? DeviceTypeID { get; set; }
