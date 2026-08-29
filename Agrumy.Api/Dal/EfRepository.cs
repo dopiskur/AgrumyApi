@@ -80,7 +80,8 @@ namespace api.Dal
         {
             Exception inner = ex is DbUpdateException due && due.InnerException != null ? due.InnerException : ex;
 
-            // MySql error numbers: 1146 ER_NO_SUCH_TABLE, 1051 ER_BAD_TABLE_ERROR, 1305 SP_DOES_NOT_EXIST.
+            // MySql error numbers: 1146 ER_NO_SUCH_TABLE, 1051 ER_BAD_TABLE_ERROR, 1305 SP_DOES_NOT_EXIST;
+            // 1216/1217/1451/1452 FK violation, 1062 duplicate key, 1213 deadlock, 1205 lock-wait timeout.
             if (inner is MySqlException mysqlEx)
             {
                 switch (mysqlEx.Number)
@@ -89,10 +90,21 @@ namespace api.Dal
                     case 1051:
                     case 1305:
                         return DbFailureKind.SchemaMissing;
+                    case 1216:
+                    case 1217:
+                    case 1451:
+                    case 1452:
+                    case 1062:
+                        return DbFailureKind.ConstraintViolation;
+                    case 1213:
+                    case 1205:
+                        return DbFailureKind.Contention;
                 }
             }
 
-            // PostgreSQL SQLSTATE: 42P01 undefined_table, 42703 undefined_column, 3F000 invalid_schema_name.
+            // PostgreSQL SQLSTATE: 42P01 undefined_table, 42703 undefined_column, 3F000 invalid_schema_name;
+            // 23503 FK violation, 23505 unique violation, 23514 check violation; 40P01 deadlock,
+            // 40001 serialization failure, 55P03 lock not available.
             if (inner is PostgresException pgEx)
             {
                 switch (pgEx.SqlState)
@@ -101,6 +113,14 @@ namespace api.Dal
                     case "42703":
                     case "3F000":
                         return DbFailureKind.SchemaMissing;
+                    case "23503":
+                    case "23505":
+                    case "23514":
+                        return DbFailureKind.ConstraintViolation;
+                    case "40P01":
+                    case "40001":
+                    case "55P03":
+                        return DbFailureKind.Contention;
                 }
             }
 

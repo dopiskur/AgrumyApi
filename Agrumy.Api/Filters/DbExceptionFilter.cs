@@ -6,9 +6,10 @@ using Microsoft.AspNetCore.Mvc.Filters;
 namespace api.Filters
 {
     /// <summary>
-    /// Turns any exception escaping an API action into the response the controllers used to build
-    /// by hand: a unique-constraint hit becomes a 500 with a business message, anything else goes
-    /// through <see cref="IRepository.ClassifyException"/> to a 503 with the DbErrorResponse shape.
+    /// Turns any exception escaping an API action into a response: a named unique-constraint hit
+    /// (email/username) becomes a 500 business message; anything else goes through
+    /// <see cref="IRepository.ClassifyException"/> to the DbErrorResponse shape with the status
+    /// <see cref="DbErrorResponse.StatusCodeFor"/> picks (409 for a constraint violation, else 503).
     /// Registered globally in Program.cs.
     /// </summary>
     public sealed class DbExceptionFilter(IRepository repo, ILogger<DbExceptionFilter> logger) : IExceptionFilter
@@ -32,9 +33,10 @@ namespace api.Filters
             else
             {
                 logger.LogError(ex, "API action {Action} failed", context.ActionDescriptor.DisplayName);
-                context.Result = new ObjectResult(DbErrorResponse.For(repo.ClassifyException(ex)))
+                DbFailureKind kind = repo.ClassifyException(ex);
+                context.Result = new ObjectResult(DbErrorResponse.For(kind))
                 {
-                    StatusCode = StatusCodes.Status503ServiceUnavailable,
+                    StatusCode = DbErrorResponse.StatusCodeFor(kind),
                 };
             }
 

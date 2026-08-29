@@ -9,6 +9,12 @@ namespace api.Dal
         ConnectionFailure,
 
         /// <summary>The database is reachable but a required table or stored routine is missing.</summary>
-        SchemaMissing
+        SchemaMissing,
+
+        /// <summary>A FK / check / unique constraint was violated (and DbExceptionFilter did not name it specifically).</summary>
+        ConstraintViolation,
+
+        /// <summary>A deadlock or lock-wait timeout - transient, the caller can retry.</summary>
+        Contention
     }
 }

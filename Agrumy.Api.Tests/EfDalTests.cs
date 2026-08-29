@@ -126,6 +126,70 @@ public class ClassifyExceptionTests
         Assert.Equal(DbFailureKind.ConnectionFailure,
             _repo.ClassifyException(new TimeoutException("connect timeout")));
     }
+
+    private static Npgsql.PostgresException Pg(string sqlState) =>
+        new("boom", "ERROR", "ERROR", sqlState);
+
+    [Theory]
+    [InlineData("23503")] // foreign_key_violation
+    [InlineData("23505")] // unique_violation
+    [InlineData("23514")] // check_violation
+    public void PostgresConstraintSqlState_IsConstraintViolation(string sqlState)
+    {
+        Assert.Equal(DbFailureKind.ConstraintViolation, _repo.ClassifyException(Pg(sqlState)));
+    }
+
+    [Theory]
+    [InlineData("40P01")] // deadlock_detected
+    [InlineData("40001")] // serialization_failure
+    [InlineData("55P03")] // lock_not_available
+    public void PostgresContentionSqlState_IsContention(string sqlState)
+    {
+        Assert.Equal(DbFailureKind.Contention, _repo.ClassifyException(Pg(sqlState)));
+    }
+
+    [Fact]
+    public void PostgresUndefinedTable_StaysSchemaMissing()
+    {
+        Assert.Equal(DbFailureKind.SchemaMissing, _repo.ClassifyException(Pg("42P01")));
+    }
+
+    [Fact]
+    public void DbUpdateException_WrappingConstraintViolation_IsConstraintViolation()
+    {
+        var ex = new Microsoft.EntityFrameworkCore.DbUpdateException(
+            "An error occurred while saving the entity changes.", Pg("23505"));
+
+        Assert.Equal(DbFailureKind.ConstraintViolation, _repo.ClassifyException(ex));
+    }
+}
+
+public class DbErrorResponseForTests
+{
+    private static string Json(DbFailureKind kind) =>
+        JsonSerializer.Serialize(DbErrorResponse.For(kind));
+
+    [Fact]
+    public void For_ConstraintViolation_HasConstraintReason()
+    {
+        Assert.Contains("constraint_violation", Json(DbFailureKind.ConstraintViolation));
+    }
+
+    [Fact]
+    public void For_Contention_HasContentionReason()
+    {
+        Assert.Contains("contention", Json(DbFailureKind.Contention));
+    }
+
+    [Theory]
+    [InlineData(DbFailureKind.ConstraintViolation, 409)]
+    [InlineData(DbFailureKind.Contention, 503)]
+    [InlineData(DbFailureKind.SchemaMissing, 503)]
+    [InlineData(DbFailureKind.ConnectionFailure, 503)]
+    public void StatusCodeFor_MapsKindToHttpStatus(DbFailureKind kind, int expected)
+    {
+        Assert.Equal(expected, DbErrorResponse.StatusCodeFor(kind));
+    }
 }
 
 public class DbErrorResponseMentionsTests

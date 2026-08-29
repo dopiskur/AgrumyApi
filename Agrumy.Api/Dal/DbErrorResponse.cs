@@ -13,11 +13,28 @@ namespace api.Dal
                 reason = "schema_missing",
                 message = "The database schema is not provisioned. Restart the service to auto-provision it, or contact the administrator."
             },
+            DbFailureKind.ConstraintViolation => new
+            {
+                reason = "constraint_violation",
+                message = "The request conflicts with an existing record or a referenced record does not exist."
+            },
+            DbFailureKind.Contention => new
+            {
+                reason = "contention",
+                message = "The database is busy (deadlock or lock timeout). Please try again."
+            },
             _ => new
             {
                 reason = "connection_failure",
                 message = "The service could not reach the database. Please try again later."
             }
+        };
+
+        /// <summary>HTTP status for a given failure kind: a constraint violation is a 409, everything else a 503.</summary>
+        public static int StatusCodeFor(DbFailureKind kind) => kind switch
+        {
+            DbFailureKind.ConstraintViolation => 409,
+            _ => 503
         };
 
         /// <summary>

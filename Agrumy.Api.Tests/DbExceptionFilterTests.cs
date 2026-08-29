@@ -55,6 +55,29 @@ public class DbExceptionFilterTests
     }
 
     [Fact]
+    public void ConstraintViolation_Becomes409WithDbErrorResponse()
+    {
+        var ctx = Context(new Exception("FK violation"));
+        Filter(DbFailureKind.ConstraintViolation).OnException(ctx);
+
+        var obj = Assert.IsType<ObjectResult>(ctx.Result);
+        Assert.Equal(StatusCodes.Status409Conflict, obj.StatusCode);
+        Assert.Contains("constraint_violation", JsonSerializer.Serialize(obj.Value));
+        Assert.True(ctx.ExceptionHandled);
+    }
+
+    [Fact]
+    public void Contention_Becomes503WithDbErrorResponse()
+    {
+        var ctx = Context(new Exception("deadlock found"));
+        Filter(DbFailureKind.Contention).OnException(ctx);
+
+        var obj = Assert.IsType<ObjectResult>(ctx.Result);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, obj.StatusCode);
+        Assert.Contains("contention", JsonSerializer.Serialize(obj.Value));
+    }
+
+    [Fact]
     public void UniqueEmailViolation_Becomes500BusinessMessage()
     {
         var ctx = Context(new Exception("outer",

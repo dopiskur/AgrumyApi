@@ -587,4 +587,24 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             Assert.Equal(DbFailureKind.SchemaMissing, _repo.ClassifyException(ex));
         }
     }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task ClassifyException_On_Real_Unique_Violation_Is_ConstraintViolation(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        string name = "T_" + U();
+        await _repo.TenantAddAsync(name);
+
+        await using var db = _fx.NewContext(t);
+        db.Tenants.Add(new TenantRow { TenantName = name }); // collides with tenant.Name_UNIQUE
+        try
+        {
+            await db.SaveChangesAsync();
+            Assert.Fail("expected the duplicate insert to throw");
+        }
+        catch (Exception ex)
+        {
+            Assert.Equal(DbFailureKind.ConstraintViolation, _repo.ClassifyException(ex));
+        }
+    }
 }
