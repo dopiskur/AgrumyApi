@@ -26,17 +26,14 @@ namespace api.Controllers.API
         [HttpPut]
         public async Task<ActionResult<bool>> DeviceUpdate([FromBody] Device device)
         {
-            Device existing = await Repo.DeviceGetByIdAsync(device.IDDevice);
-            if (existing.IDDevice == null)
+            var (existing, error) = await EnsureOwnedDeviceAsync(
+                () => Repo.DeviceGetByIdAsync(device.IDDevice), "Device");
+            if (error != null)
             {
-                return NotFound();
-            }
-            if (existing.TenantID != CallerTenantId)
-            {
-                return StatusCode(403, "Device belongs to a different tenant");
+                return error;
             }
 
-            device.TenantID = existing.TenantID; // payload cannot move a device to another tenant
+            device.TenantID = existing!.TenantID; // payload cannot move a device to another tenant
 
             await Repo.DeviceUpdateAsync(device);
             await RefreshConfigVersionCacheAsync(device.IDDevice);
@@ -47,19 +44,14 @@ namespace api.Controllers.API
         [HttpDelete]
         public async Task<ActionResult<bool>> DeviceDelete(int? idDevice)
         {
-            Device existing = await Repo.DeviceGetByIdAsync(idDevice);
-            if (existing.IDDevice == null)
+            var (_, error) = await EnsureOwnedDeviceAsync(
+                () => Repo.DeviceGetByIdAsync(idDevice), "Device");
+            if (error != null)
             {
-                return NotFound();
+                return error;
             }
 
-            int? callerTenantId = CallerTenantId;
-            if (existing.TenantID != callerTenantId)
-            {
-                return StatusCode(403, "Device belongs to a different tenant");
-            }
-
-            await Repo.DeviceDeleteAsync(idDevice, callerTenantId);
+            await Repo.DeviceDeleteAsync(idDevice, CallerTenantId);
             return true;
         }
 
@@ -67,14 +59,11 @@ namespace api.Controllers.API
         [HttpGet("Sensor")]
         public async Task<ActionResult<DeviceConfigSensor>> DeviceConfigSensorGet(int? deviceConfigSensorID)
         {
-            Device owner = await Repo.DeviceGetByDeviceConfigSensorIdAsync(deviceConfigSensorID);
-            if (owner.IDDevice == null)
+            var (_, error) = await EnsureOwnedDeviceAsync(
+                () => Repo.DeviceGetByDeviceConfigSensorIdAsync(deviceConfigSensorID), "Sensor config");
+            if (error != null)
             {
-                return NotFound();
-            }
-            if (owner.TenantID != CallerTenantId)
-            {
-                return StatusCode(403, "Sensor config belongs to a different tenant");
+                return error;
             }
 
             return Ok(await Repo.DeviceConfigSensorGetAsync(deviceConfigSensorID));
@@ -84,14 +73,11 @@ namespace api.Controllers.API
         [HttpGet("Controller")]
         public async Task<ActionResult<DeviceConfigController>> DeviceConfigControllerGet(int? deviceConfigControllerID)
         {
-            Device owner = await Repo.DeviceGetByDeviceConfigControllerIdAsync(deviceConfigControllerID);
-            if (owner.IDDevice == null)
+            var (_, error) = await EnsureOwnedDeviceAsync(
+                () => Repo.DeviceGetByDeviceConfigControllerIdAsync(deviceConfigControllerID), "Controller config");
+            if (error != null)
             {
-                return NotFound();
-            }
-            if (owner.TenantID != CallerTenantId)
-            {
-                return StatusCode(403, "Controller config belongs to a different tenant");
+                return error;
             }
 
             return Ok(await Repo.DeviceConfigControllerGetAsync(deviceConfigControllerID));
@@ -106,14 +92,11 @@ namespace api.Controllers.API
                 return BadRequest("Device is required.");
             }
 
-            Device existing = await Repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice);
-            if (existing.IDDevice == null)
+            var (_, error) = await EnsureOwnedDeviceAsync(
+                () => Repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice), "Device");
+            if (error != null)
             {
-                return NotFound();
-            }
-            if (existing.TenantID != CallerTenantId)
-            {
-                return StatusCode(403, "Device belongs to a different tenant");
+                return error;
             }
 
             await Repo.DeviceConfigSensorUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Sensor);
@@ -130,19 +113,35 @@ namespace api.Controllers.API
                 return BadRequest("Device is required.");
             }
 
-            Device existing = await Repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice);
-            if (existing.IDDevice == null)
+            var (_, error) = await EnsureOwnedDeviceAsync(
+                () => Repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice), "Device");
+            if (error != null)
             {
-                return NotFound();
-            }
-            if (existing.TenantID != CallerTenantId)
-            {
-                return StatusCode(403, "Device belongs to a different tenant");
+                return error;
             }
 
             await Repo.DeviceConfigControllerUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Controller);
             await RefreshConfigVersionCacheAsync(deviceUpdate.Device.IDDevice);
             return true;
+        }
+
+        /// <summary>
+        /// Looks a device up and checks it is owned by the caller's tenant. Returns (null, 404) when
+        /// no device matches, (device, 403) on a tenant mismatch, or (device, null) when it is owned.
+        /// </summary>
+        private async Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(
+            Func<Task<Device>> lookup, string ownerLabel)
+        {
+            Device device = await lookup();
+            if (device.IDDevice == null)
+            {
+                return (null, NotFound());
+            }
+            if (device.TenantID != CallerTenantId)
+            {
+                return (device, StatusCode(403, $"{ownerLabel} belongs to a different tenant"));
+            }
+            return (device, null);
         }
 
         /// <summary>

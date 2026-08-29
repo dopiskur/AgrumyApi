@@ -66,6 +66,51 @@ public class ApiControllerTests
         _repo.Verify(r => r.DeviceDeleteAsync(It.IsAny<int?>(), It.IsAny<int?>()), Times.Never);
     }
 
+    [Fact]
+    public async Task DeviceUpdate_UnknownDevice_Returns404AndDoesNotUpdate()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(99)).ReturnsAsync(new Device()); // IDDevice == null
+
+        var controller = NewDeviceController();
+        SetCaller(controller, "admin", 1);
+        var result = await controller.DeviceUpdate(new Device { IDDevice = 99 });
+
+        Assert.IsType<NotFoundResult>(result.Result);
+        _repo.Verify(r => r.DeviceUpdateAsync(It.IsAny<Device>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeviceConfigSensorGet_DifferentTenant_Returns403_WithConfigSpecificMessage()
+    {
+        _repo.Setup(r => r.DeviceGetByDeviceConfigSensorIdAsync(5))
+             .ReturnsAsync(new Device { IDDevice = 8, TenantID = 99 });
+
+        var controller = NewDeviceController();
+        SetCaller(controller, "user", 1);
+        var result = await controller.DeviceConfigSensorGet(5);
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+        Assert.Equal("Sensor config belongs to a different tenant", obj.Value);
+        _repo.Verify(r => r.DeviceConfigSensorGetAsync(It.IsAny<int?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeviceConfigSensorGet_OwnedByCaller_ReturnsConfig()
+    {
+        var cfg = new DeviceConfigSensor { IDDeviceConfigSensor = 5, SensorTemp = 1 };
+        _repo.Setup(r => r.DeviceGetByDeviceConfigSensorIdAsync(5))
+             .ReturnsAsync(new Device { IDDevice = 8, TenantID = 1 });
+        _repo.Setup(r => r.DeviceConfigSensorGetAsync(5)).ReturnsAsync(cfg);
+
+        var controller = NewDeviceController();
+        SetCaller(controller, "user", 1);
+        var result = await controller.DeviceConfigSensorGet(5);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Same(cfg, ok.Value);
+    }
+
     // ---- UserApiController.UserRegistration ------------------------------------------------
 
     [Fact]
