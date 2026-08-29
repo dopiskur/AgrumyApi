@@ -79,7 +79,7 @@ builder.Services.AddHsts(options =>
     options.IncludeSubDomains = true;
 });
 
-builder.Services.AddScoped<IRepository, SqlRepository>();
+builder.Services.AddScoped<IRepository, EfRepository>();
 builder.Services.AddScoped<ICache, CacheRepository>();
 
 builder.Services.AddSwaggerGen(option =>

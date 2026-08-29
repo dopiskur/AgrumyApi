@@ -96,12 +96,12 @@ namespace api.Controllers.API
                 _logger.LogError(e, "User write operation failed");
 
                 // Unique-constraint hits are a meaningful business response, not an internal detail.
-                if (e.Message.Contains("email_UNIQUE"))
+                if (DbErrorResponse.Mentions(e, "email_UNIQUE"))
                 {
                     return StatusCode(500, "email already registered");
                 }
 
-                if (e.Message.Contains("Username_UNIQUE"))
+                if (DbErrorResponse.Mentions(e, "Username_UNIQUE"))
                 {
                     return StatusCode(500, "username already registered");
                 }
@@ -343,12 +343,12 @@ namespace api.Controllers.API
                 _logger.LogError(e, "User write operation failed");
 
                 // Unique-constraint hits are a meaningful business response, not an internal detail.
-                if (e.Message.Contains("email_UNIQUE"))
+                if (DbErrorResponse.Mentions(e, "email_UNIQUE"))
                 {
                     return StatusCode(500, "email already registered");
                 }
 
-                if (e.Message.Contains("Username_UNIQUE"))
+                if (DbErrorResponse.Mentions(e, "Username_UNIQUE"))
                 {
                     return StatusCode(500, "username already registered");
                 }
@@ -414,12 +414,12 @@ namespace api.Controllers.API
                 _logger.LogError(e, "User write operation failed");
 
                 // Unique-constraint hits are a meaningful business response, not an internal detail.
-                if (e.Message.Contains("email_UNIQUE"))
+                if (DbErrorResponse.Mentions(e, "email_UNIQUE"))
                 {
                     return StatusCode(500, "email already registered");
                 }
 
-                if (e.Message.Contains("Username_UNIQUE"))
+                if (DbErrorResponse.Mentions(e, "Username_UNIQUE"))
                 {
                     return StatusCode(500, "username already registered");
                 }
