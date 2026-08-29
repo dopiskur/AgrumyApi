@@ -111,6 +111,26 @@ public class ApiControllerTests
         Assert.Same(cfg, ok.Value);
     }
 
+    [Fact]
+    public async Task DeviceRegistration_UnknownEmail_Returns401_NotA503()
+    {
+        _repo.Setup(r => r.UserGetAsync(null, "ghost@example.com", null))
+             .ThrowsAsync(new ArgumentException("Wrong id, no such person")); // DAL "no such user"
+
+        var controller = NewDeviceController();
+        var result = await controller.DeviceRegistration(new DeviceRegistration
+        {
+            Email = "ghost@example.com",
+            DevicePin = 1234,
+            MacAddress = "AABBCCDDEEFF",
+        });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(401, obj.StatusCode);
+        Assert.Equal("Wrong user or pin", obj.Value);
+        _repo.Verify(r => r.DeviceAddAsync(It.IsAny<Device>()), Times.Never);
+    }
+
     // ---- UserApiController.UserRegistration ------------------------------------------------
 
     [Fact]
@@ -200,6 +220,20 @@ public class ApiControllerTests
 
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(401, obj.StatusCode);
+    }
+
+    [Fact]
+    public async Task UserLogin_NoSuchUser_Returns401_NotA503()
+    {
+        _repo.Setup(r => r.UserGetAsync(null, "ghost@example.com", null))
+             .ThrowsAsync(new ArgumentException("Wrong id, no such person"));
+
+        var controller = NewUserController();
+        var result = await controller.UserLogin(new UserLogin { Login = "ghost@example.com", Password = "whatever" });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(401, obj.StatusCode);
+        Assert.Equal("Wrong username or password", obj.Value);
     }
 
     // ---- tenant scoping ---------------------------------------------------------------

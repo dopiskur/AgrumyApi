@@ -121,10 +121,29 @@ public class ClassifyExceptionTests
     }
 
     [Fact]
-    public void UnrelatedError_IsConnectionFailure()
+    public void TransportError_IsConnectionFailure()
     {
         Assert.Equal(DbFailureKind.ConnectionFailure,
             _repo.ClassifyException(new TimeoutException("connect timeout")));
+        Assert.Equal(DbFailureKind.ConnectionFailure,
+            _repo.ClassifyException(new System.Net.Sockets.SocketException()));
+    }
+
+    [Theory]
+    [InlineData(typeof(InvalidOperationException))]
+    [InlineData(typeof(NullReferenceException))]
+    public void UnrecognisedException_IsUnknown(Type exType)
+    {
+        var ex = (Exception)Activator.CreateInstance(exType)!;
+        Assert.Equal(DbFailureKind.Unknown, _repo.ClassifyException(ex));
+    }
+
+    [Fact]
+    public void NotFoundArgumentException_IsUnknown_NotConnectionFailure()
+    {
+        // The DAL throws ArgumentException for "no such user/device"; that must not read as a DB outage.
+        Assert.Equal(DbFailureKind.Unknown,
+            _repo.ClassifyException(new ArgumentException("Wrong id, no such person")));
     }
 
     private static Npgsql.PostgresException Pg(string sqlState) =>
@@ -181,11 +200,18 @@ public class DbErrorResponseForTests
         Assert.Contains("contention", Json(DbFailureKind.Contention));
     }
 
+    [Fact]
+    public void For_Unknown_HasServerErrorReason()
+    {
+        Assert.Contains("server_error", Json(DbFailureKind.Unknown));
+    }
+
     [Theory]
     [InlineData(DbFailureKind.ConstraintViolation, 409)]
     [InlineData(DbFailureKind.Contention, 503)]
     [InlineData(DbFailureKind.SchemaMissing, 503)]
     [InlineData(DbFailureKind.ConnectionFailure, 503)]
+    [InlineData(DbFailureKind.Unknown, 500)]
     public void StatusCodeFor_MapsKindToHttpStatus(DbFailureKind kind, int expected)
     {
         Assert.Equal(expected, DbErrorResponse.StatusCodeFor(kind));

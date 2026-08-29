@@ -68,7 +68,17 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-            var (user, secret) = await LookupAsync(value.Login);
+            User user;
+            UserSecret secret;
+            try
+            {
+                (user, secret) = await LookupAsync(value.Login);
+            }
+            catch (ArgumentException) // DAL throws this when the login matches no user
+            {
+                return StatusCode(401, "Wrong username or password");
+            }
+
             if (!AuthenticationProvider.VerifyHash(secret.PwdHash, secret.PwdSalt, value.Password))
             {
                 return StatusCode(401, "Wrong username or password");

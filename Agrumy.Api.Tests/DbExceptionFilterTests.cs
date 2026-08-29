@@ -78,6 +78,18 @@ public class DbExceptionFilterTests
     }
 
     [Fact]
+    public void UnknownError_Becomes500NotAMisleading503()
+    {
+        var ctx = Context(new ArgumentException("Wrong id, no such person"));
+        Filter(DbFailureKind.Unknown).OnException(ctx);
+
+        var obj = Assert.IsType<ObjectResult>(ctx.Result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, obj.StatusCode);
+        Assert.Contains("server_error", JsonSerializer.Serialize(obj.Value));
+        Assert.DoesNotContain("connection_failure", JsonSerializer.Serialize(obj.Value));
+    }
+
+    [Fact]
     public void UniqueEmailViolation_Becomes500BusinessMessage()
     {
         var ctx = Context(new Exception("outer",

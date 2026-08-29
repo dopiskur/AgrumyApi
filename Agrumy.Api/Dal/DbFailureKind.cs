@@ -15,6 +15,9 @@ namespace api.Dal
         ConstraintViolation,
 
         /// <summary>A deadlock or lock-wait timeout - transient, the caller can retry.</summary>
-        Contention
+        Contention,
+
+        /// <summary>Not a recognised database failure - an unexpected server-side error (HTTP 500, not 503).</summary>
+        Unknown
     }
 }

@@ -23,6 +23,11 @@ namespace api.Dal
                 reason = "contention",
                 message = "The database is busy (deadlock or lock timeout). Please try again."
             },
+            DbFailureKind.Unknown => new
+            {
+                reason = "server_error",
+                message = "The service hit an unexpected error handling the request."
+            },
             _ => new
             {
                 reason = "connection_failure",
@@ -30,10 +35,11 @@ namespace api.Dal
             }
         };
 
-        /// <summary>HTTP status for a given failure kind: a constraint violation is a 409, everything else a 503.</summary>
+        /// <summary>HTTP status for a failure kind: 409 for a constraint violation, 500 for an unknown/unexpected error, otherwise 503.</summary>
         public static int StatusCodeFor(DbFailureKind kind) => kind switch
         {
             DbFailureKind.ConstraintViolation => 409,
+            DbFailureKind.Unknown => 500,
             _ => 503
         };
 

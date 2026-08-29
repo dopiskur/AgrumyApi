@@ -100,6 +100,8 @@ namespace api.Dal
                     case 1205:
                         return DbFailureKind.Contention;
                 }
+                // Any other MySql error still reached the server but failed - treat as a connection-level failure.
+                return DbFailureKind.ConnectionFailure;
             }
 
             // PostgreSQL SQLSTATE: 42P01 undefined_table, 42703 undefined_column, 3F000 invalid_schema_name;
@@ -122,6 +124,7 @@ namespace api.Dal
                     case "55P03":
                         return DbFailureKind.Contention;
                 }
+                return DbFailureKind.ConnectionFailure;
             }
 
             // MySQL text fallback for a missing table when the exception type isn't MySqlException.
@@ -134,7 +137,16 @@ namespace api.Dal
                 return DbFailureKind.SchemaMissing;
             }
 
-            return DbFailureKind.ConnectionFailure;
+            // Genuine transport-level failures still mean "can't reach the DB, retry later" (503).
+            if (ex is TimeoutException or System.Net.Sockets.SocketException or System.Data.Common.DbException ||
+                inner is TimeoutException or System.Net.Sockets.SocketException or System.Data.Common.DbException)
+            {
+                return DbFailureKind.ConnectionFailure;
+            }
+
+            // Anything else escaping an action (e.g. a not-found ArgumentException from the DAL) is a
+            // server-side bug, not a database outage - let it surface as 500, not a misleading 503.
+            return DbFailureKind.Unknown;
         }
 
         // ---- Server config ------------------------------------------------------------
