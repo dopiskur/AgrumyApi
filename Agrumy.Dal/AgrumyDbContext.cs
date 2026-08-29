@@ -7,13 +7,20 @@ namespace api.Dal
     /// EF Core context for the Agrumy database. Replaces the Dapper + stored-procedure
     /// <c>SqlRepository</c> / <c>Schema.SchemaScripts</c> pair (roadmap #42).
     ///
-    /// Mapped against the legacy MySQL/MariaDB schema: camelCase table names, <c>IDXxx</c> primary
-    /// keys, a mix of AUTO_INCREMENT and manually-assigned ids. Relationships are intentionally not
-    /// configured - EfRepository does every join explicitly in LINQ - so the baseline migration
-    /// creates tables without the legacy NO-ACTION foreign keys. That is fine for a fresh database
-    /// and irrelevant to the existing shared one (EnsureSchemaAsync never migrates it).
+    /// Provider-neutral (roadmap #42 Phase 2): runs on MySQL/MariaDB (Pomelo) and PostgreSQL
+    /// (Npgsql), chosen at runtime by <c>Database:Provider</c>. No <c>HasColumnType</c> with
+    /// vendor-specific type names - EF maps each CLR type to the right column type per provider
+    /// (bool -&gt; tinyint(1) / boolean, unbounded string -&gt; longtext / text, DateTime -&gt;
+    /// datetime(6) / timestamp). Only <c>HasMaxLength</c> (portable varchar(n)) and
+    /// <c>CURRENT_TIMESTAMP</c> defaults (valid SQL on both) are used.
+    ///
+    /// Mapped against the legacy schema: camelCase table names, <c>IDXxx</c> primary keys, a mix of
+    /// identity and manually-assigned ids. Relationships are intentionally not configured -
+    /// EfRepository does every join explicitly in LINQ - so a baseline migration creates tables
+    /// without the legacy NO-ACTION foreign keys. That is fine for a fresh database and irrelevant
+    /// to one that already has tables (EnsureSchemaAsync never migrates it).
     /// </summary>
-    internal class AgrumyDbContext : DbContext
+    public class AgrumyDbContext : DbContext
     {
         public AgrumyDbContext(DbContextOptions<AgrumyDbContext> options) : base(options) { }
 
@@ -83,12 +90,11 @@ namespace api.Dal
                 e.Property(x => x.IDUser).ValueGeneratedOnAdd();
                 e.Property(x => x.Email).HasMaxLength(100).IsRequired();
                 e.Property(x => x.Username).HasMaxLength(100);
-                e.Property(x => x.PwdHash).HasColumnType("text").IsRequired();
+                e.Property(x => x.PwdHash).IsRequired();
                 e.Property(x => x.PwdSalt).HasMaxLength(128).IsRequired();
                 e.Property(x => x.FirstName).HasMaxLength(100);
                 e.Property(x => x.LastName).HasMaxLength(100);
                 e.Property(x => x.Phone).HasMaxLength(15);
-                e.Property(x => x.Enabled).HasColumnType("tinyint(1)");
                 e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.Property(x => x.DateModified).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.HasIndex(x => x.Email).IsUnique().HasDatabaseName("email_UNIQUE");
@@ -102,7 +108,6 @@ namespace api.Dal
                 e.Property(x => x.IDServerConfig).ValueGeneratedNever();
                 e.Property(x => x.ServerConfigName).HasMaxLength(100);
                 e.Property(x => x.ConfigKey).HasMaxLength(128).IsRequired();
-                e.Property(x => x.JWTKey).HasColumnType("text");
                 e.Property(x => x.ServerConfigCol).HasColumnName("serverConfigcol").HasMaxLength(45);
             });
 
@@ -120,7 +125,6 @@ namespace api.Dal
                 e.HasKey(x => x.IDDeviceUnit);
                 e.Property(x => x.IDDeviceUnit).ValueGeneratedNever();
                 e.Property(x => x.DeviceUnitName).HasMaxLength(100);
-                e.Property(x => x.ZoneEnabled).HasColumnType("bit(1)");
             });
 
             b.Entity<DeviceTypeRow>(e =>
@@ -129,8 +133,6 @@ namespace api.Dal
                 e.HasKey(x => x.IDDeviceType);
                 e.Property(x => x.IDDeviceType).ValueGeneratedOnAdd();
                 e.Property(x => x.DeviceTypeName).HasMaxLength(100);
-                e.Property(x => x.SensorEnabled).HasColumnType("tinyint(1)");
-                e.Property(x => x.ControllerEnabled).HasColumnType("tinyint(1)");
             });
 
             b.Entity<DeviceTypeServiceRow>(e =>
@@ -155,7 +157,6 @@ namespace api.Dal
                 e.HasKey(x => x.IDDeviceTypeSensor);
                 e.Property(x => x.IDDeviceTypeSensor).ValueGeneratedNever();
                 e.Property(x => x.SensorName).HasMaxLength(128);
-                e.Property(x => x.SensorDescription).HasColumnType("text");
             });
 
             b.Entity<DeviceConfigControllerRow>(e =>
@@ -163,7 +164,6 @@ namespace api.Dal
                 e.ToTable("deviceConfigController");
                 e.HasKey(x => x.IDDeviceConfigController);
                 e.Property(x => x.IDDeviceConfigController).ValueGeneratedOnAdd();
-                e.Property(x => x.RelayEnabled).HasColumnType("tinyint(1)");
             });
 
             b.Entity<DeviceConfigSensorRow>(e =>
@@ -183,16 +183,6 @@ namespace api.Dal
                 e.Property(x => x.ApiId).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ApiKey).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ServicePoint).HasMaxLength(200);
-                e.Property(x => x.ServicePublicKey).HasColumnType("text");
-                e.Property(x => x.SleepDeepEnabled).HasColumnType("tinyint(1)");
-                e.Property(x => x.DeviceSensorEnabled).HasColumnType("tinyint(1)");
-                e.Property(x => x.DeviceControllerEnabled).HasColumnType("tinyint(1)");
-                e.Property(x => x.BatteryEnabled).HasColumnType("tinyint(1)");
-                e.Property(x => x.Enabled).HasColumnType("tinyint(1)");
-                e.Property(x => x.Debug).HasColumnType("tinyint(1)");
-                e.Property(x => x.Reboot).HasColumnType("tinyint(1)");
-                e.Property(x => x.Reset).HasColumnType("tinyint(1)");
-                e.Property(x => x.FirmwareUpdate).HasColumnType("tinyint(1)");
                 e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.Property(x => x.DateModified).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.HasIndex(x => x.ApiId).IsUnique().HasDatabaseName("ApiID_UNIQUE");
@@ -204,7 +194,6 @@ namespace api.Dal
                 e.HasKey(x => x.IDDeviceFirmware);
                 e.Property(x => x.IDDeviceFirmware).ValueGeneratedOnAdd();
                 e.Property(x => x.Version).HasMaxLength(20);
-                e.Property(x => x.Url).HasColumnType("text");
                 e.Property(x => x.DateAdded).HasDefaultValueSql("CURRENT_TIMESTAMP");
             });
 
@@ -213,10 +202,9 @@ namespace api.Dal
                 e.ToTable("sensorData");
                 e.HasKey(x => x.IDSensorData);
                 e.Property(x => x.IDSensorData).ValueGeneratedOnAdd();
-                // Legacy columns Battery / Moisture / WaterLevel are tinyint(1); the DTO and these
-                // rows expose them as int. Pomelo won't map int -> tinyint(1), so a fresh database
-                // gets plain int here - harmless, and reads of the existing tinyint(1) columns still
-                // materialise fine.
+                // Legacy columns Battery / Moisture / WaterLevel are tinyint(1) in the old MySQL
+                // schema; the DTO and these rows expose them as int, so a fresh database gets plain
+                // int here. Reads of the existing tinyint(1) columns still materialise fine.
                 e.HasIndex(x => new { x.DeviceID, x.TenantID, x.DateCreated })
                  .HasDatabaseName("ix_sensorData_device_tenant_date");
             });
@@ -229,7 +217,7 @@ namespace api.Dal
                 e.Property(x => x.DeviceID).HasColumnName("deviceID");
                 e.Property(x => x.ReportName).HasMaxLength(128);
                 e.Property(x => x.DateGenerated).HasDefaultValueSql("CURRENT_TIMESTAMP");
-                e.Property(x => x.SensorData).HasColumnName("sensorData").HasColumnType("longtext");
+                e.Property(x => x.SensorData).HasColumnName("sensorData");
             });
 
             b.Entity<EventDeviceRow>(e =>
@@ -237,7 +225,6 @@ namespace api.Dal
                 e.ToTable("eventDevice");
                 e.HasKey(x => x.IDEventDevice);
                 e.Property(x => x.IDEventDevice).ValueGeneratedOnAdd();
-                e.Property(x => x.Message).HasColumnType("text");
             });
 
             b.Entity<EventServiceRow>(e =>
@@ -245,7 +232,6 @@ namespace api.Dal
                 e.ToTable("eventService");
                 e.HasKey(x => x.IDEventService);
                 e.Property(x => x.IDEventService).ValueGeneratedOnAdd();
-                e.Property(x => x.Message).HasColumnType("text");
             });
         }
     }

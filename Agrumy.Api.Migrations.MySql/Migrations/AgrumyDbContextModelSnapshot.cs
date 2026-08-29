@@ -3,20 +3,17 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using api.Dal;
 
 #nullable disable
 
-namespace api.Migrations
+namespace Agrumy.Api.Migrations.MySql.Migrations
 {
     [DbContext(typeof(AgrumyDbContext))]
-    [Migration("20260829124658_InitialCreate")]
-    partial class InitialCreate
+    partial class AgrumyDbContextModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -164,7 +161,7 @@ namespace api.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("Url")
-                        .HasColumnType("text");
+                        .HasColumnType("longtext");
 
                     b.Property<string>("Version")
                         .HasMaxLength(20)
@@ -261,7 +258,7 @@ namespace api.Migrations
                         .HasColumnType("varchar(200)");
 
                     b.Property<string>("ServicePublicKey")
-                        .HasColumnType("text");
+                        .HasColumnType("longtext");
 
                     b.Property<bool?>("SleepDeepEnabled")
                         .HasColumnType("tinyint(1)");
@@ -345,7 +342,7 @@ namespace api.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("SensorDescription")
-                        .HasColumnType("text");
+                        .HasColumnType("longtext");
 
                     b.Property<string>("SensorName")
                         .HasMaxLength(128)
@@ -400,8 +397,8 @@ namespace api.Migrations
                     b.Property<int?>("DeviceUnitZoneID")
                         .HasColumnType("int");
 
-                    b.Property<ulong?>("ZoneEnabled")
-                        .HasColumnType("bit(1)");
+                    b.Property<bool?>("ZoneEnabled")
+                        .HasColumnType("tinyint(1)");
 
                     b.HasKey("IDDeviceUnit");
 
@@ -440,7 +437,7 @@ namespace api.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("Message")
-                        .HasColumnType("text");
+                        .HasColumnType("longtext");
 
                     b.HasKey("IDEventDevice");
 
@@ -462,7 +459,7 @@ namespace api.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("Message")
-                        .HasColumnType("text");
+                        .HasColumnType("longtext");
 
                     b.Property<int>("ServiceID")
                         .HasColumnType("int");
@@ -583,7 +580,7 @@ namespace api.Migrations
                         .HasColumnType("varchar(128)");
 
                     b.Property<string>("JWTKey")
-                        .HasColumnType("text");
+                        .HasColumnType("longtext");
 
                     b.Property<int?>("PortHTTP")
                         .HasColumnType("int");
@@ -732,7 +729,7 @@ namespace api.Migrations
 
                     b.Property<string>("PwdHash")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("longtext");
 
                     b.Property<string>("PwdSalt")
                         .IsRequired()
