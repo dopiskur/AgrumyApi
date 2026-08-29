@@ -1,6 +1,4 @@
 ﻿using api.Models;
-using Microsoft.AspNetCore.Mvc;
-using System.Text.Json.Nodes;
 
 namespace api.Dal.Interface
 {
@@ -9,7 +7,7 @@ namespace api.Dal.Interface
 
 
         // MANAGE USER
-        public Task<UserLoginResult>? UserLogin(UserLogin userLogin);
+        public Task<UserLoginResult?> UserLogin(UserLogin userLogin);
 
         public Task<bool> UserAdd(string jwtKey, UserAdd user);
         public Task<bool> UserUpdate(string jwtKey, UserUpdate userUpdate);

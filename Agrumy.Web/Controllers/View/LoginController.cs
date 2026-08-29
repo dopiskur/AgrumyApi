@@ -1,4 +1,4 @@
-﻿using api.Dal.Interface;
+using api.Dal.Interface;
 using api.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,50 +7,52 @@ namespace api.Controllers.View
 {
     public class LoginController : Controller
     {
+        private const string CookieUserId = "userID";
+        private const string CookieLogin = "login";
+        private const string CookieAuthorization = "authorization";
 
-        private static string? secureKey = Config.secureKey;
-        const string CookieUserId = "userID";
-        const string CookieLogin = "login";
-        const string CookieAuthorization = "authorization";
+        private readonly IApi _api;
+
+        public LoginController(IApi api) => _api = api ?? throw new ArgumentNullException(nameof(api));
 
         public ActionResult Index()
         {
-
-
-
             UserLogin userLogin = new UserLogin();
             return View(userLogin);
         }
 
-
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult Index(UserLogin userLogin)
+        public async Task<ActionResult> Index(UserLogin userLogin)
         {
-
             try
             {
-                UserLoginResult? result = RepoFactory.GetApi().UserLogin(userLogin).Result;
+                UserLoginResult? result = await _api.UserLogin(userLogin);
+                if (result?.Token == null)
+                {
+                    ModelState.AddModelError(string.Empty, "Invalid email/username or password.");
+                    return View(userLogin);
+                }
 
-                // login result mora vratiti ID, EMAIL, TOKEN!
                 // HttpOnly keeps the JWT out of reach of any injected script (unlike localStorage,
                 // which page JS - including a successful XSS payload - can read outright).
-                CookieOptions options = new CookieOptions();
-                options.Expires = DateTime.Now.AddDays(7);
-                options.HttpOnly = true;
-                // Secure over HTTPS (production), but not over plain-HTTP dev on localhost -
-                // browsers silently drop a Secure cookie set over HTTP, which would leave the
-                // post-login redirect to /Device with no auth cookie (looks like login "does nothing").
-                options.Secure = Request.IsHttps;
-                options.SameSite = SameSiteMode.Strict;
-                Response.Cookies.Append(CookieUserId, result.IDUser.ToString(), options);
-                Response.Cookies.Append(CookieLogin, result.Email.ToString(), options);
-                Response.Cookies.Append(CookieAuthorization, result.Token.ToString(), options);
-
+                CookieOptions options = new CookieOptions
+                {
+                    Expires = DateTime.Now.AddDays(7),
+                    HttpOnly = true,
+                    // Secure over HTTPS (production), but not over plain-HTTP dev on localhost -
+                    // browsers silently drop a Secure cookie set over HTTP, which would leave the
+                    // post-login redirect to /Device with no auth cookie (looks like login "does nothing").
+                    Secure = Request.IsHttps,
+                    SameSite = SameSiteMode.Strict,
+                };
+                Response.Cookies.Append(CookieUserId, result.IDUser.ToString() ?? "", options);
+                Response.Cookies.Append(CookieLogin, result.Email ?? "", options);
+                Response.Cookies.Append(CookieAuthorization, result.Token, options);
 
                 return RedirectToAction("Index", "Device");
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 ModelState.AddModelError(string.Empty, "Invalid email/username or password.");
                 return View(userLogin);
@@ -67,22 +69,14 @@ namespace api.Controllers.View
             HttpContext.Response.Cookies.Append(CookieUserId, "");
             HttpContext.Response.Cookies.Append(CookieLogin, "");
             HttpContext.Response.Cookies.Append(CookieAuthorization, "");
-            //return "Cookies are Deleted";
-            //Response.Cookies["Expires"].Value = DateTime.Now.AddDays(-1);
-            //HttpCookie nameCookie = Request.Cookies["Name"];
 
-            //cookie.Expires = DateTime.Now.AddDays(-1);
             return RedirectToAction("Index", "Home");
         }
 
-
         public ActionResult Register()
         {
-
             return View();
         }
-
-
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -90,7 +84,6 @@ namespace api.Controllers.View
         {
             try
             {
-
                 return RedirectToAction(nameof(Index));
             }
             catch
@@ -99,17 +92,9 @@ namespace api.Controllers.View
             }
         }
 
-
         public ActionResult Cookie()
         {
-            //Accessing the Cookie Data inside a Method
-            //int? UserId = Convert.ToInt32(Request.Cookies[CookieUserId]);
-            //string? UserName = Request.Cookies[CookieUserName];
-            //string? Authorization = Request.Cookies["authorization"];
-            //string Message = $"UserName: {UserName}, UserId: {UserId}, {Authorization}";
-
             return View();
         }
-
     }
 }

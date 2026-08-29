@@ -1,4 +1,4 @@
-﻿using api.Dal.Interface;
+using api.Dal.Interface;
 using api.Models;
 using api.Security;
 using Microsoft.AspNetCore.Mvc;
@@ -6,48 +6,30 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.View
 {
-
-
     public class UserController : Controller
     {
+        private readonly IApi _api;
 
-        private static string roleName = "";
-
-        private readonly IApi _service;
-        public UserController(IApi service)
-        {
-            _service = service ?? throw new ArgumentNullException(nameof(service));
-        }
+        public UserController(IApi api) => _api = api ?? throw new ArgumentNullException(nameof(api));
 
         // The app has no UI for adding roles, so this list never changes at runtime - no caching
         // needed. Kept as its own method (rather than inlined) so that can change later if it does.
-        private IEnumerable<UserGroup> UserGroups()
+        private async Task<IEnumerable<UserGroup>> UserGroups()
         {
-            try
-            {
-                HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
-
-                IEnumerable<UserGroup> userGroups = RepoFactory.GetApi().UserGroupsGet(jwtKey).Result;
-
-                return userGroups;
-            }
-            catch (Exception e)
-            {
-                throw;
-            }
+            HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+            return await _api.UserGroupsGet(jwtKey);
         }
 
-
-
-        public ActionResult Index()
+        public async Task<ActionResult> Index()
         {
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
-                IEnumerable<User> users = RepoFactory.GetApi().UsersGet(jwtKey).Result;
+                IEnumerable<User> users = await _api.UsersGet(jwtKey);
 
                 return View(users);
             }
@@ -55,20 +37,18 @@ namespace api.Controllers.View
             {
                 return StatusCode(500, e.Message);
             }
-
         }
 
-
-        public ActionResult Details(int? idUser)
+        public async Task<ActionResult> Details(int? idUser)
         {
             try
             {
-
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
-                User user = RepoFactory.GetApi().UserGet(jwtKey, idUser, null, null).Result;
+                User user = await _api.UserGet(jwtKey, idUser, null, null);
 
                 return View(user);
             }
@@ -78,18 +58,17 @@ namespace api.Controllers.View
             }
         }
 
-
-        public ActionResult Create()
+        public async Task<ActionResult> Create()
         {
-
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
                 UserView userView = new UserView();
-                userView.UserGroups = UserGroups();
+                userView.UserGroups = await UserGroups();
                 return View(userView);
             }
             catch (Exception e)
@@ -98,18 +77,16 @@ namespace api.Controllers.View
             }
         }
 
-
-
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult Create(UserView userView)
+        public async Task<ActionResult> Create(UserView userView)
         {
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
-
 
                 UserAdd userAdd = new UserAdd();
 
@@ -123,11 +100,9 @@ namespace api.Controllers.View
                 userAdd.UserGroupID = userView.UserAdd.UserGroupID;
                 userAdd.Enabled = userView.UserAdd.Enabled;
 
-
-                RepoFactory.GetApi().UserAdd(jwtKey, userAdd);
+                await _api.UserAdd(jwtKey, userAdd);
 
                 return RedirectToAction("Index");
-
             }
             catch (Exception e)
             {
@@ -135,18 +110,17 @@ namespace api.Controllers.View
             }
         }
 
-        public ActionResult Edit(int? idUser)
+        public async Task<ActionResult> Edit(int? idUser)
         {
-
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
-
                 UserView? userView = new UserView();
-                User value = RepoFactory.GetApi().UserGet(jwtKey, idUser, null, null).Result;
+                User value = await _api.UserGet(jwtKey, idUser, null, null);
 
                 UserUpdate userUpdate = new UserUpdate();
                 userUpdate.IDUser = value.IDUser;
@@ -161,7 +135,7 @@ namespace api.Controllers.View
                 userUpdate.Enabled = value.Enabled ?? false;
 
                 userView.UserUpdate = userUpdate;
-                userView.UserGroups = UserGroups();
+                userView.UserGroups = await UserGroups();
 
                 return View(userView);
             }
@@ -173,42 +147,38 @@ namespace api.Controllers.View
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult Edit(UserView userView)
+        public async Task<ActionResult> Edit(UserView userView)
         {
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
                 UserUpdate userUpdate = userView.UserUpdate;
 
-                if (RepoFactory.GetApi().UserUpdate(jwtKey, userUpdate).Result)
-                {
-                    bool result = RepoFactory.GetApi().UserUpdate(jwtKey, userUpdate).Result;
-                }
+                bool result = await _api.UserUpdate(jwtKey, userUpdate);
 
-
-                User user = RepoFactory.GetApi().UserGet(jwtKey, userView.UserUpdate.IDUser, null, null).Result;
+                User user = await _api.UserGet(jwtKey, userView.UserUpdate.IDUser, null, null);
                 return View("Details", user);
             }
             catch (Exception e)
             {
-
                 return StatusCode(500, e.Message);
             }
         }
 
-
-        public ActionResult Delete(int? idUser)
+        public async Task<ActionResult> Delete(int? idUser)
         {
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
-                User user = RepoFactory.GetApi().UserGet(jwtKey, idUser, null, null).Result;
+                User user = await _api.UserGet(jwtKey, idUser, null, null);
                 return View(user);
             }
             catch (Exception e)
@@ -217,18 +187,18 @@ namespace api.Controllers.View
             }
         }
 
-
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult DeleteConfirm(int? idUser)
+        public async Task<ActionResult> DeleteConfirm(int? idUser)
         {
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
-                RepoFactory.GetApi().UserDelete(jwtKey, idUser);
+                await _api.UserDelete(jwtKey, idUser);
 
                 return RedirectToAction(nameof(Index));
             }
@@ -237,8 +207,5 @@ namespace api.Controllers.View
                 return StatusCode(500, e.Message);
             }
         }
-
-
-
     }
 }

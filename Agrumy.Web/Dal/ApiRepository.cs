@@ -1,376 +1,176 @@
-﻿using api.Dal.Interface;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Web;
+using api.Dal.Interface;
 using api.Models;
 using api.Utils;
-using Newtonsoft.Json;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Web;
 
 namespace api.Dal
 {
+    /// <summary>
+    /// HTTP-backed <see cref="IApi"/> - the admin UI's only way to reach Agrumy.Api.
+    ///
+    /// The <see cref="HttpClient"/> is the one supplied by <c>IHttpClientFactory</c>
+    /// (<c>AddHttpClient&lt;IApi, ApiRepository&gt;</c> in Program.cs); its <c>BaseAddress</c> is
+    /// already set from <c>WebView:ApiService</c>. The caller's JWT is attached per request via a
+    /// fresh <see cref="HttpRequestMessage"/> - never on <c>DefaultRequestHeaders</c>, which on a
+    /// shared client would let concurrent requests from different users overwrite each other's
+    /// bearer token.
+    /// </summary>
     public class ApiRepository : IApi
     {
-        private static string? apiService = Config.apiService;
-
-
-        private static readonly string UserLoginPostApi = "/api/User/Login";
-
-        private static readonly string UsersGetApi = "/api/User/All";
-        private static readonly string UserGetApi = "/api/User/?";
-        private static readonly string UserDeleteApi = "/api/User/?";
-        private static readonly string UserPostApi = "/api/User";
-        private static readonly string UserPutApi = "/api/User";
-        private static readonly string UserRoleGetApi = "/api/User/Roles";
-
-        private static readonly string UsersGroupsGetApi = "/api/User/Group/All";
-        private static readonly string UsersGroupGetApi = "/api/User/Group?";
-        private static readonly string UsersGroupPostApi = "/api/User/Group";
-        private static readonly string UsersGroupDeleteApi = "/api/User/Group?";
-
-        private static readonly string DevicesGetApi = "/api/Device/All";
-        private static readonly string DeviceGetApi = "/api/Device?";
-        private static readonly string DeviceDeleteApi = "/api/Device/?";
-        private static readonly string DevicePutApi = "/api/Device";
-        private static readonly string DeviceConfigSensorGetApi = "/api/Device/Sensor?";
-        private static readonly string DeviceConfigSensorPutApi = "/api/Device/Sensor?";
-        private static readonly string DeviceConfigControllerGetApi = "/api/Device/Controller?";
-        private static readonly string DeviceConfigControllerPutApi = "/api/Device/Controller?";
-
-        private static readonly string DeviceTypeGetApi = "/api/Device/Type";
-        private static readonly string DeviceTypeRelayGetApi = "/api/Device/TypeRelay";
-        private static readonly string DeviceTypeSensorGetApi = "/api/Device/TypeSensor";
-        private static readonly string DeviceTypeServiceGetApi = "/api/Device/TypeService";
-
-        private static readonly string SensorDataGetApi = "/api/SensorData?";
-        private static readonly string SensorDataReportGetApi = "/api/SensorData/Report?";
-
-
-        private static HttpClient httpClient = new()
-        {
-            //BaseAddress = new Uri("http://localhost:5151"),
-            BaseAddress = new Uri(apiService)
-        };
-
-        // dependancy injection
         private readonly HttpClient _client;
-        public ApiRepository(HttpClient client)
-        {
+
+        public ApiRepository(HttpClient client) =>
             _client = client ?? throw new ArgumentNullException(nameof(client));
+
+        // ---- endpoints -------------------------------------------------------
+
+        private const string UserLoginApi = "/api/User/Login";
+        private const string UsersGetApi = "/api/User/All";
+        private const string UserApi = "/api/User";
+        private const string UserRoleGetApi = "/api/User/Roles";
+        private const string UserGroupsGetApi = "/api/User/Group/All";
+        private const string UserGroupApi = "/api/User/Group";
+        private const string DevicesGetApi = "/api/Device/All";
+        private const string DeviceApi = "/api/Device";
+        private const string DeviceConfigSensorApi = "/api/Device/Sensor";
+        private const string DeviceConfigControllerApi = "/api/Device/Controller";
+        private const string DeviceTypeGetApi = "/api/Device/Type";
+        private const string DeviceTypeRelayGetApi = "/api/Device/TypeRelay";
+        private const string DeviceTypeSensorGetApi = "/api/Device/TypeSensor";
+        private const string DeviceTypeServiceGetApi = "/api/Device/TypeService";
+        private const string SensorDataGetApi = "/api/SensorData";
+        private const string SensorDataReportGetApi = "/api/SensorData/Report";
+
+        // ---- request helpers ----------------------------------------------
+
+        private static HttpRequestMessage Request(HttpMethod method, string url, string? jwt, object? body = null)
+        {
+            var request = new HttpRequestMessage(method, url);
+            if (!string.IsNullOrEmpty(jwt))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+            }
+            if (body is not null)
+            {
+                request.Content = JsonContent.Create(body, options: HttpClientExtensions.Json);
+            }
+            return request;
         }
 
-        public ApiRepository()
+        private async Task<T> Send<T>(HttpMethod method, string url, string? jwt, object? body = null)
         {
-
+            using var response = await _client.SendAsync(Request(method, url, jwt, body)).ConfigureAwait(false);
+            return await response.ReadJsonAsync<T>().ConfigureAwait(false);
         }
 
-
-        #region Device
-
-        public async Task<IEnumerable<Device>> DevicesGet(string jwtKey)
+        private static string WithQuery(string path, params (string key, object? value)[] parameters)
         {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-            var response = await httpClient.GetAsync(DevicesGetApi); // send async za parametre
-
-            return await response.ReadContentAsync<IEnumerable<Device>>();
-        }
-        public async Task<Device> DeviceGet(string jwtKey, int? idDevice, string? apiId, string? macAddress)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-
             var query = HttpUtility.ParseQueryString(string.Empty);
-            if (idDevice != null) { query["idDevice"] = idDevice.ToString(); }
-            if (apiId != null) { query["apiId"] = apiId.ToString(); }
-            if (macAddress != null) { query["macAddress"] = macAddress.ToString(); }
-
-            string queryString = DeviceGetApi + query.ToString();
-
-            var response = await httpClient.GetAsync(queryString);
-
-            return await response.ReadContentAsync<Device>();
-        }
-        public async Task<bool> DeviceUpdate(string jwtKey, Device? device)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-
-            string? jsonData = JsonConvert.SerializeObject(device);
-            HttpContent content = new StringContent(jsonData, Encoding.UTF8, "application/json");
-            var response = await httpClient.PutAsync(DevicePutApi, content); // send async za parametre
-
-            return await response.ReadContentAsync<bool>();
-        }
-        public async Task<bool> DeviceDelete(string jwtKey, int? idDevice)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-            var query = HttpUtility.ParseQueryString(string.Empty);
-            if (idDevice != null) { query["idDevice"] = idDevice.ToString(); }
-            string queryString = DeviceDeleteApi + query.ToString();
-
-            var response = await httpClient.DeleteAsync(queryString); // send async za parametre
-            return await response.ReadContentAsync<bool>();
+            foreach (var (key, value) in parameters)
+            {
+                if (value is not null)
+                {
+                    query[key] = value.ToString();
+                }
+            }
+            string qs = query.ToString() ?? "";
+            return qs.Length == 0 ? path : $"{path}?{qs}";
         }
 
+        // ---- Device ----------------------------------------------------
 
-        // Config
-        public async Task<DeviceConfigSensor> DeviceConfigSensorGet(string jwtKey, int? deviceConfigSensorID)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
+        public Task<IEnumerable<Device>> DevicesGet(string jwtKey) =>
+            Send<IEnumerable<Device>>(HttpMethod.Get, DevicesGetApi, jwtKey);
 
-            var query = HttpUtility.ParseQueryString(string.Empty);
-            query["deviceConfigSensorID"] = deviceConfigSensorID.ToString(); 
+        public Task<Device> DeviceGet(string jwtKey, int? idDevice, string? apiId, string? macAddress) =>
+            Send<Device>(HttpMethod.Get,
+                WithQuery(DeviceApi, ("idDevice", idDevice), ("apiId", apiId), ("macAddress", macAddress)), jwtKey);
 
-            string queryString = DeviceConfigSensorGetApi + query.ToString();
+        public Task<bool> DeviceUpdate(string jwtKey, Device? device) =>
+            Send<bool>(HttpMethod.Put, DeviceApi, jwtKey, device);
 
-            var response = await httpClient.GetAsync(queryString);
+        public Task<bool> DeviceDelete(string jwtKey, int? idDevice) =>
+            Send<bool>(HttpMethod.Delete, WithQuery(DeviceApi, ("idDevice", idDevice)), jwtKey);
 
-            return await response.ReadContentAsync<DeviceConfigSensor>();
-        }
-        public async Task<DeviceConfigController> DeviceConfigControllerGet(string jwtKey, int? deviceConfigControllerID)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
+        public Task<DeviceConfigSensor> DeviceConfigSensorGet(string jwtKey, int? deviceConfigSensorID) =>
+            Send<DeviceConfigSensor>(HttpMethod.Get,
+                WithQuery(DeviceConfigSensorApi, ("deviceConfigSensorID", deviceConfigSensorID)), jwtKey);
 
-            var query = HttpUtility.ParseQueryString(string.Empty);
-            query["deviceConfigControllerID"] = deviceConfigControllerID.ToString();
+        public Task<DeviceConfigController> DeviceConfigControllerGet(string jwtKey, int? deviceConfigControllerID) =>
+            Send<DeviceConfigController>(HttpMethod.Get,
+                WithQuery(DeviceConfigControllerApi, ("deviceConfigControllerID", deviceConfigControllerID)), jwtKey);
 
-            string queryString = DeviceConfigControllerGetApi + query.ToString();
+        public Task<bool> DeviceConfigSensorUpdate(string jwtKey, DeviceUpdate deviceUpdate) =>
+            Send<bool>(HttpMethod.Put, DeviceConfigSensorApi, jwtKey, deviceUpdate);
 
-            var response = await httpClient.GetAsync(queryString);
+        public Task<bool> DeviceConfigControllerUpdate(string jwtKey, DeviceUpdate deviceUpdate) =>
+            Send<bool>(HttpMethod.Put, DeviceConfigControllerApi, jwtKey, deviceUpdate);
 
-            return await response.ReadContentAsync<DeviceConfigController>();
-        }
+        public Task<IEnumerable<DeviceType>> DeviceTypeGet(string jwtKey) =>
+            Send<IEnumerable<DeviceType>>(HttpMethod.Get, DeviceTypeGetApi, jwtKey);
 
-        public async Task<bool> DeviceConfigSensorUpdate(string jwtKey, DeviceUpdate deviceUpdate)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
+        public Task<IEnumerable<DeviceTypeRelay>> DeviceTypeRelayGet(string jwtKey) =>
+            Send<IEnumerable<DeviceTypeRelay>>(HttpMethod.Get, DeviceTypeRelayGetApi, jwtKey);
 
-            string? jsonData = JsonConvert.SerializeObject(deviceUpdate);
-            HttpContent content = new StringContent(jsonData, Encoding.UTF8, "application/json");
-            var response = await httpClient.PutAsync(DeviceConfigSensorPutApi, content); // send async za parametre
+        public Task<IEnumerable<DeviceTypeSensor>> DeviceTypeSensorGet(string jwtKey) =>
+            Send<IEnumerable<DeviceTypeSensor>>(HttpMethod.Get, DeviceTypeSensorGetApi, jwtKey);
 
-            return await response.ReadContentAsync<bool>();
-        }
-        public async Task<bool> DeviceConfigControllerUpdate(string jwtKey, DeviceUpdate deviceUpdate)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
+        public Task<IEnumerable<DeviceTypeService>> DeviceTypeServiceGet(string jwtKey) =>
+            Send<IEnumerable<DeviceTypeService>>(HttpMethod.Get, DeviceTypeServiceGetApi, jwtKey);
 
-            string? jsonData = JsonConvert.SerializeObject(deviceUpdate);
-            HttpContent content = new StringContent(jsonData, Encoding.UTF8, "application/json");
-            var response = await httpClient.PutAsync(DeviceConfigControllerPutApi, content); // send async za parametre
+        // ---- SensorData ---------------------------------------------
 
-            return await response.ReadContentAsync<bool>();
-        }
-
-
-        // Types
-        public async Task<IEnumerable<DeviceType>> DeviceTypeGet(string jwtKey)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-            var response = await httpClient.GetAsync(DeviceTypeGetApi); // send async za parametre
-
-            return await response.ReadContentAsync<IEnumerable<DeviceType>>();
-        }
-
-        public async Task<IEnumerable<DeviceTypeRelay>> DeviceTypeRelayGet(string jwtKey)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-            var response = await httpClient.GetAsync(DeviceTypeRelayGetApi); // send async za parametre
-
-            return await response.ReadContentAsync<IEnumerable<DeviceTypeRelay>>();
-        }
-
-        public async Task<IEnumerable<DeviceTypeSensor>> DeviceTypeSensorGet(string jwtKey)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-            var response = await httpClient.GetAsync(DeviceTypeSensorGetApi); // send async za parametre
-
-            return await response.ReadContentAsync<IEnumerable<DeviceTypeSensor>>();
-        }
-
-        public async Task<IEnumerable<DeviceTypeService>> DeviceTypeServiceGet(string jwtKey)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-            var response = await httpClient.GetAsync(DeviceTypeServiceGetApi); // send async za parametre
-
-            return await response.ReadContentAsync<IEnumerable<DeviceTypeService>>();
-        }
-
-
-        #endregion
-
-
-        #region SensorData
         public async Task<string> SensorDataGet(string jwtKey, int? deviceID, int? timeRange, int? timeMDMY, int? buildReport)
         {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-
-            var query = HttpUtility.ParseQueryString(string.Empty);
-            query["deviceID"] = deviceID.ToString();
-            query["timeRange"] = timeRange.ToString();
-            query["timeMDMY"] = timeMDMY.ToString();
-            query["buildReport"] = buildReport.ToString();
-
-
-            string queryString = SensorDataGetApi + query.ToString();
-
-            var response = await httpClient.GetAsync(queryString);
-
-            return await response.Content.ReadAsStringAsync();
-        }
-        public async Task<IEnumerable<SensorDataReport>> SensorDataReportGet(string? jwtKey, int? idDevice, int? iDSensorDataReport, int? getData)
-        {
-            //SensorDataReportGetApi
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-
-            var query = HttpUtility.ParseQueryString(string.Empty);
-            if (idDevice != null) { query["idDevice"] = idDevice.ToString(); }
-            if (iDSensorDataReport != null) { query["iDSensorDataReport"] = iDSensorDataReport.ToString(); }
-            if (getData != null) { query["getData"] = getData.ToString(); }
-
-            string queryString = SensorDataReportGetApi + query.ToString();
-
-            var response = await httpClient.GetAsync(queryString);
-
-            return await response.ReadContentAsync<IEnumerable<SensorDataReport>>();
+            string url = WithQuery(SensorDataGetApi,
+                ("deviceID", deviceID), ("timeRange", timeRange), ("timeMDMY", timeMDMY), ("buildReport", buildReport));
+            using var response = await _client.SendAsync(Request(HttpMethod.Get, url, jwtKey)).ConfigureAwait(false);
+            return await response.ReadStringAsync().ConfigureAwait(false);
         }
 
-        #endregion
+        public Task<IEnumerable<SensorDataReport>> SensorDataReportGet(string? jwtKey, int? idDevice, int? iDSensorDataReport, int? getData) =>
+            Send<IEnumerable<SensorDataReport>>(HttpMethod.Get,
+                WithQuery(SensorDataReportGetApi,
+                    ("idDevice", idDevice), ("iDSensorDataReport", iDSensorDataReport), ("getData", getData)), jwtKey);
 
-        #region User 
+        // ---- User ------------------------------------------------
 
-        public async Task<UserLoginResult>? UserLogin(UserLogin userLogin)
-        {
+        public Task<UserLoginResult?> UserLogin(UserLogin userLogin) =>
+            Send<UserLoginResult?>(HttpMethod.Post, UserLoginApi, jwt: null, body: userLogin);
 
-            string? jsonData = JsonConvert.SerializeObject(userLogin);
-            HttpContent content = new StringContent(jsonData, Encoding.UTF8, "application/json");
-            var response = await httpClient.PostAsync(UserLoginPostApi, content); // send async za parametre
-            // ovo radi, ali imamo problem da se ne refresha.
-            return await response.ReadContentAsync<UserLoginResult>();
-        }
+        public Task<bool> UserAdd(string jwtKey, UserAdd user) =>
+            Send<bool>(HttpMethod.Post, UserApi, jwtKey, user);
 
+        public Task<bool> UserUpdate(string jwtKey, UserUpdate userUpdate) =>
+            Send<bool>(HttpMethod.Put, UserApi, jwtKey, userUpdate);
 
-        public async Task<bool> UserAdd(string? jwtKey, UserAdd? userAdd)
-        {
-            
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
+        public Task<bool> UserDelete(string jwtKey, int? idUser) =>
+            Send<bool>(HttpMethod.Delete, WithQuery(UserApi, ("idUser", idUser)), jwtKey);
 
-            string? jsonData = JsonConvert.SerializeObject(userAdd);
-            HttpContent content = new StringContent(jsonData, Encoding.UTF8, "application/json");
-            var response = await httpClient.PostAsync(UserPostApi, content); // send async za parametre
-            // ovo radi, ali imamo problem da se ne refresha.
-            return await response.ReadContentAsync<bool>();
-        }
+        public Task<User> UserGet(string? jwtKey, int? idUser, string? email, string? username) =>
+            Send<User>(HttpMethod.Get,
+                WithQuery(UserApi, ("idUser", idUser), ("email", email), ("username", username)), jwtKey);
 
-        public async Task<bool> UserDelete(string jwtKey, int? idUser)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-            var query = HttpUtility.ParseQueryString(string.Empty);
-            if (idUser != null) { query["idUser"] = idUser.ToString(); }
-            string queryString = UserDeleteApi + query.ToString();
+        public Task<IEnumerable<User>> UsersGet(string jwtKey) =>
+            Send<IEnumerable<User>>(HttpMethod.Get, UsersGetApi, jwtKey);
 
-            var response = await httpClient.DeleteAsync(queryString); // send async za parametre
+        public Task<IEnumerable<UserRole>> UserRoleGet(string jwtKey) =>
+            Send<IEnumerable<UserRole>>(HttpMethod.Get, UserRoleGetApi, jwtKey);
 
+        // ---- Group -----------------------------------------------
 
-            return await response.ReadContentAsync<bool>();
-        }
+        public Task<IEnumerable<UserGroup>> UserGroupsGet(string jwtKey) =>
+            Send<IEnumerable<UserGroup>>(HttpMethod.Get, UserGroupsGetApi, jwtKey);
 
-        public async Task<User> UserGet(string? jwtKey, int? idUser, string? email, string? username)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
+        public Task<UserGroup> UserGroupGet(string jwtKey, int idUserGroup) =>
+            Send<UserGroup>(HttpMethod.Get, WithQuery(UserGroupApi, ("idUserGroup", idUserGroup)), jwtKey);
 
-            var query = HttpUtility.ParseQueryString(string.Empty);
-            if (idUser != null) { query["idUser"] = idUser.ToString(); }
-            if (email != null) { query["email"] = email.ToString(); }
-            if (username != null) { query["username"] = username.ToString(); }
+        public Task<bool> UserGroupAdd(string jwtKey, UserGroup userGroup) =>
+            Send<bool>(HttpMethod.Post, UserGroupApi, jwtKey, userGroup);
 
-            string queryString = UserGetApi + query.ToString();
-
-            var response = await httpClient.GetAsync(queryString);
-
-            return await response.ReadContentAsync<User>();
-        }
-       
-        public async Task<IEnumerable<User>> UsersGet(string jwtKey)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-            var response = await httpClient.GetAsync(UsersGetApi); // send async za parametre
-
-            return await response.ReadContentAsync<IEnumerable<User>>();
-        }
-
-        public async Task<bool> UserUpdate (string jwtKey, UserUpdate userUpdate)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-
-            string? jsonData = JsonConvert.SerializeObject(userUpdate);
-            HttpContent content = new StringContent(jsonData, Encoding.UTF8, "application/json");
-            var response = await httpClient.PutAsync(UserPutApi, content); // send async za parametre
-
-            return await response.ReadContentAsync<bool>();
-        }
-        public async Task<IEnumerable<UserRole>> UserRoleGet(string jwtKey)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-            var response = await httpClient.GetAsync(UserRoleGetApi); // send async za parametre
-
-            return await response.ReadContentAsync<IEnumerable<UserRole>>();
-        }
-        #endregion
-
-        #region Group 
-
-        public async Task <IEnumerable<UserGroup>> UserGroupsGet(string jwtKey)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-            var response = await httpClient.GetAsync(UsersGroupsGetApi); // send async za parametre
-
-            return await response.ReadContentAsync<IEnumerable<UserGroup>>();
-        }
-
-        public async Task<UserGroup> UserGroupGet(string jwtKey, int idUserGroup)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-
-            var query = HttpUtility.ParseQueryString(string.Empty);
-            query["idUserGroup"] = idUserGroup.ToString(); 
-
-            string queryString = UsersGroupGetApi + query.ToString();
-
-            var response = await httpClient.GetAsync(queryString);
-
-            return await response.ReadContentAsync<UserGroup>();
-        }
-
-        public async Task<bool> UserGroupAdd(string jwtKey, UserGroup userGroup)
-        {
-
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-
-            string? jsonData = JsonConvert.SerializeObject(userGroup);
-            HttpContent content = new StringContent(jsonData, Encoding.UTF8, "application/json");
-            var response = await httpClient.PostAsync(UsersGroupPostApi, content); // send async za parametre
-            // ovo radi, ali imamo problem da se ne refresha.
-            return await response.ReadContentAsync<bool>();
-
-        }
-
-        public async Task<bool> UserGroupDelete(string jwtKey, int? idUserGroup)
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtKey); // add header value, work 
-            var query = HttpUtility.ParseQueryString(string.Empty);
-            if (idUserGroup != null) { query["idUserGroup"] = idUserGroup.ToString(); }
-            string queryString = UsersGroupDeleteApi + query.ToString();
-
-            var response = await httpClient.DeleteAsync(queryString); // send async za parametre
-
-
-            return await response.ReadContentAsync<bool>();
-        }
-
-
-
-
-
-
-        #endregion
-
+        public Task<bool> UserGroupDelete(string jwtKey, int? idUserGroup) =>
+            Send<bool>(HttpMethod.Delete, WithQuery(UserGroupApi, ("idUserGroup", idUserGroup)), jwtKey);
     }
 }

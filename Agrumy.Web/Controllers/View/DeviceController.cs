@@ -1,4 +1,4 @@
-﻿using api.Dal.Interface;
+using api.Dal.Interface;
 using api.Models;
 using api.Security;
 using Microsoft.AspNetCore.Mvc;
@@ -11,75 +11,67 @@ namespace api.Controllers.View
         // DeviceTypeSensor() helpers (dead code, never called) - they were the only place the View
         // layer touched RepoFactory.GetRepo() / the DAL directly.
 
-        private static string roleName="";
+        private readonly IApi _api;
 
+        public DeviceController(IApi api) => _api = api ?? throw new ArgumentNullException(nameof(api));
 
-        public ActionResult Index()
+        public async Task<ActionResult> Index()
         {
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
                 if (jwtKey == null || JwtTokenProvider.ValidateToken(jwtKey) == null) { return RedirectToAction("Index", "Login"); }
 
-
-                IEnumerable<Device> devices = RepoFactory.GetApi().DevicesGet(jwtKey).Result;
+                IEnumerable<Device> devices = await _api.DevicesGet(jwtKey);
 
                 return View(devices);
             }
             catch (Exception e)
             {
-
                 return StatusCode(500, e.Message);
             }
         }
 
-        public ActionResult Details(int? idDevice)
+        public async Task<ActionResult> Details(int? idDevice)
         {
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
                 if (jwtKey == null || JwtTokenProvider.ValidateToken(jwtKey) == null) { return RedirectToAction("Index", "Login"); }
 
-                Device device = RepoFactory.GetApi().DeviceGet(jwtKey, idDevice, null, null).Result; //0 for default tenant
-
+                Device device = await _api.DeviceGet(jwtKey, idDevice, null, null); //0 for default tenant
 
                 return View(device);
             }
             catch (Exception e)
             {
-
                 return StatusCode(500, e.Message);
             }
-
         }
 
-
-
-        public ActionResult Edit(int? idDevice)
+        public async Task<ActionResult> Edit(int? idDevice)
         {
-
             HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+            string? roleName;
             if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
             if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
-
             DeviceView? deviceView = new DeviceView();
-            deviceView.DeviceType = RepoFactory.GetApi().DeviceTypeGet(jwtKey).Result;
-            deviceView.DeviceTypeService = RepoFactory.GetApi().DeviceTypeServiceGet(jwtKey).Result;
-
-            deviceView.Device = RepoFactory.GetApi().DeviceGet(jwtKey, idDevice, null, null).Result;
+            deviceView.DeviceType = await _api.DeviceTypeGet(jwtKey);
+            deviceView.DeviceTypeService = await _api.DeviceTypeServiceGet(jwtKey);
+            deviceView.Device = await _api.DeviceGet(jwtKey, idDevice, null, null);
 
             return View(deviceView);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult Edit(DeviceView? deviceView)
+        public async Task<ActionResult> Edit(DeviceView? deviceView)
         {
             try
             {
-
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
@@ -110,85 +102,81 @@ namespace api.Controllers.View
                             break;
                     }
 
-                    RepoFactory.GetApi().DeviceUpdate(jwtKey,device);
+                    await _api.DeviceUpdate(jwtKey, device);
                     // Re-fetch rather than trust the posted model, so ConfigVersion reflects what
                     // the database actually stored (kept in mind for scaling to multiple instances).
-                    device = RepoFactory.GetApi().DeviceGet(jwtKey, device.IDDevice, null, null).Result;
-
+                    device = await _api.DeviceGet(jwtKey, device.IDDevice, null, null);
                 }
 
                 return View("Details", device);
             }
             catch (Exception e)
             {
-                //return View();
                 return StatusCode(500, e.Message);
             }
         }
 
-
-
-        public ActionResult Delete(int? idDevice)
+        public async Task<ActionResult> Delete(int? idDevice)
         {
             HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+            string? roleName;
             if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
             if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
-            Device device = RepoFactory.GetApi().DeviceGet(jwtKey,idDevice, null, null).Result;
+            Device device = await _api.DeviceGet(jwtKey, idDevice, null, null);
             return View(device);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult DeleteConfirm(int? idDevice)
+        public async Task<ActionResult> DeleteConfirm(int? idDevice)
         {
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
-                bool result = RepoFactory.GetApi().DeviceDelete(jwtKey, idDevice).Result;
+                bool result = await _api.DeviceDelete(jwtKey, idDevice);
                 return RedirectToAction(nameof(Index));
             }
             catch (Exception e)
             {
-
                 return StatusCode(500, e.Message);
             }
         }
 
-        public ActionResult EditSensor(int? idDevice)
+        public async Task<ActionResult> EditSensor(int? idDevice)
         {
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
                 DeviceView? deviceView = new DeviceView();
-                deviceView.Device = RepoFactory.GetApi().DeviceGet(jwtKey, idDevice, null, null).Result;
-                deviceView.DeviceConfigSensor = RepoFactory.GetApi().DeviceConfigSensorGet(jwtKey, deviceView.Device.DeviceConfigControllerID).Result;
-                deviceView.DeviceTypeSensor = RepoFactory.GetApi().DeviceTypeSensorGet(jwtKey).Result;
-
+                deviceView.Device = await _api.DeviceGet(jwtKey, idDevice, null, null);
+                deviceView.DeviceConfigSensor = await _api.DeviceConfigSensorGet(jwtKey, deviceView.Device.DeviceConfigControllerID);
+                deviceView.DeviceTypeSensor = await _api.DeviceTypeSensorGet(jwtKey);
 
                 return View(deviceView);
             }
             catch (Exception e)
             {
-
                 return View();
             }
         }
 
-
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult EditSensor(DeviceView? deviceView)
+        public async Task<ActionResult> EditSensor(DeviceView? deviceView)
         {
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
@@ -197,8 +185,8 @@ namespace api.Controllers.View
                 deviceUpdate.Device = deviceView.Device;
                 deviceUpdate.Sensor = deviceView.DeviceConfigSensor;
 
-                RepoFactory.GetApi().DeviceConfigSensorUpdate(jwtKey, deviceUpdate);
-                Device device = RepoFactory.GetApi().DeviceGet(jwtKey, deviceView.Device.IDDevice, null, null).Result;
+                await _api.DeviceConfigSensorUpdate(jwtKey, deviceUpdate);
+                Device device = await _api.DeviceGet(jwtKey, deviceView.Device.IDDevice, null, null);
 
                 return View("Details", device);
             }
@@ -208,37 +196,36 @@ namespace api.Controllers.View
             }
         }
 
-
-        public ActionResult EditController(int? idDevice)
+        public async Task<ActionResult> EditController(int? idDevice)
         {
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
                 DeviceView? deviceView = new DeviceView();
-                deviceView.Device = RepoFactory.GetApi().DeviceGet(jwtKey, idDevice, null, null).Result;
-                deviceView.DeviceConfigController = RepoFactory.GetApi().DeviceConfigControllerGet(jwtKey, deviceView.Device.DeviceConfigControllerID).Result;
-                deviceView.DeviceTypeRelay = RepoFactory.GetApi().DeviceTypeRelayGet(jwtKey).Result;
-
+                deviceView.Device = await _api.DeviceGet(jwtKey, idDevice, null, null);
+                deviceView.DeviceConfigController = await _api.DeviceConfigControllerGet(jwtKey, deviceView.Device.DeviceConfigControllerID);
+                deviceView.DeviceTypeRelay = await _api.DeviceTypeRelayGet(jwtKey);
 
                 return View(deviceView);
             }
             catch
             {
-
                 return View();
             }
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult EditController(DeviceView? deviceView)
+        public async Task<ActionResult> EditController(DeviceView? deviceView)
         {
             try
             {
                 HttpContext.Request.Cookies.TryGetValue("authorization", out var jwtKey);
+                string? roleName;
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
@@ -247,8 +234,8 @@ namespace api.Controllers.View
                 deviceUpdate.Device = deviceView.Device;
                 deviceUpdate.Controller = deviceView.DeviceConfigController;
 
-                RepoFactory.GetApi().DeviceConfigControllerUpdate(jwtKey, deviceUpdate);
-                Device device = RepoFactory.GetApi().DeviceGet(jwtKey, deviceView.Device.IDDevice, null, null).Result;
+                await _api.DeviceConfigControllerUpdate(jwtKey, deviceUpdate);
+                Device device = await _api.DeviceGet(jwtKey, deviceView.Device.IDDevice, null, null);
 
                 return View("Details", device);
             }
