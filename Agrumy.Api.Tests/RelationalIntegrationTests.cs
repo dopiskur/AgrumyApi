@@ -63,12 +63,28 @@ public sealed class RelationalIntegrationFixture
         int deviceType = db.DeviceTypes.Where(t => t.DeviceTypeName == "greenhouse")
                            .Select(t => (int?)t.IDDeviceType).FirstOrDefault() ?? SeedDeviceType(db);
 
+        // deviceUnit(0)/deviceUnitZone(0) are the "Default"/"Disabled" sentinel rows the production
+        // DB ships (db/agrumyDB-withData.sql); sensorData's non-null DeviceUnitID/DeviceUnitZoneID
+        // default to 0, so with the legacy FKs in place these must exist. Zone before unit.
+        if (!db.DeviceUnitZones.Any())
+            db.DeviceUnitZones.Add(new DeviceUnitZoneRow { IDDeviceUnitZone = 0, DeviceUnitZoneName = "Disabled" });
+        db.SaveChanges();
+        if (!db.DeviceUnits.Any())
+            db.DeviceUnits.Add(new DeviceUnitRow { IDDeviceUnit = 0, DeviceUnitZoneID = null, DeviceUnitName = "Default" });
+
         if (!db.DeviceTypeServices.Any())
             db.DeviceTypeServices.Add(new DeviceTypeServiceRow { IDDeviceTypeService = 1, ServiceType = "HTTPS" });
         if (!db.DeviceTypeRelays.Any())
-            db.DeviceTypeRelays.Add(new DeviceTypeRelayRow { IDDeviceTypeRelay = 1, RelayName = "pump" });
+            db.DeviceTypeRelays.AddRange(
+                new DeviceTypeRelayRow { IDDeviceTypeRelay = 0, RelayName = "Disabled" },
+                new DeviceTypeRelayRow { IDDeviceTypeRelay = 1, RelayName = "Ventilation" },
+                new DeviceTypeRelayRow { IDDeviceTypeRelay = 2, RelayName = "Light" },
+                new DeviceTypeRelayRow { IDDeviceTypeRelay = 3, RelayName = "Heating" },
+                new DeviceTypeRelayRow { IDDeviceTypeRelay = 4, RelayName = "Water pump" });
         if (!db.DeviceTypeSensors.Any())
-            db.DeviceTypeSensors.Add(new DeviceTypeSensorRow { IDDeviceTypeSensor = 1, SensorName = "dht22" });
+            db.DeviceTypeSensors.AddRange(
+                new DeviceTypeSensorRow { IDDeviceTypeSensor = 0, SensorName = "Disabled" },
+                new DeviceTypeSensorRow { IDDeviceTypeSensor = 1, SensorName = "dht22" });
         db.SaveChanges();
 
         _targets[provider] = new Target(provider, conn, regular, admin, deviceType);

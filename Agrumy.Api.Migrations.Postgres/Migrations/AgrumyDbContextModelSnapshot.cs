@@ -89,6 +89,22 @@ namespace Agrumy.Api.Migrations.Postgres.Migrations
 
                     b.HasKey("IDDeviceConfigController");
 
+                    b.HasIndex("Relay1");
+
+                    b.HasIndex("Relay2");
+
+                    b.HasIndex("Relay3");
+
+                    b.HasIndex("Relay4");
+
+                    b.HasIndex("Relay5");
+
+                    b.HasIndex("Relay6");
+
+                    b.HasIndex("Relay7");
+
+                    b.HasIndex("Relay8");
+
                     b.ToTable("deviceConfigController", (string)null);
                 });
 
@@ -140,6 +156,32 @@ namespace Agrumy.Api.Migrations.Postgres.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("IDDeviceConfigSensor");
+
+                    b.HasIndex("SensorBarometer");
+
+                    b.HasIndex("SensorBattery");
+
+                    b.HasIndex("SensorCo2");
+
+                    b.HasIndex("SensorHumid");
+
+                    b.HasIndex("SensorLight");
+
+                    b.HasIndex("SensorMoist");
+
+                    b.HasIndex("SensorPH");
+
+                    b.HasIndex("SensorRainLevel");
+
+                    b.HasIndex("SensorTemp");
+
+                    b.HasIndex("SensorTempSoil");
+
+                    b.HasIndex("SensorTvoc");
+
+                    b.HasIndex("SensorWaterLevel");
+
+                    b.HasIndex("SensorWind");
 
                     b.ToTable("deviceConfigSensor", (string)null);
                 });
@@ -275,6 +317,18 @@ namespace Agrumy.Api.Migrations.Postgres.Migrations
                         .IsUnique()
                         .HasDatabaseName("ApiID_UNIQUE");
 
+                    b.HasIndex("DeviceConfigControllerID");
+
+                    b.HasIndex("DeviceConfigSensorID");
+
+                    b.HasIndex("DeviceTypeID");
+
+                    b.HasIndex("DeviceTypeServiceID");
+
+                    b.HasIndex("DeviceUnitID");
+
+                    b.HasIndex("TenantID");
+
                     b.ToTable("device", (string)null);
                 });
 
@@ -402,6 +456,8 @@ namespace Agrumy.Api.Migrations.Postgres.Migrations
 
                     b.HasKey("IDDeviceUnit");
 
+                    b.HasIndex("DeviceUnitZoneID");
+
                     b.ToTable("deviceUnit", (string)null);
                 });
 
@@ -496,6 +552,8 @@ namespace Agrumy.Api.Migrations.Postgres.Migrations
 
                     b.HasKey("IDSensorDataReport");
 
+                    b.HasIndex("DeviceID");
+
                     b.ToTable("sensorDataReport", (string)null);
                 });
 
@@ -562,6 +620,10 @@ namespace Agrumy.Api.Migrations.Postgres.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("IDSensorData");
+
+                    b.HasIndex("DeviceUnitID");
+
+                    b.HasIndex("DeviceUnitZoneID");
 
                     b.HasIndex("DeviceID", "TenantID", "DateCreated")
                         .HasDatabaseName("ix_sensorData_device_tenant_date");
@@ -646,6 +708,8 @@ namespace Agrumy.Api.Migrations.Postgres.Migrations
 
                     b.HasKey("IDUserGroup");
 
+                    b.HasIndex("UserRoleID");
+
                     b.ToTable("userGroup", (string)null);
                 });
 
@@ -665,6 +729,8 @@ namespace Agrumy.Api.Migrations.Postgres.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("IDUserRole");
+
+                    b.HasIndex("RoleScopeID");
 
                     b.ToTable("userRole", (string)null);
                 });
@@ -752,11 +818,218 @@ namespace Agrumy.Api.Migrations.Postgres.Migrations
                         .IsUnique()
                         .HasDatabaseName("email_UNIQUE");
 
+                    b.HasIndex("UserGroupID");
+
                     b.HasIndex("Username")
                         .IsUnique()
                         .HasDatabaseName("Username_UNIQUE");
 
                     b.ToTable("user", (string)null);
+                });
+
+            modelBuilder.Entity("api.Dal.Entities.DeviceConfigControllerRow", b =>
+                {
+                    b.HasOne("api.Dal.Entities.DeviceTypeRelayRow", null)
+                        .WithMany()
+                        .HasForeignKey("Relay1")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeRelayRow", null)
+                        .WithMany()
+                        .HasForeignKey("Relay2")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeRelayRow", null)
+                        .WithMany()
+                        .HasForeignKey("Relay3")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeRelayRow", null)
+                        .WithMany()
+                        .HasForeignKey("Relay4")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeRelayRow", null)
+                        .WithMany()
+                        .HasForeignKey("Relay5")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeRelayRow", null)
+                        .WithMany()
+                        .HasForeignKey("Relay6")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeRelayRow", null)
+                        .WithMany()
+                        .HasForeignKey("Relay7")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeRelayRow", null)
+                        .WithMany()
+                        .HasForeignKey("Relay8")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("api.Dal.Entities.DeviceConfigSensorRow", b =>
+                {
+                    b.HasOne("api.Dal.Entities.DeviceTypeSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("SensorBarometer")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("SensorBattery")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("SensorCo2")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("SensorHumid")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("SensorLight")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("SensorMoist")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("SensorPH")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("SensorRainLevel")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("SensorTemp")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("SensorTempSoil")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("SensorTvoc")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("SensorWaterLevel")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("SensorWind")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("api.Dal.Entities.DeviceRow", b =>
+                {
+                    b.HasOne("api.Dal.Entities.DeviceConfigControllerRow", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceConfigControllerID")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceConfigSensorRow", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceConfigSensorID")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeRow", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceTypeID")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceTypeServiceRow", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceTypeServiceID")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.DeviceUnitRow", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceUnitID")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("api.Dal.Entities.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantID")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("api.Dal.Entities.DeviceUnitRow", b =>
+                {
+                    b.HasOne("api.Dal.Entities.DeviceUnitZoneRow", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceUnitZoneID")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("api.Dal.Entities.SensorDataReportRow", b =>
+                {
+                    b.HasOne("api.Dal.Entities.DeviceRow", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceID")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("api.Dal.Entities.SensorDataRow", b =>
+                {
+                    b.HasOne("api.Dal.Entities.DeviceRow", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceID")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("api.Dal.Entities.DeviceUnitRow", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceUnitID")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("api.Dal.Entities.DeviceUnitZoneRow", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceUnitZoneID")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("api.Dal.Entities.UserGroupRow", b =>
+                {
+                    b.HasOne("api.Dal.Entities.UserRoleRow", null)
+                        .WithMany()
+                        .HasForeignKey("UserRoleID")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("api.Dal.Entities.UserRoleRow", b =>
+                {
+                    b.HasOne("api.Dal.Entities.UserRoleScopeRow", null)
+                        .WithMany()
+                        .HasForeignKey("RoleScopeID")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("api.Dal.Entities.UserRow", b =>
+                {
+                    b.HasOne("api.Dal.Entities.UserGroupRow", null)
+                        .WithMany()
+                        .HasForeignKey("UserGroupID")
+                        .OnDelete(DeleteBehavior.NoAction);
                 });
 #pragma warning restore 612, 618
         }

@@ -68,6 +68,7 @@ namespace api.Dal
                 e.HasKey(x => x.IDUserRole);
                 e.Property(x => x.IDUserRole).ValueGeneratedOnAdd();
                 e.Property(x => x.RoleName).HasMaxLength(45);
+                e.HasOne<UserRoleScopeRow>().WithMany().HasForeignKey(x => x.RoleScopeID).OnDelete(DeleteBehavior.NoAction);
             });
 
             b.Entity<UserGroupRow>(e =>
@@ -76,6 +77,7 @@ namespace api.Dal
                 e.HasKey(x => x.IDUserGroup);
                 e.Property(x => x.IDUserGroup).ValueGeneratedOnAdd();
                 e.Property(x => x.GroupName).HasMaxLength(128);
+                e.HasOne<UserRoleRow>().WithMany().HasForeignKey(x => x.UserRoleID).OnDelete(DeleteBehavior.NoAction);
             });
 
             b.Entity<UserRow>(e =>
@@ -94,6 +96,8 @@ namespace api.Dal
                 e.Property(x => x.DateModified).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.HasIndex(x => x.Email).IsUnique().HasDatabaseName("email_UNIQUE");
                 e.HasIndex(x => x.Username).IsUnique().HasDatabaseName("Username_UNIQUE");
+                // user.TenantID has no FK in the legacy schema - only UserGroupID does.
+                e.HasOne<UserGroupRow>().WithMany().HasForeignKey(x => x.UserGroupID).OnDelete(DeleteBehavior.NoAction);
             });
 
             b.Entity<ServerConfigRow>(e =>
@@ -120,6 +124,7 @@ namespace api.Dal
                 e.HasKey(x => x.IDDeviceUnit);
                 e.Property(x => x.IDDeviceUnit).ValueGeneratedNever();
                 e.Property(x => x.DeviceUnitName).HasMaxLength(100);
+                e.HasOne<DeviceUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceUnitZoneID).OnDelete(DeleteBehavior.NoAction);
             });
 
             b.Entity<DeviceTypeRow>(e =>
@@ -159,6 +164,15 @@ namespace api.Dal
                 e.ToTable("deviceConfigController");
                 e.HasKey(x => x.IDDeviceConfigController);
                 e.Property(x => x.IDDeviceConfigController).ValueGeneratedOnAdd();
+                // Relay1-8 each reference deviceTypeRelay (legacy fk_deviceConfigController_relayN).
+                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay1).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay2).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay3).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay4).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay5).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay6).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay7).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay8).OnDelete(DeleteBehavior.NoAction);
             });
 
             b.Entity<DeviceConfigSensorRow>(e =>
@@ -166,6 +180,20 @@ namespace api.Dal
                 e.ToTable("deviceConfigSensor");
                 e.HasKey(x => x.IDDeviceConfigSensor);
                 e.Property(x => x.IDDeviceConfigSensor).ValueGeneratedOnAdd();
+                // Every Sensor* column references deviceTypeSensor (legacy fk_deviceConfigSensor_deviceTypeSensor_*).
+                e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorBattery).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorTemp).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorTempSoil).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorHumid).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorMoist).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorLight).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorCo2).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorTvoc).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorBarometer).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorPH).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorRainLevel).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorWaterLevel).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorWind).OnDelete(DeleteBehavior.NoAction);
             });
 
             b.Entity<DeviceRow>(e =>
@@ -181,6 +209,13 @@ namespace api.Dal
                 e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.Property(x => x.DateModified).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.HasIndex(x => x.ApiId).IsUnique().HasDatabaseName("ApiID_UNIQUE");
+                // Legacy device FKs (fk_device_*). DeviceUnitZoneID has no FK on device.
+                e.HasOne<DeviceConfigControllerRow>().WithMany().HasForeignKey(x => x.DeviceConfigControllerID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceConfigSensorRow>().WithMany().HasForeignKey(x => x.DeviceConfigSensorID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.DeviceTypeID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeServiceRow>().WithMany().HasForeignKey(x => x.DeviceTypeServiceID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<TenantRow>().WithMany().HasForeignKey(x => x.TenantID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
             });
 
             b.Entity<DeviceFirmwareRow>(e =>
@@ -200,6 +235,10 @@ namespace api.Dal
                 // Legacy Battery/Moisture/WaterLevel are tinyint(1); the DTO exposes them as int, so a fresh DB uses int (old tinyint(1) columns still read fine).
                 e.HasIndex(x => new { x.DeviceID, x.TenantID, x.DateCreated })
                  .HasDatabaseName("ix_sensorData_device_tenant_date");
+                // Legacy fk_sensorData_* (no FK on sensorData.TenantID).
+                e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceUnitZoneID).OnDelete(DeleteBehavior.NoAction);
             });
 
             b.Entity<SensorDataReportRow>(e =>
@@ -211,6 +250,7 @@ namespace api.Dal
                 e.Property(x => x.ReportName).HasMaxLength(128);
                 e.Property(x => x.DateGenerated).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.Property(x => x.SensorData).HasColumnName("sensorData");
+                e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 
             b.Entity<EventDeviceRow>(e =>
