@@ -4,24 +4,15 @@ using api.Dal.Entities;
 namespace api.Dal
 {
     /// <summary>
-    /// Pure port of the <c>SensorDataReportBuilder</c> stored procedure's shaping step (roadmap #42).
-    /// The caller (<see cref="EfRepository.SensorDataGetAsync"/>) is responsible for the row filter
-    /// - device, tenant, <c>Co2 &lt; 8000</c> and the time window - exactly as the proc's WHERE did;
-    /// this class only does the time-bucket grouping and JSON assembly, so it needs no database and
-    /// is unit-tested directly.
-    ///
-    /// Bucket granularity by <c>timeMDMY</c> matches the proc's <c>DATE_FORMAT</c> masks:
-    ///   0 =&gt; minute, 1 =&gt; hour, 2 =&gt; day, 3 =&gt; day.
-    /// One representative row per bucket. The proc relied on MySQL returning an arbitrary row from a
-    /// non-aggregated <c>GROUP BY</c>; this port pins that to "latest by DateCreated" so the output
-    /// is deterministic.
+    /// Pure port of the <c>SensorDataReportBuilder</c> proc's shaping step (roadmap #42): time-bucket
+    /// grouping and JSON assembly only; the caller (<see cref="EfRepository.SensorDataGetAsync"/>) does
+    /// the row filter. <c>timeMDMY</c> buckets: 0 =&gt; minute, 1 =&gt; hour, 2/3 =&gt; day. One row per
+    /// bucket, pinned to "latest by DateCreated" (the proc relied on an arbitrary <c>GROUP BY</c> row).
     /// </summary>
     internal static class SensorReportShaper
     {
         /// <returns>
-        /// A JSON string <c>{"sensorData":[ {record}, ... ]}</c>, or an empty string when no rows
-        /// match - mirroring the proc, whose <c>SELECT sensorDataResult</c> came back as SQL NULL
-        /// (read as <c>""</c> by the old SqlRepository) when the grouped set was empty.
+        /// JSON <c>{"sensorData":[...]}</c>, or <c>""</c> when no rows match (the proc returned SQL NULL, read as <c>""</c>).
         /// </returns>
         public static string Build(IEnumerable<SensorDataRow> filteredRows, int timeMDMY)
         {

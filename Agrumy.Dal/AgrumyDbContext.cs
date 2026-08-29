@@ -4,21 +4,16 @@ using Microsoft.EntityFrameworkCore;
 namespace api.Dal
 {
     /// <summary>
-    /// EF Core context for the Agrumy database. Replaces the Dapper + stored-procedure
-    /// <c>SqlRepository</c> / <c>Schema.SchemaScripts</c> pair (roadmap #42).
+    /// EF Core context for the Agrumy database, replacing the Dapper + stored-procedure SqlRepository (roadmap #42).
     ///
-    /// Provider-neutral (roadmap #42 Phase 2): runs on MySQL/MariaDB (Pomelo) and PostgreSQL
-    /// (Npgsql), chosen at runtime by <c>Database:Provider</c>. No <c>HasColumnType</c> with
-    /// vendor-specific type names - EF maps each CLR type to the right column type per provider
-    /// (bool -&gt; tinyint(1) / boolean, unbounded string -&gt; longtext / text, DateTime -&gt;
-    /// datetime(6) / timestamp). Only <c>HasMaxLength</c> (portable varchar(n)) and
-    /// <c>CURRENT_TIMESTAMP</c> defaults (valid SQL on both) are used.
+    /// Provider-neutral (Phase 2): MySQL/MariaDB (Pomelo) or PostgreSQL (Npgsql), chosen at runtime by
+    /// <c>Database:Provider</c>. No vendor-specific <c>HasColumnType</c> - EF maps each CLR type per
+    /// provider; only portable <c>HasMaxLength</c> and <c>CURRENT_TIMESTAMP</c> defaults are used.
     ///
-    /// Mapped against the legacy schema: camelCase table names, <c>IDXxx</c> primary keys, a mix of
-    /// identity and manually-assigned ids. Relationships are intentionally not configured -
-    /// EfRepository does every join explicitly in LINQ - so a baseline migration creates tables
-    /// without the legacy NO-ACTION foreign keys. That is fine for a fresh database and irrelevant
-    /// to one that already has tables (EnsureSchemaAsync never migrates it).
+    /// Mapped against the legacy schema (camelCase tables, <c>IDXxx</c> keys, mixed id strategies).
+    /// Relationships are intentionally not configured - EfRepository does every join in LINQ - so the
+    /// baseline migration creates tables without the legacy NO-ACTION FKs (fine for a fresh database,
+    /// irrelevant to one that already has tables).
     /// </summary>
     public class AgrumyDbContext : DbContext
     {
@@ -202,9 +197,7 @@ namespace api.Dal
                 e.ToTable("sensorData");
                 e.HasKey(x => x.IDSensorData);
                 e.Property(x => x.IDSensorData).ValueGeneratedOnAdd();
-                // Legacy columns Battery / Moisture / WaterLevel are tinyint(1) in the old MySQL
-                // schema; the DTO and these rows expose them as int, so a fresh database gets plain
-                // int here. Reads of the existing tinyint(1) columns still materialise fine.
+                // Legacy Battery/Moisture/WaterLevel are tinyint(1); the DTO exposes them as int, so a fresh DB uses int (old tinyint(1) columns still read fine).
                 e.HasIndex(x => new { x.DeviceID, x.TenantID, x.DateCreated })
                  .HasDatabaseName("ix_sensorData_device_tenant_date");
             });

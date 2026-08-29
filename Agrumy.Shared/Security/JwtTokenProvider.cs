@@ -68,7 +68,6 @@ namespace api.Security
                 var jwtToken = (JwtSecurityToken)validatedToken;
                 var value = jwtToken.Claims.First(x => x.Type == "role").Value;
 
-                // return user id from JWT token if validation successful
                 return value;
             }
             catch

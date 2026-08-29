@@ -70,13 +70,10 @@ builder.Services.AddRateLimiter(options =>
     // Human interactive login/registration - strict, this is the credential-stuffing target.
     options.AddPolicy("login", httpContext => IpFixedWindow(httpContext, 5));
 
-    // Device onboarding / auth / config poll. A device wakes ~every SleepSeconds (default 60s)
-    // and does ~1 Authenticate + ~1 Config per wake => ~2 req/min per device. 20/min/IP leaves
-    // headroom for ~10 devices behind one NAT/public IP plus retries.
+    // Device onboarding/auth/config poll: ~2 req/min per device; 20/min/IP covers ~10 devices behind one NAT plus retries.
     options.AddPolicy("device-auth", httpContext => IpFixedWindow(httpContext, 20));
 
-    // Device telemetry push (SensorData POST). ~1 push/min per device; higher ceiling for many
-    // devices sharing one NAT and for catch-up bursts after a device was offline.
+    // Device telemetry push: ~1/min per device; higher ceiling for many devices behind one NAT and catch-up bursts.
     options.AddPolicy("device-data", httpContext => IpFixedWindow(httpContext, 60));
 });
 
@@ -84,12 +81,10 @@ builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddLogging();
 
-// HTTPS enforcement is opt-out: Security:EnforceHttps=false lets the API run over plain HTTP
-// (e.g. while the device firmware is still on http://). Defaults to true.
+// HTTPS enforcement is opt-out via Security:EnforceHttps=false (default true), e.g. while firmware is still on http://.
 bool enforceHttps = !bool.TryParse(builder.Configuration["Security:EnforceHttps"], out var eh) || eh;
 
-// HSTS (Strict-Transport-Security) - only applied when enforcing HTTPS and outside Development
-// (see pipeline below).
+// HSTS only when enforcing HTTPS and outside Development (see pipeline below).
 builder.Services.AddHsts(options =>
 {
     options.MaxAge = TimeSpan.FromDays(365);
@@ -134,9 +129,7 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// Enforce HTTPS unless disabled via Security:EnforceHttps=false. UseHsts only outside
-// Development so local HTTP dev without a cert is not disrupted; UseHttpsRedirection is a
-// no-op in dev when no https port is configured.
+// UseHsts only outside Development so local HTTP dev without a cert still works; UseHttpsRedirection is a no-op in dev with no https port.
 if (enforceHttps)
 {
     if (!app.Environment.IsDevelopment())
@@ -154,10 +147,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Runs here, before the app starts accepting traffic, rather than lazily on the first request -
-// a misconfigured connection string surfaces immediately in the deploy logs instead of as the
-// first user's 500. Whether that failure stops startup or just logs a warning is controlled by
-// "Startup:FailFastOnDbCheck".
+// Run the DB check at startup, not lazily on first request, so a bad connection string shows in deploy logs; Startup:FailFastOnDbCheck controls stop-vs-warn.
 using (var scope = app.Services.CreateScope())
 {
     var startupLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
