@@ -10,7 +10,7 @@ namespace api.Dal.Interface
         /// <summary>Opens and immediately closes a database connection. Returns true if the connection could be opened.</summary>
         Task<bool> TestConnectionAsync();
 
-        /// <summary>Ensures the schema exists: if the key table is missing, runs the batches from Schema/SchemaScripts.cs.</summary>
+        /// <summary>Ensures the schema exists: on an empty database, applies the EF Core baseline migration; a database that already has tables is left untouched.</summary>
         Task EnsureSchemaAsync();
 
         /// <summary>Classifies a database-layer exception so callers can return a consistent error response. CPU-only, stays synchronous.</summary>

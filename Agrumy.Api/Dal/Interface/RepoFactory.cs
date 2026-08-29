@@ -11,7 +11,7 @@ namespace api.Dal.Interface
     public static class RepoFactory
     {
 
-        private static readonly Lazy<IRepository> repository = new(() => new SqlRepository());
+        private static readonly Lazy<IRepository> repository = new(() => new EfRepository());
 
         private static readonly Lazy<ICache> cache = new(() => new CacheRepository());
 
