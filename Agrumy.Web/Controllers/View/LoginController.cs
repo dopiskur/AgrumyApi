@@ -38,7 +38,10 @@ namespace api.Controllers.View
                 CookieOptions options = new CookieOptions();
                 options.Expires = DateTime.Now.AddDays(7);
                 options.HttpOnly = true;
-                options.Secure = true;
+                // Secure over HTTPS (production), but not over plain-HTTP dev on localhost -
+                // browsers silently drop a Secure cookie set over HTTP, which would leave the
+                // post-login redirect to /Device with no auth cookie (looks like login "does nothing").
+                options.Secure = Request.IsHttps;
                 options.SameSite = SameSiteMode.Strict;
                 Response.Cookies.Append(CookieUserId, result.IDUser.ToString(), options);
                 Response.Cookies.Append(CookieLogin, result.Email.ToString(), options);
