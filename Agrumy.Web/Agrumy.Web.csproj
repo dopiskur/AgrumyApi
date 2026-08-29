@@ -17,4 +17,9 @@
     <ProjectReference Include="..\Agrumy.Shared\Agrumy.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Refit.HttpClientFactory" Version="15.2.0" />
+    <PackageReference Include="Refit.Reflection" Version="15.2.0" />
+  </ItemGroup>
+
 </Project>

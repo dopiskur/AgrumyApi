@@ -158,7 +158,7 @@ namespace api.Controllers.View
 
                 UserUpdate userUpdate = userView.UserUpdate;
 
-                bool result = await _api.UserUpdate(jwtKey, userUpdate);
+                await _api.UserUpdate(jwtKey, userUpdate);
 
                 User user = await _api.UserGet(jwtKey, userView.UserUpdate.IDUser, null, null);
                 return View("Details", user);

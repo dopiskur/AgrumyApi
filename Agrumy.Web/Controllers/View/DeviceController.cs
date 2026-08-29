@@ -138,7 +138,7 @@ namespace api.Controllers.View
                 if (jwtKey == null || (roleName = JwtTokenProvider.ValidateToken(jwtKey)) == null) { return RedirectToAction("Index", "Login"); }
                 if (roleName != "admin") { return RedirectToAction("Index", "Device"); }
 
-                bool result = await _api.DeviceDelete(jwtKey, idDevice);
+                await _api.DeviceDelete(jwtKey, idDevice);
                 return RedirectToAction(nameof(Index));
             }
             catch (Exception e)

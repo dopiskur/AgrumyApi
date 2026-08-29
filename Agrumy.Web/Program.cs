@@ -1,5 +1,6 @@
-using api.Dal;
 using api.Dal.Interface;
+using api.Utils;
+using Refit;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,8 +13,10 @@ if (string.IsNullOrEmpty(apiServiceUrl))
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpContextAccessor(); // used by _Layout / views for the auth cookie
 
-// HttpClient for the HTTP-backed API repository
-builder.Services.AddHttpClient<IApi, ApiRepository>(c => c.BaseAddress = new Uri(apiServiceUrl));
+// Declarative Refit client for Agrumy.Api (IHttpClientFactory-managed HttpClient underneath).
+builder.Services
+    .AddRefitClient<IApi>(RefitConfig.Settings)
+    .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiServiceUrl));
 
 builder.Services.AddLogging();
 
