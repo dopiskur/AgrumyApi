@@ -1,13 +1,12 @@
 using api.Dal;
 using api.Dal.Interface;
 using api.Models;
+using api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text.Json.Nodes;
-
 
 
 namespace api.Controllers.API
@@ -31,19 +30,14 @@ namespace api.Controllers.API
             return claim != null && int.TryParse(claim.Value, out var tenantId) ? tenantId : null;
         }
 
-        // GET: api/<SensorDataController>
-
-
-
-        //[HttpGet("SensorData")]
         [HttpGet]
         [Authorize]
-        public async Task<ActionResult<SensorData>> Get(int? deviceID, int? timeRange = 60, int? timeMDMY = 0, int? buildReport=0) // 0 minute, 1 days, 2 months, 3 years
+        public async Task<ActionResult<string>> Get(int? deviceID, int? timeRange = 60, int? timeMDMY = 0, int? buildReport = 0)
         {
-
             try
             {
-                string sensorData = await RepoFactory.GetRepo().SensorDataGetAsync(0, deviceID, timeRange, timeMDMY, buildReport);
+                string sensorData = await RepoFactory.GetRepo()
+                    .SensorDataGetAsync(GetCallerTenantId(), deviceID, timeRange, timeMDMY, buildReport);
                 return Ok(sensorData);
             }
             catch (Exception e)
@@ -54,33 +48,19 @@ namespace api.Controllers.API
             }
         }
 
-
-
-        //[HttpPost("SensorData")]
         [HttpPost]
         [EnableRateLimiting("device-data")]
-        public async Task<ActionResult<string>> Post([FromBody] JsonArray jsonArray)
+        [Authorize(Policy = DeviceAuth.SessionPolicy)]
+        public async Task<ActionResult<int?>> Post([FromBody] JsonArray jsonArray)
         {
             try
             {
+                if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-                if (AuthenticationHeaderValue.TryParse(Request.Headers["apiId"], out var apiId) && AuthenticationHeaderValue.TryParse(Request.Headers.Authorization, out var authKey))
-                {
+                await RepoFactory.GetRepo().SensorDataPushAsync(jsonArray);
 
-                    if (!DeviceApiController.GetAuth(apiId.ToString(), authKey.ToString()))
-                    {
-                        return StatusCode(401);
-                    }
-
-                    if (!ModelState.IsValid) { return BadRequest(ModelState); }
-
-                    await RepoFactory.GetRepo().SensorDataPushAsync(jsonArray);
-
-                    DeviceCache? deviceCache = RepoFactory.GetCache().GetDeviceCache(apiId.ToString());
-                    return Ok(deviceCache.ConfigVersion);
-                }
-
-                return StatusCode(401, "Wrong Id or Key");
+                DeviceCache? deviceCache = RepoFactory.GetCache().GetDeviceCache(HttpContext.DeviceApiId()!);
+                return Ok(deviceCache.ConfigVersion);
             }
             catch (Exception e)
             {
@@ -90,19 +70,13 @@ namespace api.Controllers.API
             }
         }
 
-
-
-        //[HttpDelete("{id}")]
-        // mozda cu koristit post za ovo, jer ne mogu dobit u body resposne koliko je redova obrisano, delete to ne podrzava
         [HttpDelete]
         [Authorize(Roles = "admin")]
         public async Task<ActionResult> Delete(int deviceID, int timeMDMY = 0, int timeRange = 0)
         {
-
             try
             {
                 await RepoFactory.GetRepo().SensorDataDeleteAsync(GetCallerTenantId(), deviceID, timeRange, timeMDMY);
-
                 return Ok();
             }
             catch (Exception e)
@@ -113,20 +87,13 @@ namespace api.Controllers.API
             }
         }
 
-
-
-
-        [HttpGet("Report")] // Request authentication
+        [HttpGet("Report")]
         [Authorize]
-        public async Task<ActionResult<IEnumerable<SensorData>>> ReportGet(int? getData, int? idDevice, int? iDSensorDataReport)
+        public async Task<ActionResult<IEnumerable<SensorDataReport>>> ReportGet(int? getData, int? idDevice, int? iDSensorDataReport)
         {
-
-            IEnumerable<SensorDataReport>? sensorDataResult = await RepoFactory.GetRepo().SensorDataReportGetAsync(GetCallerTenantId(), getData, idDevice, iDSensorDataReport);
-
-
-            return Ok(sensorDataResult);
-        }// private su metode koje se koriste interno, ali i dalaje mora imat httpget
-
-
+            IEnumerable<SensorDataReport> reports = await RepoFactory.GetRepo()
+                .SensorDataReportGetAsync(GetCallerTenantId(), getData, idDevice, iDSensorDataReport);
+            return Ok(reports);
+        }
     }
 }

@@ -69,7 +69,7 @@ namespace api.Security
             return CryptographicOperations.FixedTimeEquals(storedBytes, computedBytes);
         }
 
-        // NOTE: device apiId/apiKey verification lives in api.Security.DeviceAuthenticationProvider
+        // NOTE: device apiId/apiKey verification lives in api.Security.DeviceAuth (Agrumy.Api)
         // (Agrumy.Api) because it needs the data-access layer, which this shared assembly must not
         // reference.
     }

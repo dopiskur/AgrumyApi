@@ -50,9 +50,10 @@ public class ApiControllerTests : IDisposable
     public async Task DeviceGet_HappyPath_ReturnsOkWithDevice()
     {
         var device = new Device { IDDevice = 42, DeviceName = "greenhouse-1" };
-        _repo.Setup(r => r.DeviceGetAsync(0, 42, null, null)).ReturnsAsync(device);
+        _repo.Setup(r => r.DeviceGetAsync(7, 42, null, null)).ReturnsAsync(device);
 
         var controller = new DeviceApiController(NullLogger<DeviceApiController>.Instance);
+        SetCaller(controller, "user", 7); // DeviceGet now scopes to the caller's tenant
         var result = await controller.DeviceGet(42);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);

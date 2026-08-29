@@ -141,9 +141,13 @@ namespace api.Controllers.API
                 {
 
                     IList<UserRole> roles = await RepoFactory.GetRepo().UserRoleGetAsync();
-                    string roleName = roles.First(m => m.IDUserRole == user.UserRoleID).RoleName;
+                    UserRole? role = roles.FirstOrDefault(m => m.IDUserRole == user.UserRoleID);
+                    if (role?.RoleName == null)
+                    {
+                        return StatusCode(500, "User has no valid role assigned.");
+                    }
 
-                    var serializedToken = JwtTokenProvider.CreateToken(secureKey, 120, user.Email, roleName, user.TenantID.ToString());
+                    var serializedToken = JwtTokenProvider.CreateToken(secureKey, 120, user.Email, role.RoleName, user.TenantID.ToString());
 
 
                     UserLoginResult userLoginResult = new UserLoginResult();
@@ -249,10 +253,9 @@ namespace api.Controllers.API
         }
 
 
-        // get user by self
+        // The caller's own record - looked up by the email in their JWT, so any authenticated user.
         [HttpGet("Self")]
-        [Authorize(Roles = "admin")]
-        //[Authorize(Roles = "admin, user")]
+        [Authorize]
         public async Task<ActionResult<User>> GetUserSelf()
         {
             try

@@ -104,9 +104,12 @@ namespace api.Dal
                 }
             }
 
+            // MySQL text fallback for a missing table when the exception type isn't MySqlException.
+            // (PostgreSQL's "relation ... does not exist" is covered by the 42P01 SqlState above -
+            // a bare "does not exist" match would also swallow unrelated errors like a missing
+            // trigger definer.)
             if (DbErrorResponse.Mentions(ex, "doesn't exist") ||
-                DbErrorResponse.Mentions(ex, "Unknown table") ||
-                DbErrorResponse.Mentions(ex, "does not exist"))
+                DbErrorResponse.Mentions(ex, "Unknown table"))
             {
                 return DbFailureKind.SchemaMissing;
             }
@@ -380,6 +383,13 @@ namespace api.Dal
         {
             await using var db = Db();
             var row = await db.Devices.AsNoTracking().FirstOrDefaultAsync(d => d.IDDevice == idDevice);
+            return row == null ? new Device() : ToDto(row);
+        }
+
+        public async Task<Device> DeviceGetByApiIdAsync(string? apiId)
+        {
+            await using var db = Db();
+            var row = await db.Devices.AsNoTracking().FirstOrDefaultAsync(d => d.ApiId == apiId);
             return row == null ? new Device() : ToDto(row);
         }
 

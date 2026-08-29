@@ -5,16 +5,13 @@ using api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using System.Net.Http.Headers;
 using System.Security.Claims;
 
 
 namespace api.Controllers.API
 {
-    //[Route("api/[controller]")]
     [Route("/api/Device")]
     [ApiController]
-
     public class DeviceApiController : ControllerBase
     {
         private readonly ILogger<DeviceApiController> _logger;
@@ -33,23 +30,20 @@ namespace api.Controllers.API
         }
 
         #region websvc api
+
         [Authorize]
         [HttpGet("All")]
         public async Task<ActionResult<Device>> DevicesGet()
-        { //0 day, 1 month, 2 year
-
-            IEnumerable<Device> devices = new List<Device>();
-            devices = await RepoFactory.GetRepo().DevicesGetAsync(0);
-
+        {
+            IEnumerable<Device> devices = await RepoFactory.GetRepo().DevicesGetAsync(GetCallerTenantId());
             return Ok(devices);
         }
 
         [Authorize]
         [HttpGet]
         public async Task<ActionResult<Device>> DeviceGet(int? idDevice)
-        { //0 day, 1 month, 2 year
-
-            Device device = await RepoFactory.GetRepo().DeviceGetAsync(0, idDevice, null, null);
+        {
+            Device device = await RepoFactory.GetRepo().DeviceGetAsync(GetCallerTenantId(), idDevice, null, null);
             return Ok(device);
         }
 
@@ -57,15 +51,15 @@ namespace api.Controllers.API
         [HttpPut]
         public async Task<ActionResult<bool>> DeviceUpdate([FromBody] Device device)
         {
-
             try
             {
-                Device existingDevice = await RepoFactory.GetRepo().DeviceGetByIdAsync(device.IDDevice);
+                var repo = RepoFactory.GetRepo();
+
+                Device existingDevice = await repo.DeviceGetByIdAsync(device.IDDevice);
                 if (existingDevice.IDDevice == null)
                 {
                     return NotFound();
                 }
-
                 if (existingDevice.TenantID != GetCallerTenantId())
                 {
                     return StatusCode(403, "Device belongs to a different tenant");
@@ -73,12 +67,8 @@ namespace api.Controllers.API
 
                 device.TenantID = existingDevice.TenantID; // payload cannot move a device to another tenant
 
-                await RepoFactory.GetRepo().DeviceUpdateAsync(device);
-
-                // Updating configversion cache on update
-                DeviceCache deviceCache = new DeviceCache();
-                deviceCache.ConfigVersion = device.ConfigVersion;
-                RepoFactory.GetCache().SetItem(device.ApiId, deviceCache);
+                await repo.DeviceUpdateAsync(device);
+                await RefreshConfigVersionCacheAsync(device.IDDevice);
 
                 return true;
             }
@@ -94,7 +84,6 @@ namespace api.Controllers.API
         [HttpDelete]
         public async Task<ActionResult<bool>> DeviceDelete(int? idDevice)
         {
-
             try
             {
                 Device existingDevice = await RepoFactory.GetRepo().DeviceGetByIdAsync(idDevice);
@@ -122,9 +111,8 @@ namespace api.Controllers.API
 
         [Authorize]
         [HttpGet("Sensor")]
-        public async Task<ActionResult<Device>> DeviceConfigSensorGet(int? deviceConfigSensorID)
-        { //0 day, 1 month, 2 year
-
+        public async Task<ActionResult<DeviceConfigSensor>> DeviceConfigSensorGet(int? deviceConfigSensorID)
+        {
             Device owner = await RepoFactory.GetRepo().DeviceGetByDeviceConfigSensorIdAsync(deviceConfigSensorID);
             if (owner.IDDevice == null)
             {
@@ -135,15 +123,13 @@ namespace api.Controllers.API
                 return StatusCode(403, "Sensor config belongs to a different tenant");
             }
 
-            DeviceConfigSensor deviceConfigSensor = await RepoFactory.GetRepo().DeviceConfigSensorGetAsync(deviceConfigSensorID);
-            return Ok(deviceConfigSensor);
+            return Ok(await RepoFactory.GetRepo().DeviceConfigSensorGetAsync(deviceConfigSensorID));
         }
 
         [Authorize]
         [HttpGet("Controller")]
-        public async Task<ActionResult<Device>> DeviceConfigControllerGet(int? deviceConfigControllerID)
-        { //0 day, 1 month, 2 year
-
+        public async Task<ActionResult<DeviceConfigController>> DeviceConfigControllerGet(int? deviceConfigControllerID)
+        {
             Device owner = await RepoFactory.GetRepo().DeviceGetByDeviceConfigControllerIdAsync(deviceConfigControllerID);
             if (owner.IDDevice == null)
             {
@@ -154,98 +140,122 @@ namespace api.Controllers.API
                 return StatusCode(403, "Controller config belongs to a different tenant");
             }
 
-            DeviceConfigController deviceConfigController = await RepoFactory.GetRepo().DeviceConfigControllerGetAsync(deviceConfigControllerID);
-            return Ok(deviceConfigController);
+            return Ok(await RepoFactory.GetRepo().DeviceConfigControllerGetAsync(deviceConfigControllerID));
         }
 
         [Authorize(Roles = "admin")]
         [HttpPut("Sensor")]
         public async Task<ActionResult<bool>> DeviceConfigSensorUpdate(DeviceUpdate? deviceUpdate)
-        { //0 day, 1 month, 2 year
-
-            Device existingDevice = await RepoFactory.GetRepo().DeviceGetByIdAsync(deviceUpdate.Device.IDDevice);
-            if (existingDevice.IDDevice == null)
+        {
+            if (deviceUpdate?.Device?.IDDevice == null)
             {
-                return NotFound();
-            }
-            if (existingDevice.TenantID != GetCallerTenantId())
-            {
-                return StatusCode(403, "Device belongs to a different tenant");
+                return BadRequest("Device is required.");
             }
 
-            await RepoFactory.GetRepo().DeviceConfigSensorUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Sensor);
+            try
+            {
+                var repo = RepoFactory.GetRepo();
 
-            DeviceCache deviceCache = new DeviceCache();
-            deviceCache.ConfigVersion = deviceUpdate.Device.ConfigVersion;
-            RepoFactory.GetCache().SetItem(deviceUpdate.Device.ApiId, deviceCache);
-            return true;
+                Device existingDevice = await repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice);
+                if (existingDevice.IDDevice == null)
+                {
+                    return NotFound();
+                }
+                if (existingDevice.TenantID != GetCallerTenantId())
+                {
+                    return StatusCode(403, "Device belongs to a different tenant");
+                }
+
+                await repo.DeviceConfigSensorUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Sensor);
+                await RefreshConfigVersionCacheAsync(deviceUpdate.Device.IDDevice);
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "DeviceConfigSensorUpdate failed for device {IDDevice}", deviceUpdate.Device.IDDevice);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+            }
         }
 
         [Authorize(Roles = "admin")]
         [HttpPut("Controller")]
         public async Task<ActionResult<bool>> DeviceConfigControllerUpdate(DeviceUpdate? deviceUpdate)
-        { //0 day, 1 month, 2 year
-
-            Device existingDevice = await RepoFactory.GetRepo().DeviceGetByIdAsync(deviceUpdate.Device.IDDevice);
-            if (existingDevice.IDDevice == null)
+        {
+            if (deviceUpdate?.Device?.IDDevice == null)
             {
-                return NotFound();
-            }
-            if (existingDevice.TenantID != GetCallerTenantId())
-            {
-                return StatusCode(403, "Device belongs to a different tenant");
+                return BadRequest("Device is required.");
             }
 
-            await RepoFactory.GetRepo().DeviceConfigControllerUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Controller);
+            try
+            {
+                var repo = RepoFactory.GetRepo();
 
-            DeviceCache deviceCache = new DeviceCache();
-            deviceCache.ConfigVersion = deviceUpdate.Device.ConfigVersion;
-            RepoFactory.GetCache().SetItem(deviceUpdate.Device.ApiId, deviceCache);
-            return true;
+                Device existingDevice = await repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice);
+                if (existingDevice.IDDevice == null)
+                {
+                    return NotFound();
+                }
+                if (existingDevice.TenantID != GetCallerTenantId())
+                {
+                    return StatusCode(403, "Device belongs to a different tenant");
+                }
+
+                await repo.DeviceConfigControllerUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Controller);
+                await RefreshConfigVersionCacheAsync(deviceUpdate.Device.IDDevice);
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "DeviceConfigControllerUpdate failed for device {IDDevice}", deviceUpdate.Device.IDDevice);
+                var kind = RepoFactory.GetRepo().ClassifyException(e);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+            }
         }
 
+        /// <summary>
+        /// Re-reads the device and writes its authoritative ConfigVersion into the cache, so the
+        /// next config poll from that device sees the bump the update just made in the database.
+        /// Preserves the device's current apiAuth session token (mutates the existing cache entry
+        /// rather than replacing it).
+        /// </summary>
+        private async Task RefreshConfigVersionCacheAsync(int? idDevice)
+        {
+            Device updated = await RepoFactory.GetRepo().DeviceGetByIdAsync(idDevice);
+            if (updated.ApiId == null)
+            {
+                return;
+            }
 
+            var cache = RepoFactory.GetCache();
+            DeviceCache entry = cache.GetDeviceCache(updated.ApiId) ?? new DeviceCache();
+            entry.ConfigVersion = updated.ConfigVersion;
+            cache.SetItem(updated.ApiId, entry);
+        }
 
         #endregion
 
 
         #region Device communication
 
-        // Device point
         [HttpPost("Config")]
         [EnableRateLimiting("device-auth")]
+        [Authorize(Policy = DeviceAuth.SessionPolicy)]
         public async Task<ActionResult<DeviceConfig>> GetConfig([FromBody] Device value)
         {
-            if (AuthenticationHeaderValue.TryParse(Request.Headers["apiId"], out var apiId) && AuthenticationHeaderValue.TryParse(Request.Headers.Authorization, out var authKey))
+            string apiId = HttpContext.DeviceApiId()!;
+
+            DeviceCache? deviceCache = RepoFactory.GetCache().GetDeviceCache(apiId);
+            if (value.ConfigVersion == deviceCache.ConfigVersion)
             {
-                if (!GetAuth(apiId.ToString(), authKey.ToString()))
-                {
-                    return StatusCode(401);
-                }
-
-                Device test = new Device();
-                test.ConfigVersion = value.ConfigVersion;
-
-                DeviceCache? deviceCache = RepoFactory.GetCache().GetDeviceCache(apiId.ToString());
-                if (value.ConfigVersion != deviceCache.ConfigVersion)
-                {
-
-                    Device device = await RepoFactory.GetRepo().DeviceGetAsync(0, null, apiId.ToString(), null);
-
-                    DeviceConfig deviceConfig = await BuildDeviceConfigAsync(device);
-
-
-
-                    return Ok(deviceConfig);
-                }
-
-                return Ok();     // DEVICE DO NOTHING
-
+                return Ok(); // device is up to date - do nothing
             }
-            return StatusCode(401);
-        }
 
-        // POST api/<DeviceController>
+            Device device = await RepoFactory.GetRepo().DeviceGetByApiIdAsync(apiId);
+            return Ok(await BuildDeviceConfigAsync(device));
+        }
 
         [HttpPost("Register")]
         [EnableRateLimiting("device-auth")]
@@ -253,30 +263,20 @@ namespace api.Controllers.API
         {
             try
             {
-
-                Device device = new Device();
-                User user = new User();
-
-                DeviceConfigSensor deviceConfigSensor = new DeviceConfigSensor();
-                DeviceConfigController deviceConfigController = new DeviceConfigController();
-
-
-                user = await RepoFactory.GetRepo().UserGetAsync(null, value.Email, null);
+                User user = await RepoFactory.GetRepo().UserGetAsync(null, value.Email, null);
 
                 if (user.DevicePin != value.DevicePin)
                 {
                     return StatusCode(401, "Wrong pin");
                 }
 
-
-                device = await RepoFactory.GetRepo().DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
+                Device device = await RepoFactory.GetRepo().DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
 
                 if (device.IDDevice == null)
                 {
-                    // Add new device
                     device.ConfigVersion = 1;
                     device.TenantID = user.TenantID;
-                    device.DeviceName = "Agrumy_" + value.MacAddress.ToUpper().ToString();
+                    device.DeviceName = "Agrumy_" + value.MacAddress.ToUpper();
                     device.MacAddress = value.MacAddress;
                     device.ApiId = Guid.NewGuid().ToString();
                     device.ApiKey = Guid.NewGuid().ToString();
@@ -288,11 +288,7 @@ namespace api.Controllers.API
                     device = await RepoFactory.GetRepo().DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
                 }
 
-                DeviceConfig deviceConfig = await BuildDeviceConfigAsync(device);
-
-
-                return Ok(deviceConfig);
-
+                return Ok(await BuildDeviceConfigAsync(device));
             }
             catch (Exception e)
             {
@@ -300,17 +296,12 @@ namespace api.Controllers.API
                 var kind = RepoFactory.GetRepo().ClassifyException(e);
                 return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
             }
-
-
-
         }
 
-        [HttpGet]
         private async Task<DeviceConfig> BuildDeviceConfigAsync(Device device)
         {
             DeviceConfig deviceConfig = new DeviceConfig();
 
-            // return values
             deviceConfig.ConfigVersion = device.ConfigVersion;
             deviceConfig.TenantID = device.TenantID;
             deviceConfig.deviceID = device.IDDevice;
@@ -345,11 +336,9 @@ namespace api.Controllers.API
 
             deviceConfig.Enabled = device.Enabled;
 
-            // get config if enabled
             if (deviceConfig.DeviceSensorEnabled == true)
             {
                 deviceConfig.DeviceConfigSensor = await RepoFactory.GetRepo().DeviceConfigSensorGetAsync(device.DeviceConfigSensorID);
-
             }
 
             if (deviceConfig.DeviceControllerEnabled == true)
@@ -358,40 +347,26 @@ namespace api.Controllers.API
             }
 
             return deviceConfig;
-
         }
 
-
-
-        // Device point
-        [HttpPost("Authenticate")] // Request authentication
+        [HttpPost("Authenticate")]
         [EnableRateLimiting("device-auth")]
-        public async Task<ActionResult<DeviceAuthentication>> ReqAuth() // private su metode koje se koriste interno, ali i dalaje mora imat httpget
+        [Authorize(Policy = DeviceAuth.ApiKeyPolicy)]
+        public async Task<ActionResult<DeviceAuthentication>> ReqAuth()
         {
             try
             {
-                if (AuthenticationHeaderValue.TryParse(Request.Headers["apiId"], out var apiId) && AuthenticationHeaderValue.TryParse(Request.Headers["apiKey"], out var apiKey))
+                string apiId = HttpContext.DeviceApiId()!;
+                Device device = await RepoFactory.GetRepo().DeviceGetByApiIdAsync(apiId);
+
+                var deviceAuthentication = new DeviceAuthentication { apiAuth = Guid.NewGuid().ToString() };
+                RepoFactory.GetCache().SetItem(apiId, new DeviceCache
                 {
+                    ConfigVersion = device.ConfigVersion,
+                    apiAuth = deviceAuthentication.apiAuth,
+                });
 
-
-
-                    if (await DeviceAuthenticationProvider.VerifyDeviceAsync(apiId, apiKey))
-                    {
-                        Device device = await RepoFactory.GetRepo().DeviceGetAsync(0, null, apiId.ToString(), null); // Query for configVerion
-                        DeviceAuthentication? deviceAuthentication = new DeviceAuthentication();
-                        deviceAuthentication.apiAuth = Guid.NewGuid().ToString();
-                        DeviceCache deviceCache = new DeviceCache();
-                        deviceCache.ConfigVersion = device.ConfigVersion; //Settings config version
-                        deviceCache.apiAuth = deviceAuthentication.apiAuth;
-                        RepoFactory.GetCache().SetItem(apiId.ToString(), deviceCache);
-                        return Ok(deviceAuthentication);
-                    }
-
-                    return StatusCode(401);
-
-                }
-
-                return StatusCode(401, "Parameter missing");
+                return Ok(deviceAuthentication);
             }
             catch (Exception e)
             {
@@ -401,65 +376,29 @@ namespace api.Controllers.API
             }
         }
 
-        // Check apiKey true/false
-        [HttpGet]
-        public static bool GetAuth(string apiId, string authKey) // private su metode koje se koriste interno, ali i dalje mora imat httpget
-        {
-            // in-memory cache lookup only - stays synchronous
-
-            DeviceCache? deviceCache = RepoFactory.GetCache().GetDeviceCache(apiId);
-
-            if (authKey.ToString() == deviceCache.apiAuth)
-            {
-                return true;
-            }
-
-
-            return false;
-        }
         #endregion
 
         #region Device Types
 
-        // Device Types
         [HttpGet("Type")]
         [Authorize]
-        public async Task<ActionResult<string>> DeviceTypeGet()
-        {
-            IEnumerable<DeviceType> deviceType = await RepoFactory.GetRepo().DeviceTypeGetAsync();
-
-            return Ok(deviceType);
-        }
+        public async Task<ActionResult<IEnumerable<DeviceType>>> DeviceTypeGet() =>
+            Ok(await RepoFactory.GetRepo().DeviceTypeGetAsync());
 
         [HttpGet("TypeService")]
         [Authorize]
-        public async Task<ActionResult<string>> DeviceTypeServiceGet()
-        {
-
-            IEnumerable<DeviceTypeService> deviceTypeService = await RepoFactory.GetRepo().DeviceTypeServiceGetAsync();
-
-            return Ok(deviceTypeService);
-        }
+        public async Task<ActionResult<IEnumerable<DeviceTypeService>>> DeviceTypeServiceGet() =>
+            Ok(await RepoFactory.GetRepo().DeviceTypeServiceGetAsync());
 
         [HttpGet("TypeRelay")]
         [Authorize]
-        public async Task<ActionResult<string>> DeviceTypeRelayGet()
-        {
-
-            IEnumerable<DeviceTypeRelay> deviceTypeRelay = await RepoFactory.GetRepo().DeviceTypeRelayGetAsync();
-
-            return Ok(deviceTypeRelay);
-        }
+        public async Task<ActionResult<IEnumerable<DeviceTypeRelay>>> DeviceTypeRelayGet() =>
+            Ok(await RepoFactory.GetRepo().DeviceTypeRelayGetAsync());
 
         [HttpGet("TypeSensor")]
         [Authorize]
-        public async Task<ActionResult<string>> DeviceTypeSensorGet()
-        {
-
-            IEnumerable<DeviceTypeSensor> deviceTypeSensor = await RepoFactory.GetRepo().DeviceTypeSensorGetAsync();
-
-            return Ok(deviceTypeSensor);
-        }
+        public async Task<ActionResult<IEnumerable<DeviceTypeSensor>>> DeviceTypeSensorGet() =>
+            Ok(await RepoFactory.GetRepo().DeviceTypeSensorGetAsync());
 
         #endregion
     }

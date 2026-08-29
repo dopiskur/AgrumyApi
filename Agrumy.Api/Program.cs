@@ -1,6 +1,8 @@
 using api.Dal;
 using api.Dal.Interface;
+using api.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -31,6 +33,16 @@ builder.Services
             IssuerSigningKey = new SymmetricSecurityKey(Key)
         };
     });
+
+// Device-communication endpoints authenticate by apiId/apiKey (or the short-lived apiAuth
+// session token), not a user JWT - see api.Security.DeviceAuth.
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(DeviceAuth.ApiKeyPolicy, p => p.AddRequirements(new DeviceApiKeyRequirement()));
+    options.AddPolicy(DeviceAuth.SessionPolicy, p => p.AddRequirements(new DeviceSessionRequirement()));
+});
+builder.Services.AddScoped<IAuthorizationHandler, DeviceApiKeyHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, DeviceSessionHandler>();
 
 builder.Services.AddControllers();
 

@@ -363,6 +363,9 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(d.IDDevice, (await _repo.DeviceGetAsync(tenantId, null, null, d.MacAddress)).IDDevice);
         Assert.Null((await _repo.DeviceGetAsync(tenantId + 12345, null, d.ApiId, null)).IDDevice);
         Assert.Equal(d.IDDevice, (await _repo.DeviceGetByIdAsync(d.IDDevice)).IDDevice);
+        // DeviceGetByApiIdAsync has no tenant filter (device-comm endpoints have no tenant context).
+        Assert.Equal(d.IDDevice, (await _repo.DeviceGetByApiIdAsync(d.ApiId)).IDDevice);
+        Assert.Null((await _repo.DeviceGetByApiIdAsync("no-such-api-id-" + U())).IDDevice);
         Assert.Single(await _repo.DevicesGetAsync(tenantId));
         Assert.True(await _repo.DeviceCheckMacAddressAsync(tenantId, d.MacAddress));
         Assert.False(await _repo.DeviceCheckMacAddressAsync(tenantId, "no_" + U()));

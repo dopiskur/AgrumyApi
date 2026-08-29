@@ -43,6 +43,9 @@ namespace api.Dal.Interface
 
         /// <summary>Fetches a device by id only, with no tenant filter - used only to check device ownership before an authorized write, never to serve data directly to a caller.</summary>
         Task<Device> DeviceGetByIdAsync(int? idDevice);
+
+        /// <summary>Fetches a device by its globally unique ApiId, with no tenant filter - the device-communication endpoints authenticate by ApiId/ApiKey and have no tenant context of their own.</summary>
+        Task<Device> DeviceGetByApiIdAsync(string? apiId);
         Task<IList<Device>> DevicesGetAsync(int? tenantID);
         Task<bool> DeviceCheckMacAddressAsync(int? tenantID, string? macAddress);
         Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID);
