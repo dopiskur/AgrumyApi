@@ -33,7 +33,7 @@
       "liquidPH": { "type": ["string", "null"] },
       "rainLevel": {
         "type": ["string", "null"],
-        "description": "KNOWN MISMATCH: firmware sends 'rainLevel' but the SensorDataPush stored procedure reads $.rainlevel (lowercase L), so rain level is currently dropped server-side. This schema documents the wire reality (the firmware key); the proc/firmware fix is tracked separately."
+        "description": "Rain sensor reading. The SensorDataPush stored procedure reads it via JSON_TABLE PATH '$.rainLevel', which matches this key - it is stored, not dropped."
       },
       "waterLevel": { "type": ["string", "null"] },
       "wind": { "type": ["string", "null"] },

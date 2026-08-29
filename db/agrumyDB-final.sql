@@ -12522,7 +12522,7 @@ INSERT
     tvoc,
     barometer,
     liquidPH,
-    rainlevel,
+    rainLevel,
     waterLevel,
     wind,
     dateCreated
@@ -12542,7 +12542,7 @@ INSERT
     j.tvoc,
     j.barometer,
     j.liquidPH,
-    j.rainlevel,
+    j.rainLevel,
     j.waterLevel,
     j.wind,
     j.dateCreated
@@ -12562,7 +12562,7 @@ INSERT
       tvoc INT PATH '$.tvoc',
       barometer DOUBLE PATH '$.barometer',
       liquidPH DOUBLE PATH '$.liquidPH',
-      rainlevel INT PATH '$.rainLevel',
+      rainLevel INT PATH '$.rainLevel',
       waterLevel TINYINT PATH '$.waterLevel',
       wind SMALLINT PATH '$.wind',
       dateCreated DATETIME PATH '$.dateCreated'
