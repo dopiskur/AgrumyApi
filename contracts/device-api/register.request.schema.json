@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/register.request.schema.json",
+  "title": "Device Register - request  (firmware -> POST /api/Device/Register)",
+  "description": "Body built by AgrumyDevice DeviceController::registerDevice() (payload[...] lines). This is the unauthenticated bootstrap call - identity is proven by email + devicePin in the body, NOT by headers. Server model: api.Models.DeviceRegistration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["macAddress", "email", "devicePin", "serviceType"],
+  "properties": {
+    "macAddress": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Uppercase hex with no separators, from WiFi.macAddress() (e.g. \"240AC4040AF8\"). Binds to DeviceRegistration.MacAddress; the server also builds DeviceName as \"Agrumy_\" + macAddress.ToUpper()."
+    },
+    "email": {
+      "type": "string",
+      "minLength": 1,
+      "description": "User account e-mail (firmware sends config[\"userLogin\"]). Binds to DeviceRegistration.Email; the server looks the user up by it and checks the PIN."
+    },
+    "devicePin": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "The user's device PIN. Firmware sends it as a STRING (char devicePin[8]); the server property is int? and relies on System.Text.Json Web-defaults (NumberHandling.AllowReadingFromString) to parse it. Keep it digits-only."
+    },
+    "serviceType": {
+      "type": "integer",
+      "enum": [0, 1, 2],
+      "description": "Echoed from DeviceDefaults.serviceType (0 http, 1 https, 2 mqtt). Binds to DeviceRegistration.ServiceType; the server stores but does not currently act on it."
+    }
+  },
+  "$comment": "Firmware does NOT send 'servicePoint' in this body (it only uses it as the URL host). The server model has a ServicePoint property that defaults to \"api.agrumy.com\" when the key is absent, which is why additionalProperties is false here - if the firmware starts sending it, that is a deliberate contract change and this schema should be updated."
+}

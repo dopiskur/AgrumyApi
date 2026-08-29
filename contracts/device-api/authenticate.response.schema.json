@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/authenticate.response.schema.json",
+  "title": "Device Authenticate - response  (server -> firmware)",
+  "description": "System.Text.Json serialization of api.Models.DeviceAuthentication. Firmware reads payload[\"apiAuth\"] in ServiceController::apiAuthenticate() and then sends it as the 'Authorization' header on subsequent /Config and /SensorData calls. On bad credentials the server returns 401 with no body (not covered by this schema).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiAuth"],
+  "properties": {
+    "apiAuth": {
+      "type": ["string", "null"],
+      "description": "Opaque session token (a GUID). The C# property is already named 'apiAuth' so camelCase serialization does not change it. In practice always a non-null fresh GUID; null is allowed here only because the C# type is string?."
+    }
+  }
+}

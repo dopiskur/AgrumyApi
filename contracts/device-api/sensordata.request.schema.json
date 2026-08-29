@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/sensordata.request.schema.json",
+  "title": "SensorData - request  (firmware -> POST /api/SensorData)",
+  "description": "Body built by SensorController::buildSensorDataPayload(): a JSON ARRAY of readings. The firmware buffers unsent readings and flushes them together, so the array has one or more items. Each measurement field is sent either as a STRING (ArduinoJson stores the Arduino String value, e.g. \"26.13\") or as null when that sensor produced no value this cycle. The API forwards the array unchanged to the SensorDataPush stored procedure (JSON_TABLE). There is no response schema - the endpoint returns the caller's cached ConfigVersion as a bare value. Credentials travel as HTTP HEADERS: 'apiId' and 'Authorization' (apiAuth token).",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "deviceID", "tenantID", "deviceUnitID", "deviceUnitZoneID",
+      "temperature", "soilTemperature", "humidity", "battery", "moisture", "light",
+      "co2", "tvoc", "barometer", "liquidPH", "rainLevel", "waterLevel", "wind", "dateCreated"
+    ],
+    "properties": {
+      "deviceID": { "type": ["integer", "null"] },
+      "tenantID": { "type": ["integer", "null"] },
+      "deviceUnitID": { "type": ["integer", "null"] },
+      "deviceUnitZoneID": { "type": ["integer", "null"] },
+      "temperature": { "type": ["string", "null"] },
+      "soilTemperature": {
+        "type": ["string", "null"],
+        "description": "Firmware sends the key 'soilTemperature'. Note the DeviceModel.h SensorData field is named 'temperatureSoil' - the wire key does not match the struct field name."
+      },
+      "humidity": { "type": ["string", "null"] },
+      "battery": { "type": ["string", "null"] },
+      "moisture": { "type": ["string", "null"] },
+      "light": { "type": ["string", "null"] },
+      "co2": { "type": ["string", "null"] },
+      "tvoc": { "type": ["string", "null"] },
+      "barometer": { "type": ["string", "null"] },
+      "liquidPH": { "type": ["string", "null"] },
+      "rainLevel": {
+        "type": ["string", "null"],
+        "description": "KNOWN MISMATCH: firmware sends 'rainLevel' but the SensorDataPush stored procedure reads $.rainlevel (lowercase L), so rain level is currently dropped server-side. This schema documents the wire reality (the firmware key); the proc/firmware fix is tracked separately."
+      },
+      "waterLevel": { "type": ["string", "null"] },
+      "wind": { "type": ["string", "null"] },
+      "dateCreated": {
+        "type": ["string", "null"],
+        "description": "Firmware-side timestamp (device.getDateTime()) recorded when the reading was buffered; null when the clock is not yet set."
+      }
+    }
+  }
+}

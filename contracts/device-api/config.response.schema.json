@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/config.response.schema.json",
+  "title": "Device config - response  (server -> firmware)",
+  "description": "System.Text.Json serialization (ASP.NET Core Web defaults => camelCase property names, null values KEPT) of api.Models.DeviceConfig, produced by DeviceApiController.BuildDeviceConfigAsync(). Returned by BOTH POST /api/Device/Config (only when the device's ConfigVersion differs from the server's - otherwise the server returns 200 with an EMPTY body) AND POST /api/Device/Register. Firmware parses it in DeviceController::loadConfig(). This file and register.response.schema.json are identical by construction - keep them in sync.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "configVersion", "tenantID", "deviceID", "deviceUnitID", "deviceUnitZoneID", "deviceTypeServiceID",
+    "apiId", "apiKey", "servicePoint", "servicePublicKey",
+    "sleepSeconds", "sleepDeep", "deviceSensorEnabled", "deviceControllerEnabled", "batteryEnabled",
+    "debug", "reboot", "reset", "firmwareUpdate", "enabled",
+    "deviceConfigSensor", "deviceConfigController"
+  ],
+  "properties": {
+    "configVersion": { "type": ["integer", "null"] },
+    "tenantID": { "type": ["integer", "null"] },
+    "deviceID": {
+      "type": ["integer", "null"],
+      "description": "Lowercase 'd' - the C# property is literally 'deviceID', so camelCase serialization leaves it unchanged. Firmware reads config[\"deviceID\"]."
+    },
+    "deviceUnitID": { "type": ["integer", "null"] },
+    "deviceUnitZoneID": { "type": ["integer", "null"] },
+    "deviceTypeServiceID": {
+      "type": ["integer", "null"],
+      "description": "0 http, 1 https, 2 mqtt. Drives DeviceController::serviceType() in steady-state operation."
+    },
+    "apiId": { "type": ["string", "null"] },
+    "apiKey": { "type": ["string", "null"] },
+    "servicePoint": { "type": ["string", "null"] },
+    "servicePublicKey": {
+      "type": ["string", "null"],
+      "description": "Pinned CA/self-signed cert for self-hosted deployments; null => firmware validates the TLS chain against its embedded CA bundle."
+    },
+    "sleepSeconds": { "type": ["integer", "null"] },
+    "sleepDeep": { "type": ["boolean", "null"] },
+    "deviceSensorEnabled": { "type": ["boolean", "null"] },
+    "deviceControllerEnabled": { "type": ["boolean", "null"] },
+    "batteryEnabled": { "type": ["boolean", "null"] },
+    "debug": { "type": ["boolean", "null"] },
+    "reboot": { "type": ["boolean", "null"] },
+    "reset": { "type": ["boolean", "null"] },
+    "firmwareUpdate": { "type": ["boolean", "null"] },
+    "enabled": { "type": ["boolean", "null"] },
+    "deviceConfigSensor": {
+      "description": "Populated only when deviceSensorEnabled is true; otherwise serialized as null (System.Text.Json keeps the key).",
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/definitions/deviceConfigSensor" }
+      ]
+    },
+    "deviceConfigController": {
+      "description": "Populated only when deviceControllerEnabled is true; otherwise serialized as null.",
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/definitions/deviceConfigController" }
+      ]
+    }
+  },
+  "definitions": {
+    "deviceConfigSensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "camelCase serialization of api.Models.DeviceConfigSensor.",
+      "required": [
+        "idDeviceConfigSensor", "sensorBattery", "sensorTemp", "sensorTempSoil", "sensorHumid",
+        "sensorMoist", "sensorLight", "sensorCo2", "sensorTvoc", "sensorBarometer", "sensorPH",
+        "sensorRainLevel", "sensorWaterLevel", "sensorWind"
+      ],
+      "properties": {
+        "idDeviceConfigSensor": { "type": ["integer", "null"] },
+        "sensorBattery": { "type": ["integer", "null"] },
+        "sensorTemp": { "type": ["integer", "null"] },
+        "sensorTempSoil": { "type": ["integer", "null"] },
+        "sensorHumid": { "type": ["integer", "null"] },
+        "sensorMoist": { "type": ["integer", "null"] },
+        "sensorLight": { "type": ["integer", "null"] },
+        "sensorCo2": { "type": ["integer", "null"] },
+        "sensorTvoc": { "type": ["integer", "null"] },
+        "sensorBarometer": { "type": ["integer", "null"] },
+        "sensorPH": {
+          "type": ["integer", "null"],
+          "description": "C# property is 'SensorPH'; camelCase leaves the 'PH' suffix uppercase -> 'sensorPH'."
+        },
+        "sensorRainLevel": { "type": ["integer", "null"] },
+        "sensorWaterLevel": { "type": ["integer", "null"] },
+        "sensorWind": { "type": ["integer", "null"] }
+      }
+    },
+    "deviceConfigController": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "camelCase serialization of api.Models.DeviceConfigController.",
+      "required": [
+        "idDeviceConfigController", "tempLow", "tempHigh", "humidLow", "humidHigh", "moistLow",
+        "moistHigh", "lightLow", "lightHigh", "waterLow", "waterHigh",
+        "ventilationIntervalEnabled", "ventilationInterval", "ventilationIntervalLenght",
+        "lightIntervalEnabled", "lightInterval", "lightIntervalLenght",
+        "heatingIntervalEnabled", "heatingInterval", "heatingIntervalLenght",
+        "waterPumpIntervalEnabled", "waterPumpInterval", "waterPumpIntervalLenght",
+        "relayEnabled", "relay1", "relay2", "relay3", "relay4", "relay5", "relay6", "relay7", "relay8"
+      ],
+      "properties": {
+        "idDeviceConfigController": { "type": ["integer", "null"] },
+        "tempLow": { "type": ["number", "null"] },
+        "tempHigh": { "type": ["number", "null"] },
+        "humidLow": { "type": ["number", "null"] },
+        "humidHigh": { "type": ["number", "null"] },
+        "moistLow": { "type": ["number", "null"] },
+        "moistHigh": { "type": ["number", "null"] },
+        "lightLow": { "type": ["number", "null"] },
+        "lightHigh": { "type": ["number", "null"] },
+        "waterLow": { "type": ["number", "null"] },
+        "waterHigh": { "type": ["number", "null"] },
+        "ventilationIntervalEnabled": { "type": ["boolean", "null"] },
+        "ventilationInterval": { "type": ["integer", "null"] },
+        "ventilationIntervalLenght": {
+          "type": ["integer", "null"],
+          "description": "Spelling 'Lenght' is intentional - it matches the C# property DeviceConfigController.VentilationIntervalLenght. Same for the two below."
+        },
+        "lightIntervalEnabled": { "type": ["boolean", "null"] },
+        "lightInterval": { "type": ["integer", "null"] },
+        "lightIntervalLenght": { "type": ["integer", "null"] },
+        "heatingIntervalEnabled": { "type": ["boolean", "null"] },
+        "heatingInterval": { "type": ["integer", "null"] },
+        "heatingIntervalLenght": { "type": ["integer", "null"] },
+        "waterPumpIntervalEnabled": { "type": ["boolean", "null"] },
+        "waterPumpInterval": { "type": ["integer", "null"] },
+        "waterPumpIntervalLenght": { "type": ["integer", "null"] },
+        "relayEnabled": { "type": ["boolean", "null"] },
+        "relay1": { "type": ["integer", "null"] },
+        "relay2": { "type": ["integer", "null"] },
+        "relay3": { "type": ["integer", "null"] },
+        "relay4": { "type": ["integer", "null"] },
+        "relay5": { "type": ["integer", "null"] },
+        "relay6": { "type": ["integer", "null"] },
+        "relay7": { "type": ["integer", "null"] },
+        "relay8": { "type": ["integer", "null"] }
+      }
+    }
+  }
+}

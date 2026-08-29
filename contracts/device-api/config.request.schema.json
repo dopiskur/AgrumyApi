@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/config.request.schema.json",
+  "title": "Device Config - request  (firmware -> POST /api/Device/Config)",
+  "description": "Body built by ServiceController::apiConfig(): a single key 'ConfigVersion' - PascalCase, unlike every other firmware payload - whose value is the device's current config version sent as a STRING (String(deviceConfig.configVersion)). The server binds it to api.Models.Device.ConfigVersion (int?) via System.Text.Json case-insensitive property matching plus NumberHandling.AllowReadingFromString. Credentials travel as HTTP HEADERS: 'apiId' (device GUID) and 'Authorization' (the apiAuth token from /Authenticate).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ConfigVersion"],
+  "properties": {
+    "ConfigVersion": {
+      "type": ["string", "integer"],
+      "description": "Firmware sends a string (e.g. \"66\"); an integer is also accepted by the server. If the value differs from the server's stored ConfigVersion, the response is the full config object (config.response.schema.json). If it is equal, the server returns HTTP 200 with an EMPTY body."
+    }
+  },
+  "$comment": "Required request headers (contract record only): 'apiId': device ApiId GUID; 'Authorization': apiAuth token from POST /api/Device/Authenticate."
+}
