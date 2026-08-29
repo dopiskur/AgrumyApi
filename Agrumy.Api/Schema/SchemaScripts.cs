@@ -364,13 +364,22 @@ CREATE TABLE IF NOT EXISTS `sensorDataReport` (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 """;
 
+        // Roadmap #3 (OTA firmware update). Changed from the original definition:
+        //  * Version was decimal(10,0) - could not hold a semver like "0.1.1"; now varchar(20).
+        //  * DateAdded is new - DeviceFirmwareLatestGetAsync picks the newest row per
+        //    DeviceTypeID with ORDER BY DateAdded DESC.
+        //  * IDDeviceFirmware is now AUTO_INCREMENT (was a manually-assigned int).
+        // EnsureSchemaAsync only applies this to a FRESH database (it returns early when the
+        // `device` table already exists). Existing databases must be migrated by hand with
+        // db/migrations/2026-08-29-deviceFirmware-ota.sql.
         private const string T_DeviceFirmware =
 """
 CREATE TABLE IF NOT EXISTS `deviceFirmware` (
-  `IDDeviceFirmware` int(11) NOT NULL,
+  `IDDeviceFirmware` int(11) NOT NULL AUTO_INCREMENT,
   `DeviceTypeID` int(11) DEFAULT NULL,
-  `Version` decimal(10,0) DEFAULT NULL,
+  `Version` varchar(20) DEFAULT NULL,
   `Url` text DEFAULT NULL,
+  `DateAdded` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`IDDeviceFirmware`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 """;

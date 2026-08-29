@@ -17,6 +17,7 @@ namespace Agrumy.Api.Tests;
 /// <summary>
 /// Controller tests with a mocked IRepository swapped in via RepoFactory's test seam. No database.
 /// </summary>
+[Collection("RepoFactory")]
 public class ApiControllerTests : IDisposable
 {
     private readonly Mock<IRepository> _repo = new(MockBehavior.Strict);

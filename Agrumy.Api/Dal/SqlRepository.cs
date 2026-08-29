@@ -558,6 +558,20 @@ namespace api.Dal
             return config ?? new DeviceConfigController(); // empty config on no row, kept intentionally
         }
 
+        // Roadmap #3 (OTA). Parameterised inline SQL rather than a stored proc: the
+        // deviceFirmware table has no proc of its own and this is a single trivial read.
+        // "Latest" = most recently added row for the device type (see the DateAdded column
+        // added by db/migrations/2026-08-29-deviceFirmware-ota.sql).
+        public async Task<DeviceFirmware?> DeviceFirmwareLatestGetAsync(int? deviceTypeID)
+        {
+            using var connection = new MySqlConnection(sqlcon);
+            return await connection.QueryFirstOrDefaultAsync<DeviceFirmware>(
+                "SELECT IDDeviceFirmware, DeviceTypeID, Version, Url, DateAdded " +
+                "FROM deviceFirmware WHERE DeviceTypeID = @deviceTypeID " +
+                "ORDER BY DateAdded DESC LIMIT 1",
+                new { deviceTypeID });
+        }
+
         public async Task<Device> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID)
         {
             // No tenant filter by design - used only to look up the owning device's TenantID

@@ -90,6 +90,10 @@ namespace api.Models
         public bool? Reboot { get; set; }
         public bool? Reset { get; set; }
         public bool? FirmwareUpdate { get; set; }
+        // Roadmap #3 (OTA): populated by BuildDeviceConfigAsync from the newest deviceFirmware
+        // row for the device's type, but only when FirmwareUpdate == true. Null otherwise.
+        public string? FirmwareVersion { get; set; }
+        public string? FirmwareUrl { get; set; }
         public bool? Enabled { get; set; }
         public DeviceConfigSensor? DeviceConfigSensor { get; set; }
         public DeviceConfigController? DeviceConfigController { get; set; }

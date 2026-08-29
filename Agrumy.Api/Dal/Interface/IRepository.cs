@@ -52,6 +52,9 @@ namespace api.Dal.Interface
         Task<Device> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID);
         Task<Device> DeviceGetByDeviceConfigControllerIdAsync(int? deviceConfigControllerID);
 
+        /// <summary>Newest published firmware for a device type (by DateAdded), or null if none. Roadmap #3 (OTA).</summary>
+        Task<DeviceFirmware?> DeviceFirmwareLatestGetAsync(int? deviceTypeID);
+
         // Device UPDATE
         Task DeviceUpdateAsync(Device? device);
         Task DeviceConfigControllerUpdateAsync(int? idDevice, DeviceConfigController? deviceConfigController);

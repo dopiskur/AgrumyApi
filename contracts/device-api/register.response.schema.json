@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/register.response.schema.json",
+  "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/config.response.schema.json",
   "title": "Device Register - response  (server -> firmware)",
   "description": "System.Text.Json serialization (ASP.NET Core Web defaults => camelCase property names, null values KEPT) of api.Models.DeviceConfig, produced by DeviceApiController.BuildDeviceConfigAsync(). Returned by BOTH POST /api/Device/Config (only when the device's ConfigVersion differs from the server's - otherwise the server returns 200 with an EMPTY body) AND POST /api/Device/Register. Firmware parses it in DeviceController::loadConfig(). This file and register.response.schema.json are identical by construction - keep them in sync.",
   "type": "object",
@@ -9,7 +9,7 @@
     "configVersion", "tenantID", "deviceID", "deviceUnitID", "deviceUnitZoneID", "deviceTypeServiceID",
     "apiId", "apiKey", "servicePoint", "servicePublicKey",
     "sleepSeconds", "sleepDeep", "deviceSensorEnabled", "deviceControllerEnabled", "batteryEnabled",
-    "debug", "reboot", "reset", "firmwareUpdate", "enabled",
+    "debug", "reboot", "reset", "firmwareUpdate", "firmwareVersion", "firmwareUrl", "enabled",
     "deviceConfigSensor", "deviceConfigController"
   ],
   "properties": {
@@ -41,6 +41,14 @@
     "reboot": { "type": ["boolean", "null"] },
     "reset": { "type": ["boolean", "null"] },
     "firmwareUpdate": { "type": ["boolean", "null"] },
+    "firmwareVersion": {
+      "type": ["string", "null"],
+      "description": "Roadmap #3 (OTA). The newest published firmware version for this device's type; non-null only when firmwareUpdate is true and a deviceFirmware row exists. The firmware compares it against its compiled-in version before downloading."
+    },
+    "firmwareUrl": {
+      "type": ["string", "null"],
+      "description": "Roadmap #3 (OTA). HTTP(S) URL of the .bin to flash; paired with firmwareVersion, same null conditions."
+    },
     "enabled": { "type": ["boolean", "null"] },
     "deviceConfigSensor": {
       "description": "Populated only when deviceSensorEnabled is true; otherwise serialized as null (System.Text.Json keeps the key).",

@@ -328,6 +328,21 @@ namespace api.Controllers.API
             deviceConfig.Reboot = device.Reboot;
             deviceConfig.Reset = device.Reset;
             deviceConfig.FirmwareUpdate = device.FirmwareUpdate;
+
+            // Roadmap #3 (OTA). Only look up a build when the flag is set; the firmware does a
+            // version comparison of its own so this being present on every Config sync is fine.
+            // Runs for both Register and Config (both call this method) - harmless on Register:
+            // a freshly-created device has FirmwareUpdate == null so the branch is skipped.
+            if (device.FirmwareUpdate == true && device.DeviceTypeID != null)
+            {
+                DeviceFirmware? firmware = await RepoFactory.GetRepo().DeviceFirmwareLatestGetAsync(device.DeviceTypeID);
+                if (firmware != null)
+                {
+                    deviceConfig.FirmwareVersion = firmware.Version;
+                    deviceConfig.FirmwareUrl = firmware.Url;
+                }
+            }
+
             deviceConfig.Enabled = device.Enabled;
 
             // get config if enabled
