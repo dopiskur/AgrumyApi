@@ -1,64 +1,28 @@
-﻿using api.Dal.Interface;
+using api.Dal.Interface;
 using api.Models;
-using System.Net.Http.Headers;
 using System.Runtime.Caching;
 
 namespace api.Dal
 {
     internal class CacheRepository : ICache
     {
+        private static readonly MemoryCache CacheDevice = new("ApiKey");
 
-        private static MemoryCache CacheDevice = new MemoryCache("ApiKey");
-
-
-        public CacheRepository()
+        private static readonly CacheItemPolicy GlobalCacheItemPolicy = new()
         {
-        }
-
-        private static CacheItemPolicy GlobalCacheItemPolicy = new()
-        {
-            // AbsoluteExpiration = DateTimeOffset.Now.AddMinutes(10),
-            SlidingExpiration = TimeSpan.FromMinutes(5) // u sekundama, brise item nakon 5min neaktivnosti
+            SlidingExpiration = TimeSpan.FromMinutes(5), // drop the item after 5 min of inactivity
         };
-
-
-        public bool KeyValid(string key)
-        {
-            return CacheDevice.Contains(key);
-        }
 
         public DeviceCache? GetDeviceCache(string key)
         {
-            // ne mozes direktno toStringat value, ako je potencijalno null
-            DeviceCache? deviceCache = new DeviceCache();
-            DeviceCache value = (DeviceCache)CacheDevice.Get(key); // ako je null, stavi prazni string
-            if(value == null)
-            {
-                deviceCache.ConfigVersion = 0;
-                deviceCache.apiAuth = null;
-            }
-            else
-            {
-                deviceCache = value;
-            }
-            return deviceCache; 
+            return CacheDevice.Get(key) as DeviceCache
+                   ?? new DeviceCache { ConfigVersion = 0, apiAuth = null };
         }
 
         public void SetItem(string key, DeviceCache deviceCache)
         {
-            // koristimo set jer set radi insert ili update, bolje nego remove i add, ne ostavlja rupe u listi
+            // Set does insert-or-update in one step.
             CacheDevice.Set(new CacheItem(key, deviceCache), GlobalCacheItemPolicy);
-            
-        }
-
-        public void RemoveItem(string key)
-        {
-
-            if(CacheDevice.Contains(key))
-            {
-                CacheDevice.Remove(key);
-            }         
-
         }
     }
 }

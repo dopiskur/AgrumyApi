@@ -8,14 +8,16 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
-
 namespace api.Controllers.API
 {
     [Route("api/User")]
     [ApiController]
     public class UserApiController : ControllerBase
     {
-        private static string? secureKey = Config.secureKey;
+        private const int DefaultRoleId = 1;   // "regular user" group on an existing tenant
+        private const bool DefaultUserEnabled = false;
+
+        private static readonly string? SecureKey = Config.secureKey;
 
         private readonly ILogger<UserApiController> _logger;
 
@@ -23,12 +25,6 @@ namespace api.Controllers.API
         {
             _logger = logger;
         }
-
-        // CONSTANTS
-        private readonly int? DEFAULT_TENANTID = 0;
-        private readonly int? DEFAULT_ROLEID = 1;
-        private readonly bool? DEFAULT_USER_ENABLED = false;
-        private readonly bool? TENANT_ENABLED = true;
 
         /// <summary>TenantID claim set at login (JwtTokenProvider.CreateToken) - null only if the claim is somehow missing.</summary>
         private int? GetCallerTenantId()
@@ -38,144 +34,117 @@ namespace api.Controllers.API
             return claim != null && int.TryParse(claim.Value, out var tenantId) ? tenantId : null;
         }
 
+        private string? CallerRole() => (HttpContext.User.Identity as ClaimsIdentity)?.FindFirst(ClaimTypes.Role)?.Value;
 
+        /// <summary>Looks up a user + their password secret by email or username (whichever <paramref name="login"/> looks like).</summary>
+        private static async Task<(User user, UserSecret secret)> LookupAsync(string? login)
+        {
+            var repo = RepoFactory.GetRepo();
+            return FieldValidator.IsValidEmail(login)
+                ? (await repo.UserGetAsync(null, login, null), await repo.UserSecretGetAsync(null, login, null))
+                : (await repo.UserGetAsync(null, null, login), await repo.UserSecretGetAsync(null, null, login));
+        }
 
-        // User registration
+        /// <summary>Maps a unique-constraint violation to a business response, or null if it isn't one.</summary>
+        private ObjectResult? UniqueViolationResult(Exception e)
+        {
+            if (DbErrorResponse.Mentions(e, "email_UNIQUE"))
+            {
+                return StatusCode(500, "email already registered");
+            }
+            if (DbErrorResponse.Mentions(e, "Username_UNIQUE"))
+            {
+                return StatusCode(500, "username already registered");
+            }
+            return null;
+        }
+
+        private ObjectResult DbFailure(Exception e) =>
+            StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(RepoFactory.GetRepo().ClassifyException(e)));
+
+        // ---- registration / auth ---------------------------------------------------
+
         [HttpPost("Register")]
         [EnableRateLimiting("login")]
-        public async Task<ActionResult<UserRegistration>> UserRegistration([FromBody] UserRegistration value)
+        public async Task<ActionResult<User>> UserRegistration([FromBody] UserRegistration value)
         {
             try
             {
                 if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-                User user = new User();
+                var user = new User
+                {
+                    Email = value.Email,
+                    Username = value.Username,
+                    FirstName = value.FirstName,
+                    LastName = value.LastName,
+                    Phone = value.Phone,
+                };
 
-
-                user.TenantID = DEFAULT_TENANTID; // default tenant value
-                user.UserGroupID = DEFAULT_ROLEID; // set as user on existing tenant
-                user.Enabled = DEFAULT_USER_ENABLED; // user disabled by default
-                user.Email = value.Email;
-                user.Username = value.Username;
-                user.FirstName = value.FirstName;
-                user.LastName = value.LastName;
-                user.Phone = value.Phone;
-
-                UserSecret userSecret = new UserSecret();
-                userSecret.PwdSalt = AuthenticationProvider.GetSalt();
+                var userSecret = new UserSecret { PwdSalt = AuthenticationProvider.GetSalt() };
                 userSecret.PwdHash = AuthenticationProvider.GetHash(value.Password, userSecret.PwdSalt);
 
-
-                // check tenant name
-                if (TENANT_ENABLED == true)
+                if (!await RepoFactory.GetRepo().TenantGetAsync(value.TenantName))
                 {
-                    if (!await RepoFactory.GetRepo().TenantGetAsync(value.TenantName))
-                    {
-                        user.TenantID = await RepoFactory.GetRepo().TenantAddAsync(value.TenantName);
-                        user.UserGroupID = 0; // set as admin on new tenant
-                        user.Enabled = true; // set as enabled user
-                    }
-                    else
-                    {
-                        // Tenant already exists: join it as a regular, disabled user instead of
-                        // silently falling through to DEFAULT_TENANTID (0) - that would have
-                        // merged unrelated tenants' users into the same "default" tenant bucket.
-                        user.TenantID = await RepoFactory.GetRepo().TenantGetIdAsync(value.TenantName);
-                        user.UserGroupID = DEFAULT_ROLEID; // regular user, not admin
-                        user.Enabled = DEFAULT_USER_ENABLED; // waits for that tenant's admin to enable them
-                    }
+                    // Brand-new tenant: the registrant becomes its admin.
+                    user.TenantID = await RepoFactory.GetRepo().TenantAddAsync(value.TenantName);
+                    user.UserGroupID = 0;
+                    user.Enabled = true;
+                }
+                else
+                {
+                    // Existing tenant: join as a regular, disabled user (not the default tenant 0 -
+                    // that would merge unrelated tenants' users into one bucket).
+                    user.TenantID = await RepoFactory.GetRepo().TenantGetIdAsync(value.TenantName);
+                    user.UserGroupID = DefaultRoleId;
+                    user.Enabled = DefaultUserEnabled;
                 }
 
-
                 await RepoFactory.GetRepo().UserAddAsync(user, userSecret);
-
                 return Ok(user);
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "User write operation failed");
-
-                // Unique-constraint hits are a meaningful business response, not an internal detail.
-                if (DbErrorResponse.Mentions(e, "email_UNIQUE"))
-                {
-                    return StatusCode(500, "email already registered");
-                }
-
-                if (DbErrorResponse.Mentions(e, "Username_UNIQUE"))
-                {
-                    return StatusCode(500, "username already registered");
-                }
-
-                var kind = RepoFactory.GetRepo().ClassifyException(e);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+                _logger.LogError(e, "User registration failed");
+                return UniqueViolationResult(e) ?? DbFailure(e);
             }
-
         }
 
-        // User login
         [HttpPost("Login")]
         [EnableRateLimiting("login")]
-        public async Task<ActionResult<UserLogin>> UserLogin([FromBody] UserLogin value)
+        public async Task<ActionResult<UserLoginResult>> UserLogin([FromBody] UserLogin value)
         {
-            //AuthProvider.VerifyPassword(value.Email,value.Password);
-
             try
             {
                 if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-                User user = new User();
-                UserSecret userSecret = new UserSecret();
+                var (user, secret) = await LookupAsync(value.Login);
 
-                if (FieldValidator.IsValidEmail(value.Login))
-                {
-                    user = await RepoFactory.GetRepo().UserGetAsync(null, value.Login, null);
-                    userSecret = await RepoFactory.GetRepo().UserSecretGetAsync(null, value.Login, null);
-                }
-                else
-                {
-                    user = await RepoFactory.GetRepo().UserGetAsync(null, null, value.Login);
-                    userSecret = await RepoFactory.GetRepo().UserSecretGetAsync(null, null, value.Login);
-                }
-
-                if (AuthenticationProvider.VerifyHash(userSecret.PwdHash, userSecret.PwdSalt, value.Password))
-                {
-
-                    IList<UserRole> roles = await RepoFactory.GetRepo().UserRoleGetAsync();
-                    UserRole? role = roles.FirstOrDefault(m => m.IDUserRole == user.UserRoleID);
-                    if (role?.RoleName == null)
-                    {
-                        return StatusCode(500, "User has no valid role assigned.");
-                    }
-
-                    var serializedToken = JwtTokenProvider.CreateToken(secureKey, 120, user.Email, role.RoleName, user.TenantID.ToString());
-
-
-                    UserLoginResult userLoginResult = new UserLoginResult();
-                    userLoginResult.IDUser = user.IDUser;
-                    userLoginResult.Email = user.Email;
-                    userLoginResult.Token = serializedToken;
-
-                    return Ok(userLoginResult);
-                }
+                if (!AuthenticationProvider.VerifyHash(secret.PwdHash, secret.PwdSalt, value.Password))
                 {
                     return StatusCode(401, "Wrong username or password");
                 }
 
+                IList<UserRole> roles = await RepoFactory.GetRepo().UserRoleGetAsync();
+                UserRole? role = roles.FirstOrDefault(m => m.IDUserRole == user.UserRoleID);
+                if (role?.RoleName == null)
+                {
+                    return StatusCode(500, "User has no valid role assigned.");
+                }
 
+                string token = JwtTokenProvider.CreateToken(SecureKey, 120, user.Email, role.RoleName, user.TenantID.ToString());
+                return Ok(new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = token });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "UserLogin failed");
-                var kind = RepoFactory.GetRepo().ClassifyException(ex);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+                return DbFailure(ex);
             }
         }
 
-        // Change password
         [HttpPost("ChangePassword")]
-        public async Task<ActionResult<UserSetPassword>> UserSetPassword([FromBody] UserSetPassword value)
+        public async Task<ActionResult<string>> UserSetPassword([FromBody] UserSetPassword value)
         {
-
             try
             {
                 if (!ModelState.IsValid) { return BadRequest(ModelState); }
@@ -185,345 +154,230 @@ namespace api.Controllers.API
                     return StatusCode(403, "The new password must be different from the old password");
                 }
 
-                User user = new User();
-                UserSecret userSecret = new UserSecret();
+                var (user, secret) = await LookupAsync(value.Login);
 
-                if (FieldValidator.IsValidEmail(value.Login))
-                {
-                    user = await RepoFactory.GetRepo().UserGetAsync(null, value.Login, null);
-                    userSecret = await RepoFactory.GetRepo().UserSecretGetAsync(null, value.Login, null);
-                }
-                else
-                {
-                    user = await RepoFactory.GetRepo().UserGetAsync(null, null, value.Login);
-                    userSecret = await RepoFactory.GetRepo().UserSecretGetAsync(null, null, value.Login);
-                }
-
-                if (AuthenticationProvider.VerifyHash(userSecret.PwdHash, userSecret.PwdSalt, value.OldPassword))
-                {
-                    userSecret.PwdSalt = AuthenticationProvider.GetSalt();
-                    userSecret.PwdHash = AuthenticationProvider.GetHash(value.NewPassword, userSecret.PwdSalt);
-
-                    if (await RepoFactory.GetRepo().UserSetPasswordAsync(user.Email, userSecret))
-                    {
-                        return Ok("Password changed successfully for: " + user.Email);
-                    }
-                    else
-                    {
-                        return StatusCode(403, "Password change failed for: +user.Email");
-                    }
-
-                }
+                if (!AuthenticationProvider.VerifyHash(secret.PwdHash, secret.PwdSalt, value.OldPassword))
                 {
                     return StatusCode(401, "Wrong password");
                 }
 
+                secret.PwdSalt = AuthenticationProvider.GetSalt();
+                secret.PwdHash = AuthenticationProvider.GetHash(value.NewPassword, secret.PwdSalt);
 
+                return await RepoFactory.GetRepo().UserSetPasswordAsync(user.Email, secret)
+                    ? Ok("Password changed successfully for: " + user.Email)
+                    : StatusCode(403, "Password change failed for: " + user.Email);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "UserSetPassword failed");
-                var kind = RepoFactory.GetRepo().ClassifyException(ex);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+                return DbFailure(ex);
             }
         }
 
+        // ---- read ----------------------------------------------------------------
 
-        // Get all users, as admin
         [HttpGet("All")]
         [Authorize(Roles = "admin")]
         public async Task<ActionResult<IList<User>>> UsersGet()
         {
-
             try
             {
-                IList<User> users = new List<User>();
-                users = await RepoFactory.GetRepo().UsersGetAsync(GetCallerTenantId());
-
-                return Ok(users);
-
+                return Ok(await RepoFactory.GetRepo().UsersGetAsync(GetCallerTenantId()));
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "User read operation failed");
-                var kind = RepoFactory.GetRepo().ClassifyException(e);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+                return DbFailure(e);
             }
-
         }
 
-
-        // The caller's own record - looked up by the email in their JWT, so any authenticated user.
+        /// <summary>The caller's own record - looked up by the email in their JWT, so any authenticated user.</summary>
         [HttpGet("Self")]
         [Authorize]
         public async Task<ActionResult<User>> GetUserSelf()
         {
             try
             {
-                var identity = HttpContext.User.Identity as ClaimsIdentity;
-                User user;
-                user = await RepoFactory.GetRepo().UserGetAsync(null, identity.Name, null);
-
-                return Ok(user);
+                return Ok(await RepoFactory.GetRepo().UserGetAsync(null, User.Identity?.Name, null));
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "User read operation failed");
-                var kind = RepoFactory.GetRepo().ClassifyException(e);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+                return DbFailure(e);
             }
-
         }
 
-
-        // get user by ID
         [HttpGet]
         [Authorize(Roles = "admin")]
         public async Task<ActionResult<User>> UserGet(int idUser)
         {
             try
             {
-
-                var identity = HttpContext.User.Identity as ClaimsIdentity;
-
-                if (!(identity.FindFirst(ClaimTypes.Role).Value == "admin"))
-                {
-                    return Unauthorized();
-                }
-
-
                 User user = await RepoFactory.GetRepo().UserGetAsync(idUser, null, null);
-
                 if (user.TenantID != GetCallerTenantId())
                 {
                     return StatusCode(403, "Target user belongs to a different tenant");
                 }
-
                 return Ok(user);
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "User read operation failed");
-                var kind = RepoFactory.GetRepo().ClassifyException(e);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+                return DbFailure(e);
             }
-
         }
 
+        // ---- write -------------------------------------------------------------
 
-        // Create user as admin
         [HttpPost]
         [Authorize(Roles = "admin")]
-        public async Task<ActionResult<UserAdd>> UserAdd([FromBody] UserAdd? value)
+        public async Task<ActionResult<string>> UserAdd([FromBody] UserAdd value)
         {
             try
             {
                 if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-                User user = new User();
+                var user = new User
+                {
+                    TenantID = GetCallerTenantId(), // payload's TenantID is ignored - admins only create in their own tenant
+                    UserGroupID = value.UserGroupID,
+                    Email = value.Email,
+                    Username = value.Username,
+                    FirstName = value.FirstName,
+                    LastName = value.LastName,
+                    Phone = value.Phone,
+                    Enabled = value.Enabled,
+                };
 
-                user.TenantID = GetCallerTenantId(); // payload's TenantID is ignored - an admin can only create users in their own tenant
-                user.UserGroupID = value.UserGroupID;
-                user.Email = value.Email;
-                user.Username = value.Username;
-                user.FirstName = value.FirstName;
-                user.LastName = value.LastName;
-                user.Phone = value.Phone;
-                user.Enabled = value.Enabled;
-
-
-                UserSecret userSecret = new UserSecret();
-                userSecret.PwdSalt = AuthenticationProvider.GetSalt();
+                var userSecret = new UserSecret { PwdSalt = AuthenticationProvider.GetSalt() };
                 userSecret.PwdHash = AuthenticationProvider.GetHash(value.Password, userSecret.PwdSalt);
 
-
                 await RepoFactory.GetRepo().UserAddAsync(user, userSecret);
-
                 return Ok("User created successfully: " + user.Email);
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "User write operation failed");
-
-                // Unique-constraint hits are a meaningful business response, not an internal detail.
-                if (DbErrorResponse.Mentions(e, "email_UNIQUE"))
-                {
-                    return StatusCode(500, "email already registered");
-                }
-
-                if (DbErrorResponse.Mentions(e, "Username_UNIQUE"))
-                {
-                    return StatusCode(500, "username already registered");
-                }
-
-                var kind = RepoFactory.GetRepo().ClassifyException(e);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+                return UniqueViolationResult(e) ?? DbFailure(e);
             }
-
         }
 
-        // Update users ad admin, or self as user
         [HttpPut]
         [Authorize(Roles = "admin")]
         public async Task<ActionResult<bool>> UserUpdate([FromBody] UserUpdate value)
         {
             try
             {
-                bool result = false;
                 if (!ModelState.IsValid) { return BadRequest(ModelState); }
-                var identity = HttpContext.User.Identity as ClaimsIdentity;
 
+                bool isAdmin = CallerRole() == "admin";
                 User user = await RepoFactory.GetRepo().UserGetAsync(value.IDUser, null, null);
 
-                if (identity.FindFirst(ClaimTypes.Role).Value == "user" && value.Email != identity.Name) // if user, jwt token name must be equal to email identity
+                if (!isAdmin && value.Email != User.Identity?.Name) // a plain user may only edit their own record
                 {
                     return Unauthorized();
                 }
-
                 if (user.TenantID != GetCallerTenantId())
                 {
                     return StatusCode(403, "Target user belongs to a different tenant");
                 }
 
-
-                // check for password change
-                UserSecret userSecret = await RepoFactory.GetRepo().UserSecretGetAsync(value.IDUser, null, null);
                 if (value.Password != null)
                 {
-
-                    userSecret.PwdSalt = AuthenticationProvider.GetSalt();
-                    userSecret.PwdHash = AuthenticationProvider.GetHash(value.Password, userSecret.PwdSalt);
-                    await RepoFactory.GetRepo().UserSetPasswordAsync(user.Email, userSecret);
+                    var secret = await RepoFactory.GetRepo().UserSecretGetAsync(value.IDUser, null, null);
+                    secret.PwdSalt = AuthenticationProvider.GetSalt();
+                    secret.PwdHash = AuthenticationProvider.GetHash(value.Password, secret.PwdSalt);
+                    await RepoFactory.GetRepo().UserSetPasswordAsync(user.Email, secret);
                 }
 
-                // if (value.TenantID != null) { user.TenantID = value.TenantID; } // ovo ostavljamo za iducu iteraciju
                 if (value.Email != null) { user.Email = value.Email; }
                 if (value.Username != null) { user.Username = value.Username; }
                 if (value.FirstName != null) { user.FirstName = value.FirstName; }
                 if (value.LastName != null) { user.LastName = value.LastName; }
                 if (value.Phone != null) { user.Phone = value.Phone; }
-                if (value.UserGroupID != null && identity.FindFirst(ClaimTypes.Role).Value == "admin") { user.UserGroupID = value.UserGroupID; } // can change roleid only if admin
-                if (value.Enabled != null && identity.FindFirst(ClaimTypes.Role).Value == "admin") { user.Enabled = value.Enabled; } // can change enabled status only if admin
-
+                if (value.UserGroupID != null && isAdmin) { user.UserGroupID = value.UserGroupID; } // role change: admin only
+                if (value.Enabled != null && isAdmin) { user.Enabled = value.Enabled; }             // enable/disable: admin only
 
                 await RepoFactory.GetRepo().UserUpdateAsync(user);
-
-                return Ok(result=true);
-
-
+                return Ok(true);
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "User write operation failed");
-
-                // Unique-constraint hits are a meaningful business response, not an internal detail.
-                if (DbErrorResponse.Mentions(e, "email_UNIQUE"))
-                {
-                    return StatusCode(500, "email already registered");
-                }
-
-                if (DbErrorResponse.Mentions(e, "Username_UNIQUE"))
-                {
-                    return StatusCode(500, "username already registered");
-                }
-
-                var kind = RepoFactory.GetRepo().ClassifyException(e);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+                return UniqueViolationResult(e) ?? DbFailure(e);
             }
-
         }
 
-        // DELETE api/<UserController>/5
         [HttpDelete]
         [Authorize(Roles = "admin")]
         public async Task<ActionResult<string>> Delete(int? idUser)
         {
             try
             {
-
-
-                if (idUser > 1) // preventing deletion of admin
+                if (idUser is null or <= 1) // ids 0 and 1 are the protected default accounts
                 {
-                    User targetUser = await RepoFactory.GetRepo().UserGetAsync(idUser, null, null);
-
-                    if (targetUser.TenantID != GetCallerTenantId())
-                    {
-                        return StatusCode(403, "Target user belongs to a different tenant");
-                    }
-
-                    if (await RepoFactory.GetRepo().UserDeleteAsync(idUser))
-                    {
-                        return Ok("User deleted");
-                    };
-                    return NotFound("User not found");
+                    return Unauthorized("Deleting default user is not allowed");
                 }
 
+                User targetUser = await RepoFactory.GetRepo().UserGetAsync(idUser, null, null);
+                if (targetUser.TenantID != GetCallerTenantId())
+                {
+                    return StatusCode(403, "Target user belongs to a different tenant");
+                }
 
-                return Unauthorized("Deleting default user is not allowed");
+                return await RepoFactory.GetRepo().UserDeleteAsync(idUser)
+                    ? Ok("User deleted")
+                    : NotFound("User not found");
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "User read operation failed");
-                var kind = RepoFactory.GetRepo().ClassifyException(e);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+                _logger.LogError(e, "User write operation failed");
+                return DbFailure(e);
             }
-
         }
 
-
-        // User Role List
         [HttpGet("Roles")]
         [Authorize(Roles = "admin")]
-        public async Task<ActionResult<string>> UserRoleGet()
-        {
-            IEnumerable<UserRole> userRoles = new List<UserRole>();
-            userRoles = await RepoFactory.GetRepo().UserRoleGetAsync();
-            return Ok(userRoles);
-        }
+        public async Task<ActionResult<IEnumerable<UserRole>>> UserRoleGet() =>
+            Ok(await RepoFactory.GetRepo().UserRoleGetAsync());
 
-        #region Group
+        // ---- groups ----------------------------------------------------------
+
         [HttpGet("Group/All")]
         [Authorize(Roles = "admin")]
-        public async Task<ActionResult<string>> UserGroupsGet()
+        public async Task<ActionResult<IEnumerable<UserGroup>>> UserGroupsGet()
         {
             try
             {
-                IEnumerable<UserGroup> userGroups = new List<UserGroup>();
-                userGroups = await RepoFactory.GetRepo().UserGroupsGetAsync();
-                return Ok(userGroups);
+                return Ok(await RepoFactory.GetRepo().UserGroupsGetAsync());
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "User read operation failed");
-                var kind = RepoFactory.GetRepo().ClassifyException(e);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+                return DbFailure(e);
             }
         }
 
         [HttpGet("Group")]
         [Authorize(Roles = "admin")]
-        public async Task<ActionResult<string>> UserGroupGet(int? idUserGroup)
+        public async Task<ActionResult<UserGroup>> UserGroupGet(int? idUserGroup)
         {
             try
             {
-                UserGroup userGroup = await RepoFactory.GetRepo().UserGroupGetAsync(idUserGroup);
-                return Ok(userGroup);
+                return Ok(await RepoFactory.GetRepo().UserGroupGetAsync(idUserGroup));
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "User read operation failed");
-                var kind = RepoFactory.GetRepo().ClassifyException(e);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+                return DbFailure(e);
             }
         }
-
-
 
         [HttpPost("Group")]
         [Authorize(Roles = "admin")]
         public async Task<ActionResult<bool>> UserGroupAdd(UserGroup userGroup)
         {
-
             try
             {
                 await RepoFactory.GetRepo().UserGroupAddAsync(userGroup);
@@ -532,8 +386,7 @@ namespace api.Controllers.API
             catch (Exception e)
             {
                 _logger.LogError(e, "UserGroupAdd failed for group {GroupName}", userGroup?.GroupName);
-                var kind = RepoFactory.GetRepo().ClassifyException(e);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+                return DbFailure(e);
             }
         }
 
@@ -543,21 +396,14 @@ namespace api.Controllers.API
         {
             try
             {
-            await RepoFactory.GetRepo().UserGroupDeleteAsync(idUserGroup);
-            return true;
+                await RepoFactory.GetRepo().UserGroupDeleteAsync(idUserGroup);
+                return true;
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "UserGroupDelete failed for group {IdUserGroup}", idUserGroup);
-                var kind = RepoFactory.GetRepo().ClassifyException(e);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, DbErrorResponse.For(kind));
+                return DbFailure(e);
             }
         }
-
-        #endregion
-
-
-
-
     }
 }

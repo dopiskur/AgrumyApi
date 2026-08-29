@@ -1,10 +1,14 @@
-﻿using System.Text.RegularExpressions;
-
+using System.Text.RegularExpressions;
 
 namespace api.Utils
 {
-    public static class FieldValidator
+    public static partial class FieldValidator
     {
-        public static bool IsValidEmail(string? email) => Regex.IsMatch(email, @"\A(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\Z", RegexOptions.IgnoreCase);
+        public static bool IsValidEmail(string? email) => email is not null && EmailRegex().IsMatch(email);
+
+        [GeneratedRegex(
+            @"\A(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\Z",
+            RegexOptions.IgnoreCase)]
+        private static partial Regex EmailRegex();
     }
 }
