@@ -155,6 +155,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         };
         await _repo.UserAddAsync(user, new UserSecret { PwdHash = "h", PwdSalt = "s" });
         var back = await _repo.UserGetAsync(null, user.Email, null);
+        Assert.NotNull(back);
         return (tenantId, back.IDUser!.Value, user.Email!);
     }
 
@@ -249,8 +250,11 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (tenantId, userId, email) = await MakeUser(t);
 
         var byId = await _repo.UserGetAsync(userId, null, null);
+        Assert.NotNull(byId);
         var byEmail = await _repo.UserGetAsync(null, email, null);
         var byName = await _repo.UserGetAsync(null, null, byId.Username);
+        Assert.NotNull(byEmail);
+        Assert.NotNull(byName);
 
         Assert.Equal(userId, byEmail.IDUser);
         Assert.Equal(userId, byName.IDUser);
@@ -260,11 +264,11 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task User_Get_NoMatch_Throws(DbProviderKind provider)
+    public async Task User_Get_NoMatch_ReturnsNull(DbProviderKind provider)
     {
         Use(provider);
-        await Assert.ThrowsAsync<ArgumentException>(() => _repo.UserGetAsync(null, "nope_" + U() + "@x.com", null));
-        await Assert.ThrowsAsync<ArgumentException>(() => _repo.UserGetAsync(null, null, null));
+        Assert.Null(await _repo.UserGetAsync(null, "nope_" + U() + "@x.com", null));
+        Assert.Null(await _repo.UserGetAsync(null, null, null)); // no lookup key
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -286,6 +290,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (_, userId, email) = await MakeUser(t);
 
         var s = await _repo.UserSecretGetAsync(userId, null, null);
+        Assert.NotNull(s);
         Assert.Equal("h", s.PwdHash);
         Assert.Equal("s", s.PwdSalt);
 
@@ -293,9 +298,10 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.False(await _repo.UserSetPasswordAsync("missing_" + U() + "@x.com", new UserSecret { PwdHash = "x", PwdSalt = "y" }));
 
         var s2 = await _repo.UserSecretGetAsync(null, email, null);
+        Assert.NotNull(s2);
         Assert.Equal("h2", s2.PwdHash);
 
-        await Assert.ThrowsAsync<ArgumentException>(() => _repo.UserSecretGetAsync(null, "missing_" + U() + "@x.com", null));
+        Assert.Null(await _repo.UserSecretGetAsync(null, "missing_" + U() + "@x.com", null));
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -311,6 +317,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         });
 
         var back = await _repo.UserGetAsync(userId, null, null);
+        Assert.NotNull(back);
         Assert.Equal("New", back.FirstName);
         Assert.Equal(7, back.TenantID);
         Assert.False(back.Enabled);
@@ -325,7 +332,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.False(await _repo.UserDeleteAsync(1));
         Assert.False(await _repo.UserDeleteAsync(null));
         Assert.True(await _repo.UserDeleteAsync(userId));
-        await Assert.ThrowsAsync<ArgumentException>(() => _repo.UserGetAsync(userId, null, null));
+        Assert.Null(await _repo.UserGetAsync(userId, null, null));
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -343,11 +350,12 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal("admin", mine.RoleName);
 
         var one = await _repo.UserGroupGetAsync(mine.IDUserGroup);
+        Assert.NotNull(one);
         Assert.Equal("admin", one.RoleName);
 
         await _repo.UserGroupDeleteAsync(0);
         await _repo.UserGroupDeleteAsync(mine.IDUserGroup);
-        await Assert.ThrowsAsync<ArgumentException>(() => _repo.UserGroupGetAsync(mine.IDUserGroup));
+        Assert.Null(await _repo.UserGroupGetAsync(mine.IDUserGroup));
     }
 
     // ---- device ---------------------------------------------------------

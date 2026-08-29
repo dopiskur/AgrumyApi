@@ -233,7 +233,7 @@ namespace api.Dal
             return rows > 0;
         }
 
-        public async Task<User> UserGetAsync(int? idUser, string? email, string? username)
+        public async Task<User?> UserGetAsync(int? idUser, string? email, string? username)
         {
             await using var db = Db();
 
@@ -256,16 +256,11 @@ namespace api.Dal
             }
             else
             {
-                // No lookup key - the proc's IF/ELSE chain returns no result set.
-                throw new ArgumentException("Wrong id, no such person");
+                return null; // no lookup key - the proc's IF/ELSE chain returned no result set
             }
 
             var hit = await q.FirstOrDefaultAsync();
-            if (hit == null)
-            {
-                throw new ArgumentException("Wrong id, no such person");
-            }
-            return ToDto(hit.u, hit.g);
+            return hit == null ? null : ToDto(hit.u, hit.g);
         }
 
         public async Task<IList<User>> UsersGetAsync(int? tenantID)
@@ -278,7 +273,7 @@ namespace api.Dal
             return rows.Select(x => ToDto(x.u, x.g)).ToList();
         }
 
-        public async Task<UserSecret> UserSecretGetAsync(int? idUser, string? email, string? username)
+        public async Task<UserSecret?> UserSecretGetAsync(int? idUser, string? email, string? username)
         {
             await using var db = Db();
             IQueryable<UserRow> q = db.Users.AsNoTracking();
@@ -297,12 +292,11 @@ namespace api.Dal
             }
             else
             {
-                throw new ArgumentException("Wrong id, no such device"); // message kept verbatim from the old proc wrapper
+                return null; // no lookup key
             }
 
-            var secret = await q.Select(u => new UserSecret { PwdHash = u.PwdHash, PwdSalt = u.PwdSalt })
-                                .FirstOrDefaultAsync();
-            return secret ?? throw new ArgumentException("Wrong id, no such device");
+            return await q.Select(u => new UserSecret { PwdHash = u.PwdHash, PwdSalt = u.PwdSalt })
+                          .FirstOrDefaultAsync();
         }
 
         public async Task<bool> UserSetPasswordAsync(string? email, UserSecret userSecret)
@@ -853,20 +847,19 @@ namespace api.Dal
                           }).ToListAsync();
         }
 
-        public async Task<UserGroup> UserGroupGetAsync(int? idUserGroup)
+        public async Task<UserGroup?> UserGroupGetAsync(int? idUserGroup)
         {
             await using var db = Db();
-            var group = await (from g in db.UserGroups.AsNoTracking()
-                               join r in db.UserRoles.AsNoTracking() on g.UserRoleID equals r.IDUserRole
-                               where g.IDUserGroup == idUserGroup
-                               select new UserGroup
-                               {
-                                   IDUserGroup = g.IDUserGroup,
-                                   GroupName = g.GroupName,
-                                   UserRoleID = g.UserRoleID,
-                                   RoleName = r.RoleName,
-                               }).FirstOrDefaultAsync();
-            return group ?? throw new ArgumentException("Wrong id, no such person");
+            return await (from g in db.UserGroups.AsNoTracking()
+                          join r in db.UserRoles.AsNoTracking() on g.UserRoleID equals r.IDUserRole
+                          where g.IDUserGroup == idUserGroup
+                          select new UserGroup
+                          {
+                              IDUserGroup = g.IDUserGroup,
+                              GroupName = g.GroupName,
+                              UserRoleID = g.UserRoleID,
+                              RoleName = r.RoleName,
+                          }).FirstOrDefaultAsync();
         }
 
         public async Task UserGroupDeleteAsync(int? idUserGroup)

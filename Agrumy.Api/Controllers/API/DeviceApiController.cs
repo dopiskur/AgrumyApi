@@ -188,17 +188,8 @@ namespace api.Controllers.API
         [EnableRateLimiting("device-auth")]
         public async Task<ActionResult<DeviceConfig>> DeviceRegistration([FromBody] DeviceRegistration value)
         {
-            User user;
-            try
-            {
-                user = await Repo.UserGetAsync(null, value.Email, null);
-            }
-            catch (ArgumentException) // DAL throws this when the email matches no user
-            {
-                return StatusCode(401, "Wrong user or pin");
-            }
-
-            if (user.DevicePin != value.DevicePin)
+            User? user = await Repo.UserGetAsync(null, value.Email, null);
+            if (user is null || user.DevicePin != value.DevicePin)
             {
                 return StatusCode(401, "Wrong user or pin");
             }

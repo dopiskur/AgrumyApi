@@ -16,8 +16,8 @@ namespace api.Controllers.API
 
         private static readonly string? SecureKey = Config.secureKey;
 
-        /// <summary>Looks up a user + their password secret by email or username (whichever <paramref name="login"/> looks like).</summary>
-        private async Task<(User user, UserSecret secret)> LookupAsync(string? login) =>
+        /// <summary>Looks up a user + their password secret by email or username (whichever <paramref name="login"/> looks like); either element is null when nothing matches.</summary>
+        private async Task<(User? user, UserSecret? secret)> LookupAsync(string? login) =>
             FieldValidator.IsValidEmail(login)
                 ? (await Repo.UserGetAsync(null, login, null), await Repo.UserSecretGetAsync(null, login, null))
                 : (await Repo.UserGetAsync(null, null, login), await Repo.UserSecretGetAsync(null, null, login));
@@ -68,18 +68,9 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-            User user;
-            UserSecret secret;
-            try
-            {
-                (user, secret) = await LookupAsync(value.Login);
-            }
-            catch (ArgumentException) // DAL throws this when the login matches no user
-            {
-                return StatusCode(401, "Wrong username or password");
-            }
-
-            if (!AuthenticationProvider.VerifyHash(secret.PwdHash, secret.PwdSalt, value.Password))
+            var (user, secret) = await LookupAsync(value.Login);
+            if (user is null || secret is null ||
+                !AuthenticationProvider.VerifyHash(secret.PwdHash, secret.PwdSalt, value.Password))
             {
                 return StatusCode(401, "Wrong username or password");
             }
@@ -106,7 +97,8 @@ namespace api.Controllers.API
             }
 
             var (user, secret) = await LookupAsync(value.Login);
-            if (!AuthenticationProvider.VerifyHash(secret.PwdHash, secret.PwdSalt, value.OldPassword))
+            if (user is null || secret is null ||
+                !AuthenticationProvider.VerifyHash(secret.PwdHash, secret.PwdSalt, value.OldPassword))
             {
                 return StatusCode(401, "Wrong password");
             }
@@ -129,14 +121,21 @@ namespace api.Controllers.API
         /// <summary>The caller's own record - looked up by the email in their JWT, so any authenticated user.</summary>
         [HttpGet("Self")]
         [Authorize]
-        public async Task<ActionResult<User>> GetUserSelf() =>
-            Ok(await Repo.UserGetAsync(null, User.Identity?.Name, null));
+        public async Task<ActionResult<User>> GetUserSelf()
+        {
+            User? user = await Repo.UserGetAsync(null, User.Identity?.Name, null);
+            return user is null ? NotFound() : Ok(user);
+        }
 
         [HttpGet]
         [Authorize(Roles = "admin")]
         public async Task<ActionResult<User>> UserGet(int idUser)
         {
-            User user = await Repo.UserGetAsync(idUser, null, null);
+            User? user = await Repo.UserGetAsync(idUser, null, null);
+            if (user is null)
+            {
+                return NotFound();
+            }
             return user.TenantID != CallerTenantId
                 ? StatusCode(403, "Target user belongs to a different tenant")
                 : Ok(user);
@@ -176,7 +175,11 @@ namespace api.Controllers.API
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
             bool isAdmin = CallerRole == "admin";
-            User user = await Repo.UserGetAsync(value.IDUser, null, null);
+            User? user = await Repo.UserGetAsync(value.IDUser, null, null);
+            if (user is null)
+            {
+                return NotFound();
+            }
 
             if (!isAdmin && value.Email != User.Identity?.Name) // a plain user may only edit their own record
             {
@@ -189,7 +192,7 @@ namespace api.Controllers.API
 
             if (value.Password != null)
             {
-                var secret = await Repo.UserSecretGetAsync(value.IDUser, null, null);
+                var secret = await Repo.UserSecretGetAsync(value.IDUser, null, null) ?? new UserSecret();
                 secret.PwdSalt = AuthenticationProvider.GetSalt();
                 secret.PwdHash = AuthenticationProvider.GetHash(value.Password, secret.PwdSalt);
                 await Repo.UserSetPasswordAsync(user.Email, secret);
@@ -216,7 +219,11 @@ namespace api.Controllers.API
                 return Unauthorized("Deleting default user is not allowed");
             }
 
-            User targetUser = await Repo.UserGetAsync(idUser, null, null);
+            User? targetUser = await Repo.UserGetAsync(idUser, null, null);
+            if (targetUser is null)
+            {
+                return NotFound("User not found");
+            }
             if (targetUser.TenantID != CallerTenantId)
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
@@ -239,8 +246,11 @@ namespace api.Controllers.API
 
         [HttpGet("Group")]
         [Authorize(Roles = "admin")]
-        public async Task<ActionResult<UserGroup>> UserGroupGet(int? idUserGroup) =>
-            Ok(await Repo.UserGroupGetAsync(idUserGroup));
+        public async Task<ActionResult<UserGroup>> UserGroupGet(int? idUserGroup)
+        {
+            UserGroup? group = await Repo.UserGroupGetAsync(idUserGroup);
+            return group is null ? NotFound() : Ok(group);
+        }
 
         [HttpPost("Group")]
         [Authorize(Roles = "admin")]

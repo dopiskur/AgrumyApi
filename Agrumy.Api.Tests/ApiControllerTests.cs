@@ -115,7 +115,7 @@ public class ApiControllerTests
     public async Task DeviceRegistration_UnknownEmail_Returns401_NotA503()
     {
         _repo.Setup(r => r.UserGetAsync(null, "ghost@example.com", null))
-             .ThrowsAsync(new ArgumentException("Wrong id, no such person")); // DAL "no such user"
+             .ReturnsAsync((User?)null);
 
         var controller = NewDeviceController();
         var result = await controller.DeviceRegistration(new DeviceRegistration
@@ -225,8 +225,8 @@ public class ApiControllerTests
     [Fact]
     public async Task UserLogin_NoSuchUser_Returns401_NotA503()
     {
-        _repo.Setup(r => r.UserGetAsync(null, "ghost@example.com", null))
-             .ThrowsAsync(new ArgumentException("Wrong id, no such person"));
+        _repo.Setup(r => r.UserGetAsync(null, "ghost@example.com", null)).ReturnsAsync((User?)null);
+        _repo.Setup(r => r.UserSecretGetAsync(null, "ghost@example.com", null)).ReturnsAsync((UserSecret?)null);
 
         var controller = NewUserController();
         var result = await controller.UserLogin(new UserLogin { Login = "ghost@example.com", Password = "whatever" });
@@ -249,6 +249,30 @@ public class ApiControllerTests
 
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(403, obj.StatusCode);
+    }
+
+    [Fact]
+    public async Task UserGet_UnknownId_Returns404()
+    {
+        _repo.Setup(r => r.UserGetAsync(999, null, null)).ReturnsAsync((User?)null);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 1);
+        var result = await controller.UserGet(999);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task UserGroupGet_UnknownId_Returns404()
+    {
+        _repo.Setup(r => r.UserGroupGetAsync(999)).ReturnsAsync((UserGroup?)null);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 1);
+        var result = await controller.UserGroupGet(999);
+
+        Assert.IsType<NotFoundResult>(result.Result);
     }
 
     [Fact]

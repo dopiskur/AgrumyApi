@@ -26,9 +26,13 @@ namespace api.Dal.Interface
         Task UserAddAsync(User user, UserSecret userHash);
         Task UserUpdateAsync(User user);
         Task<bool> UserDeleteAsync(int? idUser);
-        Task<User> UserGetAsync(int? idUser, string? email, string? username);
+
+        /// <summary>The user matched by id / email / username, or null if none matches (or no key was given).</summary>
+        Task<User?> UserGetAsync(int? idUser, string? email, string? username);
         Task<IList<User>> UsersGetAsync(int? tenantID);
-        Task<UserSecret> UserSecretGetAsync(int? idUser, string? email, string? username);
+
+        /// <summary>The password hash+salt for the user matched by id / email / username, or null if none matches.</summary>
+        Task<UserSecret?> UserSecretGetAsync(int? idUser, string? email, string? username);
 
         Task<bool> UserSetPasswordAsync(string? email, UserSecret userSecret);
 
@@ -86,7 +90,9 @@ namespace api.Dal.Interface
 
         // Group
         Task<IList<UserGroup>> UserGroupsGetAsync();
-        Task<UserGroup> UserGroupGetAsync(int? idUserGroup);
+
+        /// <summary>The group matched by id, or null if none matches.</summary>
+        Task<UserGroup?> UserGroupGetAsync(int? idUserGroup);
         Task UserGroupDeleteAsync(int? idUserGroup);
         Task UserGroupAddAsync(UserGroup userGroup);
     }
