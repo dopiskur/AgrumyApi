@@ -20,6 +20,9 @@
   <ItemGroup>
     <PackageReference Include="Refit.HttpClientFactory" Version="15.2.0" />
     <PackageReference Include="Refit.Reflection" Version="15.2.0" />
+    <!-- Restores wwwroot/lib from libman.json on build (roadmap #33); the folder is
+         gitignored, not committed. No Node toolchain. -->
+    <PackageReference Include="Microsoft.Web.LibraryManager.Build" Version="3.0.114" />
   </ItemGroup>
 
 </Project>
