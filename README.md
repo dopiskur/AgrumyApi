@@ -16,14 +16,13 @@ UI operators use to manage devices, users and tenants.
 | --- | --- | --- |
 | `Agrumy.Shared` | class library | Models (`api.Models`), `Config`, `Security` (`JwtTokenProvider`, `AuthenticationProvider`). Referenced by both apps. |
 | `Agrumy.Dal` | class library | Data-access model: `AgrumyDbContext`, EF entities (`api.Dal.Entities`), provider selection (`DbProviderKind`, `DbOptionsFactory`). No stored procedures - every query is LINQ. |
-| `Agrumy.Api` | Web API | Device/sensor communication + admin API (`Controllers/API`), the `IRepository` implementation (`Dal/EfRepository`, EF Core over `Agrumy.Dal`), MySQL/MariaDB **or** PostgreSQL, JWT bearer auth, Swagger, startup DB health-check / migration on an empty database. |
-| `Agrumy.Api.Migrations.MySql` | class library | EF Core migrations for the MySQL/MariaDB provider. |
-| `Agrumy.Api.Migrations.Postgres` | class library | EF Core migrations for the PostgreSQL provider. |
+| `Agrumy.Api` | Web API | Device/sensor communication + admin API (`Controllers/API`), the `IRepository` implementation (`Dal/EfRepository`, EF Core over `Agrumy.Dal`), MySQL/MariaDB **or** PostgreSQL, JWT bearer auth, Swagger, startup DB health-check + schema creation on an empty database. |
 | `Agrumy.Web` | MVC app | Admin UI (`Controllers/View`, `Views/`, `wwwroot/`). Talks to `Agrumy.Api` **only over HTTP** (`Dal/ApiRepository` + `HttpClient` with a JWT bearer token). No direct database access. |
 
 `db/` holds a historical schema dump (`agrumyDB-final.sql`, `agrumyDB-withData.sql`)
 and old deployment notes (`README.txt`), kept for reference only - the schema is now
-owned by the EF Core migrations under the two `Agrumy.Api.Migrations.*` projects.
+owned by the `AgrumyDbContext` model. `db/migrations/` holds a few hand-written SQL
+patches applied to the pre-existing legacy database, unrelated to EF.
 
 ## How it works
 
@@ -129,45 +128,34 @@ listens on (5000 by default, set in `Agrumy.Api/Properties/launchSettings.json`)
 The data-access layer is EF Core (`Agrumy.Dal/AgrumyDbContext` + `Dal/EfRepository`),
 LINQ only - no stored procedures. It runs on **MySQL/MariaDB** (Pomelo) or
 **PostgreSQL** (Npgsql), chosen by `Database:Provider` (see Configuration).
-`DbOptionsFactory` points EF at the matching migrations project so the two baselines
-never collide.
 
-On startup `EfRepository.EnsureSchemaAsync` checks whether the database has any
-tables; if it is empty it applies that provider's EF baseline migration to build
-the schema from scratch, and if tables already exist it does nothing - no manual
-SQL setup for a fresh environment, no repeated work against an existing one.
-Whether a *failed* check stops the app or just logs a warning is controlled by
-`Startup:FailFastOnDbCheck` (see Configuration above).
+On startup `EfRepository.EnsureSchemaAsync` calls `EnsureCreatedAsync()`: an empty
+database gets every table straight from the `AgrumyDbContext` model, and a database
+that already has tables is left untouched - no manual SQL setup for a fresh
+environment, no repeated work against an existing one. Whether a *failed* check
+stops the app or just logs a warning is controlled by `Startup:FailFastOnDbCheck`
+(see Configuration above).
 
-### Migrations
+### Schema evolution
 
-Migrations live in `Agrumy.Api.Migrations.MySql` and `Agrumy.Api.Migrations.Postgres`,
-one baseline (`InitialCreate`) each. The `dotnet-ef` tool is pinned in
-`.config/dotnet-tools.json` (`dotnet tool restore` once). To add a migration you
-run it against both providers:
-
-```
-dotnet ef migrations add NAME -p Agrumy.Api.Migrations.MySql    -s Agrumy.Api -- --provider mysql
-dotnet ef migrations add NAME -p Agrumy.Api.Migrations.Postgres -s Agrumy.Api -- --provider postgres
-```
-
-The design-time factory (`Agrumy.Api/Dal/AgrumyDbContextDesignTimeFactory`) reads
-the provider from `--provider` (or `AGRUMY_DB_PROVIDER`) and the connection from
-`--connection` (or the `ConnectionStrings__DefaultConnection` / `DefaultConnection`
-env vars); a real connection is only needed for commands that touch the database
-(`database update`), not for `migrations add`.
+Pre-beta there are no EF migrations. The project has no real users or data to
+preserve across schema changes, so the model is the single source of truth and a
+fresh database is built with `EnsureCreatedAsync()`. Changing the schema during
+development means recreating the dev database (drop it, let startup re-create it).
+Migrations are planned to return for the beta once the schema settles - see the
+roadmap. `db/migrations/` holds unrelated hand-written SQL patches for the legacy
+database and is not part of this.
 
 ### Provider notes
 
 - **EF Core is held at 9.0.x** (`Microsoft.EntityFrameworkCore*`, Pomelo 9.0.0,
-  Npgsql 9.0.4, `dotnet-ef` 9.0.x). The runtime still targets net10.0; the pin is
-  only because the official Pomelo MySQL provider has no EF Core 10 build yet.
-- **No foreign keys.** The model configures primary keys and the unique indexes
+  Npgsql 9.0.4). The runtime still targets net10.0; the pin is only because the
+  official Pomelo MySQL provider has no EF Core 10 build yet.
+- **Legacy foreign keys.** The model configures primary keys, the unique indexes
   the app depends on (`email_UNIQUE`, `Username_UNIQUE`, `ApiID_UNIQUE`,
-  `Name_UNIQUE`) but no relationships - `EfRepository` joins explicitly in LINQ.
-  A database created by the EF baseline therefore has no FK constraints; a legacy
-  database keeps whatever FKs it already had (the migration is never applied to
-  it).
+  `Name_UNIQUE`) and the legacy `NO ACTION` FKs; navigation properties are not
+  mapped - `EfRepository` joins explicitly in LINQ. A legacy database keeps
+  whatever FKs it already had (`EnsureCreatedAsync` never touches a non-empty DB).
 - **PostgreSQL:** `NpgsqlCompat` opts into pre-6.0 timestamp behaviour
   (`DateTime` -> `timestamp without time zone`, any `DateTimeKind`) because the
   schema stores naive local datetimes throughout. Legacy MySQL `0000-00-00`

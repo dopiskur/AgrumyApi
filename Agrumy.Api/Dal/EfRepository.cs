@@ -4,8 +4,6 @@ using api.Dal.Entities;
 using api.Dal.Interface;
 using api.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Storage;
 using MySqlConnector;
 using Npgsql;
 
@@ -66,14 +64,12 @@ namespace api.Dal
         {
             await using var db = Db();
 
-            // Same intent as the old EnsureSchemaAsync: only provision an empty database. On the
-            // shared invent.hr DB (tables already present) this is a no-op; a fresh database gets
-            // every table from the EF baseline migration.
-            var creator = db.GetService<IRelationalDatabaseCreator>();
-            if (!await creator.HasTablesAsync())
-            {
-                await db.Database.MigrateAsync();
-            }
+            // Pre-beta: no real data to preserve across schema changes, so we skip migration
+            // history entirely and just create-if-missing from the current model. Empty DB gets
+            // every table from AgrumyDbContext as it stands today; shared DB with tables already
+            // present is a no-op either way (EnsureCreatedAsync also no-ops if the DB isn't empty).
+            // Migrations come back at beta - see roadmap.
+            await db.Database.EnsureCreatedAsync();
         }
 
         public DbFailureKind ClassifyException(Exception ex)

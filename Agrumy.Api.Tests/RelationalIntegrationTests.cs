@@ -21,8 +21,9 @@ namespace Agrumy.Api.Tests;
 ///   docker run -d --name agrumy-pg -e POSTGRES_PASSWORD=postgres  -p 55432:5432 postgres:17
 /// </code>
 ///
-/// The fixture applies each engine's EF baseline migration and seeds the reference rows the
-/// proc-era inner joins need; every test uses GUID-unique keys so there is no teardown.
+/// The fixture creates each engine's schema from the model (EnsureCreated, matching the
+/// pre-beta EfRepository.EnsureSchemaAsync) and seeds the reference rows the proc-era inner
+/// joins need; every test uses GUID-unique keys so there is no teardown.
 /// </summary>
 public sealed class RelationalIntegrationFixture
 {
@@ -43,7 +44,7 @@ public sealed class RelationalIntegrationFixture
         if (string.IsNullOrWhiteSpace(conn)) return;
 
         using var db = new AgrumyDbContext(DbOptionsFactory.Build(provider, conn));
-        db.Database.Migrate();
+        db.Database.EnsureCreated();
 
         if (!db.UserRoles.Any())
         {

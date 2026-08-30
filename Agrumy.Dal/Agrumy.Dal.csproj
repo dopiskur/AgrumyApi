@@ -8,12 +8,11 @@
     <AssemblyName>Agrumy.Dal</AssemblyName>
   </PropertyGroup>
 
-  <!-- Data-access model shared by Agrumy.Api and the two provider migration projects.
+  <!-- Data-access model shared by Agrumy.Api (Agrumy.Web talks HTTP only).
        EF Core held at 9.0.x: official Pomelo has no EF Core 10 build yet (runtime is net10.0).
        Roadmap #42. -->
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.19" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.19" />
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
   </ItemGroup>

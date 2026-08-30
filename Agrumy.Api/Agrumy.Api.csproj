@@ -21,10 +21,6 @@
     <ProjectReference Include="..\Agrumy.Shared\Agrumy.Shared.csproj" />
     <!-- DbContext + entities + provider selection (EF Core packages come transitively). -->
     <ProjectReference Include="..\Agrumy.Dal\Agrumy.Dal.csproj" />
-    <!-- Per-provider migration assemblies, resolved by name in DbOptionsFactory. Referenced here
-         only so their DLLs land next to Agrumy.Api for Database.Migrate() at runtime. -->
-    <ProjectReference Include="..\Agrumy.Api.Migrations.MySql\Agrumy.Api.Migrations.MySql.csproj" />
-    <ProjectReference Include="..\Agrumy.Api.Migrations.Postgres\Agrumy.Api.Migrations.Postgres.csproj" />
   </ItemGroup>
 
   <ItemGroup>
