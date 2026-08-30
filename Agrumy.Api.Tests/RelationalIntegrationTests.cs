@@ -883,7 +883,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     {
         var t = Use(provider);
         var (_, userId, _) = await MakeUser(t);
-        const string tokenHash = "hash-does-not-need-to-be-real-sha256-for-this-test";
+        string tokenHash = "hash-" + U(); // unique per run - the suite has no teardown and the column has a unique index
         await _repo.UserSetActivationTokenAsync(userId, tokenHash, DateTime.UtcNow.AddHours(1));
 
         User? activated = await _repo.UserActivateAsync(tokenHash);
@@ -902,7 +902,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     {
         var t = Use(provider);
         var (_, userId, email) = await MakeUser(t);
-        const string tokenHash = "expired-token-hash";
+        string tokenHash = "expired-" + U(); // stays in the DB forever (expiry never clears it), so it MUST be run-unique
         await _repo.UserSetActivationTokenAsync(userId, tokenHash, DateTime.UtcNow.AddHours(-1)); // already in the past
 
         User? result = await _repo.UserActivateAsync(tokenHash);
@@ -917,10 +917,11 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     {
         var t = Use(provider);
         var (_, userId, _) = await MakeUser(t);
-        await _repo.UserSetActivationTokenAsync(userId, "first-token", DateTime.UtcNow.AddHours(1));
-        Assert.NotNull(await _repo.UserActivateAsync("first-token")); // now EmailVerified
+        string firstToken = "first-" + U();
+        await _repo.UserSetActivationTokenAsync(userId, firstToken, DateTime.UtcNow.AddHours(1));
+        Assert.NotNull(await _repo.UserActivateAsync(firstToken)); // now EmailVerified
 
-        bool issued = await _repo.UserIssueActivationTokenAsync(userId, "second-token", DateTime.UtcNow.AddHours(1), cooldownMinutes: 0);
+        bool issued = await _repo.UserIssueActivationTokenAsync(userId, "second-" + U(), DateTime.UtcNow.AddHours(1), cooldownMinutes: 0);
 
         Assert.False(issued);
     }
@@ -930,9 +931,9 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     {
         var t = Use(provider);
         var (_, userId, _) = await MakeUser(t);
-        await _repo.UserSetActivationTokenAsync(userId, "initial-token", DateTime.UtcNow.AddHours(1)); // sets ActivationLastSentAt=now
+        await _repo.UserSetActivationTokenAsync(userId, "initial-" + U(), DateTime.UtcNow.AddHours(1)); // sets ActivationLastSentAt=now
 
-        bool tooSoon = await _repo.UserIssueActivationTokenAsync(userId, "resend-1", DateTime.UtcNow.AddHours(1), cooldownMinutes: 10);
+        bool tooSoon = await _repo.UserIssueActivationTokenAsync(userId, "resend1-" + U(), DateTime.UtcNow.AddHours(1), cooldownMinutes: 10);
         Assert.False(tooSoon);
 
         // Backdate ActivationLastSentAt past the cooldown window directly, same technique the
@@ -944,11 +945,12 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             await db.SaveChangesAsync();
         }
 
-        bool offCooldown = await _repo.UserIssueActivationTokenAsync(userId, "resend-2", DateTime.UtcNow.AddHours(1), cooldownMinutes: 10);
+        string resend2 = "resend2-" + U();
+        bool offCooldown = await _repo.UserIssueActivationTokenAsync(userId, resend2, DateTime.UtcNow.AddHours(1), cooldownMinutes: 10);
         Assert.True(offCooldown);
 
         // The new token, not the stale one, must be the one that now activates the account.
-        Assert.NotNull(await _repo.UserActivateAsync("resend-2"));
+        Assert.NotNull(await _repo.UserActivateAsync(resend2));
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 using api.Dal.Interface;
 using api.Models;
 using api.Utils;
@@ -100,8 +101,28 @@ namespace api.Security
                 new AuthenticationToken { Name = "access_token", Value = accessToken },
                 new AuthenticationToken { Name = "refresh_token", Value = refreshToken },
             });
-            await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, auth.Principal, auth.Properties)
-                .ConfigureAwait(false);
+
+            // #66: the fresh access token carries the user's CURRENT role set (the API re-reads
+            // userUserRole on every refresh) - rebuild the cookie's role claims from it instead of
+            // re-signing the stale ones, so a role change (or a pre-#66 single-role cookie)
+            // propagates to the Web session at the next ~2h token refresh, not after the 7-day
+            // cookie expiry. On any parsing hiccup keep the old principal - a refresh must never
+            // downgrade a working session.
+            await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
+                RebuildPrincipalFromToken(auth.Principal, accessToken), auth.Properties).ConfigureAwait(false);
+        }
+
+        private static ClaimsPrincipal RebuildPrincipalFromToken(ClaimsPrincipal current, string accessToken)
+        {
+            IReadOnlyList<string>? roles = JwtTokenProvider.ValidateToken(accessToken);
+            if (roles is null || roles.Count == 0)
+            {
+                return current;
+            }
+
+            var claims = new List<Claim> { new(ClaimTypes.Name, current.Identity?.Name ?? "") };
+            claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+            return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
         }
 
         /// <summary>An HttpRequestMessage can only be sent once - HttpClient disposes it after the
