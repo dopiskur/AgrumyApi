@@ -41,20 +41,35 @@
 
             <ul class="nav nav-tabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-thresholds" type="button" role="tab">Thresholds</button>
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-relays" type="button" role="tab">Relays</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-hysteresis" type="button" role="tab">Hysteresis</button>
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-thresholds" type="button" role="tab">Thresholds</button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-intervals" type="button" role="tab">Intervals</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-relays" type="button" role="tab">Relays</button>
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-hysteresis" type="button" role="tab">Hysteresis</button>
                 </li>
             </ul>
             <div class="tab-content border border-top-0 rounded-bottom p-3 mb-3">
-                <div class="tab-pane fade show active" id="tab-thresholds" role="tabpanel">
+                <div class="tab-pane fade show active" id="tab-relays" role="tabpanel">
+                    <partial name="_EnabledToggleField" model="relayEnabledToggle" />
+
+                    @foreach (var slot in relaySlots)
+                    {
+                        var selectModel = new SelectFieldViewModel
+                        {
+                            Name = ControllerField(slot.Name),
+                            Label = slot.Name,
+                            Items = new SelectList(Model.DeviceTypeRelay, nameof(DeviceTypeRelay.IDDeviceTypeRelay), nameof(DeviceTypeRelay.RelayName), slot.Selected),
+                        };
+                        <partial name="_SelectField" model="selectModel" />
+                    }
+                </div>
+
+                <div class="tab-pane fade" id="tab-thresholds" role="tabpanel">
                     <div class="mb-3">
                         <label asp-for="DeviceConfigController.TempLow" class="control-label"></label>
                         <input asp-for="DeviceConfigController.TempLow" class="form-control" />
@@ -104,29 +119,6 @@
                         <label asp-for="DeviceConfigController.WaterHigh" class="control-label"></label>
                         <input asp-for="DeviceConfigController.WaterHigh" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.WaterHigh" class="text-danger"></span>
-                    </div>
-                </div>
-
-                <div class="tab-pane fade" id="tab-hysteresis" role="tabpanel">
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.WaterLevelHysteresis" class="control-label"></label>
-                        <input asp-for="DeviceConfigController.WaterLevelHysteresis" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.WaterLevelHysteresis" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.TemperatureHysteresis" class="control-label"></label>
-                        <input asp-for="DeviceConfigController.TemperatureHysteresis" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.TemperatureHysteresis" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.HumidityHysteresis" class="control-label"></label>
-                        <input asp-for="DeviceConfigController.HumidityHysteresis" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.HumidityHysteresis" class="text-danger"></span>
-                    </div>
-                    <div class="mb-0">
-                        <label asp-for="DeviceConfigController.LightHysteresis" class="control-label"></label>
-                        <input asp-for="DeviceConfigController.LightHysteresis" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.LightHysteresis" class="text-danger"></span>
                     </div>
                 </div>
 
@@ -180,19 +172,27 @@
                     </div>
                 </div>
 
-                <div class="tab-pane fade" id="tab-relays" role="tabpanel">
-                    <partial name="_EnabledToggleField" model="relayEnabledToggle" />
-
-                    @foreach (var slot in relaySlots)
-                    {
-                        var selectModel = new SelectFieldViewModel
-                        {
-                            Name = ControllerField(slot.Name),
-                            Label = slot.Name,
-                            Items = new SelectList(Model.DeviceTypeRelay, nameof(DeviceTypeRelay.IDDeviceTypeRelay), nameof(DeviceTypeRelay.RelayName), slot.Selected),
-                        };
-                        <partial name="_SelectField" model="selectModel" />
-                    }
+                <div class="tab-pane fade" id="tab-hysteresis" role="tabpanel">
+                    <div class="mb-3">
+                        <label asp-for="DeviceConfigController.WaterLevelHysteresis" class="control-label"></label>
+                        <input asp-for="DeviceConfigController.WaterLevelHysteresis" class="form-control" />
+                        <span asp-validation-for="DeviceConfigController.WaterLevelHysteresis" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="DeviceConfigController.TemperatureHysteresis" class="control-label"></label>
+                        <input asp-for="DeviceConfigController.TemperatureHysteresis" class="form-control" />
+                        <span asp-validation-for="DeviceConfigController.TemperatureHysteresis" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="DeviceConfigController.HumidityHysteresis" class="control-label"></label>
+                        <input asp-for="DeviceConfigController.HumidityHysteresis" class="form-control" />
+                        <span asp-validation-for="DeviceConfigController.HumidityHysteresis" class="text-danger"></span>
+                    </div>
+                    <div class="mb-0">
+                        <label asp-for="DeviceConfigController.LightHysteresis" class="control-label"></label>
+                        <input asp-for="DeviceConfigController.LightHysteresis" class="form-control" />
+                        <span asp-validation-for="DeviceConfigController.LightHysteresis" class="text-danger"></span>
+                    </div>
                 </div>
             </div>
 
