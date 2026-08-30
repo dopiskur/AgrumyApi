@@ -63,6 +63,11 @@ builder.Services.AddLogging();
 
 var app = builder.Build();
 
+// Roadmap #69: same wiring as Agrumy.Api's Program.cs - LoginController validates the freshly
+// issued JWT through the static JwtTokenProvider, so a rejection here (key mismatch between the
+// two appsettings.json files, roadmap #48-class problems) must be visible in THIS process's log.
+JwtTokenProvider.Logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(JwtTokenProvider));
+
 // Unhandled exceptions (incl. ApiException from a failed Agrumy.Api call) render /Home/Error.
 if (!app.Environment.IsDevelopment())
 {

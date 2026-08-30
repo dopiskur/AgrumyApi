@@ -116,6 +116,23 @@ public class JwtTokenProviderTests
     }
 
     [Fact]
+    public void ValidateToken_KeyWithNonAsciiCharacter_RoundTrips()
+    {
+        // Roadmap #69 regression lock: CreateToken derived key bytes via UTF8 but ValidateToken
+        // via ASCII - any SecureKey character above U+007F silently produced two DIFFERENT keys
+        // ('š' collapses to '?'), so every token failed signature validation with no diagnostic.
+        // Uses the key-parameterized overload because the single-arg ValidateToken is hard-bound
+        // to the (ASCII-only) test appsettings key.
+        const string nonAsciiKey = "šifra-with-a-non-ascii-char-0123456789ABCDEF";
+        string token = JwtTokenProvider.CreateToken(nonAsciiKey, expiration: 5, subject: "alice@example.com", roles: new[] { "admin" }, tenantID: "0");
+
+        var roles = JwtTokenProvider.ValidateToken(token, nonAsciiKey);
+
+        Assert.NotNull(roles);
+        Assert.Equal(new[] { "admin" }, roles);
+    }
+
+    [Fact]
     public void ValidateToken_MultipleRoles_ReturnsAllOfThem()
     {
         // Roadmap #66: a caller can hold several roles at once - every one of them must round-trip.
@@ -131,7 +148,7 @@ public class JwtTokenProviderTests
     {
         // Hand-craft a token that already expired (CreateToken can't produce Expires < NotBefore),
         // signed with the same key ValidateToken uses (Config.secureKey == SigningKey).
-        var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(SigningKey));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey));
         var descriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[] { new Claim("role", "user") }),
@@ -166,7 +183,7 @@ public class JwtTokenProviderTests
         // validates against, but stamped with an issuer/audience that doesn't match
         // Config.jwtIssuer/jwtAudience - before the fix ValidateIssuer/ValidateAudience were
         // false, so this token would have silently passed.
-        var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(SigningKey));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey));
         var descriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[] { new Claim("role", "admin") }),

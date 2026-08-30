@@ -134,6 +134,10 @@ builder.Services.AddSwaggerGen(option =>
 
 var app = builder.Build();
 
+// Roadmap #69: JwtTokenProvider is static (no DI reach) - hand it a logger once so token
+// rejections land in the normal log pipeline instead of vanishing.
+JwtTokenProvider.Logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(JwtTokenProvider));
+
 app.UseSwagger();
 app.UseSwaggerUI();
 

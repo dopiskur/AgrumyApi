@@ -1,4 +1,5 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -9,6 +10,12 @@ namespace api.Security
     public class JwtTokenProvider
     {
         private static string? signKey = Config.secureKey;
+
+        /// <summary>Roadmap #69: static bridge into the repo's normal ILogger pipeline for a class
+        /// that has no DI reach (static methods, called from both Agrumy.Api and Agrumy.Web) -
+        /// each host assigns it once at startup (see both Program.cs). Null (e.g. unit tests, an
+        /// unwired host) means rejections stay silent, exactly the pre-#69 behaviour.</summary>
+        public static ILogger? Logger { get; set; }
 
 
         /// <summary>Roadmap #66: a user can hold several roles at once, so <paramref name="roles"/>
@@ -56,13 +63,22 @@ namespace api.Security
         /// null if the token itself is invalid/expired/wrongly-signed. An empty (but non-null) list
         /// means the token validated but carried no role claims at all - callers must treat that as
         /// "no roles", not "check failed".</summary>
-        public static IReadOnlyList<string>? ValidateToken(string token)
+        public static IReadOnlyList<string>? ValidateToken(string token) => ValidateToken(token, signKey);
+
+        /// <summary>Key-parameterized overload - exists so the roadmap #69 non-ASCII-key regression
+        /// test can drive the REAL validation path with a chosen key (the single-arg form above is
+        /// hard-bound to Config.secureKey via the static field); production callers never pass a key.</summary>
+        public static IReadOnlyList<string>? ValidateToken(string token, string? secureKey)
         {
             if (token == null)
                 return null;
 
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(signKey);
+            // Roadmap #69: MUST be the same encoding CreateToken (and Agrumy.Api's AddJwtBearer in
+            // Program.cs) uses to derive key bytes - this was ASCII while they were UTF8, so any
+            // SecureKey character above U+007F produced two different keys and every Web login
+            // failed silently while API bearer auth kept working.
+            var key = Encoding.UTF8.GetBytes(secureKey);
             try
             {
                 tokenHandler.ValidateToken(token, new TokenValidationParameters
@@ -84,8 +100,22 @@ namespace api.Security
                 var jwtToken = (JwtSecurityToken)validatedToken;
                 return jwtToken.Claims.Where(x => x.Type == "role").Select(x => x.Value).ToList();
             }
-            catch
+            // Roadmap #69: same null result for every failure (callers depend on that), but the
+            // CAUSE now reaches the log - a field "login just fails" report used to be
+            // indistinguishable between clock skew, a key mismatch and a mangled token.
+            catch (SecurityTokenExpiredException)
             {
+                Logger?.LogWarning("JWT rejected: expired.");
+                return null;
+            }
+            catch (SecurityTokenInvalidSignatureException)
+            {
+                Logger?.LogWarning("JWT rejected: invalid signature - key value or key-encoding mismatch between issuer and validator.");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogWarning("JWT rejected: {ExceptionType} - malformed or otherwise invalid token.", ex.GetType().Name);
                 return null;
             }
         }
