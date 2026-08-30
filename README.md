@@ -204,29 +204,17 @@ apiId/apiKey/apiAuth scheme described in "How it works", not JWT.
 
 ## Deployment
 
-Each deployable project has its own GitHub Actions workflow under
-`.github/workflows/`, since they deploy to separate Azure Web Apps:
+CI (`.github/workflows/build.yml`) builds and tests on every push to `master`;
+there is no automated deployment. The old Azure Web App workflow
+(`master_agrumy.yml`) was removed after its credentials went stale and every
+run failed at the Azure login step - restore it from git history if Azure
+deployment ever comes back.
 
-| Workflow | Deploys | Azure Web App |
-| --- | --- | --- |
-| `master_agrumy_api.yml` | `Agrumy.Api` | existing `agrumy` app - already set up, no action needed |
-| `master_agrumy_web.yml` | `Agrumy.Web` | **new** app that must be created manually - see below |
-
-Both trigger on push to `master` (and manually via `workflow_dispatch`).
-
-**Before `master_agrumy_web.yml` can deploy successfully for the first time:**
-
-1. Create the new Azure Web App in the portal and put its real name in
-   `master_agrumy_web.yml`'s `app-name` (currently the placeholder `agrumy-web`).
-2. Set up an app registration/federated credential for it (same pattern as the
-   existing `agrumy` app) and add its client-id/tenant-id/subscription-id as
-   GitHub repo secrets `AZUREAPPSERVICE_CLIENTID_WEB`,
-   `AZUREAPPSERVICE_TENANTID_WEB`, `AZUREAPPSERVICE_SUBSCRIPTIONID_WEB`
-   (Settings > Secrets and variables > Actions).
-3. On the deployed `Agrumy.Web` app, set `WebView:ApiService` to the **public**
-   URL where `Agrumy.Api` is reachable after deployment (e.g.
-   `https://agrumy.azurewebsites.net`) - not `http://localhost:5000`, which is
-   only correct for local dev.
+The test/alpha environment is deployed manually: self-contained `linux-x64`
+`dotnet publish` of `Agrumy.Api` and `Agrumy.Web`, copied to the server over
+SSH, run as systemd services behind a reverse proxy. The per-machine
+`appsettings.json` (connection string, JWT keys, `Urls`) is git-ignored and
+lives only on the server.
 
 ## License
 
