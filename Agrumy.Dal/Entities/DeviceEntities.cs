@@ -74,6 +74,23 @@ namespace api.Dal.Entities
         public double? HumidityHysteresis { get; set; }
         public double? LightHysteresis { get; set; }
 
+        // These columns exist in every deployed deviceConfigController table (pre-dating this
+        // codebase's EF Core migration) but were never declared on this entity, so EF silently
+        // never read or wrote them - the Web admin's Interval tab always saved into the void.
+        // Default member initializers match the DB column defaults (all 0/false).
+        public bool? VentilationIntervalEnabled { get; set; } = false;
+        public int? VentilationInterval { get; set; } = 0;
+        public int? VentilationIntervalLenght { get; set; } = 0;
+        public bool? LightIntervalEnabled { get; set; } = false;
+        public int? LightInterval { get; set; } = 0;
+        public int? LightIntervalLenght { get; set; } = 0;
+        public bool? HeatingIntervalEnabled { get; set; } = false;
+        public int? HeatingInterval { get; set; } = 0;
+        public int? HeatingIntervalLenght { get; set; } = 0;
+        public bool? WaterPumpIntervalEnabled { get; set; } = false;
+        public int? WaterPumpInterval { get; set; } = 0;
+        public int? WaterPumpIntervalLenght { get; set; } = 0;
+
         public bool? RelayEnabled { get; set; }
         public int? Relay1 { get; set; }
         public int? Relay2 { get; set; }
