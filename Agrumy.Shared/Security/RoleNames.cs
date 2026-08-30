@@ -36,5 +36,20 @@ namespace api.Security
         /// - used only to pick the legacy alias claim, never for a real authorization decision.</summary>
         public static bool ImpliesLegacyAdmin(IEnumerable<string> roleNames) =>
             roleNames.Contains(GlobalAdmin) || roleNames.Contains(TenantAdmin);
+
+        // #66 Phase 2: comma-separated lists for [Authorize(Roles = ...)] - any listed role passes
+        // the attribute (the coarse gate); the precise per-tenant decision then happens inline via
+        // ApiControllerBase's capability helpers. LegacyAdmin is included so an account the #66
+        // migration missed keeps its pre-#66 access instead of being locked out of everything.
+
+        /// <summary>May manage user accounts (create/edit/delete) - tenant scoping still applies inline.</summary>
+        public const string UserManagers = LegacyAdmin + "," + GlobalAdmin + "," + GlobalUser + "," + TenantAdmin + "," + TenantUser;
+
+        /// <summary>May manage devices and their configs - tenant scoping still applies inline.</summary>
+        public const string DeviceManagers = LegacyAdmin + "," + GlobalAdmin + "," + GlobalDevice + "," + TenantAdmin + "," + TenantDevice;
+
+        // Role GRANTING stays admin-only on purpose: a Tenant User could otherwise assign
+        // themselves Tenant admin - user management must not imply privilege management.
+        public const string Admins = LegacyAdmin + "," + GlobalAdmin + "," + TenantAdmin;
     }
 }

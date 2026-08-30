@@ -352,18 +352,18 @@ namespace api.Controllers.API
                 : StatusCode(403, "Password change failed for: " + user.Email);
         }
 
-        /// <summary>Roadmap #65: a minimal, deliberately narrow cross-tenant carve-out - an admin
-        /// whose own TenantID is 0 manages users in every tenant, not only their own. Users only,
-        /// not Devices (agreed scope). Meant to be replaced by a real role once #66 (full RBAC) is
-        /// built, not extended piecemeal in the meantime.</summary>
-        private bool IsGlobalAdmin => CallerRole == "admin" && CallerTenantId == 0;
+        // #66 Phase 2 note: the #65-era IsGlobalAdmin property lived here - replaced by
+        // ApiControllerBase's capability helpers (CallerIsGlobalAdmin, CallerManagesUsers, ...),
+        // exactly the planned refactor the roadmap promised when #66 got built.
 
         // ---- read ----------------------------------------------------------------
 
+        /// <summary>#66 Phase 2: opened from admin-only to every authenticated caller - a Tenant
+        /// reader's whole point is being able to SEE their tenant's resources without touching them.</summary>
         [HttpGet("All")]
-        [Authorize(Roles = "admin")]
+        [Authorize]
         public async Task<ActionResult<IList<User>>> UsersGet() =>
-            Ok(IsGlobalAdmin ? await Repo.UsersGetAllAsync() : await Repo.UsersGetAsync(CallerTenantId));
+            Ok(CallerReadsUsersGlobally ? await Repo.UsersGetAllAsync() : await Repo.UsersGetAsync(CallerTenantId));
 
         /// <summary>The caller's own record - looked up by the email in their JWT, so any authenticated user.</summary>
         [HttpGet("Self")]
@@ -380,7 +380,7 @@ namespace api.Controllers.API
         }
 
         [HttpGet]
-        [Authorize(Roles = "admin")]
+        [Authorize]
         public async Task<ActionResult<User>> UserGet(int idUser)
         {
             User? user = await Repo.UserGetAsync(idUser, null, null);
@@ -388,7 +388,7 @@ namespace api.Controllers.API
             {
                 return NotFound();
             }
-            return user.TenantID != CallerTenantId && !IsGlobalAdmin
+            return user.TenantID != CallerTenantId && !CallerReadsUsersGlobally
                 ? StatusCode(403, "Target user belongs to a different tenant")
                 : Ok(user);
         }
@@ -396,7 +396,7 @@ namespace api.Controllers.API
         // ---- write -------------------------------------------------------------
 
         [HttpPost]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.UserManagers)]
         public async Task<ActionResult<string>> UserAdd([FromBody] UserAdd value)
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
@@ -426,7 +426,7 @@ namespace api.Controllers.API
             if (added?.IDUser is int idUser)
             {
                 string startingRole = value.UserGroupID == 0
-                    ? (IsGlobalAdmin ? RoleNames.GlobalAdmin : RoleNames.TenantAdmin)
+                    ? (CallerIsGlobalAdmin ? RoleNames.GlobalAdmin : RoleNames.TenantAdmin)
                     : RoleNames.TenantReader;
                 await Repo.UserRolesSetAsync(idUser, new[] { startingRole });
             }
@@ -435,23 +435,21 @@ namespace api.Controllers.API
         }
 
         [HttpPut]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.UserManagers)]
         public async Task<ActionResult<bool>> UserUpdate([FromBody] UserUpdate value)
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-            bool isAdmin = CallerRole == "admin";
             User? user = await Repo.UserGetAsync(value.IDUser, null, null);
             if (user is null)
             {
                 return NotFound();
             }
 
-            if (!isAdmin && value.Email != User.Identity?.Name) // a plain user may only edit their own record
-            {
-                return Unauthorized();
-            }
-            if (user.TenantID != CallerTenantId && !IsGlobalAdmin)
+            // #66 Phase 2: one capability check replaces the old isAdmin + tenant-mismatch pair -
+            // the attribute already guarantees a user-manager role, this pins it to the right tenant
+            // (or lets a Global admin/User through for any tenant).
+            if (!CallerManagesUsers(user.TenantID))
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
             }
@@ -473,16 +471,16 @@ namespace api.Controllers.API
             if (value.FirstName != null) { user.FirstName = value.FirstName; }
             if (value.LastName != null) { user.LastName = value.LastName; }
             if (value.Phone != null) { user.Phone = value.Phone; }
-            if (value.UserGroupID != null && isAdmin) { user.UserGroupID = value.UserGroupID; } // role change: admin only
-            if (value.Enabled != null && isAdmin) { user.Enabled = value.Enabled; }             // enable/disable: admin only
-            if (value.TenantID != null && IsGlobalAdmin) { user.TenantID = value.TenantID; }    // roadmap #65: reassigning tenant is a global-admin-only power
+            if (value.UserGroupID != null) { user.UserGroupID = value.UserGroupID; } // attribute already restricts to user-managers
+            if (value.Enabled != null) { user.Enabled = value.Enabled; }
+            if (value.TenantID != null && CallerManagesUsersGlobally) { user.TenantID = value.TenantID; } // cross-tenant reassignment stays a Global power (#65/#66)
 
             await Repo.UserUpdateAsync(user);
             return Ok(true);
         }
 
         [HttpDelete]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.UserManagers)]
         public async Task<ActionResult<string>> Delete(int? idUser)
         {
             if (idUser is null or <= 1) // ids 0 and 1 are the protected default accounts
@@ -495,7 +493,7 @@ namespace api.Controllers.API
             {
                 return NotFound("User not found");
             }
-            if (targetUser.TenantID != CallerTenantId && !IsGlobalAdmin)
+            if (!CallerManagesUsers(targetUser.TenantID))
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
             }
@@ -504,7 +502,7 @@ namespace api.Controllers.API
         }
 
         [HttpGet("Roles")]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.UserManagers)]
         public async Task<ActionResult<IEnumerable<UserRole>>> UserRoleGet() =>
             Ok(await Repo.UserRoleGetAsync());
 
@@ -518,7 +516,7 @@ namespace api.Controllers.API
         };
 
         [HttpGet("UserRoles")]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.UserManagers)]
         public async Task<ActionResult<IReadOnlyList<string>>> UserRolesGet(int idUser)
         {
             User? target = await Repo.UserGetAsync(idUser, null, null);
@@ -526,15 +524,18 @@ namespace api.Controllers.API
             {
                 return NotFound();
             }
-            if (target.TenantID != CallerTenantId && !IsGlobalAdmin)
+            if (!CallerManagesUsers(target.TenantID))
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
             }
             return Ok(await Repo.UserRoleNamesGetAsync(idUser));
         }
 
+        // Role GRANTING deliberately stays admin-only (RoleNames.Admins, not UserManagers): a
+        // Tenant User could otherwise hand themselves Tenant admin - managing users must not
+        // imply managing privileges.
         [HttpPut("UserRoles")]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.Admins)]
         public async Task<ActionResult> UserRolesSet([FromBody] UserRolesUpdate value)
         {
             User? target = await Repo.UserGetAsync(value.IDUser, null, null);
@@ -542,12 +543,12 @@ namespace api.Controllers.API
             {
                 return NotFound();
             }
-            if (target.TenantID != CallerTenantId && !IsGlobalAdmin)
+            if (target.TenantID != CallerTenantId && !CallerIsGlobalAdmin)
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
             }
 
-            HashSet<string> allowed = IsGlobalAdmin ? RoleNames.All.ToHashSet() : TenantScopedGrantableRoles.ToHashSet();
+            HashSet<string> allowed = CallerIsGlobalAdmin ? RoleNames.All.ToHashSet() : TenantScopedGrantableRoles.ToHashSet();
             string? disallowed = value.RoleNames.FirstOrDefault(r => !allowed.Contains(r));
             if (disallowed != null)
             {
@@ -560,13 +561,17 @@ namespace api.Controllers.API
 
         // ---- groups ----------------------------------------------------------
 
+        // Group READS open to user-managers (the Web user Create/Edit forms need the dropdown);
+        // group WRITES stay admin-only - groups still drive the legacy role mapping, so editing
+        // them is privilege management, same reasoning as UserRolesSet above.
+
         [HttpGet("Group/All")]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.UserManagers)]
         public async Task<ActionResult<IEnumerable<UserGroup>>> UserGroupsGet() =>
             Ok(await Repo.UserGroupsGetAsync());
 
         [HttpGet("Group")]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.UserManagers)]
         public async Task<ActionResult<UserGroup>> UserGroupGet(int? idUserGroup)
         {
             UserGroup? group = await Repo.UserGroupGetAsync(idUserGroup);
@@ -574,7 +579,7 @@ namespace api.Controllers.API
         }
 
         [HttpPost("Group")]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.Admins)]
         public async Task<ActionResult<bool>> UserGroupAdd(UserGroup userGroup)
         {
             await Repo.UserGroupAddAsync(userGroup);
@@ -582,7 +587,7 @@ namespace api.Controllers.API
         }
 
         [HttpDelete("Group")]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.Admins)]
         public async Task<ActionResult<bool>> UserGroupDelete(int? idUserGroup)
         {
             await Repo.UserGroupDeleteAsync(idUserGroup);

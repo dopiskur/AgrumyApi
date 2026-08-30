@@ -1044,4 +1044,19 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(new[] { RoleNames.GlobalAdmin }, await _repo.UserRoleNamesGetAsync(userIdA));
         Assert.Empty(await _repo.UserRoleNamesGetAsync(userIdB));
     }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DevicesGetAllAsync_ReturnsDevicesAcrossDifferentTenants(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantA, _, _) = await MakeUser(t);
+        var (tenantB, _, _) = await MakeUser(t);
+        Device deviceA = await MakeDevice(t, tenantA);
+        Device deviceB = await MakeDevice(t, tenantB);
+
+        IList<Device> all = await _repo.DevicesGetAllAsync();
+
+        Assert.Contains(all, d => d.IDDevice == deviceA.IDDevice);
+        Assert.Contains(all, d => d.IDDevice == deviceB.IDDevice);
+    }
 }

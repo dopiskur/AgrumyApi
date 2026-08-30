@@ -11,15 +11,30 @@ namespace api.Controllers.API
     [Route("api/ServerConfig")]
     public class ServerConfigApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
     {
+        // #66 Phase 2: these are SERVER-WIDE settings, so the old "any tenant's admin can edit
+        // them" behaviour was a hole - now Global admin only. The attribute stays at the wider
+        // "admin" alias so an account the #66 migration missed reaches the inline check, where
+        // CallerIsGlobalAdmin's legacy fallback (tenant-0 admin) still lets it through.
+
         [HttpGet]
         [Authorize(Roles = "admin")]
-        public async Task<ActionResult<ServerConfig>> Get() =>
-            Ok(await Repo.ServerConfigGetAsync(1));
+        public async Task<ActionResult<ServerConfig>> Get()
+        {
+            if (!CallerIsGlobalAdmin)
+            {
+                return StatusCode(403, "Server-wide settings require the Global admin role");
+            }
+            return Ok(await Repo.ServerConfigGetAsync(1));
+        }
 
         [HttpPut]
         [Authorize(Roles = "admin")]
         public async Task<ActionResult> Update([FromBody] ServerConfig config)
         {
+            if (!CallerIsGlobalAdmin)
+            {
+                return StatusCode(403, "Server-wide settings require the Global admin role");
+            }
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await Repo.ServerConfigUpdateAsync(config);
             return Ok();

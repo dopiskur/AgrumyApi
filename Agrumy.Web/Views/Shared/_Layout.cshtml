@@ -2,6 +2,8 @@
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
     Func<string, string> navActive = c => string.Equals(c, currentController, StringComparison.OrdinalIgnoreCase) ? "active" : "";
     var currentUserEmail = User.Identity?.Name;
+    // #66 Phase 2: menu items gate on the same comma-separated role lists the controllers use.
+    Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
 }
 <!doctype html>
 <html lang="en">
@@ -96,7 +98,7 @@
                                 <p>Devices</p>
                             </a>
                         </li>
-                        @if (User.IsInRole("admin"))
+                        @if (hasAnyRole(api.Security.RoleNames.UserManagers))
                         {
                             <li class="nav-item">
                                 <a asp-area="" asp-controller="User" asp-action="Index" class="nav-link @navActive("User")">
@@ -104,12 +106,18 @@
                                     <p>Users</p>
                                 </a>
                             </li>
+                        }
+                        @if (hasAnyRole(api.Security.RoleNames.Admins))
+                        {
                             <li class="nav-item">
                                 <a asp-area="" asp-controller="Group" asp-action="Index" class="nav-link @navActive("Group")">
                                     <i class="nav-icon bi bi-diagram-3"></i>
                                     <p>Groups</p>
                                 </a>
                             </li>
+                        }
+                        @if (User.IsInRole(api.Security.RoleNames.GlobalAdmin))
+                        {
                             <li class="nav-item">
                                 <a asp-area="" asp-controller="ServerConfig" asp-action="Index" class="nav-link @navActive("ServerConfig")">
                                     <i class="nav-icon bi bi-sliders"></i>

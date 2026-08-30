@@ -28,16 +28,18 @@ public class ApiControllerTests
     private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _notifications.Object);
 
     /// <summary>Gives a bare (non-DI-constructed) controller the JWT claims an [Authorize] action reads via HttpContext.User.</summary>
-    private static void SetCaller(ControllerBase controller, string role, int? tenantId)
+    private static void SetCaller(ControllerBase controller, string role, int? tenantId) =>
+        SetCallerRoles(controller, tenantId, role);
+
+    /// <summary>#66: same, but with the full multi-role claim set a real post-#66 token carries
+    /// (legacy alias first, then the granular roles - order matters only for CallerRole).</summary>
+    private static void SetCallerRoles(ControllerBase controller, int? tenantId, params string[] roles)
     {
-        var identity = new ClaimsIdentity(new[]
-        {
-            new Claim(ClaimTypes.Role, role),
-            new Claim("TenantID", tenantId.ToString() ?? "")
-        });
+        var claims = new List<Claim> { new("TenantID", tenantId.ToString() ?? "") };
+        claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
         controller.ControllerContext = new ControllerContext
         {
-            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) }
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims)) }
         };
     }
 
@@ -910,25 +912,277 @@ public class ApiControllerTests
 
         Assert.IsType<OkResult>(result);
     }
+
+    // ---- #66 Phase 2: granular capability scoping (inline logic, attributes covered below) ----
+
+    private ServerConfigApiController NewServerConfigController() => new(_repo.Object, _cache.Object);
+    private SensorDataController NewSensorDataController() => new(_repo.Object, _cache.Object);
+
+    [Fact]
+    public async Task DeviceUpdate_TenantDevice_OwnTenant_Succeeds()
+    {
+        // ApiId left null so RefreshConfigVersionCacheAsync's early-return path fires - the cache
+        // side of an update is not what this test is about.
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 1 });
+        _repo.Setup(r => r.DeviceUpdateAsync(It.IsAny<Device>())).Returns(Task.CompletedTask);
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.TenantDevice);
+        var result = await controller.DeviceUpdate(new Device { IDDevice = 8 });
+
+        Assert.True(result.Value);
+        _repo.Verify(r => r.DeviceUpdateAsync(It.IsAny<Device>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeviceUpdate_TenantDevice_ForeignTenant_Returns403()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 99 });
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.TenantDevice);
+        var result = await controller.DeviceUpdate(new Device { IDDevice = 8 });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+        _repo.Verify(r => r.DeviceUpdateAsync(It.IsAny<Device>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeviceUpdate_GlobalDevice_CrossesTenants()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 99 });
+        _repo.Setup(r => r.DeviceUpdateAsync(It.IsAny<Device>())).Returns(Task.CompletedTask);
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.GlobalDevice);
+        var result = await controller.DeviceUpdate(new Device { IDDevice = 8 });
+
+        Assert.True(result.Value);
+    }
+
+    [Fact]
+    public async Task DeviceUpdate_GlobalReader_ForeignTenant_Returns403_ReadNeverImpliesWrite()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 99 });
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 1, "user", RoleNames.GlobalReader);
+        var result = await controller.DeviceUpdate(new Device { IDDevice = 8 });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+    }
+
+    [Fact]
+    public async Task DevicesGet_GlobalReader_SeesEveryTenant()
+    {
+        // Strict mock: an un-set-up DevicesGetAsync(3) call would throw, proving the all-tenants
+        // path was taken.
+        _repo.Setup(r => r.DevicesGetAllAsync()).ReturnsAsync(new List<Device>
+        {
+            new() { IDDevice = 1, TenantID = 0 }, new() { IDDevice = 2, TenantID = 7 },
+        });
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 3, "user", RoleNames.GlobalReader);
+        var result = await controller.DevicesGet();
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(2, Assert.IsAssignableFrom<IEnumerable<Device>>(ok.Value).Count());
+    }
+
+    [Fact]
+    public async Task DevicesGet_TenantReader_ScopedToOwnTenant()
+    {
+        _repo.Setup(r => r.DevicesGetAsync(3)).ReturnsAsync(new List<Device> { new() { IDDevice = 1, TenantID = 3 } });
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 3, "user", RoleNames.TenantReader);
+        var result = await controller.DevicesGet();
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Single(Assert.IsAssignableFrom<IEnumerable<Device>>(ok.Value));
+    }
+
+    [Fact]
+    public async Task DeviceGet_GlobalReader_UsesUnfilteredLookup()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(42)).ReturnsAsync(new Device { IDDevice = 42, TenantID = 9 });
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 1, "user", RoleNames.GlobalReader);
+        var result = await controller.DeviceGet(42);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(42, ((Device)ok.Value!).IDDevice);
+    }
+
+    [Fact]
+    public async Task DeviceDelete_GlobalAdmin_ForeignTenant_DeletesWithTheDevicesOwnTenant()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(7)).ReturnsAsync(new Device { IDDevice = 7, TenantID = 99 });
+        _repo.Setup(r => r.DeviceDeleteAsync(7, 99)).Returns(Task.CompletedTask);
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 0, "admin", RoleNames.GlobalAdmin);
+        var result = await controller.DeviceDelete(7);
+
+        Assert.True(result.Value);
+        // Strict mock proves the delete used TenantID 99 (the device's), not 0 (the caller's).
+        _repo.Verify(r => r.DeviceDeleteAsync(7, 99), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeviceEventsGet_TenantReader_OwnTenant_Ok()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(5)).ReturnsAsync(new Device { IDDevice = 5, TenantID = 2 });
+        _repo.Setup(r => r.EventDeviceGetAsync(5, 2, 100)).ReturnsAsync(new List<DeviceEvent>());
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 2, "user", RoleNames.TenantReader);
+        var result = await controller.DeviceEventsGet(5);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task DeviceEventsGet_TenantReader_ForeignTenant_Returns403()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(5)).ReturnsAsync(new Device { IDDevice = 5, TenantID = 99 });
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 2, "user", RoleNames.TenantReader);
+        var result = await controller.DeviceEventsGet(5);
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+    }
+
+    [Fact]
+    public async Task UsersGet_GlobalReader_SeesEveryTenant()
+    {
+        _repo.Setup(r => r.UsersGetAllAsync()).ReturnsAsync(new List<User> { new() { IDUser = 1, TenantID = 0 }, new() { IDUser = 2, TenantID = 7 } });
+
+        var controller = NewUserController();
+        SetCallerRoles(controller, 3, "user", RoleNames.GlobalReader);
+        var result = await controller.UsersGet();
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(2, Assert.IsAssignableFrom<IList<User>>(ok.Value).Count);
+    }
+
+    [Fact]
+    public async Task UserUpdate_TenantUser_OwnTenant_Succeeds()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local" });
+        _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.TenantUser);
+        var result = await controller.UserUpdate(new UserUpdate { IDUser = 50, FirstName = "New" });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        _repo.Verify(r => r.UserUpdateAsync(It.IsAny<User>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UserUpdate_TenantDevice_Returns403_DeviceGrantNeverImpliesUserManagement()
+    {
+        // Defence in depth: even if the attribute somehow let a device-only grant through, the
+        // inline CallerManagesUsers check must still refuse.
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local" });
+
+        var controller = NewUserController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.TenantDevice);
+        var result = await controller.UserUpdate(new UserUpdate { IDUser = 50, FirstName = "New" });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+        _repo.Verify(r => r.UserUpdateAsync(It.IsAny<User>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ServerConfig_TenantAdmin_Returns403_ServerWideSettingsAreGlobalOnly()
+    {
+        // Strict mock: an un-set-up ServerConfigGetAsync call would throw, so reaching the asserts
+        // proves the request was refused before touching the repo.
+        var controller = NewServerConfigController();
+        SetCallerRoles(controller, 5, "admin", RoleNames.TenantAdmin);
+
+        var get = await controller.Get();
+        var put = await controller.Update(new ServerConfig());
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(get.Result).StatusCode);
+        Assert.Equal(403, Assert.IsType<ObjectResult>(put).StatusCode);
+    }
+
+    [Fact]
+    public async Task ServerConfig_GlobalAdmin_CanReadAndWrite()
+    {
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { IDServerConfig = 1 });
+        _repo.Setup(r => r.ServerConfigUpdateAsync(It.IsAny<ServerConfig>())).Returns(Task.CompletedTask);
+
+        var controller = NewServerConfigController();
+        SetCallerRoles(controller, 0, "admin", RoleNames.GlobalAdmin);
+
+        Assert.IsType<OkObjectResult>((await controller.Get()).Result);
+        Assert.IsType<OkResult>(await controller.Update(new ServerConfig()));
+    }
+
+    [Fact]
+    public async Task ServerConfig_LegacyOnlyTenant0Admin_StillAllowed_MigrationMissedFallback()
+    {
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { IDServerConfig = 1 });
+
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0); // single legacy claim, no #66 roles on the token
+
+        Assert.IsType<OkObjectResult>((await controller.Get()).Result);
+    }
+
+    [Fact]
+    public async Task SensorDataDelete_TenantDevice_DeletesWithTheDevicesOwnTenant()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(7)).ReturnsAsync(new Device { IDDevice = 7, TenantID = 4 });
+        _repo.Setup(r => r.SensorDataDeleteAsync(4, 7, 0, 0)).Returns(Task.CompletedTask);
+
+        var controller = NewSensorDataController();
+        SetCallerRoles(controller, 4, "user", RoleNames.TenantReader, RoleNames.TenantDevice);
+        var result = await controller.Delete(7);
+
+        Assert.IsType<OkResult>(result);
+        _repo.Verify(r => r.SensorDataDeleteAsync(4, 7, 0, 0), Times.Once);
+    }
+
+    [Fact]
+    public async Task SensorDataDelete_TenantUser_Returns403_UserGrantNeverImpliesDeviceManagement()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(7)).ReturnsAsync(new Device { IDDevice = 7, TenantID = 4 });
+
+        var controller = NewSensorDataController();
+        SetCallerRoles(controller, 4, "user", RoleNames.TenantReader, RoleNames.TenantUser);
+        var result = await controller.Delete(7);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result).StatusCode);
+    }
 }
 
 /// <summary>
-/// Regression guard: DELETE /api/SensorData must stay admin-only. [Authorize] is middleware, so
-/// this asserts the attribute is present rather than driving a request.
+/// Regression guards for the #66 Phase 2 role gates. [Authorize] is middleware, so these assert
+/// the attribute's role list rather than driving a request - the inline tenant-scoping logic is
+/// covered by the direct-call tests above.
 /// </summary>
-public class SensorDataAuthorizationTests
+public class RoleGateAuthorizationTests
 {
+    private static string? RolesOn(Type controller, string method) =>
+        controller.GetMethod(method)!.GetCustomAttributes(inherit: true)
+            .OfType<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>().SingleOrDefault()?.Roles;
+
     [Fact]
-    public void Delete_RequiresAdminAuthorization()
+    public void SensorDataDelete_RequiresDeviceManagerRole()
     {
-        var del = typeof(SensorDataController).GetMethod("Delete");
-        Assert.NotNull(del);
-
-        var authorize = del!.GetCustomAttributes(inherit: true)
-            .OfType<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>().SingleOrDefault();
-
-        Assert.NotNull(authorize);
-        Assert.Equal("admin", authorize!.Roles);
+        Assert.Equal(RoleNames.DeviceManagers, RolesOn(typeof(SensorDataController), "Delete"));
     }
 
     [Fact]
@@ -936,5 +1190,33 @@ public class SensorDataAuthorizationTests
     {
         var del = typeof(SensorDataController).GetMethod("Delete")!;
         Assert.Contains(del.GetCustomAttributes(inherit: true), a => a is HttpDeleteAttribute);
+    }
+
+    [Fact]
+    public void DeviceWrites_RequireDeviceManagerRole()
+    {
+        Assert.Equal(RoleNames.DeviceManagers, RolesOn(typeof(DeviceApiController), "DeviceUpdate"));
+        Assert.Equal(RoleNames.DeviceManagers, RolesOn(typeof(DeviceApiController), "DeviceDelete"));
+        Assert.Equal(RoleNames.DeviceManagers, RolesOn(typeof(DeviceApiController), "DeviceConfigSensorUpdate"));
+        Assert.Equal(RoleNames.DeviceManagers, RolesOn(typeof(DeviceApiController), "DeviceConfigControllerUpdate"));
+    }
+
+    [Fact]
+    public void UserWrites_RequireUserManagerRole()
+    {
+        Assert.Equal(RoleNames.UserManagers, RolesOn(typeof(UserApiController), "UserAdd"));
+        Assert.Equal(RoleNames.UserManagers, RolesOn(typeof(UserApiController), "UserUpdate"));
+        Assert.Equal(RoleNames.UserManagers, RolesOn(typeof(UserApiController), "Delete"));
+    }
+
+    [Fact]
+    public void RoleGranting_StaysAdminOnly_NeverJustUserManager()
+    {
+        // A Tenant User must not be able to hand themselves Tenant admin - see UserRolesSet.
+        Assert.Equal(RoleNames.Admins, RolesOn(typeof(UserApiController), "UserRolesSet"));
+        Assert.Equal(RoleNames.Admins, RolesOn(typeof(UserApiController), "UserGroupAdd"));
+        Assert.Equal(RoleNames.Admins, RolesOn(typeof(UserApiController), "UserGroupDelete"));
+        Assert.DoesNotContain(RoleNames.TenantUser, RoleNames.Admins);
+        Assert.DoesNotContain(RoleNames.GlobalUser, RoleNames.Admins);
     }
 }

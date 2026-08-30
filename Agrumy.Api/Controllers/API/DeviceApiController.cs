@@ -15,22 +15,26 @@ namespace api.Controllers.API
         [Authorize]
         [HttpGet("All")]
         public async Task<ActionResult<IEnumerable<Device>>> DevicesGet() =>
-            Ok(await Repo.DevicesGetAsync(CallerTenantId));
+            Ok(CallerReadsDevicesGlobally ? await Repo.DevicesGetAllAsync() : await Repo.DevicesGetAsync(CallerTenantId));
 
         [Authorize]
         [HttpGet]
         public async Task<ActionResult<Device>> DeviceGet(int? idDevice)
         {
-            Device? device = await Repo.DeviceGetAsync(CallerTenantId, idDevice, null, null);
+            // #66 Phase 2: a Global reader/Device/admin sees any tenant's device - DeviceGetAsync's
+            // tenant filter would hide it, so use the unfiltered by-id lookup for them.
+            Device? device = CallerReadsDevicesGlobally
+                ? await Repo.DeviceGetByIdAsync(idDevice)
+                : await Repo.DeviceGetAsync(CallerTenantId, idDevice, null, null);
             return device is null ? NotFound() : Ok(device);
         }
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPut]
         public async Task<ActionResult<bool>> DeviceUpdate([FromBody] Device device)
         {
             var (existing, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(device.IDDevice), "Device");
+                () => Repo.DeviceGetByIdAsync(device.IDDevice), "Device", forWrite: true);
             if (error != null)
             {
                 return error;
@@ -43,18 +47,20 @@ namespace api.Controllers.API
             return true;
         }
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpDelete]
         public async Task<ActionResult<bool>> DeviceDelete(int? idDevice)
         {
-            var (_, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(idDevice), "Device");
+            var (device, error) = await EnsureOwnedDeviceAsync(
+                () => Repo.DeviceGetByIdAsync(idDevice), "Device", forWrite: true);
             if (error != null)
             {
                 return error;
             }
 
-            await Repo.DeviceDeleteAsync(idDevice, CallerTenantId);
+            // The device's OWN tenant, not the caller's - a Global admin/Device deleting a foreign
+            // tenant's device would otherwise silently match zero rows.
+            await Repo.DeviceDeleteAsync(idDevice, device!.TenantID);
             return true;
         }
 
@@ -63,7 +69,7 @@ namespace api.Controllers.API
         public async Task<ActionResult<DeviceConfigSensor>> DeviceConfigSensorGet(int? deviceConfigSensorID)
         {
             var (_, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByDeviceConfigSensorIdAsync(deviceConfigSensorID), "Sensor config");
+                () => Repo.DeviceGetByDeviceConfigSensorIdAsync(deviceConfigSensorID), "Sensor config", forWrite: false);
             if (error != null)
             {
                 return error;
@@ -77,7 +83,7 @@ namespace api.Controllers.API
         public async Task<ActionResult<DeviceConfigController>> DeviceConfigControllerGet(int? deviceConfigControllerID)
         {
             var (_, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByDeviceConfigControllerIdAsync(deviceConfigControllerID), "Controller config");
+                () => Repo.DeviceGetByDeviceConfigControllerIdAsync(deviceConfigControllerID), "Controller config", forWrite: false);
             if (error != null)
             {
                 return error;
@@ -86,23 +92,26 @@ namespace api.Controllers.API
             return Ok(await Repo.DeviceConfigControllerGetAsync(deviceConfigControllerID));
         }
 
-        /// <summary>Roadmap #28 admin diagnostic view - tenant ownership enforced the same way as
-        /// every other Device sub-resource GET, not just by trusting idDevice.</summary>
-        [Authorize(Roles = "admin")]
+        /// <summary>Roadmap #28 diagnostic view - #66 Phase 2 opened it from admin-only to any
+        /// authenticated caller (a Tenant reader may look at their tenant's event log); tenant
+        /// ownership still enforced the same way as every other Device sub-resource GET.</summary>
+        [Authorize]
         [HttpGet("Events")]
         public async Task<ActionResult<IList<DeviceEvent>>> DeviceEventsGet(int? idDevice)
         {
             var (device, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(idDevice), "Device");
+                () => Repo.DeviceGetByIdAsync(idDevice), "Device", forWrite: false);
             if (error != null)
             {
                 return error;
             }
 
-            return Ok(await Repo.EventDeviceGetAsync(device!.IDDevice, CallerTenantId));
+            // The device's own tenant (== the caller's for a tenant-scoped caller; the ensure call
+            // above already authorized a cross-tenant global reader).
+            return Ok(await Repo.EventDeviceGetAsync(device!.IDDevice, device.TenantID));
         }
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPut("Sensor")]
         public async Task<ActionResult<bool>> DeviceConfigSensorUpdate(DeviceUpdate? deviceUpdate)
         {
@@ -112,7 +121,7 @@ namespace api.Controllers.API
             }
 
             var (_, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice), "Device");
+                () => Repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice), "Device", forWrite: true);
             if (error != null)
             {
                 return error;
@@ -123,7 +132,7 @@ namespace api.Controllers.API
             return true;
         }
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPut("Controller")]
         public async Task<ActionResult<bool>> DeviceConfigControllerUpdate(DeviceUpdate? deviceUpdate)
         {
@@ -133,7 +142,7 @@ namespace api.Controllers.API
             }
 
             var (_, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice), "Device");
+                () => Repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice), "Device", forWrite: true);
             if (error != null)
             {
                 return error;
@@ -145,18 +154,22 @@ namespace api.Controllers.API
         }
 
         /// <summary>
-        /// Looks a device up and checks it is owned by the caller's tenant. Returns (null, 404) when
-        /// no device matches, (device, 403) on a tenant mismatch, or (device, null) when it is owned.
+        /// Looks a device up and checks the caller may touch it. Returns (null, 404) when no device
+        /// matches, (device, 403) on a tenant mismatch, or (device, null) when access is allowed.
+        /// #66 Phase 2: a foreign tenant's device passes for Global roles - CallerManagesDevicesGlobally
+        /// on a write, the wider CallerReadsDevicesGlobally (includes Global reader) on a read.
         /// </summary>
         private async Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(
-            Func<Task<Device?>> lookup, string ownerLabel)
+            Func<Task<Device?>> lookup, string ownerLabel, bool forWrite)
         {
             Device? device = await lookup();
             if (device is null)
             {
                 return (null, NotFound());
             }
-            if (device.TenantID != CallerTenantId)
+
+            bool crossTenantAllowed = forWrite ? CallerManagesDevicesGlobally : CallerReadsDevicesGlobally;
+            if (device.TenantID != CallerTenantId && !crossTenantAllowed)
             {
                 return (device, StatusCode(403, $"{ownerLabel} belongs to a different tenant"));
             }

@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using api.Dal.Entities;
 using api.Dal.Interface;
 using api.Models;
+using api.Security;
 using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
 using Npgsql;
@@ -70,6 +71,20 @@ namespace api.Dal
             // present is a no-op either way (EnsureCreatedAsync also no-ops if the DB isn't empty).
             // Migrations come back at beta - see roadmap.
             await db.Database.EnsureCreatedAsync();
+
+            // #66: EnsureCreatedAsync makes tables, never rows - without the role catalog a fresh
+            // install would have every login fall back to the legacy single-role path forever and
+            // registration's UserRolesSetAsync would silently assign nothing. Insert-if-missing by
+            // name; on a DB migrated via 2026-08-30-rbac-composable-roles.sql these already exist
+            // (with proper RoleScopeIDs, which nothing reads for authorization) so this is a no-op.
+            var existingNames = await db.UserRoles.AsNoTracking()
+                .Where(r => r.RoleName != null).Select(r => r.RoleName!).ToListAsync();
+            var missing = RoleNames.All.Except(existingNames).ToList();
+            if (missing.Count > 0)
+            {
+                db.UserRoles.AddRange(missing.Select(name => new UserRoleRow { RoleName = name }));
+                await db.SaveChangesAsync();
+            }
         }
 
         public DbFailureKind ClassifyException(Exception ex)
@@ -657,6 +672,15 @@ namespace api.Dal
         {
             await using var db = Db();
             var rows = await db.Devices.AsNoTracking().Where(d => d.TenantID == tenantID).ToListAsync();
+            return rows.Select(ToDto).ToList();
+        }
+
+        // #66 Phase 2: same query minus the tenant filter - callers (DeviceApiController) only
+        // reach this after CallerReadsDevicesGlobally passed, mirroring UsersGetAllAsync.
+        public async Task<IList<Device>> DevicesGetAllAsync()
+        {
+            await using var db = Db();
+            var rows = await db.Devices.AsNoTracking().ToListAsync();
             return rows.Select(ToDto).ToList();
         }
 

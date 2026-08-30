@@ -1,4 +1,5 @@
 using api.Dal.Interface;
+using api.Security;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
@@ -43,5 +44,44 @@ namespace api.Controllers.API
 
         /// <summary>True if the caller holds this exact role name, among possibly several.</summary>
         protected bool CallerHasRole(string roleName) => CallerRoles.Contains(roleName);
+
+        // ---- Roadmap #66 Phase 2: capability checks -------------------------------------------
+        // Every [Authorize(Roles=...)] attribute is only the coarse gate; these helpers make the
+        // precise decision (which tenant, read vs write, users vs devices). An account the #66
+        // migration missed carries only the legacy "admin"/"user" claim - for those, fall back to
+        // the pre-#66 semantics: tenant-0 admin acted globally (#65), any other admin tenant-wide.
+
+        /// <summary>Token carries none of the #66 role names - only the legacy "admin"/"user" claim.</summary>
+        private bool LegacyOnlyToken => !CallerRoles.Any(r => RoleNames.All.Contains(r));
+
+        private bool LegacyAdminFallback => LegacyOnlyToken && CallerHasRole(RoleNames.LegacyAdmin);
+
+        protected bool CallerIsGlobalAdmin =>
+            CallerHasRole(RoleNames.GlobalAdmin) || (LegacyAdminFallback && CallerTenantId == 0);
+
+        protected bool CallerManagesUsersGlobally =>
+            CallerIsGlobalAdmin || CallerHasRole(RoleNames.GlobalUser);
+
+        /// <summary>May the caller create/edit/delete users belonging to <paramref name="targetTenantId"/>.</summary>
+        protected bool CallerManagesUsers(int? targetTenantId) =>
+            CallerManagesUsersGlobally ||
+            ((CallerHasRole(RoleNames.TenantAdmin) || CallerHasRole(RoleNames.TenantUser) || LegacyAdminFallback)
+             && targetTenantId == CallerTenantId);
+
+        protected bool CallerManagesDevicesGlobally =>
+            CallerIsGlobalAdmin || CallerHasRole(RoleNames.GlobalDevice);
+
+        /// <summary>May the caller modify/delete devices belonging to <paramref name="targetTenantId"/>.</summary>
+        protected bool CallerManagesDevices(int? targetTenantId) =>
+            CallerManagesDevicesGlobally ||
+            ((CallerHasRole(RoleNames.TenantAdmin) || CallerHasRole(RoleNames.TenantDevice) || LegacyAdminFallback)
+             && targetTenantId == CallerTenantId);
+
+        // Reads: managing implies reading; Global reader reads everything everywhere but writes nothing.
+        protected bool CallerReadsUsersGlobally =>
+            CallerManagesUsersGlobally || CallerHasRole(RoleNames.GlobalReader);
+
+        protected bool CallerReadsDevicesGlobally =>
+            CallerManagesDevicesGlobally || CallerHasRole(RoleNames.GlobalReader);
     }
 }

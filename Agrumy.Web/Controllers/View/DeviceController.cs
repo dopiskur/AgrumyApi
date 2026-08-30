@@ -1,5 +1,6 @@
 using api.Dal.Interface;
 using api.Models;
+using api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,7 +14,7 @@ namespace api.Controllers.View
         public async Task<ActionResult> Details(int? idDevice) =>
             View(await api.DeviceGet(idDevice));
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> Edit(int? idDevice) =>
             View(new DeviceView
             {
@@ -22,7 +23,7 @@ namespace api.Controllers.View
                 Device = await api.DeviceGet(idDevice),
             });
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> Edit(DeviceView deviceView)
@@ -49,7 +50,8 @@ namespace api.Controllers.View
             return View("Details", await api.DeviceGet(device.IDDevice));
         }
 
-        [Authorize(Roles = "admin")]
+        // #66 Phase 2: events are a read-only diagnostic - any authenticated caller (Tenant
+        // reader included); the API scopes to the caller's tenant.
         public async Task<ActionResult> Events(int? idDevice) =>
             View(new DeviceView
             {
@@ -57,11 +59,11 @@ namespace api.Controllers.View
                 Events = await api.DeviceEventsGet(idDevice),
             });
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> Delete(int? idDevice) =>
             View(await api.DeviceGet(idDevice));
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> DeleteConfirm(int? idDevice)
@@ -70,7 +72,7 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Index));
         }
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> EditSensor(int? idDevice)
         {
             var device = await api.DeviceGet(idDevice);
@@ -82,7 +84,7 @@ namespace api.Controllers.View
             });
         }
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> EditSensor(DeviceView deviceView)
@@ -95,7 +97,7 @@ namespace api.Controllers.View
             return View("Details", await api.DeviceGet(deviceView.Device!.IDDevice));
         }
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> EditController(int? idDevice)
         {
             var device = await api.DeviceGet(idDevice);
@@ -107,7 +109,7 @@ namespace api.Controllers.View
             });
         }
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> EditController(DeviceView deviceView)

@@ -114,6 +114,9 @@ namespace api.Dal.Interface
         /// <summary>The device with this globally unique ApiId (no tenant filter), or null if none. Device-comm endpoints authenticate by ApiId/ApiKey and have no tenant context.</summary>
         Task<Device?> DeviceGetByApiIdAsync(string? apiId);
         Task<IList<Device>> DevicesGetAsync(int? tenantID);
+
+        /// <summary>Every device in every tenant - #66 Phase 2, callers must check CallerReadsDevicesGlobally themselves.</summary>
+        Task<IList<Device>> DevicesGetAllAsync();
         Task<bool> DeviceCheckMacAddressAsync(int? tenantID, string? macAddress);
         Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID);
         Task<DeviceConfigController?> DeviceConfigControllerGetAsync(int? deviceConfigControllerID);

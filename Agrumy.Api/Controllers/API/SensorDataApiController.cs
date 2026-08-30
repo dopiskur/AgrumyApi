@@ -37,11 +37,24 @@ namespace api.Controllers.API
             return Ok(Cache.GetDeviceCache(apiId).ConfigVersion);
         }
 
+        /// <summary>#66 Phase 2: deleting telemetry is device management, so the gate moved from the
+        /// binary "admin" to the device-manager roles, and the target device's own tenant is resolved
+        /// and checked explicitly (previously a cross-tenant id silently deleted zero rows).</summary>
         [HttpDelete]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> Delete(int deviceID, int timeMDMY = 0, int timeRange = 0)
         {
-            await Repo.SensorDataDeleteAsync(CallerTenantId, deviceID, timeRange, timeMDMY);
+            Device? device = await Repo.DeviceGetByIdAsync(deviceID);
+            if (device is null)
+            {
+                return NotFound();
+            }
+            if (!CallerManagesDevices(device.TenantID))
+            {
+                return StatusCode(403, "Device belongs to a different tenant");
+            }
+
+            await Repo.SensorDataDeleteAsync(device.TenantID, deviceID, timeRange, timeMDMY);
             return Ok();
         }
 
