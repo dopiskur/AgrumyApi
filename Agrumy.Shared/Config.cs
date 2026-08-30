@@ -50,9 +50,19 @@ namespace api
         // Roadmap #28: how long a device's identical repeated event is ignored server-side.
         public static int eventDedupeMinutes = ParseIntOr("ServerConfig:EventDedupeMinutes", 10);
 
+        // Roadmap #24: how long a user must wait between "resend activation email" requests.
+        public static int activationResendCooldownMinutes = ParseIntOr("ServerConfig:ActivationResendCooldownMinutes", 10);
+
+        // Roadmap #64: off by default - UserRegistration rejects an unknown tenant name instead of
+        // silently creating one until an admin opts in.
+        public static bool allowSelfServiceTenantCreation = ParseBoolOr("ServerConfig:AllowSelfServiceTenantCreation", false);
+
         private static int ParseIntOr(string key, int fallback) =>
             int.TryParse(configuration.GetSection(key).Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
                 ? value
                 : fallback;
+
+        private static bool ParseBoolOr(string key, bool fallback) =>
+            bool.TryParse(configuration.GetSection(key).Value, out var value) ? value : fallback;
     }
 }

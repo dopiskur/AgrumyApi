@@ -111,5 +111,10 @@ namespace api.Dal.Interface
 
         [Put("/api/ServerConfig")]
         Task ServerConfigUpdate([Body] ServerConfig config);
+
+        /// <summary>Roadmap #64: the one ServerConfig field an anonymous page (Register) is allowed
+        /// to read - whether to show the "create a new tenant" option at all.</summary>
+        [Get("/api/ServerConfig/Public")]
+        Task<PublicServerConfig> ServerConfigGetPublic();
     }
 }

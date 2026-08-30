@@ -22,5 +22,21 @@ namespace api.Models
         // of its last one is ignored server-side rather than stored - same seed/reload/admin-edit
         // pattern as the hysteresis fields above.
         public int? EventDedupeMinutes { get; set; }
+
+        // Roadmap #24: minimum minutes between "resend activation email" requests for the same
+        // user - default 10, admin-editable (same seed/reload pattern as the fields above).
+        public int? ActivationResendCooldownMinutes { get; set; }
+
+        // Roadmap #64: off by default. When true, UserRegistration is allowed to create a brand
+        // new tenant for a name it doesn't recognize instead of rejecting the registration.
+        public bool? AllowSelfServiceTenantCreation { get; set; }
+    }
+
+    /// <summary>The only two fields of <see cref="ServerConfig"/> a pre-login, unauthenticated page
+    /// is allowed to see - roadmap #64's Register view uses this to decide whether to show the
+    /// "create a new tenant" option at all, without needing the admin-only /api/ServerConfig.</summary>
+    public class PublicServerConfig
+    {
+        public bool AllowSelfServiceTenantCreation { get; set; }
     }
 }

@@ -53,6 +53,26 @@
                 <span asp-validation-for="EventDedupeMinutes" class="text-danger"></span>
             </div>
 
+            <p class="text-secondary">
+                Minimum minutes a user must wait between "resend activation email" requests
+                (roadmap #24).
+            </p>
+            <div class="mb-3">
+                <label asp-for="ActivationResendCooldownMinutes" class="control-label"></label>
+                <input asp-for="ActivationResendCooldownMinutes" class="form-control" />
+                <span asp-validation-for="ActivationResendCooldownMinutes" class="text-danger"></span>
+            </div>
+
+            <p class="text-secondary">
+                When enabled, the public Register page lets a visitor create a brand new tenant
+                (min. 6-character name) by simply typing a name that doesn't exist yet - they
+                become that tenant's admin. Off by default (roadmap #64).
+            </p>
+            <div class="mb-3 form-check">
+                <input asp-for="AllowSelfServiceTenantCreation" class="form-check-input" />
+                <label asp-for="AllowSelfServiceTenantCreation" class="form-check-label"></label>
+            </div>
+
             <div class="mb-0">
                 <input type="submit" value="Save" class="btn btn-primary" />
             </div>

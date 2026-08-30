@@ -50,6 +50,15 @@ namespace api.Dal.Entities
         public bool? Enabled { get; set; }
         public DateTime? DateCreated { get; set; }
         public DateTime? DateModified { get; set; }
+
+        // Roadmap #24: email ownership proof, separate from Enabled (roadmap #68 fixed Enabled to
+        // actually gate login; EmailVerified is a second, independent gate on top of it).
+        public bool EmailVerified { get; set; }
+        public string? ActivationTokenHash { get; set; }
+        public DateTime? ActivationTokenExpiresAt { get; set; }
+
+        // Resend-cooldown bookkeeping only - never surfaced on the public User DTO.
+        public DateTime? ActivationLastSentAt { get; set; }
     }
 
     /// <summary>One issued JWT refresh token. Single-use: a rotation marks the row revoked and
@@ -84,5 +93,9 @@ namespace api.Dal.Entities
 
         // Roadmap #28 - see api.Models.ServerConfig.EventDedupeMinutes.
         public int? EventDedupeMinutes { get; set; }
+
+        // Roadmap #24/#64 - see api.Models.ServerConfig.
+        public int? ActivationResendCooldownMinutes { get; set; }
+        public bool? AllowSelfServiceTenantCreation { get; set; }
     }
 }

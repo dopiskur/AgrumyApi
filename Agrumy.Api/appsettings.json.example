@@ -55,7 +55,11 @@
       "Light": 20.0
     },
     "// EventDedupeMinutes": "Roadmap #28 - a device repeating the identical event type within this many minutes of its last one is ignored server-side, not stored.",
-    "EventDedupeMinutes": 10
+    "EventDedupeMinutes": 10,
+    "// ActivationResendCooldownMinutes": "Roadmap #24 - minimum minutes between 'resend activation email' requests for the same user.",
+    "ActivationResendCooldownMinutes": 10,
+    "// AllowSelfServiceTenantCreation": "Roadmap #64 - false (default) rejects a registration for an unknown tenant name; true lets it create that tenant (min. 6-character name) and make the registrant its admin.",
+    "AllowSelfServiceTenantCreation": false
   },
 
   "// Notifications": "Alert delivery channels (roadmap #6). A channel with Enabled=false or missing settings is skipped, never an error.",

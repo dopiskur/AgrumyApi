@@ -173,6 +173,8 @@ namespace api.Dal
                 HumidityHysteresis = Config.hysteresisHumidity,
                 LightHysteresis = Config.hysteresisLight,
                 EventDedupeMinutes = Config.eventDedupeMinutes,
+                ActivationResendCooldownMinutes = Config.activationResendCooldownMinutes,
+                AllowSelfServiceTenantCreation = Config.allowSelfServiceTenantCreation,
             };
             db.ServerConfigs.Add(generated);
             await db.SaveChangesAsync();
@@ -193,6 +195,8 @@ namespace api.Dal
             row.HumidityHysteresis = config.HumidityHysteresis;
             row.LightHysteresis = config.LightHysteresis;
             row.EventDedupeMinutes = config.EventDedupeMinutes;
+            row.ActivationResendCooldownMinutes = config.ActivationResendCooldownMinutes;
+            row.AllowSelfServiceTenantCreation = config.AllowSelfServiceTenantCreation;
             await db.SaveChangesAsync();
         }
 
@@ -221,6 +225,8 @@ namespace api.Dal
             row.HumidityHysteresis = Config.hysteresisHumidity;
             row.LightHysteresis = Config.hysteresisLight;
             row.EventDedupeMinutes = Config.eventDedupeMinutes;
+            row.ActivationResendCooldownMinutes = Config.activationResendCooldownMinutes;
+            row.AllowSelfServiceTenantCreation = Config.allowSelfServiceTenantCreation;
             await db.SaveChangesAsync();
         }
 
@@ -242,6 +248,7 @@ namespace api.Dal
                 Phone = user.Phone,
                 UserGroupID = user.UserGroupID,
                 Enabled = user.Enabled,
+                EmailVerified = user.EmailVerified ?? false,
             });
             await db.SaveChangesAsync();
         }
@@ -321,6 +328,17 @@ namespace api.Dal
             return rows.Select(x => ToDto(x.u, x.g)).ToList();
         }
 
+        // Roadmap #65: same query as UsersGetAsync minus the tenant filter - callers (UserApiController)
+        // only reach this after confirming the caller is a TenantID==0 admin.
+        public async Task<IList<User>> UsersGetAllAsync()
+        {
+            await using var db = Db();
+            var rows = await (from u in db.Users.AsNoTracking()
+                              join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup
+                              select new { u, g }).ToListAsync();
+            return rows.Select(x => ToDto(x.u, x.g)).ToList();
+        }
+
         public async Task<UserSecret?> UserSecretGetAsync(int? idUser, string? email, string? username)
         {
             await using var db = Db();
@@ -363,6 +381,71 @@ namespace api.Dal
             return await db.UserRoles.AsNoTracking()
                 .Select(r => new UserRole { IDUserRole = r.IDUserRole, RoleName = r.RoleName, RoleScopeID = r.RoleScopeID })
                 .ToListAsync();
+        }
+
+        // ---- Email activation (roadmap #24) -----------------------------------------
+
+        public async Task UserSetActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt)
+        {
+            await using var db = Db();
+            var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == idUser);
+            if (row is null) { return; }
+
+            row.ActivationTokenHash = tokenHash;
+            row.ActivationTokenExpiresAt = expiresAt;
+            row.ActivationLastSentAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+
+        public async Task<bool> UserIssueActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt, int cooldownMinutes)
+        {
+            await using var db = Db();
+            var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == idUser);
+            if (row is null || row.EmailVerified)
+            {
+                return false;
+            }
+            if (row.ActivationLastSentAt is DateTime lastSent && lastSent > DateTime.UtcNow.AddMinutes(-cooldownMinutes))
+            {
+                return false; // still in cooldown
+            }
+
+            row.ActivationTokenHash = tokenHash;
+            row.ActivationTokenExpiresAt = expiresAt;
+            row.ActivationLastSentAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<User?> UserActivateAsync(string tokenHash)
+        {
+            await using var db = Db();
+            var row = await db.Users.FirstOrDefaultAsync(u => u.ActivationTokenHash == tokenHash);
+            if (row is null || row.ActivationTokenExpiresAt is null || row.ActivationTokenExpiresAt < DateTime.UtcNow)
+            {
+                return null;
+            }
+
+            row.EmailVerified = true;
+            row.ActivationTokenHash = null;
+            row.ActivationTokenExpiresAt = null;
+            await db.SaveChangesAsync();
+
+            UserGroupRow? group = await db.UserGroups.AsNoTracking().FirstOrDefaultAsync(g => g.IDUserGroup == row.UserGroupID);
+            return group is null ? null : ToDto(row, group);
+        }
+
+        // Roadmap #63: a tenant can never have zero admins - its creator becomes one at registration
+        // (see UserApiController.UserRegistration) - so this is never empty for a real tenant.
+        public async Task<IList<User>> TenantAdminsGetAsync(int tenantId)
+        {
+            await using var db = Db();
+            var rows = await (from u in db.Users.AsNoTracking()
+                              join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup
+                              join r in db.UserRoles.AsNoTracking() on g.UserRoleID equals r.IDUserRole
+                              where u.TenantID == tenantId && r.RoleName == "admin"
+                              select new { u, g }).ToListAsync();
+            return rows.Select(x => ToDto(x.u, x.g)).ToList();
         }
 
         // ---- Refresh tokens ---------------------------------------------------------
@@ -1091,6 +1174,8 @@ namespace api.Dal
             HumidityHysteresis = r.HumidityHysteresis,
             LightHysteresis = r.LightHysteresis,
             EventDedupeMinutes = r.EventDedupeMinutes,
+            ActivationResendCooldownMinutes = r.ActivationResendCooldownMinutes,
+            AllowSelfServiceTenantCreation = r.AllowSelfServiceTenantCreation,
         };
 
         // UserGet / UsersGet joined only userGroup (not userRole), so RoleName stays null and
@@ -1111,6 +1196,7 @@ namespace api.Dal
             Enabled = u.Enabled,
             DateCreated = u.DateCreated,
             DateModified = u.DateModified,
+            EmailVerified = u.EmailVerified,
         };
 
         private static Device ToDto(DeviceRow d) => new()

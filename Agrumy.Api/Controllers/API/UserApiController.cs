@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using api.Dal.Interface;
 using api.Models;
+using api.Notifications;
 using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Authorization;
@@ -11,24 +12,26 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace api.Controllers.API
 {
     [Route("api/User")]
-    public class UserApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
+    public class UserApiController(IRepository repo, ICache cache, INotificationDispatcher notifications) : ApiControllerBase(repo, cache)
     {
         private const int DefaultRoleId = 1;   // "regular user" group on an existing tenant
-        private const bool DefaultUserEnabled = false;
         private const int AccessTokenMinutes = 120;
         private const int RefreshTokenDays = 30;
+        private const int ActivationTokenValidHours = 24; // roadmap #24
+        private const int MinTenantNameLength = 6;        // roadmap #64
 
         private static readonly string? SecureKey = Config.secureKey;
 
-        /// <summary>New opaque refresh token plus the hash that's actually stored - the plaintext
-        /// never touches the DB.</summary>
-        private static (string Plaintext, string Hash) GenerateRefreshToken()
+        /// <summary>New opaque token plus the hash that's actually stored - the plaintext never
+        /// touches the DB. Shared by refresh tokens and activation tokens; same shape, same
+        /// single-use-until-redeemed lifecycle.</summary>
+        private static (string Plaintext, string Hash) GenerateOpaqueToken()
         {
             string plaintext = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
-            return (plaintext, HashRefreshToken(plaintext));
+            return (plaintext, HashToken(plaintext));
         }
 
-        private static string HashRefreshToken(string plaintext) =>
+        private static string HashToken(string plaintext) =>
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(plaintext)));
 
         /// <summary>Looks up a user + their password secret by email or username (whichever <paramref name="login"/> looks like); either element is null when nothing matches.</summary>
@@ -45,6 +48,23 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
+            bool isNewTenant = !await Repo.TenantGetAsync(value.TenantName!);
+            if (isNewTenant)
+            {
+                // Roadmap #64: self-service tenant creation is opt-in, and when it's on the name
+                // still needs to be long enough that it wasn't just a typo of an existing one.
+                ServerConfig serverConfig = await Repo.ServerConfigGetAsync(1);
+                bool allowSelfService = serverConfig.AllowSelfServiceTenantCreation ?? Config.allowSelfServiceTenantCreation;
+                if (!allowSelfService)
+                {
+                    return StatusCode(403, "Unknown tenant name, and self-service tenant creation is disabled.");
+                }
+                if ((value.TenantName?.Length ?? 0) < MinTenantNameLength)
+                {
+                    return BadRequest($"Tenant name must be at least {MinTenantNameLength} characters.");
+                }
+            }
+
             var user = new User
             {
                 Email = value.Email,
@@ -52,29 +72,125 @@ namespace api.Controllers.API
                 FirstName = value.FirstName,
                 LastName = value.LastName,
                 Phone = value.Phone,
+                EmailVerified = false, // roadmap #24 - proven only via GET /api/User/Activate below
             };
 
             var userSecret = new UserSecret { PwdSalt = AuthenticationProvider.GetSalt() };
             userSecret.PwdHash = AuthenticationProvider.GetHash(value.Password, userSecret.PwdSalt);
 
-            if (!await Repo.TenantGetAsync(value.TenantName))
+            if (isNewTenant)
             {
-                // Brand-new tenant: the registrant becomes its admin.
-                user.TenantID = await Repo.TenantAddAsync(value.TenantName);
+                // Brand-new tenant: the registrant becomes its admin - nobody else exists yet to approve them.
+                user.TenantID = await Repo.TenantAddAsync(value.TenantName!);
                 user.UserGroupID = 0;
-                user.Enabled = true;
             }
             else
             {
-                // Existing tenant: join as a regular, disabled user (not the default tenant 0 -
-                // that would merge unrelated tenants' users into one bucket).
-                user.TenantID = await Repo.TenantGetIdAsync(value.TenantName);
+                // Existing tenant: join as a regular user.
+                user.TenantID = await Repo.TenantGetIdAsync(value.TenantName!);
                 user.UserGroupID = DefaultRoleId;
-                user.Enabled = DefaultUserEnabled;
             }
 
+            // Roadmap #63: TenantID==0 (the shared default tenant) has no owning admin to ask,
+            // same reasoning as a brand-new tenant's own creator above - everyone else joining an
+            // EXISTING, non-zero tenant waits for that tenant's admin to enable them.
+            user.Enabled = isNewTenant || user.TenantID == 0;
+
             await Repo.UserAddAsync(user, userSecret);
+
+            // Roadmap #24: UserAddAsync doesn't hand back the new IDUser, and the activation token
+            // needs one to attach to - a fresh lookup by the just-inserted, unique email is simplest.
+            User? added = await Repo.UserGetAsync(null, value.Email, null);
+            if (added?.IDUser is int idUser)
+            {
+                var (plaintext, hash) = GenerateOpaqueToken();
+                await Repo.UserSetActivationTokenAsync(idUser, hash, DateTime.UtcNow.AddHours(ActivationTokenValidHours));
+                await SendActivationEmailAsync(user.Email, plaintext);
+            }
+
             return Ok(user);
+        }
+
+        /// <summary>Roadmap #24: proves the registrant owns the email address on file - the direct
+        /// link a user clicks from their inbox, so it must work unauthenticated.</summary>
+        [HttpGet("Activate")]
+        [AllowAnonymous]
+        public async Task<ActionResult> Activate([FromQuery] string? token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return BadRequest("Missing activation token.");
+            }
+
+            User? user = await Repo.UserActivateAsync(HashToken(token));
+            if (user is null)
+            {
+                return StatusCode(400, "Activation link is invalid or has expired.");
+            }
+
+            // Roadmap #63: TenantID==0 and a brand-new tenant's own creator were already Enabled at
+            // registration above (nobody to ask) - anyone else joining an existing tenant still
+            // needs that tenant's admin to approve them, which only makes sense to ask for now that
+            // the email address is confirmed real.
+            if (user.TenantID != 0 && user.Enabled != true)
+            {
+                await NotifyTenantAdminsOfPendingApprovalAsync(user);
+                return Ok("Email verified. Your tenant administrator has been notified and must approve your account before you can sign in.");
+            }
+            return Ok("Email verified. You can now sign in.");
+        }
+
+        /// <summary>Roadmap #24: re-sends the activation email. Rate-limited server-side by
+        /// ServerConfig.ActivationResendCooldownMinutes (not just the IP-based "login" policy
+        /// below) so a forgotten inbox can't be used to spam one address. Always returns the same
+        /// generic message regardless of whether the account exists or is already verified - the
+        /// one endpoint in this controller that must not leak either fact.</summary>
+        [HttpPost("ResendActivation")]
+        [AllowAnonymous]
+        [EnableRateLimiting("login")]
+        public async Task<ActionResult> ResendActivation([FromBody] ResendActivationRequest value)
+        {
+            if (!ModelState.IsValid) { return BadRequest(ModelState); }
+
+            var (user, _) = await LookupAsync(value.Login);
+            if (user?.IDUser is int idUser && user.EmailVerified != true)
+            {
+                int cooldownMinutes = (await Repo.ServerConfigGetAsync(1)).ActivationResendCooldownMinutes ?? Config.activationResendCooldownMinutes;
+                var (plaintext, hash) = GenerateOpaqueToken();
+                bool issued = await Repo.UserIssueActivationTokenAsync(idUser, hash, DateTime.UtcNow.AddHours(ActivationTokenValidHours), cooldownMinutes);
+                if (issued)
+                {
+                    await SendActivationEmailAsync(user.Email, plaintext);
+                }
+            }
+            return Ok("If that account exists and is not yet verified, a new activation email has been sent.");
+        }
+
+        private async Task SendActivationEmailAsync(string? email, string plaintextToken)
+        {
+            if (string.IsNullOrWhiteSpace(email)) { return; }
+
+            string link = $"{Config.jwtIssuer}/api/User/Activate?token={Uri.EscapeDataString(plaintextToken)}";
+            await notifications.DispatchAsync(new Notification(
+                "Confirm your Agrumy account",
+                $"Click the link below to verify your email address:\n{link}\n\nThis link expires in {ActivationTokenValidHours} hours.",
+                new NotificationRecipient(Email: email)));
+        }
+
+        /// <summary>Roadmap #63: tells every admin of the given tenant that a newly-verified user
+        /// is waiting for approval. Never a no-op silently - a tenant can never have zero admins,
+        /// its creator becomes one at registration (see UserRegistration above).</summary>
+        private async Task NotifyTenantAdminsOfPendingApprovalAsync(User user)
+        {
+            IList<User> admins = await Repo.TenantAdminsGetAsync(user.TenantID!.Value);
+            foreach (User admin in admins)
+            {
+                if (string.IsNullOrWhiteSpace(admin.Email)) { continue; }
+                await notifications.DispatchAsync(new Notification(
+                    "New user awaiting approval",
+                    $"{user.Email} ({user.Username}) verified their email and is waiting for your approval before they can sign in.",
+                    new NotificationRecipient(Email: admin.Email)));
+            }
         }
 
         [HttpPost("Login")]
@@ -90,6 +206,19 @@ namespace api.Controllers.API
                 return StatusCode(401, "Wrong username or password");
             }
 
+            // Roadmap #68: Enabled/EmailVerified were never actually checked here before - a
+            // disabled or unverified account could log in and use the API regardless of what the
+            // admin UI or "check your inbox" message implied. Checked in this order so the more
+            // specific, actionable reason (verify your email) surfaces before the generic one.
+            if (user.EmailVerified != true)
+            {
+                return StatusCode(403, "Email address not verified yet - check your inbox for the activation link.");
+            }
+            if (user.Enabled != true)
+            {
+                return StatusCode(403, "Account not yet enabled - waiting for administrator approval.");
+            }
+
             IList<UserRole> roles = await Repo.UserRoleGetAsync();
             UserRole? role = roles.FirstOrDefault(m => m.IDUserRole == user.UserRoleID);
             if (role?.RoleName == null)
@@ -98,7 +227,7 @@ namespace api.Controllers.API
             }
 
             string token = JwtTokenProvider.CreateToken(SecureKey, AccessTokenMinutes, user.Email, role.RoleName, user.TenantID.ToString());
-            var (refreshToken, refreshTokenHash) = GenerateRefreshToken();
+            var (refreshToken, refreshTokenHash) = GenerateOpaqueToken();
             await Repo.RefreshTokenAddAsync(user.IDUser!.Value, refreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
 
             return Ok(new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = token, RefreshToken = refreshToken });
@@ -113,7 +242,7 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-            string incomingHash = HashRefreshToken(value.RefreshToken!);
+            string incomingHash = HashToken(value.RefreshToken!);
             RefreshTokenInfo? stored = await Repo.RefreshTokenGetAsync(incomingHash);
             if (stored is null)
             {
@@ -136,6 +265,13 @@ namespace api.Controllers.API
             {
                 return StatusCode(401, "User no longer exists");
             }
+            // Roadmap #68: a refresh must not silently keep a since-disabled/unverified account
+            // logged in forever - same gate as UserLogin, just without the two distinct messages
+            // (this is a machine-to-machine call, not a form the user reads).
+            if (user.EmailVerified != true || user.Enabled != true)
+            {
+                return StatusCode(403, "Account is not active.");
+            }
 
             IList<UserRole> roles = await Repo.UserRoleGetAsync();
             UserRole? role = roles.FirstOrDefault(m => m.IDUserRole == user.UserRoleID);
@@ -144,7 +280,7 @@ namespace api.Controllers.API
                 return StatusCode(500, "User has no valid role assigned.");
             }
 
-            var (newRefreshToken, newRefreshTokenHash) = GenerateRefreshToken();
+            var (newRefreshToken, newRefreshTokenHash) = GenerateOpaqueToken();
             await Repo.RefreshTokenRotateAsync(incomingHash, newRefreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
 
             string newAccessToken = JwtTokenProvider.CreateToken(SecureKey, AccessTokenMinutes, user.Email, role.RoleName, user.TenantID.ToString());
@@ -159,7 +295,7 @@ namespace api.Controllers.API
         {
             if (!string.IsNullOrWhiteSpace(value.RefreshToken))
             {
-                await Repo.RefreshTokenRevokeAsync(HashRefreshToken(value.RefreshToken));
+                await Repo.RefreshTokenRevokeAsync(HashToken(value.RefreshToken));
             }
             return Ok();
         }
@@ -189,12 +325,18 @@ namespace api.Controllers.API
                 : StatusCode(403, "Password change failed for: " + user.Email);
         }
 
+        /// <summary>Roadmap #65: a minimal, deliberately narrow cross-tenant carve-out - an admin
+        /// whose own TenantID is 0 manages users in every tenant, not only their own. Users only,
+        /// not Devices (agreed scope). Meant to be replaced by a real role once #66 (full RBAC) is
+        /// built, not extended piecemeal in the meantime.</summary>
+        private bool IsGlobalAdmin => CallerRole == "admin" && CallerTenantId == 0;
+
         // ---- read ----------------------------------------------------------------
 
         [HttpGet("All")]
         [Authorize(Roles = "admin")]
         public async Task<ActionResult<IList<User>>> UsersGet() =>
-            Ok(await Repo.UsersGetAsync(CallerTenantId));
+            Ok(IsGlobalAdmin ? await Repo.UsersGetAllAsync() : await Repo.UsersGetAsync(CallerTenantId));
 
         /// <summary>The caller's own record - looked up by the email in their JWT, so any authenticated user.</summary>
         [HttpGet("Self")]
@@ -219,7 +361,7 @@ namespace api.Controllers.API
             {
                 return NotFound();
             }
-            return user.TenantID != CallerTenantId
+            return user.TenantID != CallerTenantId && !IsGlobalAdmin
                 ? StatusCode(403, "Target user belongs to a different tenant")
                 : Ok(user);
         }
@@ -242,6 +384,7 @@ namespace api.Controllers.API
                 LastName = value.LastName,
                 Phone = value.Phone,
                 Enabled = value.Enabled,
+                EmailVerified = true, // an admin vouching for the address directly bypasses roadmap #24's proof-of-ownership step
             };
 
             var userSecret = new UserSecret { PwdSalt = AuthenticationProvider.GetSalt() };
@@ -268,7 +411,7 @@ namespace api.Controllers.API
             {
                 return Unauthorized();
             }
-            if (user.TenantID != CallerTenantId)
+            if (user.TenantID != CallerTenantId && !IsGlobalAdmin)
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
             }
@@ -292,6 +435,7 @@ namespace api.Controllers.API
             if (value.Phone != null) { user.Phone = value.Phone; }
             if (value.UserGroupID != null && isAdmin) { user.UserGroupID = value.UserGroupID; } // role change: admin only
             if (value.Enabled != null && isAdmin) { user.Enabled = value.Enabled; }             // enable/disable: admin only
+            if (value.TenantID != null && IsGlobalAdmin) { user.TenantID = value.TenantID; }    // roadmap #65: reassigning tenant is a global-admin-only power
 
             await Repo.UserUpdateAsync(user);
             return Ok(true);
@@ -311,7 +455,7 @@ namespace api.Controllers.API
             {
                 return NotFound("User not found");
             }
-            if (targetUser.TenantID != CallerTenantId)
+            if (targetUser.TenantID != CallerTenantId && !IsGlobalAdmin)
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
             }

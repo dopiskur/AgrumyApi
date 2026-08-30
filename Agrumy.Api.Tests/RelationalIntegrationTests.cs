@@ -866,4 +866,117 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             Assert.Equal(DbFailureKind.ConstraintViolation, _repo.ClassifyException(ex));
         }
     }
+
+    // ---- Email activation (roadmap #24/#63) ----------------------------------
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task UserActivateAsync_ValidToken_SetsEmailVerifiedAndClearsToken(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+        const string tokenHash = "hash-does-not-need-to-be-real-sha256-for-this-test";
+        await _repo.UserSetActivationTokenAsync(userId, tokenHash, DateTime.UtcNow.AddHours(1));
+
+        User? activated = await _repo.UserActivateAsync(tokenHash);
+
+        Assert.NotNull(activated);
+        Assert.Equal(userId, activated!.IDUser);
+        Assert.True(activated.EmailVerified);
+
+        // The token must not be redeemable a second time - UserActivateAsync clears it.
+        User? secondAttempt = await _repo.UserActivateAsync(tokenHash);
+        Assert.Null(secondAttempt);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task UserActivateAsync_ExpiredToken_ReturnsNull_LeavesEmailUnverified(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, email) = await MakeUser(t);
+        const string tokenHash = "expired-token-hash";
+        await _repo.UserSetActivationTokenAsync(userId, tokenHash, DateTime.UtcNow.AddHours(-1)); // already in the past
+
+        User? result = await _repo.UserActivateAsync(tokenHash);
+
+        Assert.Null(result);
+        User? stillPending = await _repo.UserGetAsync(null, email, null);
+        Assert.False(stillPending!.EmailVerified);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task UserIssueActivationTokenAsync_AlreadyVerified_ReturnsFalse(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+        await _repo.UserSetActivationTokenAsync(userId, "first-token", DateTime.UtcNow.AddHours(1));
+        Assert.NotNull(await _repo.UserActivateAsync("first-token")); // now EmailVerified
+
+        bool issued = await _repo.UserIssueActivationTokenAsync(userId, "second-token", DateTime.UtcNow.AddHours(1), cooldownMinutes: 0);
+
+        Assert.False(issued);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task UserIssueActivationTokenAsync_WithinCooldown_ReturnsFalse_ButOffCooldown_ReturnsTrue(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+        await _repo.UserSetActivationTokenAsync(userId, "initial-token", DateTime.UtcNow.AddHours(1)); // sets ActivationLastSentAt=now
+
+        bool tooSoon = await _repo.UserIssueActivationTokenAsync(userId, "resend-1", DateTime.UtcNow.AddHours(1), cooldownMinutes: 10);
+        Assert.False(tooSoon);
+
+        // Backdate ActivationLastSentAt past the cooldown window directly, same technique the
+        // EventDevicePush dedupe-expiry test uses - no need to actually wait 10 minutes.
+        await using (var db = _fx.NewContext(t))
+        {
+            var row = await db.Users.FirstAsync(u => u.IDUser == userId);
+            row.ActivationLastSentAt = DateTime.UtcNow.AddMinutes(-11);
+            await db.SaveChangesAsync();
+        }
+
+        bool offCooldown = await _repo.UserIssueActivationTokenAsync(userId, "resend-2", DateTime.UtcNow.AddHours(1), cooldownMinutes: 10);
+        Assert.True(offCooldown);
+
+        // The new token, not the stale one, must be the one that now activates the account.
+        Assert.NotNull(await _repo.UserActivateAsync("resend-2"));
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task TenantAdminsGetAsync_ReturnsOnlyAdminsOfThatTenant(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        string tag = U();
+        int tenantId = await _repo.TenantAddAsync("T_" + tag);
+
+        var admin = new User { TenantID = tenantId, UserGroupID = t.AdminGroupId, Email = tag + "-admin@ex.com", Username = "admin_" + tag, DevicePin = 1 };
+        var regular = new User { TenantID = tenantId, UserGroupID = t.RegularGroupId, Email = tag + "-user@ex.com", Username = "user_" + tag, DevicePin = 2 };
+        await _repo.UserAddAsync(admin, new UserSecret { PwdHash = "h", PwdSalt = "s" });
+        await _repo.UserAddAsync(regular, new UserSecret { PwdHash = "h", PwdSalt = "s" });
+
+        // A tenant admin elsewhere must never show up for THIS tenant's lookup.
+        var (_, _, _) = await MakeUser(t); // creates its own tenant + a regular user, unrelated
+        int otherTenantId = await _repo.TenantAddAsync("T_" + U());
+        var otherAdmin = new User { TenantID = otherTenantId, UserGroupID = t.AdminGroupId, Email = U() + "@ex.com", Username = "u_" + U(), DevicePin = 3 };
+        await _repo.UserAddAsync(otherAdmin, new UserSecret { PwdHash = "h", PwdSalt = "s" });
+
+        IList<User> admins = await _repo.TenantAdminsGetAsync(tenantId);
+
+        Assert.Single(admins);
+        Assert.Equal(admin.Email, admins[0].Email);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task UsersGetAllAsync_ReturnsUsersAcrossDifferentTenants(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantA, userIdA, _) = await MakeUser(t);
+        var (tenantB, userIdB, _) = await MakeUser(t);
+        Assert.NotEqual(tenantA, tenantB);
+
+        IList<User> all = await _repo.UsersGetAllAsync();
+
+        Assert.Contains(all, u => u.IDUser == userIdA);
+        Assert.Contains(all, u => u.IDUser == userIdB);
+    }
 }

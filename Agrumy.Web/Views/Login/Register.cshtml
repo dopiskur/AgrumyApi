@@ -36,6 +36,20 @@
             </div>
             <span asp-validation-for="Password" class="text-danger"></span>
         </div>
+        @if ((bool)(ViewBag.AllowSelfServiceTenantCreation ?? false))
+        {
+            @* Roadmap #64: hidden entirely when self-service tenant creation is off - the model's
+               own default ("default") is submitted for everyone in that case, unchanged. *@
+            <div class="mb-3">
+                <label asp-for="TenantName" class="visually-hidden"></label>
+                <div class="input-group">
+                    <input asp-for="TenantName" class="form-control" placeholder="Tenant name (leave as 'default' to join the shared workspace)" />
+                    <div class="input-group-text"><span class="bi bi-building"></span></div>
+                </div>
+                <span asp-validation-for="TenantName" class="text-danger"></span>
+                <div class="form-text">To create a new tenant, enter a name that doesn't exist yet (at least 6 characters) - you become its admin.</div>
+            </div>
+        }
         <div class="row">
             <div class="col-12">
                 <div class="d-grid gap-2">

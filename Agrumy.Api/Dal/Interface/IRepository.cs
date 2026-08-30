@@ -36,12 +36,35 @@ namespace api.Dal.Interface
         Task<User?> UserGetAsync(int? idUser, string? email, string? username);
         Task<IList<User>> UsersGetAsync(int? tenantID);
 
+        /// <summary>Every user in every tenant - roadmap #65, callers must enforce the global-admin check themselves.</summary>
+        Task<IList<User>> UsersGetAllAsync();
+
         /// <summary>The password hash+salt for the user matched by id / email / username, or null if none matches.</summary>
         Task<UserSecret?> UserSecretGetAsync(int? idUser, string? email, string? username);
 
         Task<bool> UserSetPasswordAsync(string? email, UserSecret userSecret);
 
         Task<IList<UserRole>> UserRoleGetAsync();
+
+        // Email activation (roadmap #24)
+
+        /// <summary>Attaches a fresh activation token to a just-registered user. Always issues - no
+        /// cooldown check, this is the first send.</summary>
+        Task UserSetActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt);
+
+        /// <summary>Re-issues an activation token for the "resend" flow. Returns false (issuing
+        /// nothing) when the user is already verified or the last send is still within
+        /// cooldownMinutes, so the controller's generic "if that account exists" response stays
+        /// truthful either way without a separate state check.</summary>
+        Task<bool> UserIssueActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt, int cooldownMinutes);
+
+        /// <summary>Marks the user matching this activation token hash as EmailVerified and clears
+        /// the token. Returns null if the hash matches nothing or the token already expired.</summary>
+        Task<User?> UserActivateAsync(string tokenHash);
+
+        /// <summary>Every admin-role user in the given tenant - roadmap #63's "notify the tenant's
+        /// admins" step. Never empty for a real tenant: its creator always becomes its first admin.</summary>
+        Task<IList<User>> TenantAdminsGetAsync(int tenantId);
 
         // Refresh tokens - opaque, single-use, rotated on every redemption. Only a SHA-256 hash of
         // the token ever reaches the DB or these method signatures.

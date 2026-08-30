@@ -2,6 +2,7 @@ using System.Security.Claims;
 using api.Controllers.API;
 using api.Dal.Interface;
 using api.Models;
+using api.Notifications;
 using api.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -19,8 +20,12 @@ public class ApiControllerTests
     private readonly Mock<IRepository> _repo = new(MockBehavior.Strict);
     private readonly Mock<ICache> _cache = new();
 
+    // Loose: most tests here don't care whether/how an activation or approval email was
+    // dispatched - only the handful that assert on it (see the roadmap #24/#63 section) add setups.
+    private readonly Mock<INotificationDispatcher> _notifications = new();
+
     private DeviceApiController NewDeviceController() => new(_repo.Object, _cache.Object);
-    private UserApiController NewUserController() => new(_repo.Object, _cache.Object);
+    private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _notifications.Object);
 
     /// <summary>Gives a bare (non-DI-constructed) controller the JWT claims an [Authorize] action reads via HttpContext.User.</summary>
     private static void SetCaller(ControllerBase controller, string role, int? tenantId)
@@ -145,11 +150,22 @@ public class ApiControllerTests
 
     // ---- UserApiController.UserRegistration ------------------------------------------------
 
+    /// <summary>Common post-UserAddAsync plumbing every UserRegistration call now goes through
+    /// (roadmap #24): a lookup to recover the freshly-inserted IDUser, then an activation token
+    /// write. Neither is the point of most of these tests, so they're stubbed permissively here.</summary>
+    private void StubActivationPlumbing(string email, int idUser)
+    {
+        _repo.Setup(r => r.UserGetAsync(null, email, null)).ReturnsAsync(new User { IDUser = idUser, Email = email });
+        _repo.Setup(r => r.UserSetActivationTokenAsync(idUser, It.IsAny<string>(), It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+    }
+
     [Fact]
     public async Task UserRegistration_NewTenantName_CreatesTenantAndBecomesAdmin()
     {
-        _repo.Setup(r => r.TenantGetAsync("Acme")).ReturnsAsync(false);
-        _repo.Setup(r => r.TenantAddAsync("Acme")).ReturnsAsync(42);
+        _repo.Setup(r => r.TenantGetAsync("AcmeCorp")).ReturnsAsync(false);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { AllowSelfServiceTenantCreation = true });
+        _repo.Setup(r => r.TenantAddAsync("AcmeCorp")).ReturnsAsync(42);
+        StubActivationPlumbing("owner@acme.local", 1);
 
         User? capturedUser = null;
         _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>()))
@@ -157,14 +173,44 @@ public class ApiControllerTests
              .Returns(Task.CompletedTask);
 
         var controller = NewUserController();
-        var value = new UserRegistration { Email = "owner@acme.local", Username = "owner", Password = "pw", TenantName = "Acme" };
+        var value = new UserRegistration { Email = "owner@acme.local", Username = "owner", Password = "pw", TenantName = "AcmeCorp" };
         var result = await controller.UserRegistration(value);
 
         Assert.IsType<OkObjectResult>(result.Result);
         Assert.NotNull(capturedUser);
         Assert.Equal(42, capturedUser!.TenantID);
         Assert.Equal(0, capturedUser.UserGroupID); // admin on a brand new tenant
-        Assert.True(capturedUser.Enabled);
+        Assert.True(capturedUser.Enabled);          // nobody else exists yet to approve them (roadmap #63)
+        Assert.False(capturedUser.EmailVerified);   // still needs to click the activation link (roadmap #24)
+    }
+
+    [Fact]
+    public async Task UserRegistration_UnknownTenantName_SelfServiceDisabled_Returns403AndDoesNotCreateTenant()
+    {
+        _repo.Setup(r => r.TenantGetAsync("AcmeCorp")).ReturnsAsync(false);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { AllowSelfServiceTenantCreation = false });
+
+        var controller = NewUserController();
+        var value = new UserRegistration { Email = "owner@acme.local", Username = "owner", Password = "pw", TenantName = "AcmeCorp" };
+        var result = await controller.UserRegistration(value);
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+        _repo.Verify(r => r.TenantAddAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UserRegistration_NewTenantName_TooShort_Returns400EvenWhenSelfServiceEnabled()
+    {
+        _repo.Setup(r => r.TenantGetAsync("abc")).ReturnsAsync(false);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { AllowSelfServiceTenantCreation = true });
+
+        var controller = NewUserController();
+        var value = new UserRegistration { Email = "owner@acme.local", Username = "owner", Password = "pw", TenantName = "abc" };
+        var result = await controller.UserRegistration(value);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        _repo.Verify(r => r.TenantAddAsync(It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
@@ -172,6 +218,7 @@ public class ApiControllerTests
     {
         _repo.Setup(r => r.TenantGetAsync("Acme")).ReturnsAsync(true);
         _repo.Setup(r => r.TenantGetIdAsync("Acme")).ReturnsAsync(42);
+        StubActivationPlumbing("member@acme.local", 2);
 
         User? capturedUser = null;
         _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>()))
@@ -186,7 +233,29 @@ public class ApiControllerTests
         Assert.NotNull(capturedUser);
         Assert.Equal(42, capturedUser!.TenantID); // joins the existing tenant, no new one created
         Assert.Equal(1, capturedUser.UserGroupID); // regular user, not admin
-        Assert.False(capturedUser.Enabled);        // waits for that tenant's admin to enable them
+        Assert.False(capturedUser.Enabled);        // waits for that tenant's admin to enable them (roadmap #63)
+    }
+
+    [Fact]
+    public async Task UserRegistration_ExistingTenantZero_AutoEnabled_NoOneToApprove()
+    {
+        // TenantID 0 has no owning admin to ask, same "nobody to approve" reasoning as a brand-new
+        // tenant's own creator above - roadmap #63.
+        _repo.Setup(r => r.TenantGetAsync("default")).ReturnsAsync(true);
+        _repo.Setup(r => r.TenantGetIdAsync("default")).ReturnsAsync(0);
+        StubActivationPlumbing("newbie@example.com", 3);
+
+        User? capturedUser = null;
+        _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>()))
+             .Callback<User, UserSecret>((u, s) => capturedUser = u)
+             .Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        var value = new UserRegistration { Email = "newbie@example.com", Username = "newbie", Password = "pw", TenantName = "default" };
+        var result = await controller.UserRegistration(value);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.True(capturedUser!.Enabled);
     }
 
     // ---- UserApiController.UserLogin -----------------------------------------------------
@@ -199,7 +268,7 @@ public class ApiControllerTests
         string hash = AuthenticationProvider.GetHash(password, salt);
 
         _repo.Setup(r => r.UserGetAsync(null, "alice@example.com", null))
-             .ReturnsAsync(new User { IDUser = 5, Email = "alice@example.com", UserRoleID = 1, TenantID = 0 });
+             .ReturnsAsync(new User { IDUser = 5, Email = "alice@example.com", UserRoleID = 1, TenantID = 0, EmailVerified = true, Enabled = true });
         _repo.Setup(r => r.UserSecretGetAsync(null, "alice@example.com", null))
              .ReturnsAsync(new UserSecret { PwdHash = hash, PwdSalt = salt });
         _repo.Setup(r => r.UserRoleGetAsync())
@@ -250,6 +319,48 @@ public class ApiControllerTests
         Assert.Equal("Wrong username or password", obj.Value);
     }
 
+    // ---- UserApiController.UserLogin - roadmap #68 (Enabled/EmailVerified were never checked) ----
+
+    [Fact]
+    public async Task UserLogin_CorrectPassword_EmailNotVerified_Returns403_NotAToken()
+    {
+        const string password = "hunter2!";
+        string salt = AuthenticationProvider.GetSalt();
+        string hash = AuthenticationProvider.GetHash(password, salt);
+
+        _repo.Setup(r => r.UserGetAsync(null, "pending@example.com", null))
+             .ReturnsAsync(new User { IDUser = 7, Email = "pending@example.com", UserRoleID = 1, TenantID = 0, EmailVerified = false, Enabled = true });
+        _repo.Setup(r => r.UserSecretGetAsync(null, "pending@example.com", null))
+             .ReturnsAsync(new UserSecret { PwdHash = hash, PwdSalt = salt });
+
+        var controller = NewUserController();
+        var result = await controller.UserLogin(new UserLogin { Login = "pending@example.com", Password = password });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+        // MockBehavior.Strict: an un-set-up RefreshTokenAddAsync call would throw, so reaching this
+        // point already proves no token was ever issued.
+    }
+
+    [Fact]
+    public async Task UserLogin_EmailVerified_ButNotEnabled_Returns403_NotAToken()
+    {
+        const string password = "hunter2!";
+        string salt = AuthenticationProvider.GetSalt();
+        string hash = AuthenticationProvider.GetHash(password, salt);
+
+        _repo.Setup(r => r.UserGetAsync(null, "waiting@example.com", null))
+             .ReturnsAsync(new User { IDUser = 8, Email = "waiting@example.com", UserRoleID = 1, TenantID = 1, EmailVerified = true, Enabled = false });
+        _repo.Setup(r => r.UserSecretGetAsync(null, "waiting@example.com", null))
+             .ReturnsAsync(new UserSecret { PwdHash = hash, PwdSalt = salt });
+
+        var controller = NewUserController();
+        var result = await controller.UserLogin(new UserLogin { Login = "waiting@example.com", Password = password });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+    }
+
     // ---- UserApiController.RefreshToken / RevokeRefreshToken --------------------------
 
     private static string HashRefreshToken(string plaintext) =>
@@ -264,7 +375,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.RefreshTokenGetAsync(hash)).ReturnsAsync(
             new RefreshTokenInfo { UserID = 5, ExpiresAt = DateTime.UtcNow.AddDays(10), RevokedAt = null });
         _repo.Setup(r => r.UserGetAsync(5, null, null))
-             .ReturnsAsync(new User { IDUser = 5, Email = "alice@example.com", UserRoleID = 1, TenantID = 0 });
+             .ReturnsAsync(new User { IDUser = 5, Email = "alice@example.com", UserRoleID = 1, TenantID = 0, EmailVerified = true, Enabled = true });
         _repo.Setup(r => r.UserRoleGetAsync())
              .ReturnsAsync(new List<UserRole> { new() { IDUserRole = 1, RoleName = "user" } });
         _repo.Setup(r => r.RefreshTokenRotateAsync(hash, It.IsAny<string>(), It.IsAny<DateTime>()))
@@ -327,6 +438,25 @@ public class ApiControllerTests
         Assert.Equal(401, obj.StatusCode);
         // MockBehavior.Strict: an un-set-up RefreshTokenRotateAsync/RevokeAllForUserAsync call would
         // throw, so reaching this point already proves neither was called.
+    }
+
+    [Fact]
+    public async Task RefreshToken_ValidToken_ButUserDisabledSinceIssue_Returns403_DoesNotRotate()
+    {
+        // Roadmap #68: a refresh token issued before an admin disabled the account (or before email
+        // verification, hypothetically) must not keep minting fresh access tokens forever.
+        string hash = HashRefreshToken("still-technically-valid");
+        _repo.Setup(r => r.RefreshTokenGetAsync(hash)).ReturnsAsync(
+            new RefreshTokenInfo { UserID = 11, ExpiresAt = DateTime.UtcNow.AddDays(10), RevokedAt = null });
+        _repo.Setup(r => r.UserGetAsync(11, null, null))
+             .ReturnsAsync(new User { IDUser = 11, Email = "disabled@example.com", UserRoleID = 1, TenantID = 1, EmailVerified = true, Enabled = false });
+
+        var controller = NewUserController();
+        var result = await controller.RefreshToken(new RefreshTokenRequest { RefreshToken = "still-technically-valid" });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+        // MockBehavior.Strict: an un-set-up RefreshTokenRotateAsync call would throw.
     }
 
     [Fact]
@@ -440,6 +570,208 @@ public class ApiControllerTests
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(403, obj.StatusCode);
         _repo.Verify(r => r.UserUpdateAsync(It.IsAny<User>()), Times.Never);
+    }
+
+    // ---- UserApiController.Activate / ResendActivation - roadmap #24/#63 -------------------
+
+    [Fact]
+    public async Task Activate_ValidToken_TenantZero_VerifiesAndReportsCanSignIn()
+    {
+        const string plaintext = "the-activation-token";
+        string hash = HashRefreshToken(plaintext);
+        _repo.Setup(r => r.UserActivateAsync(hash))
+             .ReturnsAsync(new User { IDUser = 1, Email = "a@example.com", TenantID = 0, Enabled = true });
+
+        var controller = NewUserController();
+        var result = await controller.Activate(plaintext);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Contains("now sign in", (string)ok.Value!);
+        // Loose mock: no DispatchAsync setup needed/expected - tenant 0 has nobody to notify.
+    }
+
+    [Fact]
+    public async Task Activate_ValidToken_ExistingNonZeroTenant_StillDisabled_NotifiesTenantAdmins()
+    {
+        const string plaintext = "the-activation-token";
+        string hash = HashRefreshToken(plaintext);
+        var activatedUser = new User { IDUser = 2, Email = "member@acme.local", Username = "member", TenantID = 42, Enabled = false };
+        _repo.Setup(r => r.UserActivateAsync(hash)).ReturnsAsync(activatedUser);
+        _repo.Setup(r => r.TenantAdminsGetAsync(42))
+             .ReturnsAsync(new List<User> { new() { Email = "admin@acme.local" } });
+
+        var controller = NewUserController();
+        var result = await controller.Activate(plaintext);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Contains("administrator has been notified", (string)ok.Value!);
+        _notifications.Verify(n => n.DispatchAsync(
+            It.Is<Notification>(msg => msg.Recipient.Email == "admin@acme.local"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Activate_UnknownOrExpiredToken_Returns400()
+    {
+        _repo.Setup(r => r.UserActivateAsync(It.IsAny<string>())).ReturnsAsync((User?)null);
+
+        var controller = NewUserController();
+        var result = await controller.Activate("whatever");
+
+        var obj = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, obj.StatusCode);
+    }
+
+    [Fact]
+    public async Task Activate_MissingToken_Returns400_DoesNotHitRepo()
+    {
+        // Strict mock: an un-set-up UserActivateAsync call would throw, so reaching this point
+        // already proves the controller short-circuited before touching the repo.
+        var controller = NewUserController();
+        var result = await controller.Activate(null);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task ResendActivation_AlreadyVerified_SendsNothing_ButStillReturnsGenericOk()
+    {
+        _repo.Setup(r => r.UserGetAsync(null, "verified@example.com", null))
+             .ReturnsAsync(new User { IDUser = 3, Email = "verified@example.com", EmailVerified = true });
+        _repo.Setup(r => r.UserSecretGetAsync(null, "verified@example.com", null)).ReturnsAsync((UserSecret?)null);
+
+        var controller = NewUserController();
+        var result = await controller.ResendActivation(new ResendActivationRequest { Login = "verified@example.com" });
+
+        Assert.IsType<OkObjectResult>(result);
+        // Strict mock: an un-set-up ServerConfigGetAsync/UserIssueActivationTokenAsync call would
+        // throw - reaching this point proves EmailVerified==true short-circuited before either ran.
+    }
+
+    [Fact]
+    public async Task ResendActivation_UnknownLogin_SendsNothing_ButStillReturnsGenericOk()
+    {
+        _repo.Setup(r => r.UserGetAsync(null, "ghost@example.com", null)).ReturnsAsync((User?)null);
+        _repo.Setup(r => r.UserSecretGetAsync(null, "ghost@example.com", null)).ReturnsAsync((UserSecret?)null);
+
+        var controller = NewUserController();
+        var result = await controller.ResendActivation(new ResendActivationRequest { Login = "ghost@example.com" });
+
+        Assert.IsType<OkObjectResult>(result);
+        // Same enumeration-safety guarantee as the "already verified" case above - identical response.
+    }
+
+    [Fact]
+    public async Task ResendActivation_UnverifiedAndOffCooldown_IssuesNewTokenAndEmails()
+    {
+        _repo.Setup(r => r.UserGetAsync(null, "pending@example.com", null))
+             .ReturnsAsync(new User { IDUser = 4, Email = "pending@example.com", EmailVerified = false });
+        _repo.Setup(r => r.UserSecretGetAsync(null, "pending@example.com", null)).ReturnsAsync((UserSecret?)null);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { ActivationResendCooldownMinutes = 10 });
+        _repo.Setup(r => r.UserIssueActivationTokenAsync(4, It.IsAny<string>(), It.IsAny<DateTime>(), 10)).ReturnsAsync(true);
+
+        var controller = NewUserController();
+        var result = await controller.ResendActivation(new ResendActivationRequest { Login = "pending@example.com" });
+
+        Assert.IsType<OkObjectResult>(result);
+        _notifications.Verify(n => n.DispatchAsync(
+            It.Is<Notification>(msg => msg.Recipient.Email == "pending@example.com"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ResendActivation_StillInCooldown_SendsNoEmail()
+    {
+        _repo.Setup(r => r.UserGetAsync(null, "pending@example.com", null))
+             .ReturnsAsync(new User { IDUser = 4, Email = "pending@example.com", EmailVerified = false });
+        _repo.Setup(r => r.UserSecretGetAsync(null, "pending@example.com", null)).ReturnsAsync((UserSecret?)null);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { ActivationResendCooldownMinutes = 10 });
+        _repo.Setup(r => r.UserIssueActivationTokenAsync(4, It.IsAny<string>(), It.IsAny<DateTime>(), 10)).ReturnsAsync(false);
+
+        var controller = NewUserController();
+        var result = await controller.ResendActivation(new ResendActivationRequest { Login = "pending@example.com" });
+
+        Assert.IsType<OkObjectResult>(result);
+        _notifications.Verify(n => n.DispatchAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // ---- UserApiController - roadmap #65 (minimal Global admin) ---------------------------
+
+    [Fact]
+    public async Task UsersGet_GlobalAdmin_ReturnsEveryTenant_NotJustItsOwn()
+    {
+        _repo.Setup(r => r.UsersGetAllAsync())
+             .ReturnsAsync(new List<User> { new() { IDUser = 1, TenantID = 0 }, new() { IDUser = 2, TenantID = 7 } });
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 0); // TenantID==0 admin = global admin
+        var result = await controller.UsersGet();
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(2, Assert.IsAssignableFrom<IList<User>>(ok.Value).Count);
+        // Strict mock: an un-set-up UsersGetAsync(0) call would throw, proving the "all tenants"
+        // path was taken instead of the normal tenant-scoped one.
+    }
+
+    [Fact]
+    public async Task UserGet_GlobalAdmin_DifferentTenant_BypassesTheTenantCheck()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 99 });
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 0);
+        var result = await controller.UserGet(50);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(50, ((User)ok.Value!).IDUser);
+    }
+
+    [Fact]
+    public async Task UserUpdate_GlobalAdmin_CanReassignTenantID()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 99, Email = "x@test.local" });
+        User? capturedUser = null;
+        _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>()))
+             .Callback<User>(u => capturedUser = u)
+             .Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 0);
+        var result = await controller.UserUpdate(new UserUpdate { IDUser = 50, TenantID = 7 });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(7, capturedUser!.TenantID);
+    }
+
+    [Fact]
+    public async Task UserUpdate_NonGlobalAdmin_CannotReassignTenantID()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local" });
+        User? capturedUser = null;
+        _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>()))
+             .Callback<User>(u => capturedUser = u)
+             .Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 1); // a regular (non-global) tenant admin
+        var result = await controller.UserUpdate(new UserUpdate { IDUser = 50, TenantID = 7 });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(1, capturedUser!.TenantID); // payload's TenantID=7 silently ignored
+    }
+
+    [Fact]
+    public async Task UserDelete_GlobalAdmin_DifferentTenant_BypassesTheTenantCheck()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 99 });
+        _repo.Setup(r => r.UserDeleteAsync(50)).ReturnsAsync(true);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 0);
+        var result = await controller.Delete(50);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal("User deleted", ok.Value);
     }
 }
 

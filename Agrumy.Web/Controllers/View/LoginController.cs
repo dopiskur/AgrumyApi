@@ -94,7 +94,11 @@ namespace api.Controllers.View
             return RedirectToAction("Index", "Login");
         }
 
-        public ActionResult Register() => View(new UserRegistration());
+        public async Task<ActionResult> Register()
+        {
+            await SetTenantCreationViewBagAsync();
+            return View(new UserRegistration());
+        }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -102,6 +106,7 @@ namespace api.Controllers.View
         {
             if (!ModelState.IsValid)
             {
+                await SetTenantCreationViewBagAsync();
                 return View(value);
             }
 
@@ -111,13 +116,37 @@ namespace api.Controllers.View
             }
             catch (ApiException ex)
             {
-                // e.g. "email already registered" / "username already registered"
+                // e.g. "email already registered" / "unknown tenant name" (roadmap #64)
                 ModelState.AddModelError(string.Empty, ex.Body);
+                await SetTenantCreationViewBagAsync();
                 return View(value);
             }
 
-            TempData["Message"] = "Account created. An administrator has to enable it before you can sign in.";
+            // Roadmap #24/#63: Enabled alone was never the real gate (see roadmap #68) - email
+            // verification comes first for everyone, tenant-admin approval only after that and only
+            // for someone joining an existing, non-default tenant. Kept generic here since which of
+            // those applies depends on server-side state (tenant 0? brand new tenant?) this page
+            // doesn't have visibility into.
+            TempData["Message"] = "Account created. Check your email for a verification link - " +
+                "depending on your tenant, you may also need an administrator's approval before you can sign in.";
             return RedirectToAction(nameof(Index));
+        }
+
+        /// <summary>Roadmap #64: the Register view only offers a tenant-name field (and the "create
+        /// a new tenant" hint) when self-service tenant creation is on - fails closed (hides the
+        /// option) if the API call itself fails, same reasoning as any other anonymous-page best-effort call.</summary>
+        private async Task SetTenantCreationViewBagAsync()
+        {
+            bool allow = false;
+            try
+            {
+                allow = (await api.ServerConfigGetPublic()).AllowSelfServiceTenantCreation;
+            }
+            catch (Exception)
+            {
+                // ignored - ViewBag stays false, the safer default
+            }
+            ViewBag.AllowSelfServiceTenantCreation = allow;
         }
     }
 }

@@ -95,8 +95,10 @@ namespace api.Dal
                 e.Property(x => x.Phone).HasMaxLength(15);
                 e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.Property(x => x.DateModified).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                e.Property(x => x.ActivationTokenHash).HasMaxLength(64); // SHA-256 hex, same shape as userRefreshToken.TokenHash
                 e.HasIndex(x => x.Email).IsUnique().HasDatabaseName("email_UNIQUE");
                 e.HasIndex(x => x.Username).IsUnique().HasDatabaseName("Username_UNIQUE");
+                e.HasIndex(x => x.ActivationTokenHash).IsUnique().HasDatabaseName("ActivationTokenHash_UNIQUE");
                 // user.TenantID has no FK in the legacy schema - only UserGroupID does.
                 e.HasOne<UserGroupRow>().WithMany().HasForeignKey(x => x.UserGroupID).OnDelete(DeleteBehavior.NoAction);
             });

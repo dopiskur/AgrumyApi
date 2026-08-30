@@ -23,6 +23,9 @@ namespace api.Models
         public bool? Enabled { get; set; } // MySQL TINYINT(1) is needed for boolean
         public DateTime? DateCreated { get; set; }
         public DateTime? DateModified { get; set; }
+
+        // Roadmap #24: has this user proven they own their email address yet.
+        public bool? EmailVerified { get; set; }
     }
 
     public class UserSecret
@@ -67,7 +70,14 @@ namespace api.Models
         public string? Phone { get; set; }
         [Display(Name = "Role")]
         public int? UserGroupID { get; set; }
-        public bool Enabled { get; set; } = false;
+
+        // Usputni nalaz: was a non-nullable bool defaulting to false, so ANY admin PUT that didn't
+        // explicitly re-send "Enabled": true silently disabled the target user (UserApiController's
+        // "value.Enabled != null" check is always true for a non-nullable bool). Nullable now, same
+        // "null = don't touch" convention as UserGroupID above - the Web Edit form already always
+        // posts True/False explicitly (_EnabledToggleField.cshtml), so this only changes behaviour
+        // for direct API callers that omit the field.
+        public bool? Enabled { get; set; }
     }
     public class UserRegistration
     {
@@ -117,6 +127,14 @@ namespace api.Models
         public string? OldPassword { get; set; }
         [Required(ErrorMessage = "New password is required")]
         public string? NewPassword { get; set; }
+    }
+
+    /// <summary>Roadmap #24. Deliberately the same shape as <see cref="UserLogin"/>'s Login field
+    /// (email or username) - a user who forgot which one they registered with shouldn't have to guess.</summary>
+    public class ResendActivationRequest
+    {
+        [Required(ErrorMessage = "Email or username is required")]
+        public string? Login { get; set; }
     }
 
 

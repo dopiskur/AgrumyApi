@@ -24,5 +24,16 @@ namespace api.Controllers.API
             await Repo.ServerConfigUpdateAsync(config);
             return Ok();
         }
+
+        /// <summary>Roadmap #64: the Register page is anonymous and must not call the admin-only
+        /// Get() above just to know whether to show a "create a new tenant" field - this exposes
+        /// only that one flag.</summary>
+        [HttpGet("Public")]
+        [AllowAnonymous]
+        public async Task<ActionResult<PublicServerConfig>> GetPublic()
+        {
+            ServerConfig config = await Repo.ServerConfigGetAsync(1);
+            return Ok(new PublicServerConfig { AllowSelfServiceTenantCreation = config.AllowSelfServiceTenantCreation ?? Config.allowSelfServiceTenantCreation });
+        }
     }
 }
