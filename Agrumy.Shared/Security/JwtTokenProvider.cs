@@ -45,7 +45,6 @@ namespace api.Security
 
 
 
-        // OVO JE NAKNADNO DODANO!! NE RADI JOS KAK SPADA
         public static string? ValidateToken(string token)
         {
             if (token == null)
@@ -59,8 +58,14 @@ namespace api.Security
                 {
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(key),
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
+                    // Same Issuer/Audience CreateToken() stamps onto every token it mints (roadmap
+                    // #48) - reads Config.jwtIssuer/jwtAudience here rather than assuming Program.cs's
+                    // builder.Configuration values apply, since this runs inside Agrumy.Web's process
+                    // too (LoginController.cs), a separate assembly with its own appsettings.json.
+                    ValidateIssuer = true,
+                    ValidIssuer = Config.jwtIssuer,
+                    ValidateAudience = true,
+                    ValidAudience = Config.jwtAudience,
                     // set clockskew to zero so tokens expire exactly at token expiration time (instead of 5 minutes later)
                     ClockSkew = TimeSpan.Zero
                 }, out SecurityToken validatedToken);

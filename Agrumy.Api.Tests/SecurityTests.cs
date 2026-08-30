@@ -147,6 +147,28 @@ public class JwtTokenProviderTests
     {
         Assert.Null(JwtTokenProvider.ValidateToken("not-a-jwt"));
     }
+
+    [Fact]
+    public void ValidateToken_RejectsWrongIssuerOrAudience()
+    {
+        // Roadmap #48 regression guard: correctly signed with the same key Config.secureKey
+        // validates against, but stamped with an issuer/audience that doesn't match
+        // Config.jwtIssuer/jwtAudience - before the fix ValidateIssuer/ValidateAudience were
+        // false, so this token would have silently passed.
+        var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(SigningKey));
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new[] { new Claim("role", "admin") }),
+            Issuer = "https://attacker.example",
+            Audience = "not-agrumy-api",
+            Expires = DateTime.UtcNow.AddMinutes(5),
+            SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature)
+        };
+        var handler = new JwtSecurityTokenHandler();
+        string tokenWithWrongIssuerAndAudience = handler.WriteToken(handler.CreateToken(descriptor));
+
+        Assert.Null(JwtTokenProvider.ValidateToken(tokenWithWrongIssuerAndAudience));
+    }
 }
 
 public class FieldValidatorTests
