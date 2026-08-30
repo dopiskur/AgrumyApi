@@ -1,5 +1,10 @@
 # Agrumy
 
+> Agrumy core (API, firmware, enclosures) is free and open source under the
+> [Apache 2.0 license](LICENSE.txt). The mobile apps are proprietary.
+> If you use Agrumy, I'd genuinely love to hear about it — open an issue or
+> drop me a line.
+
 Agrumy is a small multi-tenant backend + admin UI for managing IoT devices that
 monitor and control greenhouse/citrus micro-climate - temperature, humidity, soil
 moisture, light, CO2, water level - and drive relays (ventilation, heating,
@@ -222,3 +227,18 @@ Both trigger on push to `master` (and manually via `workflow_dispatch`).
    URL where `Agrumy.Api` is reachable after deployment (e.g.
    `https://agrumy.azurewebsites.net`) - not `http://localhost:5000`, which is
    only correct for local dev.
+
+## License
+
+Copyright 2016-2026 Domagoj Piškur
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this project except in compliance with the License. You may obtain a copy
+of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied.
+
+The Android and iOS applications (AgrumyAndroid, AgrumyiOS) are separate,
+proprietary projects and are not covered by this license.
