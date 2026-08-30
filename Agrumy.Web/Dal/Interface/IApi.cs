@@ -31,7 +31,7 @@ namespace api.Dal.Interface
         Task UserDelete(int? idUser);
 
         [Get("/api/User")]
-        Task<User> UserGet(int? idUser, string? email, string? username);
+        Task<User> UserGet(int? idUser);
 
         [Get("/api/User/All")]
         Task<IEnumerable<User>> UsersGet();
@@ -45,7 +45,7 @@ namespace api.Dal.Interface
         Task<IEnumerable<Device>> DevicesGet();
 
         [Get("/api/Device")]
-        Task<Device> DeviceGet(int? idDevice, string? apiId, string? macAddress);
+        Task<Device> DeviceGet(int? idDevice);
 
         [Put("/api/Device")]
         Task DeviceUpdate([Body] Device? device);

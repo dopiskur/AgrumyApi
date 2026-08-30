@@ -13,7 +13,14 @@ namespace api.Controllers.View
     [AllowAnonymous]
     public class LoginController(IApi api) : Controller
     {
-        public ActionResult Index() => View(new UserLogin());
+        public ActionResult Index(bool sessionExpired = false)
+        {
+            if (sessionExpired)
+            {
+                ModelState.AddModelError(string.Empty, "Your session expired - please sign in again.");
+            }
+            return View(new UserLogin());
+        }
 
         [HttpPost]
         [ValidateAntiForgeryToken]

@@ -11,7 +11,7 @@ namespace api.Controllers.View
         public async Task<ActionResult> Index() => View(await api.DevicesGet());
 
         public async Task<ActionResult> Details(int? idDevice) =>
-            View(await api.DeviceGet(idDevice, null, null));
+            View(await api.DeviceGet(idDevice));
 
         [Authorize(Roles = "admin")]
         public async Task<ActionResult> Edit(int? idDevice) =>
@@ -19,7 +19,7 @@ namespace api.Controllers.View
             {
                 DeviceType = await api.DeviceTypeGet(),
                 DeviceTypeService = await api.DeviceTypeServiceGet(),
-                Device = await api.DeviceGet(idDevice, null, null),
+                Device = await api.DeviceGet(idDevice),
             });
 
         [Authorize(Roles = "admin")]
@@ -27,29 +27,31 @@ namespace api.Controllers.View
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> Edit(DeviceView deviceView)
         {
-            var device = deviceView.Device!;
-            if (ModelState.IsValid)
+            if (!ModelState.IsValid)
             {
-                (device.DeviceSensorEnabled, device.DeviceControllerEnabled) = device.DeviceTypeID switch
-                {
-                    0 => (false, false),
-                    1 => (true, false),
-                    2 => (false, true),
-                    3 => (true, true),
-                    _ => (device.DeviceSensorEnabled, device.DeviceControllerEnabled),
-                };
-
-                await api.DeviceUpdate(device);
-                // Re-fetch so ConfigVersion reflects what the database actually stored.
-                device = await api.DeviceGet(device.IDDevice, null, null);
+                deviceView.DeviceType = await api.DeviceTypeGet();
+                deviceView.DeviceTypeService = await api.DeviceTypeServiceGet();
+                return View(deviceView);
             }
 
-            return View("Details", device);
+            var device = deviceView.Device!;
+            (device.DeviceSensorEnabled, device.DeviceControllerEnabled) = device.DeviceTypeID switch
+            {
+                0 => (false, false),
+                1 => (true, false),
+                2 => (false, true),
+                3 => (true, true),
+                _ => (device.DeviceSensorEnabled, device.DeviceControllerEnabled),
+            };
+
+            await api.DeviceUpdate(device);
+            // Re-fetch so ConfigVersion reflects what the database actually stored.
+            return View("Details", await api.DeviceGet(device.IDDevice));
         }
 
         [Authorize(Roles = "admin")]
         public async Task<ActionResult> Delete(int? idDevice) =>
-            View(await api.DeviceGet(idDevice, null, null));
+            View(await api.DeviceGet(idDevice));
 
         [Authorize(Roles = "admin")]
         [HttpPost]
@@ -63,7 +65,7 @@ namespace api.Controllers.View
         [Authorize(Roles = "admin")]
         public async Task<ActionResult> EditSensor(int? idDevice)
         {
-            var device = await api.DeviceGet(idDevice, null, null);
+            var device = await api.DeviceGet(idDevice);
             return View(new DeviceView
             {
                 Device = device,
@@ -82,13 +84,13 @@ namespace api.Controllers.View
                 Device = deviceView.Device,
                 Sensor = deviceView.DeviceConfigSensor,
             });
-            return View("Details", await api.DeviceGet(deviceView.Device!.IDDevice, null, null));
+            return View("Details", await api.DeviceGet(deviceView.Device!.IDDevice));
         }
 
         [Authorize(Roles = "admin")]
         public async Task<ActionResult> EditController(int? idDevice)
         {
-            var device = await api.DeviceGet(idDevice, null, null);
+            var device = await api.DeviceGet(idDevice);
             return View(new DeviceView
             {
                 Device = device,
@@ -107,7 +109,7 @@ namespace api.Controllers.View
                 Device = deviceView.Device,
                 Controller = deviceView.DeviceConfigController,
             });
-            return View("Details", await api.DeviceGet(deviceView.Device!.IDDevice, null, null));
+            return View("Details", await api.DeviceGet(deviceView.Device!.IDDevice));
         }
     }
 }

@@ -18,9 +18,15 @@ namespace api.Controllers.View
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Create(UserGroup userGroup)
+        public async Task<ActionResult> Create(GroupView groupView)
         {
-            await api.UserGroupAdd(userGroup);
+            if (!ModelState.IsValid)
+            {
+                groupView.UserRoles = await api.UserRoleGet();
+                return View(groupView);
+            }
+
+            await api.UserGroupAdd(groupView.UserGroup);
             return RedirectToAction(nameof(Index));
         }
 

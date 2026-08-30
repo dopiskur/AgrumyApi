@@ -19,7 +19,7 @@
             <div class="mb-3">
                 <label asp-for="UserGroup.RoleName"></label>
                 @Html.DropDownListFor(m => m.UserGroup.UserRoleID,
-                         new SelectList(Model.UserRoles.ToList(), "IDUserRole", "RoleName", Model.UserRoles.First().IDUserRole),
+                         new SelectList(Model.UserRoles, "IDUserRole", "RoleName"),
                          new { @class = "form-control" })
             </div>
             <div class="mb-0">

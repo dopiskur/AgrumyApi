@@ -16,7 +16,7 @@ namespace api.Controllers.View
                 timeRange = 1440; // cap at one day of minute-resolution data
             }
 
-            var deviceView = new DeviceView { Device = await api.DeviceGet(idDevice, null, null) };
+            var deviceView = new DeviceView { Device = await api.DeviceGet(idDevice) };
             deviceView.TimeRange!.Range = timeRange; // reflect the selected range back to the form
 
             ViewBag.EnumList = new SelectList(
@@ -32,7 +32,7 @@ namespace api.Controllers.View
         {
             var deviceView = new DeviceView
             {
-                Device = await api.DeviceGet(idDevice, null, null),
+                Device = await api.DeviceGet(idDevice),
                 SensorDataReport = await api.SensorDataReportGet(idDevice, idSensorDataReport, 0),
             };
 
@@ -47,7 +47,7 @@ namespace api.Controllers.View
             if (idSensorDataReport > 0)
             {
                 var single = await api.SensorDataReportGet(idDevice, idSensorDataReport, 1);
-                deviceView.SensorDataJson = single.First().SensorData;
+                deviceView.SensorDataJson = single.FirstOrDefault()?.SensorData;
             }
 
             return View(deviceView);

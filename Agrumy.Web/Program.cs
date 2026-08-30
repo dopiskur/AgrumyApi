@@ -1,4 +1,5 @@
 using api.Dal.Interface;
+using api.Filters;
 using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -11,7 +12,8 @@ var apiServiceUrl = builder.Configuration["WebView:ApiService"];
 if (string.IsNullOrEmpty(apiServiceUrl))
     throw new InvalidOperationException("WebView:ApiService is missing in configuration.");
 
-builder.Services.AddControllersWithViews();
+// ApiAuthExceptionFilter turns a 401 from Agrumy.Api (expired stored JWT) into a re-login.
+builder.Services.AddControllersWithViews(o => o.Filters.Add<ApiAuthExceptionFilter>());
 builder.Services.AddHttpContextAccessor(); // BearerTokenHandler + _Layout read the current user
 
 // Cookie auth: the login POST calls Agrumy.Api, then SignInAsync writes an encrypted ticket

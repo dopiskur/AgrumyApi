@@ -11,7 +11,7 @@ namespace api.Controllers.View
         public async Task<ActionResult> Index() => View(await api.UsersGet());
 
         public async Task<ActionResult> Details(int? idUser) =>
-            View(await api.UserGet(idUser, null, null));
+            View(await api.UserGet(idUser));
 
         public async Task<ActionResult> Create() =>
             View(new UserView { UserGroups = await api.UserGroupsGet() });
@@ -20,13 +20,19 @@ namespace api.Controllers.View
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> Create(UserView userView)
         {
+            if (!ModelState.IsValid)
+            {
+                userView.UserGroups = await api.UserGroupsGet();
+                return View(userView);
+            }
+
             await api.UserAdd(userView.UserAdd!);
             return RedirectToAction(nameof(Index));
         }
 
         public async Task<ActionResult> Edit(int? idUser)
         {
-            var user = await api.UserGet(idUser, null, null);
+            var user = await api.UserGet(idUser);
             return View(new UserView
             {
                 UserUpdate = new UserUpdate
@@ -50,12 +56,18 @@ namespace api.Controllers.View
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> Edit(UserView userView)
         {
+            if (!ModelState.IsValid)
+            {
+                userView.UserGroups = await api.UserGroupsGet();
+                return View(userView);
+            }
+
             await api.UserUpdate(userView.UserUpdate!);
-            return View("Details", await api.UserGet(userView.UserUpdate!.IDUser, null, null));
+            return View("Details", await api.UserGet(userView.UserUpdate!.IDUser));
         }
 
         public async Task<ActionResult> Delete(int? idUser) =>
-            View(await api.UserGet(idUser, null, null));
+            View(await api.UserGet(idUser));
 
         [HttpPost]
         [ValidateAntiForgeryToken]
