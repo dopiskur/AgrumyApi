@@ -213,6 +213,29 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(await _repo.TestConnectionAsync());
     }
 
+    // roadmap #29: the pre-EF SchemaScripts.cs created tables as latin1. The EF model sets no
+    // charset, so a fresh MySQL/MariaDB database built by EnsureCreatedAsync must come out
+    // utf8mb4 (Pomelo applies an implicit HasCharSet("utf8mb4")). Guards against a regression
+    // that would silently corrupt non-ASCII names. MySQL-only.
+    [SkippableFact]
+    public async Task Fresh_MySql_Schema_Is_Utf8mb4_Not_Latin1()
+    {
+        var t = Use(DbProviderKind.MySql); // Skip.If when AGRUMY_TEST_MYSQL is unset
+        await using var db = _fx.NewContext(t);
+
+        var tableCharsets = await db.Database.SqlQueryRaw<string>(
+            "SELECT SUBSTRING_INDEX(TABLE_COLLATION, '_', 1) AS Value FROM information_schema.TABLES " +
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'").ToListAsync();
+        Assert.NotEmpty(tableCharsets);
+        Assert.All(tableCharsets, cs => Assert.Equal("utf8mb4", cs));
+
+        // Every actual string column, not just the table default - and nothing left on latin1/utf8mb3.
+        var columnCharsets = await db.Database.SqlQueryRaw<string>(
+            "SELECT DISTINCT CHARACTER_SET_NAME AS Value FROM information_schema.COLUMNS " +
+            "WHERE TABLE_SCHEMA = DATABASE() AND CHARACTER_SET_NAME IS NOT NULL").ToListAsync();
+        Assert.Equal(new[] { "utf8mb4" }, columnCharsets);
+    }
+
     // ---- tenant / server config -------------------------------------------
 
     [SkippableTheory, MemberData(nameof(Providers))]
