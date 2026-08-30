@@ -204,6 +204,7 @@ public class ApiControllerTests
              .ReturnsAsync(new UserSecret { PwdHash = hash, PwdSalt = salt });
         _repo.Setup(r => r.UserRoleGetAsync())
              .ReturnsAsync(new List<UserRole> { new() { IDUserRole = 1, RoleName = "user" } });
+        _repo.Setup(r => r.RefreshTokenAddAsync(5, It.IsAny<string>(), It.IsAny<DateTime>())).ReturnsAsync(1);
 
         var controller = NewUserController();
         var result = await controller.UserLogin(new UserLogin { Login = "alice@example.com", Password = password });
@@ -213,6 +214,7 @@ public class ApiControllerTests
         Assert.Equal(5, login.IDUser);
         Assert.Equal("alice@example.com", login.Email);
         Assert.False(string.IsNullOrEmpty(login.Token));
+        Assert.False(string.IsNullOrEmpty(login.RefreshToken));
         Assert.Equal("user", JwtTokenProvider.ValidateToken(login.Token!)); // token valid, role claim round-trips
     }
 
@@ -246,6 +248,96 @@ public class ApiControllerTests
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(401, obj.StatusCode);
         Assert.Equal("Wrong username or password", obj.Value);
+    }
+
+    // ---- UserApiController.RefreshToken / RevokeRefreshToken --------------------------
+
+    private static string HashRefreshToken(string plaintext) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(plaintext)));
+
+    [Fact]
+    public async Task RefreshToken_ValidToken_RotatesAndReturnsNewAccessToken()
+    {
+        const string presented = "stale-but-valid-refresh-token";
+        string hash = HashRefreshToken(presented);
+
+        _repo.Setup(r => r.RefreshTokenGetAsync(hash)).ReturnsAsync(
+            new RefreshTokenInfo { UserID = 5, ExpiresAt = DateTime.UtcNow.AddDays(10), RevokedAt = null });
+        _repo.Setup(r => r.UserGetAsync(5, null, null))
+             .ReturnsAsync(new User { IDUser = 5, Email = "alice@example.com", UserRoleID = 1, TenantID = 0 });
+        _repo.Setup(r => r.UserRoleGetAsync())
+             .ReturnsAsync(new List<UserRole> { new() { IDUserRole = 1, RoleName = "user" } });
+        _repo.Setup(r => r.RefreshTokenRotateAsync(hash, It.IsAny<string>(), It.IsAny<DateTime>()))
+             .Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        var result = await controller.RefreshToken(new RefreshTokenRequest { RefreshToken = presented });
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var login = Assert.IsType<UserLoginResult>(ok.Value);
+        Assert.Equal(5, login.IDUser);
+        Assert.False(string.IsNullOrEmpty(login.Token));
+        Assert.False(string.IsNullOrEmpty(login.RefreshToken));
+        Assert.NotEqual(presented, login.RefreshToken); // rotated, not reissued
+        Assert.Equal("user", JwtTokenProvider.ValidateToken(login.Token!));
+        _repo.Verify(r => r.RefreshTokenRotateAsync(hash, It.IsAny<string>(), It.IsAny<DateTime>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RefreshToken_UnknownToken_Returns401()
+    {
+        _repo.Setup(r => r.RefreshTokenGetAsync(It.IsAny<string>())).ReturnsAsync((RefreshTokenInfo?)null);
+
+        var controller = NewUserController();
+        var result = await controller.RefreshToken(new RefreshTokenRequest { RefreshToken = "never-issued" });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(401, obj.StatusCode);
+    }
+
+    [Fact]
+    public async Task RefreshToken_AlreadyRotatedToken_DetectsReuseAndRevokesAllSessions()
+    {
+        const string stolen = "already-used-token";
+        string hash = HashRefreshToken(stolen);
+
+        _repo.Setup(r => r.RefreshTokenGetAsync(hash)).ReturnsAsync(
+            new RefreshTokenInfo { UserID = 9, ExpiresAt = DateTime.UtcNow.AddDays(10), RevokedAt = DateTime.UtcNow.AddMinutes(-5) });
+        _repo.Setup(r => r.RefreshTokenRevokeAllForUserAsync(9)).Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        var result = await controller.RefreshToken(new RefreshTokenRequest { RefreshToken = stolen });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(401, obj.StatusCode);
+        _repo.Verify(r => r.RefreshTokenRevokeAllForUserAsync(9), Times.Once);
+    }
+
+    [Fact]
+    public async Task RefreshToken_ExpiredToken_Returns401_DoesNotRotate()
+    {
+        string hash = HashRefreshToken("expired-token");
+        _repo.Setup(r => r.RefreshTokenGetAsync(hash)).ReturnsAsync(
+            new RefreshTokenInfo { UserID = 3, ExpiresAt = DateTime.UtcNow.AddMinutes(-1), RevokedAt = null });
+
+        var controller = NewUserController();
+        var result = await controller.RefreshToken(new RefreshTokenRequest { RefreshToken = "expired-token" });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(401, obj.StatusCode);
+        // MockBehavior.Strict: an un-set-up RefreshTokenRotateAsync/RevokeAllForUserAsync call would
+        // throw, so reaching this point already proves neither was called.
+    }
+
+    [Fact]
+    public async Task RevokeRefreshToken_UnknownToken_StillReturnsOk()
+    {
+        _repo.Setup(r => r.RefreshTokenRevokeAsync(It.IsAny<string>())).Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        var result = await controller.RevokeRefreshToken(new RefreshTokenRequest { RefreshToken = "whatever" });
+
+        Assert.IsType<OkResult>(result);
     }
 
     // ---- tenant scoping ---------------------------------------------------------------

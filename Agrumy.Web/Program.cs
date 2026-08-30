@@ -35,7 +35,15 @@ builder.Services
     });
 builder.Services.AddAuthorization();
 
-// Declarative Refit client for Agrumy.Api; BearerTokenHandler injects the JWT per request.
+// Refresh-token plumbing: IAuthApi has no BearerTokenHandler (it authenticates by possessing the
+// refresh token itself), RefreshCoordinator serializes concurrent refreshes of the same stale token.
+builder.Services.AddSingleton<RefreshCoordinator>();
+builder.Services
+    .AddRefitClient<IAuthApi>(RefitConfig.Settings)
+    .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiServiceUrl));
+
+// Declarative Refit client for Agrumy.Api; BearerTokenHandler injects the JWT per request and
+// silently refreshes it on a 401 before giving up (see BearerTokenHandler).
 builder.Services.AddTransient<BearerTokenHandler>();
 builder.Services
     .AddRefitClient<IApi>(RefitConfig.Settings)

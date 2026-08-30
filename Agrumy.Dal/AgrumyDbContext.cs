@@ -21,6 +21,7 @@ namespace api.Dal
 
         public DbSet<TenantRow> Tenants => Set<TenantRow>();
         public DbSet<UserRow> Users => Set<UserRow>();
+        public DbSet<RefreshTokenRow> RefreshTokens => Set<RefreshTokenRow>();
         public DbSet<UserGroupRow> UserGroups => Set<UserGroupRow>();
         public DbSet<UserRoleRow> UserRoles => Set<UserRoleRow>();
         public DbSet<UserRoleScopeRow> UserRoleScopes => Set<UserRoleScopeRow>();
@@ -98,6 +99,19 @@ namespace api.Dal
                 e.HasIndex(x => x.Username).IsUnique().HasDatabaseName("Username_UNIQUE");
                 // user.TenantID has no FK in the legacy schema - only UserGroupID does.
                 e.HasOne<UserGroupRow>().WithMany().HasForeignKey(x => x.UserGroupID).OnDelete(DeleteBehavior.NoAction);
+            });
+
+            b.Entity<RefreshTokenRow>(e =>
+            {
+                e.ToTable("userRefreshToken");
+                e.HasKey(x => x.IDRefreshToken);
+                e.Property(x => x.IDRefreshToken).ValueGeneratedOnAdd();
+                e.Property(x => x.TokenHash).HasMaxLength(64).IsRequired();
+                e.Property(x => x.ReplacedByTokenHash).HasMaxLength(64);
+                e.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                e.HasIndex(x => x.TokenHash).IsUnique().HasDatabaseName("TokenHash_UNIQUE");
+                e.HasIndex(x => x.UserID).HasDatabaseName("ix_userRefreshToken_userID");
+                e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserID).OnDelete(DeleteBehavior.NoAction);
             });
 
             b.Entity<ServerConfigRow>(e =>

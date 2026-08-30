@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace api.Controllers.View
 {
     [AllowAnonymous]
-    public class LoginController(IApi api) : Controller
+    public class LoginController(IApi api, IAuthApi authApi) : Controller
     {
         public ActionResult Index(bool sessionExpired = false)
         {
@@ -39,14 +39,14 @@ namespace api.Controllers.View
                 role = null;
             }
 
-            if (result?.Token is null || role is null)
+            if (result?.Token is null || result.RefreshToken is null || role is null)
             {
                 ModelState.AddModelError(string.Empty, "Invalid email/username or password.");
                 return View(userLogin);
             }
 
-            // HttpOnly, SameSite=Strict cookie holding an encrypted ticket - the raw JWT rides
-            // along as a stored token for BearerTokenHandler, never exposed to page script.
+            // HttpOnly, SameSite=Strict cookie holding an encrypted ticket - the raw JWT and refresh
+            // token ride along as stored tokens for BearerTokenHandler, never exposed to page script.
             var identity = new ClaimsIdentity(
                 new[]
                 {
@@ -60,7 +60,11 @@ namespace api.Controllers.View
                 IsPersistent = true,
                 ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7),
             };
-            props.StoreTokens(new[] { new AuthenticationToken { Name = "access_token", Value = result.Token } });
+            props.StoreTokens(new[]
+            {
+                new AuthenticationToken { Name = "access_token", Value = result.Token },
+                new AuthenticationToken { Name = "refresh_token", Value = result.RefreshToken },
+            });
 
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), props);
@@ -70,6 +74,22 @@ namespace api.Controllers.View
 
         public async Task<ActionResult> Logout()
         {
+            // Best effort: kill the refresh token server-side so it can't be redeemed after logout.
+            // Must never block the local sign-out - a dead/unreachable API is not a reason to trap
+            // the user in a "logged in" cookie.
+            string? refreshToken = await HttpContext.GetTokenAsync("refresh_token");
+            if (!string.IsNullOrEmpty(refreshToken))
+            {
+                try
+                {
+                    await authApi.RevokeRefreshToken(new RefreshTokenRequest { RefreshToken = refreshToken });
+                }
+                catch (Exception)
+                {
+                    // ignored - local sign-out below still proceeds
+                }
+            }
+
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return RedirectToAction("Index", "Login");
         }

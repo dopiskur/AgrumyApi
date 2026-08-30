@@ -102,6 +102,10 @@ namespace api.Models
     {
         public int? IDUser { get; set; }
         public string? Email { get; set; }
+        /// <summary>Long-lived opaque token that redeems a new <see cref="Token"/> from
+        /// <c>POST /api/User/RefreshToken</c> once this JWT expires. Single-use - rotated on
+        /// every redemption.</summary>
+        public string? RefreshToken { get; set; }
         public string? Token { get; set; }
     }
 

@@ -52,6 +52,20 @@ namespace api.Dal.Entities
         public DateTime? DateModified { get; set; }
     }
 
+    /// <summary>One issued JWT refresh token. Single-use: a rotation marks the row revoked and
+    /// points ReplacedByTokenHash at the row that superseded it, so a reused (already-rotated)
+    /// token is detectable. Only the hash is stored, never the plaintext token.</summary>
+    public class RefreshTokenRow
+    {
+        public int IDRefreshToken { get; set; }
+        public int UserID { get; set; }
+        public string TokenHash { get; set; } = "";
+        public DateTime ExpiresAt { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? RevokedAt { get; set; }
+        public string? ReplacedByTokenHash { get; set; }
+    }
+
     public class ServerConfigRow
     {
         public int IDServerConfig { get; set; }

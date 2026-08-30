@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using api.Dal.Interface;
 using api.Models;
 using api.Security;
@@ -13,8 +15,21 @@ namespace api.Controllers.API
     {
         private const int DefaultRoleId = 1;   // "regular user" group on an existing tenant
         private const bool DefaultUserEnabled = false;
+        private const int AccessTokenMinutes = 120;
+        private const int RefreshTokenDays = 30;
 
         private static readonly string? SecureKey = Config.secureKey;
+
+        /// <summary>New opaque refresh token plus the hash that's actually stored - the plaintext
+        /// never touches the DB.</summary>
+        private static (string Plaintext, string Hash) GenerateRefreshToken()
+        {
+            string plaintext = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+            return (plaintext, HashRefreshToken(plaintext));
+        }
+
+        private static string HashRefreshToken(string plaintext) =>
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(plaintext)));
 
         /// <summary>Looks up a user + their password secret by email or username (whichever <paramref name="login"/> looks like); either element is null when nothing matches.</summary>
         private async Task<(User? user, UserSecret? secret)> LookupAsync(string? login) =>
@@ -82,8 +97,71 @@ namespace api.Controllers.API
                 return StatusCode(500, "User has no valid role assigned.");
             }
 
-            string token = JwtTokenProvider.CreateToken(SecureKey, 120, user.Email, role.RoleName, user.TenantID.ToString());
-            return Ok(new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = token });
+            string token = JwtTokenProvider.CreateToken(SecureKey, AccessTokenMinutes, user.Email, role.RoleName, user.TenantID.ToString());
+            var (refreshToken, refreshTokenHash) = GenerateRefreshToken();
+            await Repo.RefreshTokenAddAsync(user.IDUser!.Value, refreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
+
+            return Ok(new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = token, RefreshToken = refreshToken });
+        }
+
+        /// <summary>Redeems a refresh token for a new access token, rotating the refresh token in the
+        /// same call (single-use). Anonymous by design - the refresh token itself is the credential,
+        /// same model as the login endpoint it sits next to.</summary>
+        [HttpPost("RefreshToken")]
+        [EnableRateLimiting("login")]
+        public async Task<ActionResult<UserLoginResult>> RefreshToken([FromBody] RefreshTokenRequest value)
+        {
+            if (!ModelState.IsValid) { return BadRequest(ModelState); }
+
+            string incomingHash = HashRefreshToken(value.RefreshToken!);
+            RefreshTokenInfo? stored = await Repo.RefreshTokenGetAsync(incomingHash);
+            if (stored is null)
+            {
+                return StatusCode(401, "Unknown refresh token");
+            }
+            if (stored.RevokedAt is not null)
+            {
+                // This exact token was already rotated (or explicitly revoked) - someone presenting
+                // it again means it leaked. Kill every session for this user, not just this one.
+                await Repo.RefreshTokenRevokeAllForUserAsync(stored.UserID);
+                return StatusCode(401, "Refresh token already used; all sessions for this user were revoked.");
+            }
+            if (stored.ExpiresAt < DateTime.UtcNow)
+            {
+                return StatusCode(401, "Refresh token expired");
+            }
+
+            User? user = await Repo.UserGetAsync(stored.UserID, null, null);
+            if (user is null)
+            {
+                return StatusCode(401, "User no longer exists");
+            }
+
+            IList<UserRole> roles = await Repo.UserRoleGetAsync();
+            UserRole? role = roles.FirstOrDefault(m => m.IDUserRole == user.UserRoleID);
+            if (role?.RoleName == null)
+            {
+                return StatusCode(500, "User has no valid role assigned.");
+            }
+
+            var (newRefreshToken, newRefreshTokenHash) = GenerateRefreshToken();
+            await Repo.RefreshTokenRotateAsync(incomingHash, newRefreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
+
+            string newAccessToken = JwtTokenProvider.CreateToken(SecureKey, AccessTokenMinutes, user.Email, role.RoleName, user.TenantID.ToString());
+            return Ok(new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = newAccessToken, RefreshToken = newRefreshToken });
+        }
+
+        /// <summary>Explicit logout: kills one refresh token so it can't be redeemed later. Idempotent
+        /// and always 200 - a client logging out must not be blocked by an already-gone token.</summary>
+        [HttpPost("RevokeRefreshToken")]
+        [EnableRateLimiting("login")]
+        public async Task<ActionResult> RevokeRefreshToken([FromBody] RefreshTokenRequest value)
+        {
+            if (!string.IsNullOrWhiteSpace(value.RefreshToken))
+            {
+                await Repo.RefreshTokenRevokeAsync(HashRefreshToken(value.RefreshToken));
+            }
+            return Ok();
         }
 
         [HttpPost("ChangePassword")]

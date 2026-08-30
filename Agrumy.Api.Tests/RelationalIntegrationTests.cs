@@ -267,6 +267,106 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(443, a.PortHTTPS);
     }
 
+    // ---- refresh tokens -----------------------------------------------------
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task RefreshToken_AddAndGet_RoundTrips(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+        string hash = U();
+        var expires = DateTime.UtcNow.AddDays(30);
+
+        await _repo.RefreshTokenAddAsync(userId, hash, expires);
+        var stored = await _repo.RefreshTokenGetAsync(hash);
+
+        Assert.NotNull(stored);
+        Assert.Equal(userId, stored.UserID);
+        Assert.Null(stored.RevokedAt);
+        Assert.True(Math.Abs((stored.ExpiresAt - expires).TotalSeconds) < 2);
+        Assert.Null(await _repo.RefreshTokenGetAsync("no-such-hash-" + U()));
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task RefreshToken_Rotate_RevokesOldAndActivatesNew(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+        string oldHash = U();
+        string newHash = U();
+        await _repo.RefreshTokenAddAsync(userId, oldHash, DateTime.UtcNow.AddDays(30));
+
+        await _repo.RefreshTokenRotateAsync(oldHash, newHash, DateTime.UtcNow.AddDays(30));
+
+        var old = await _repo.RefreshTokenGetAsync(oldHash);
+        var replacement = await _repo.RefreshTokenGetAsync(newHash);
+        Assert.NotNull(old);
+        Assert.NotNull(old.RevokedAt);
+        Assert.NotNull(replacement);
+        Assert.Null(replacement.RevokedAt);
+        Assert.Equal(userId, replacement.UserID);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task RefreshToken_RotateOfAlreadyRevokedToken_IsANoOp(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+        string hash = U();
+        await _repo.RefreshTokenAddAsync(userId, hash, DateTime.UtcNow.AddDays(30));
+        await _repo.RefreshTokenRevokeAsync(hash);
+
+        // Simulates a stolen, already-used token being replayed: rotating it again must not
+        // resurrect it or silently create a usable replacement.
+        await _repo.RefreshTokenRotateAsync(hash, U(), DateTime.UtcNow.AddDays(30));
+
+        var stillRevoked = await _repo.RefreshTokenGetAsync(hash);
+        Assert.NotNull(stillRevoked!.RevokedAt);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task RefreshToken_Revoke_IsIdempotentAndMarksRevoked(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+        string hash = U();
+        await _repo.RefreshTokenAddAsync(userId, hash, DateTime.UtcNow.AddDays(30));
+
+        await _repo.RefreshTokenRevokeAsync(hash);
+        await _repo.RefreshTokenRevokeAsync(hash); // second call: still no error
+        await _repo.RefreshTokenRevokeAsync("never-issued-" + U()); // unknown token: still no error
+
+        Assert.NotNull((await _repo.RefreshTokenGetAsync(hash))!.RevokedAt);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task RefreshToken_RevokeAllForUser_RevokesEveryActiveToken(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+        string hashA = U();
+        string hashB = U();
+        await _repo.RefreshTokenAddAsync(userId, hashA, DateTime.UtcNow.AddDays(30));
+        await _repo.RefreshTokenAddAsync(userId, hashB, DateTime.UtcNow.AddDays(30));
+
+        await _repo.RefreshTokenRevokeAllForUserAsync(userId);
+
+        Assert.NotNull((await _repo.RefreshTokenGetAsync(hashA))!.RevokedAt);
+        Assert.NotNull((await _repo.RefreshTokenGetAsync(hashB))!.RevokedAt);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task RefreshToken_DuplicateHash_ViolatesUniqueConstraint(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+        string hash = U();
+        await _repo.RefreshTokenAddAsync(userId, hash, DateTime.UtcNow.AddDays(30));
+
+        await Assert.ThrowsAsync<DbUpdateException>(
+            () => _repo.RefreshTokenAddAsync(userId, hash, DateTime.UtcNow.AddDays(30)));
+    }
+
     // ---- user -------------------------------------------------------------
 
     [SkippableTheory, MemberData(nameof(Providers))]
