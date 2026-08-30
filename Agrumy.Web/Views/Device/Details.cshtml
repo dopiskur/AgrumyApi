@@ -131,6 +131,7 @@
         @Html.ActionLink("Edit", "Edit", new { idDevice = Model.IDDevice }, new { @class = "btn btn-primary" })
         @Html.ActionLink("Sensor config", "EditSensor", new { idDevice = Model.IDDevice }, new { @class = "btn btn-primary" })
         @Html.ActionLink("Controller config", "EditController", new { idDevice = Model.IDDevice }, new { @class = "btn btn-primary" })
+        <a asp-action="Events" asp-route-idDevice="@Model.IDDevice" class="btn btn-secondary">Events</a>
         @Html.ActionLink("Delete", "Delete", new { idDevice = Model.IDDevice }, new { @class = "btn btn-danger" })
         <a asp-action="Index" class="btn btn-outline-secondary">Back to List</a>
     </div>

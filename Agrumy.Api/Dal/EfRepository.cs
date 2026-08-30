@@ -172,6 +172,7 @@ namespace api.Dal
                 TemperatureHysteresis = Config.hysteresisTemperature,
                 HumidityHysteresis = Config.hysteresisHumidity,
                 LightHysteresis = Config.hysteresisLight,
+                EventDedupeMinutes = Config.eventDedupeMinutes,
             };
             db.ServerConfigs.Add(generated);
             await db.SaveChangesAsync();
@@ -191,6 +192,7 @@ namespace api.Dal
             row.TemperatureHysteresis = config.TemperatureHysteresis;
             row.HumidityHysteresis = config.HumidityHysteresis;
             row.LightHysteresis = config.LightHysteresis;
+            row.EventDedupeMinutes = config.EventDedupeMinutes;
             await db.SaveChangesAsync();
         }
 
@@ -218,6 +220,7 @@ namespace api.Dal
             row.TemperatureHysteresis = Config.hysteresisTemperature;
             row.HumidityHysteresis = Config.hysteresisHumidity;
             row.LightHysteresis = Config.hysteresisLight;
+            row.EventDedupeMinutes = Config.eventDedupeMinutes;
             await db.SaveChangesAsync();
         }
 
@@ -942,6 +945,60 @@ namespace api.Dal
                 .ExecuteDeleteAsync();
         }
 
+        // ---- Device events (roadmap #28) -------------------------------------------
+
+        public async Task<bool> EventDevicePushAsync(int deviceID, int tenantID, DeviceEventType eventType, string? message)
+        {
+            // Read outside the write connection, same reasoning as DeviceAddAsync's ServerConfigGetAsync
+            // call - auto-generates the row (and its EventDedupeMinutes default) on a brand-new install.
+            int dedupeMinutes = (await ServerConfigGetAsync()).EventDedupeMinutes ?? Config.eventDedupeMinutes;
+            DateTime cutoff = DateTime.UtcNow.AddMinutes(-dedupeMinutes);
+
+            await using var db = Db();
+
+            bool isDuplicate = await db.EventDevices.AsNoTracking()
+                .AnyAsync(e => e.DeviceID == deviceID && e.EventID == (int)eventType && e.Date >= cutoff);
+            if (isDuplicate)
+            {
+                return false;
+            }
+
+            db.EventDevices.Add(new EventDeviceRow
+            {
+                DeviceID = deviceID,
+                TenantID = tenantID,
+                EventID = (int)eventType,
+                Date = DateTime.UtcNow, // server clock, not device-reported - a device mid-"NoInternet" may lack NTP sync
+                Message = message,
+            });
+            await db.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<IList<DeviceEvent>> EventDeviceGetAsync(int? deviceID, int? tenantID, int limit = 100)
+        {
+            await using var db = Db();
+            var rows = await db.EventDevices.AsNoTracking()
+                .Where(e => e.DeviceID == deviceID && e.TenantID == tenantID)
+                .OrderByDescending(e => e.Date)
+                .Take(limit)
+                .ToListAsync();
+            return rows.Select(ToDto).ToList();
+        }
+
+        private static DeviceEvent ToDto(EventDeviceRow e) => new()
+        {
+            IDEventDevice = e.IDEventDevice,
+            DeviceID = e.DeviceID,
+            // Guards against a row written by a future/older enum definition than this build's -
+            // never throws, just surfaces the raw number so it's still visible in the admin list.
+            EventType = Enum.IsDefined(typeof(DeviceEventType), e.EventID)
+                ? ((DeviceEventType)e.EventID).ToString()
+                : $"Unknown({e.EventID})",
+            Message = e.Message,
+            CreatedAt = e.Date,
+        };
+
         // ---- Tenant ---------------------------------------------------------
 
         public async Task<bool> TenantGetAsync(string tenantName)
@@ -1033,6 +1090,7 @@ namespace api.Dal
             TemperatureHysteresis = r.TemperatureHysteresis,
             HumidityHysteresis = r.HumidityHysteresis,
             LightHysteresis = r.LightHysteresis,
+            EventDedupeMinutes = r.EventDedupeMinutes,
         };
 
         // UserGet / UsersGet joined only userGroup (not userRole), so RoleName stays null and

@@ -86,6 +86,22 @@ namespace api.Controllers.API
             return Ok(await Repo.DeviceConfigControllerGetAsync(deviceConfigControllerID));
         }
 
+        /// <summary>Roadmap #28 admin diagnostic view - tenant ownership enforced the same way as
+        /// every other Device sub-resource GET, not just by trusting idDevice.</summary>
+        [Authorize(Roles = "admin")]
+        [HttpGet("Events")]
+        public async Task<ActionResult<IList<DeviceEvent>>> DeviceEventsGet(int? idDevice)
+        {
+            var (device, error) = await EnsureOwnedDeviceAsync(
+                () => Repo.DeviceGetByIdAsync(idDevice), "Device");
+            if (error != null)
+            {
+                return error;
+            }
+
+            return Ok(await Repo.EventDeviceGetAsync(device!.IDDevice, CallerTenantId));
+        }
+
         [Authorize(Roles = "admin")]
         [HttpPut("Sensor")]
         public async Task<ActionResult<bool>> DeviceConfigSensorUpdate(DeviceUpdate? deviceUpdate)
@@ -185,6 +201,30 @@ namespace api.Controllers.API
 
             Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
             return device is null ? NotFound() : Ok(await BuildDeviceConfigAsync(device));
+        }
+
+        /// <summary>Roadmap #28. No identity field in the body by design - see DeviceEventPush;
+        /// deviceID/tenantID come exclusively from the authenticated apiId, same rule as
+        /// SensorDataApiController.Post (#47).</summary>
+        [HttpPost("Event")]
+        [EnableRateLimiting("device-data")]
+        [Authorize(Policy = DeviceAuth.SessionPolicy)]
+        public async Task<ActionResult> PushEvent([FromBody] DeviceEventPush value)
+        {
+            if (!Enum.TryParse<DeviceEventType>(value.EventType, ignoreCase: true, out var eventType))
+            {
+                return BadRequest($"Unknown eventType: {value.EventType}");
+            }
+
+            string apiId = HttpContext.DeviceApiId()!;
+            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            if (device is null)
+            {
+                return Unauthorized();
+            }
+
+            await Repo.EventDevicePushAsync(device.IDDevice!.Value, device.TenantID ?? 0, eventType, value.Message);
+            return Ok();
         }
 
         [HttpPost("Register")]

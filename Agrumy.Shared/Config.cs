@@ -46,5 +46,13 @@ namespace api
             double.TryParse(configuration.GetSection(key).Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
                 ? value
                 : fallback;
+
+        // Roadmap #28: how long a device's identical repeated event is ignored server-side.
+        public static int eventDedupeMinutes = ParseIntOr("ServerConfig:EventDedupeMinutes", 10);
+
+        private static int ParseIntOr(string key, int fallback) =>
+            int.TryParse(configuration.GetSection(key).Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+                ? value
+                : fallback;
     }
 }

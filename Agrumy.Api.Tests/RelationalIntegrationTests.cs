@@ -671,6 +671,78 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.False(await db.SensorData.AnyAsync(r => r.TenantID == tenantId + 999_999));
     }
 
+    // ---- device events (roadmap #28) ----------------------------------
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task EventDevicePush_InsertsWithCallerIdentity(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+
+        bool inserted = await _repo.EventDevicePushAsync(d.IDDevice!.Value, tenantId, DeviceEventType.NoInternet, "wifi dropped");
+        Assert.True(inserted);
+
+        var events = await _repo.EventDeviceGetAsync(d.IDDevice, tenantId);
+        var ev = Assert.Single(events);
+        Assert.Equal(d.IDDevice, ev.DeviceID);
+        Assert.Equal(nameof(DeviceEventType.NoInternet), ev.EventType);
+        Assert.Equal("wifi dropped", ev.Message);
+        Assert.NotNull(ev.CreatedAt);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task EventDevicePush_DedupesIdenticalEventWithinWindow_ButNotAfterItExpires(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+
+        bool first = await _repo.EventDevicePushAsync(d.IDDevice!.Value, tenantId, DeviceEventType.NoInternet, "1st");
+        bool secondImmediate = await _repo.EventDevicePushAsync(d.IDDevice!.Value, tenantId, DeviceEventType.NoInternet, "2nd, should be deduped");
+        Assert.True(first);
+        Assert.False(secondImmediate);
+        Assert.Single(await _repo.EventDeviceGetAsync(d.IDDevice, tenantId));
+
+        // Push a different event type in between - must never dedupe against an unrelated type.
+        bool differentType = await _repo.EventDevicePushAsync(d.IDDevice!.Value, tenantId, DeviceEventType.AuthFailed, "unrelated");
+        Assert.True(differentType);
+        Assert.Equal(2, (await _repo.EventDeviceGetAsync(d.IDDevice, tenantId)).Count);
+
+        // Backdate the NoInternet row past the default 10-minute dedupe window and confirm the
+        // next push of the same type is no longer suppressed.
+        await using (var db = _fx.NewContext(t))
+        {
+            var row = await db.EventDevices.SingleAsync(e => e.DeviceID == d.IDDevice!.Value && e.EventID == (int)DeviceEventType.NoInternet);
+            row.Date = DateTime.UtcNow.AddMinutes(-11);
+            await db.SaveChangesAsync();
+        }
+        bool afterWindow = await _repo.EventDevicePushAsync(d.IDDevice!.Value, tenantId, DeviceEventType.NoInternet, "3rd, window expired");
+        Assert.True(afterWindow);
+        Assert.Equal(3, (await _repo.EventDeviceGetAsync(d.IDDevice, tenantId)).Count);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task EventDeviceGet_OnlyReturnsSameTenantEvents(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantA, _, _) = await MakeUser(t);
+        var deviceA = await MakeDevice(t, tenantA);
+        var (tenantB, _, _) = await MakeUser(t);
+        var deviceB = await MakeDevice(t, tenantB);
+
+        await _repo.EventDevicePushAsync(deviceA.IDDevice!.Value, tenantA, DeviceEventType.OtaFailed, "tenant A");
+        await _repo.EventDevicePushAsync(deviceB.IDDevice!.Value, tenantB, DeviceEventType.OtaFailed, "tenant B");
+
+        var forA = await _repo.EventDeviceGetAsync(deviceA.IDDevice, tenantA);
+        Assert.Single(forA);
+        Assert.Equal("tenant A", forA[0].Message);
+
+        // Same deviceID passed under the WRONG tenant must not leak tenant A's row.
+        var wrongTenant = await _repo.EventDeviceGetAsync(deviceA.IDDevice, tenantB);
+        Assert.Empty(wrongTenant);
+    }
+
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task SensorDataGet_Buckets_Rows_Excludes_Null_Co2_And_Writes_Report(DbProviderKind provider)
     {

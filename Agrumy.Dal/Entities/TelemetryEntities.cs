@@ -36,6 +36,9 @@ namespace api.Dal.Entities
     {
         public int IDEventDevice { get; set; }
         public int DeviceID { get; set; }
+        // Legacy schema predates multi-tenancy - added for roadmap #28, stamped from the
+        // authenticated device's identity at push time, never from a client-supplied value.
+        public int TenantID { get; set; }
         public int EventID { get; set; }
         public DateTime? Date { get; set; }
         public string? Message { get; set; }

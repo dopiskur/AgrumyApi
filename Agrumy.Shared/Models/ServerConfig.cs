@@ -17,5 +17,10 @@ namespace api.Models
         public double? TemperatureHysteresis { get; set; }
         public double? HumidityHysteresis { get; set; }
         public double? LightHysteresis { get; set; }
+
+        // Roadmap #28: a device repeating the identical DeviceEventType within this many minutes
+        // of its last one is ignored server-side rather than stored - same seed/reload/admin-edit
+        // pattern as the hysteresis fields above.
+        public int? EventDedupeMinutes { get; set; }
     }
 }

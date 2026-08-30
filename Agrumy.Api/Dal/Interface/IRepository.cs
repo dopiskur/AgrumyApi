@@ -115,6 +115,21 @@ namespace api.Dal.Interface
         Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? tenantID, int? getData, int? deviceID, int? sensorDataReportID);
         Task SensorDataDeleteAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY);
 
+        // Device events (roadmap #28)
+
+        /// <summary>
+        /// Records one device event, unless an identical eventType for the same device was already
+        /// recorded within the last ServerConfig.EventDedupeMinutes (default 10) - a flapping
+        /// "NoInternet" every loop cycle should not flood the table. deviceID/tenantID come from the
+        /// authenticated device identity, same rule as SensorDataPushAsync. Returns false when the
+        /// push was deduped (nothing written), true when it was actually inserted.
+        /// </summary>
+        Task<bool> EventDevicePushAsync(int deviceID, int tenantID, DeviceEventType eventType, string? message);
+
+        /// <summary>Most recent events for one device, newest first, capped at <paramref name="limit"/>.
+        /// tenantID is the caller's own tenant, not trusted from the request - a device belonging to
+        /// another tenant simply matches zero rows rather than leaking another tenant's events.</summary>
+        Task<IList<DeviceEvent>> EventDeviceGetAsync(int? deviceID, int? tenantID, int limit = 100);
 
         // Tenant
         Task<bool> TenantGetAsync(string tenantName);

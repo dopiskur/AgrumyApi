@@ -50,6 +50,14 @@ namespace api.Controllers.View
         }
 
         [Authorize(Roles = "admin")]
+        public async Task<ActionResult> Events(int? idDevice) =>
+            View(new DeviceView
+            {
+                Device = await api.DeviceGet(idDevice),
+                Events = await api.DeviceEventsGet(idDevice),
+            });
+
+        [Authorize(Roles = "admin")]
         public async Task<ActionResult> Delete(int? idDevice) =>
             View(await api.DeviceGet(idDevice));
 

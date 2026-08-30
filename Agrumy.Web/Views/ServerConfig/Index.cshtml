@@ -43,6 +43,16 @@
                 <span asp-validation-for="LightHysteresis" class="text-danger"></span>
             </div>
 
+            <p class="text-secondary">
+                A device repeating the identical event (e.g. "NoInternet") within this many
+                minutes of its last one is ignored, not stored.
+            </p>
+            <div class="mb-3">
+                <label asp-for="EventDedupeMinutes" class="control-label"></label>
+                <input asp-for="EventDedupeMinutes" class="form-control" />
+                <span asp-validation-for="EventDedupeMinutes" class="text-danger"></span>
+            </div>
+
             <div class="mb-0">
                 <input type="submit" value="Save" class="btn btn-primary" />
             </div>

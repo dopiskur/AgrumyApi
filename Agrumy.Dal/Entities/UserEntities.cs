@@ -81,5 +81,8 @@ namespace api.Dal.Entities
         public double? TemperatureHysteresis { get; set; }
         public double? HumidityHysteresis { get; set; }
         public double? LightHysteresis { get; set; }
+
+        // Roadmap #28 - see api.Models.ServerConfig.EventDedupeMinutes.
+        public int? EventDedupeMinutes { get; set; }
     }
 }

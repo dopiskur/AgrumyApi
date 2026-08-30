@@ -53,7 +53,9 @@
       "Temperature": 1.0,
       "Humidity": 5.0,
       "Light": 20.0
-    }
+    },
+    "// EventDedupeMinutes": "Roadmap #28 - a device repeating the identical event type within this many minutes of its last one is ignored server-side, not stored.",
+    "EventDedupeMinutes": 10
   },
 
   "// Notifications": "Alert delivery channels (roadmap #6). A channel with Enabled=false or missing settings is skipped, never an error.",

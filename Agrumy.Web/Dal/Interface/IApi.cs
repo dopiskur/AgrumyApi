@@ -77,6 +77,11 @@ namespace api.Dal.Interface
         [Get("/api/Device/TypeSensor")]
         Task<IEnumerable<DeviceTypeSensor>> DeviceTypeSensorGet();
 
+        // ---- Device events (roadmap #28) -----------------------------------
+
+        [Get("/api/Device/Events")]
+        Task<IList<DeviceEvent>> DeviceEventsGet(int? idDevice);
+
         // ---- SensorData ---------------------------------------------------
 
         [Get("/api/SensorData")]

@@ -14,5 +14,7 @@
         public IEnumerable<SensorDataReport>? SensorDataReport { get; set; }
         public String? SensorDataJson { get; set; }
         public TimeRange? TimeRange { get; set; } = new TimeRange();
+
+        public IList<DeviceEvent>? Events { get; set; }
     }
 }
