@@ -114,6 +114,8 @@ listens on (5000 by default, set in `Agrumy.Api/Properties/launchSettings.json`)
 | `JWT:Audience` | yes | e.g. `agrumy-api` |
 | `Security:EnforceHttps` | no (default `true`) | `false` = serve plain HTTP, no redirect/HSTS - needed while `AgrumyDevice` firmware still calls `http://` |
 | `Startup:FailFastOnDbCheck` | no (default `false`) | `true` = stop the app if the DB check / provisioning fails |
+| `Notifications:Email:*` | no (default off) | SMTP alert email (roadmap #6). `Enabled` + `Host` + `FromAddress` are the minimum; `Port`/`UseStartTls`/`Username`/`Password`/`FromName` optional. Disabled or incomplete = channel skipped, not an error. |
+| `Notifications:Push:*` | no (default off) | FCM push channel - **prepared but inert**. Stays skipped until the Android app registers device tokens and the OAuth step in `FcmPushNotificationChannel` is wired. Leave `Enabled=false`. |
 | `WebView:Enabled`, `WebView:ApiService` | no | present in `appsettings.json.example` as a documented switch for a possible combined API+UI deployment, but **not currently read by any code** - `Agrumy.Web` is what actually serves the admin UI today |
 
 **`Agrumy.Web/appsettings.json`**

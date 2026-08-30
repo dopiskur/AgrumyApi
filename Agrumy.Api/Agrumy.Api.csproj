@@ -24,6 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- SMTP email for the notification channel (roadmap #6). -->
+    <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.22.0" />
     <!-- Swashbuckle 10.x pulls Microsoft.OpenApi v2, which renames the OpenApi model

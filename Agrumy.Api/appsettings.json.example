@@ -43,6 +43,28 @@
     "FailFastOnDbCheck": false
   },
 
+  "// Notifications": "Alert delivery channels (roadmap #6). A channel with Enabled=false or missing settings is skipped, never an error.",
+  "Notifications": {
+    "// Email": "SMTP email via MailKit. Enabled + Host + FromAddress are the minimum to send.",
+    "Email": {
+      "Enabled": false,
+      "Host": "smtp.example.com",
+      "Port": 587,
+      "// UseStartTls": "true = port 587 STARTTLS (default); false = port 465 implicit TLS.",
+      "UseStartTls": true,
+      "Username": "alerts@example.com",
+      "Password": "CHANGE_ME",
+      "FromAddress": "alerts@example.com",
+      "FromName": "Agrumy"
+    },
+    "// Push": "FCM (Android/iOS) push. PREPARED, NOT LIVE - stays skipped until the Android app registers device tokens and FcmPushNotificationChannel's OAuth step is wired. Leave Enabled=false.",
+    "Push": {
+      "Enabled": false,
+      "FcmProjectId": "",
+      "FcmCredentialsPath": ""
+    }
+  },
+
   "// Logging": "Standard ASP.NET Core logging configuration.",
   "Logging": {
     "LogLevel": {

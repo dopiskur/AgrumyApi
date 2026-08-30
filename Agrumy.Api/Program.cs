@@ -1,6 +1,7 @@
 using api.Dal;
 using api.Dal.Interface;
 using api.Filters;
+using api.Notifications;
 using api.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -48,6 +49,13 @@ builder.Services.AddScoped<IAuthorizationHandler, DeviceSessionHandler>();
 builder.Services.AddScoped<IRepository, EfRepository>();
 builder.Services.AddScoped<ICache, CacheRepository>();
 builder.Services.AddScoped<DbExceptionFilter>();
+
+// Alert delivery (roadmap #6). Email is live; the FCM push channel is registered but stays
+// skipped until the Android app registers device tokens - see FcmPushNotificationChannel.
+builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection(NotificationOptions.SectionName));
+builder.Services.AddScoped<INotificationChannel, EmailNotificationChannel>();
+builder.Services.AddScoped<INotificationChannel, FcmPushNotificationChannel>();
+builder.Services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
 
 builder.Services.AddControllers(options => options.Filters.AddService<DbExceptionFilter>());
 
