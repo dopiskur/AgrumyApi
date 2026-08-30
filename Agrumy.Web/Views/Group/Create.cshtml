@@ -1,7 +1,10 @@
 @model api.Models.GroupView
+@using Microsoft.AspNetCore.Mvc.Rendering
 
 @{
     ViewData["Title"] = "Create";
+    var userRoleItems = new SelectList(Model.UserRoles, nameof(UserRole.IDUserRole), nameof(UserRole.RoleName));
+    var userRoleSelect = new SelectFieldViewModel { Name = $"{nameof(Model.UserGroup)}.{nameof(Model.UserGroup.UserRoleID)}", Label = nameof(Model.UserGroup.RoleName), Items = userRoleItems };
 }
 
 <div class="card">
@@ -16,12 +19,9 @@
                 <input asp-for="UserGroup.GroupName" class="form-control" />
                 <span asp-validation-for="UserGroup.GroupName" class="text-danger"></span>
             </div>
-            <div class="mb-3">
-                <label asp-for="UserGroup.RoleName"></label>
-                @Html.DropDownListFor(m => m.UserGroup.UserRoleID,
-                         new SelectList(Model.UserRoles, "IDUserRole", "RoleName"),
-                         new { @class = "form-control" })
-            </div>
+
+            <partial name="_SelectField" model="userRoleSelect" />
+
             <div class="mb-0">
                 <input type="submit" value="Create" class="btn btn-primary" />
                 <a asp-action="Index" class="btn btn-outline-secondary">Back to List</a>
@@ -29,7 +29,3 @@
         </form>
     </div>
 </div>
-
-@section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
-}

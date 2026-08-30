@@ -1,0 +1,16 @@
+@model api.ViewModels.EnabledToggleFieldViewModel
+@{
+    // "." isn't valid inside a CSS id selector without escaping - keep ids readable and safe by
+    // flattening the model-bound field name (e.g. "DeviceConfigController.RelayEnabled") to underscores.
+    var idBase = Model.Name.Replace(".", "_");
+}
+
+<div class="mb-3 d-flex justify-content-between align-items-center">
+    <label class="control-label mb-0">@Model.Label</label>
+    <div class="btn-group" role="group">
+        @Html.RadioButton(Model.Name, "True", Model.Value == true, new { @class = "btn-check", id = idBase + "_True" })
+        <label class="btn btn-outline-success" for="@(idBase)_True">Enabled</label>
+        @Html.RadioButton(Model.Name, "False", Model.Value == false, new { @class = "btn-check", id = idBase + "_False" })
+        <label class="btn btn-outline-danger" for="@(idBase)_False">Disabled</label>
+    </div>
+</div>

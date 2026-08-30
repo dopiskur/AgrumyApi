@@ -1,7 +1,21 @@
 @model api.Models.DeviceView
+@using Microsoft.AspNetCore.Mvc.Rendering
 
 @{
     ViewData["Title"] = "Edit";
+    var device = Model.Device!;
+    string DeviceField(string name) => $"{nameof(Model.Device)}.{name}";
+
+    var deviceTypeItems = new SelectList(Model.DeviceType, nameof(DeviceType.IDDeviceType), nameof(DeviceType.DeviceTypeName), device.DeviceTypeID);
+    var deviceTypeSelect = new SelectFieldViewModel { Name = DeviceField(nameof(device.DeviceTypeID)), Label = nameof(device.DeviceTypeID), Items = deviceTypeItems };
+
+    var deviceTypeServiceItems = new SelectList(Model.DeviceTypeService, nameof(DeviceTypeService.IDDeviceTypeService), nameof(DeviceTypeService.ServiceType), device.DeviceTypeServiceID);
+    var deviceTypeServiceSelect = new SelectFieldViewModel { Name = DeviceField(nameof(device.DeviceTypeServiceID)), Label = nameof(device.DeviceTypeServiceID), Items = deviceTypeServiceItems };
+
+    var sleepDeepToggle = new EnabledToggleFieldViewModel { Name = DeviceField(nameof(device.SleepDeepEnabled)), Label = "SleepDeep", Value = device.SleepDeepEnabled };
+    var batteryToggle = new EnabledToggleFieldViewModel { Name = DeviceField(nameof(device.BatteryEnabled)), Label = "Device battery", Value = device.BatteryEnabled };
+    var debugToggle = new EnabledToggleFieldViewModel { Name = DeviceField(nameof(device.Debug)), Label = nameof(device.Debug), Value = device.Debug };
+    var enabledToggle = new EnabledToggleFieldViewModel { Name = DeviceField(nameof(device.Enabled)), Label = "Device", Value = device.Enabled };
 }
 
 <div class="card">
@@ -20,12 +34,7 @@
                 <span asp-validation-for="Device.TenantID" class="text-danger"></span>
             </div>
 
-            <div class="mb-3">
-                <label asp-for="Device.DeviceTypeID"></label>
-                @Html.DropDownListFor(m => m.Device.DeviceTypeID,
-                         new SelectList(Model.DeviceType.ToList(), "IDDeviceType", "DeviceTypeName", Model.DeviceType.First().IDDeviceType),
-                         new { @class = "form-control" })
-            </div>
+            <partial name="_SelectField" model="deviceTypeSelect" />
 
             <div class="mb-3">
                 <input asp-for="Device.DeviceUnitID" class="form-control" />
@@ -69,12 +78,8 @@
                 <span asp-validation-for="Device.ServicePoint" class="text-danger"></span>
             </div>
 
-            <div class="mb-3">
-                <label asp-for="Device.DeviceTypeServiceID"></label>
-                @Html.DropDownListFor(m => m.Device.DeviceTypeServiceID,
-                         new SelectList(Model.DeviceTypeService.ToList(), "IDDeviceTypeService", "ServiceType", Model.DeviceTypeService.First().IDDeviceTypeService),
-                         new { @class = "form-control" })
-            </div>
+            <partial name="_SelectField" model="deviceTypeServiceSelect" />
+
             <div class="mb-3">
                 <label asp-for="Device.ServicePublicKey" class="control-label"></label>
                 <input asp-for="Device.ServicePublicKey" class="form-control" />
@@ -95,45 +100,11 @@
                 <span asp-validation-for="Device.DeviceControllerEnabled" class="text-danger"></span>
             </div>
 
-            <div class="mb-3 d-flex justify-content-between align-items-center">
-                <label asp-for="Device.SleepDeepEnabled" class="control-label mb-0">SleepDeep</label>
-                <div class="btn-group" role="group">
-                    @Html.RadioButtonFor(m => m.Device.SleepDeepEnabled, "True", new { @name = "SleepDeepEnabled", @class = "btn-check", id = "SleepDeepEnabled_True" })
-                    <label class="btn btn-outline-success" for="SleepDeepEnabled_True">Enabled</label>
-                    @Html.RadioButtonFor(m => m.Device.SleepDeepEnabled, "False", new { @name = "SleepDeepEnabled", @class = "btn-check", id = "SleepDeepEnabled_False" })
-                    <label class="btn btn-outline-danger" for="SleepDeepEnabled_False">Disabled</label>
-                </div>
-            </div>
+            <partial name="_EnabledToggleField" model="sleepDeepToggle" />
+            <partial name="_EnabledToggleField" model="batteryToggle" />
+            <partial name="_EnabledToggleField" model="debugToggle" />
+            <partial name="_EnabledToggleField" model="enabledToggle" />
 
-            <div class="mb-3 d-flex justify-content-between align-items-center">
-                <label asp-for="Device.BatteryEnabled" class="control-label mb-0">Device battery</label>
-                <div class="btn-group" role="group">
-                    @Html.RadioButtonFor(m => m.Device.BatteryEnabled, "True", new { @name = "BatteryEnabled", @class = "btn-check", id = "BatteryEnabled_True" })
-                    <label class="btn btn-outline-success" for="BatteryEnabled_True">Enabled</label>
-                    @Html.RadioButtonFor(m => m.Device.BatteryEnabled, "False", new { @name = "BatteryEnabled", @class = "btn-check", id = "BatteryEnabled_False" })
-                    <label class="btn btn-outline-danger" for="BatteryEnabled_False">Disabled</label>
-                </div>
-            </div>
-
-            <div class="mb-3 d-flex justify-content-between align-items-center">
-                <label asp-for="Device.Debug" class="control-label mb-0"></label>
-                <div class="btn-group" role="group">
-                    @Html.RadioButtonFor(m => m.Device.Debug, "True", new { @name = "Debug", @class = "btn-check", id = "Debug_True" })
-                    <label class="btn btn-outline-success" for="Debug_True">Enabled</label>
-                    @Html.RadioButtonFor(m => m.Device.Debug, "False", new { @name = "Debug", @class = "btn-check", id = "Debug_False" })
-                    <label class="btn btn-outline-danger" for="Debug_False">Disabled</label>
-                </div>
-            </div>
-
-            <div class="mb-3 d-flex justify-content-between align-items-center">
-                <label asp-for="Device.Enabled" class="control-label mb-0">Device</label>
-                <div class="btn-group" role="group">
-                    @Html.RadioButtonFor(m => m.Device.Enabled, "True", new { @name = "Enabled", @class = "btn-check", id = "Enabled_True" })
-                    <label class="btn btn-outline-success" for="Enabled_True">Enabled</label>
-                    @Html.RadioButtonFor(m => m.Device.Enabled, "False", new { @name = "Enabled", @class = "btn-check", id = "Enabled_False" })
-                    <label class="btn btn-outline-danger" for="Enabled_False">Disabled</label>
-                </div>
-            </div>
             <div class="mb-3">
                 @Html.HiddenFor(model => model.Device.ConfigVersion)
             </div>
@@ -144,9 +115,3 @@
         </form>
     </div>
 </div>
-
-@section Scripts {
-    @{
-        await Html.RenderPartialAsync("_ValidationScriptsPartial");
-    }
-}

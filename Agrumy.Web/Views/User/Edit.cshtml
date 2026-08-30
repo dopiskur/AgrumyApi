@@ -1,7 +1,15 @@
 @model api.Models.UserView
+@using Microsoft.AspNetCore.Mvc.Rendering
 
 @{
     ViewData["Title"] = "Edit";
+    var userUpdate = Model.UserUpdate!;
+    string UserField(string name) => $"{nameof(Model.UserUpdate)}.{name}";
+
+    var userGroupItems = new SelectList(Model.UserGroups, nameof(UserGroup.IDUserGroup), nameof(UserGroup.GroupName), userUpdate.UserGroupID);
+    // UserUpdate.UserGroupID carries [Display(Name = "Role")] - use the real display name, not the raw property name.
+    var userGroupSelect = new SelectFieldViewModel { Name = UserField(nameof(userUpdate.UserGroupID)), Label = Html.DisplayNameFor(m => m.UserUpdate!.UserGroupID), Items = userGroupItems };
+    var enabledToggle = new EnabledToggleFieldViewModel { Name = UserField(nameof(userUpdate.Enabled)), Label = "Account", Value = userUpdate.Enabled };
 }
 
 <div class="card">
@@ -55,22 +63,8 @@
                 <span asp-validation-for="UserUpdate.Phone" class="text-danger"></span>
             </div>
 
-            <div class="mb-3">
-                <label asp-for="UserUpdate.UserGroupID" class="control-label"></label>
-                @Html.DropDownListFor(m => m.UserUpdate.UserGroupID,
-                         new SelectList(Model.UserGroups.ToList(), "IDUserGroup", "GroupName", Model.UserGroups.First().IDUserGroup),
-                         new { @class = "form-control" })
-            </div>
-
-            <div class="mb-3 d-flex justify-content-between align-items-center">
-                <label asp-for="UserUpdate.Enabled" class="control-label mb-0">Account</label>
-                <div class="btn-group" role="group">
-                    @Html.RadioButtonFor(m => m.UserUpdate.Enabled, "True", new { @name = "UserEnabled", @class = "btn-check", id = "UserEnabled_True" })
-                    <label class="btn btn-outline-success" for="UserEnabled_True">Enabled</label>
-                    @Html.RadioButtonFor(m => m.UserUpdate.Enabled, "False", new { @name = "UserEnabled", @class = "btn-check", id = "UserEnabled_False" })
-                    <label class="btn btn-outline-danger" for="UserEnabled_False">Disabled</label>
-                </div>
-            </div>
+            <partial name="_SelectField" model="userGroupSelect" />
+            <partial name="_EnabledToggleField" model="enabledToggle" />
 
             <div class="mb-0">
                 <input type="submit" value="Save" class="btn btn-primary" />
@@ -79,7 +73,3 @@
         </form>
     </div>
 </div>
-
-@section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
-}

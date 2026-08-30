@@ -1,0 +1,6 @@
+@model api.ViewModels.SelectFieldViewModel
+
+<div class="mb-3">
+    <label for="@Model.Name">@Model.Label</label>
+    @Html.DropDownList(Model.Name, Model.Items, new { @class = "form-control" })
+</div>
