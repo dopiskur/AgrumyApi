@@ -11,6 +11,9 @@ namespace api.Models
         ConfigApplied = 4,
         CrashLoopRollback = 5,
         OtaFailed = 6,
+        // Roadmap #9: the device dropped buffered sensor data because its LittleFS partition hit
+        // the 70% cap - deliberate loss on the device's side, but the operator should know.
+        BufferDiscarded = 7,
     }
 
     /// <summary>Body of POST /api/Device/Event. Deliberately carries no device/tenant identity field -
