@@ -507,7 +507,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
                 ["temperature"] = "27.0", ["co2"] = "410",
             });
 
-        await _repo.SensorDataPushAsync(payload);
+        await _repo.SensorDataPushAsync(payload, d.IDDevice!.Value, tenantId, 0, 0);
 
         await using var db = _fx.NewContext(t);
         var rows = await db.SensorData.Where(r => r.DeviceID == d.IDDevice).OrderBy(r => r.IDSensorData).ToListAsync();
@@ -516,6 +516,36 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(new DateTime(2026, 8, 29, 9, 50, 0), rows[0].DateCreated);
         Assert.NotNull(rows[1].DateCreated);
         Assert.True(rows[1].DateCreated > DateTime.Now.AddMinutes(-5));
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task SensorDataPush_Uses_Caller_Identity_And_Ignores_Payload_Ids(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+
+        // Every id in the payload is a lie - a different device, tenant, unit and zone.
+        var payload = new JsonArray(
+            new JsonObject
+            {
+                ["deviceID"] = d.IDDevice!.Value + 999_999,
+                ["tenantID"] = tenantId + 999_999,
+                ["deviceUnitID"] = 7,
+                ["deviceUnitZoneID"] = 9,
+                ["temperature"] = "21.5",
+            });
+
+        await _repo.SensorDataPushAsync(payload, d.IDDevice!.Value, tenantId, 0, 0);
+
+        await using var db = _fx.NewContext(t);
+        var row = await db.SensorData.SingleAsync(r => r.DeviceID == d.IDDevice!.Value);
+        Assert.Equal(tenantId, row.TenantID);
+        Assert.Equal(0, row.DeviceUnitID);
+        Assert.Equal(0, row.DeviceUnitZoneID);
+        Assert.Equal(21.5, row.Temperature);
+        Assert.False(await db.SensorData.AnyAsync(r => r.DeviceID == d.IDDevice!.Value + 999_999));
+        Assert.False(await db.SensorData.AnyAsync(r => r.TenantID == tenantId + 999_999));
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]

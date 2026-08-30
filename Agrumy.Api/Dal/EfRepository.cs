@@ -655,7 +655,7 @@ namespace api.Dal
 
         // ---- SensorData ---------------------------------------------------------
 
-        public async Task SensorDataPushAsync(JsonArray jsonArray)
+        public async Task SensorDataPushAsync(JsonArray jsonArray, int deviceID, int tenantID, int? deviceUnitID, int? deviceUnitZoneID)
         {
             var rows = new List<SensorDataRow>();
             foreach (var node in jsonArray)
@@ -668,10 +668,13 @@ namespace api.Dal
                 DateTime? dc = ReadDateTime(o, "dateCreated");
                 rows.Add(new SensorDataRow
                 {
-                    DeviceID = ReadInt(o, "deviceID") ?? 0,
-                    TenantID = ReadInt(o, "tenantID") ?? 0,
-                    DeviceUnitID = ReadInt(o, "deviceUnitID") ?? 0,
-                    DeviceUnitZoneID = ReadInt(o, "deviceUnitZoneID") ?? 0,
+                    // Identity is server-authoritative: it comes from the authenticated device, not
+                    // the payload. The deviceID/tenantID/deviceUnitID/deviceUnitZoneID keys in each
+                    // JSON row are deliberately ignored.
+                    DeviceID = deviceID,
+                    TenantID = tenantID,
+                    DeviceUnitID = deviceUnitID ?? 0,
+                    DeviceUnitZoneID = deviceUnitZoneID ?? 0,
                     Battery = ReadInt(o, "battery"),
                     Temperature = ReadDouble(o, "temperature"),
                     SoilTemperature = ReadDouble(o, "soilTemperature"),

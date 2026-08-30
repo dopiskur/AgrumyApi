@@ -21,8 +21,20 @@ namespace api.Controllers.API
         [Authorize(Policy = DeviceAuth.SessionPolicy)]
         public async Task<ActionResult<int?>> Post([FromBody] JsonArray jsonArray)
         {
-            await Repo.SensorDataPushAsync(jsonArray);
-            return Ok(Cache.GetDeviceCache(HttpContext.DeviceApiId()!).ConfigVersion);
+            string apiId = HttpContext.DeviceApiId()!;
+
+            // Resolve the device/tenant from the authenticated identity and hand them to the repo,
+            // which writes them onto every row and ignores whatever the payload claims. An
+            // authenticated apiId with no device row must not fall back to trusting the payload.
+            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            if (device is null)
+            {
+                return Unauthorized();
+            }
+
+            await Repo.SensorDataPushAsync(jsonArray, device.IDDevice!.Value, device.TenantID ?? 0,
+                device.DeviceUnitID, device.DeviceUnitZoneID);
+            return Ok(Cache.GetDeviceCache(apiId).ConfigVersion);
         }
 
         [HttpDelete]
