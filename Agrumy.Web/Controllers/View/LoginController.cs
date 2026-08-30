@@ -27,19 +27,19 @@ namespace api.Controllers.View
         public async Task<ActionResult> Index(UserLogin userLogin)
         {
             UserLoginResult? result;
-            string? role;
+            IReadOnlyList<string>? roles;
             try
             {
                 result = await api.UserLogin(userLogin);
-                role = result?.Token is { } token ? JwtTokenProvider.ValidateToken(token) : null;
+                roles = result?.Token is { } token ? JwtTokenProvider.ValidateToken(token) : null;
             }
             catch (Exception)
             {
                 result = null;
-                role = null;
+                roles = null;
             }
 
-            if (result?.Token is null || result.RefreshToken is null || role is null)
+            if (result?.Token is null || result.RefreshToken is null || roles is null || roles.Count == 0)
             {
                 ModelState.AddModelError(string.Empty, "Invalid email/username or password.");
                 return View(userLogin);
@@ -47,13 +47,11 @@ namespace api.Controllers.View
 
             // HttpOnly, SameSite=Strict cookie holding an encrypted ticket - the raw JWT and refresh
             // token ride along as stored tokens for BearerTokenHandler, never exposed to page script.
-            var identity = new ClaimsIdentity(
-                new[]
-                {
-                    new Claim(ClaimTypes.Name, result.Email ?? ""),
-                    new Claim(ClaimTypes.Role, role),
-                },
-                CookieAuthenticationDefaults.AuthenticationScheme);
+            // Roadmap #66: a caller can hold several roles at once - one Role claim per entry, same
+            // as the JWT itself; User.IsInRole(...) checks across all of them regardless of count.
+            var claims = new List<Claim> { new(ClaimTypes.Name, result.Email ?? "") };
+            claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
 
             var props = new AuthenticationProperties
             {

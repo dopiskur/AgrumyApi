@@ -39,6 +39,13 @@ namespace api.Dal.Interface
         [Get("/api/User/Roles")]
         Task<IEnumerable<UserRole>> UserRoleGet();
 
+        /// <summary>Roadmap #66: the given user's composable role set (a user can hold several).</summary>
+        [Get("/api/User/UserRoles")]
+        Task<List<string>> UserRolesGet(int idUser);
+
+        [Put("/api/User/UserRoles")]
+        Task UserRolesSet([Body] UserRolesUpdate value);
+
         // ---- Device --------------------------------------------------------
 
         [Get("/api/Device/All")]

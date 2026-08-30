@@ -159,6 +159,14 @@ namespace api.Models
         public int? RoleScopeID { get; set; }
     }
 
+    /// <summary>Roadmap #66: replaces a user's ENTIRE composable role set (not incremental) - see
+    /// api.Security.RoleNames for the valid values.</summary>
+    public class UserRolesUpdate
+    {
+        public int IDUser { get; set; }
+        public List<string> RoleNames { get; set; } = new();
+    }
+
 
 
 }

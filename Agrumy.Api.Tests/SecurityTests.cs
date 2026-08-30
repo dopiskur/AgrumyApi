@@ -108,11 +108,22 @@ public class JwtTokenProviderTests
     [Fact]
     public void ValidateToken_AcceptsFreshTokenAndReturnsRoleClaim()
     {
-        string token = JwtTokenProvider.CreateToken(SigningKey, expiration: 5, subject: "alice@example.com", role: "admin", tenantID: "0");
+        string token = JwtTokenProvider.CreateToken(SigningKey, expiration: 5, subject: "alice@example.com", roles: new[] { "admin" }, tenantID: "0");
 
-        string? role = JwtTokenProvider.ValidateToken(token);
+        var roles = JwtTokenProvider.ValidateToken(token);
 
-        Assert.Equal("admin", role);
+        Assert.Equal(new[] { "admin" }, roles);
+    }
+
+    [Fact]
+    public void ValidateToken_MultipleRoles_ReturnsAllOfThem()
+    {
+        // Roadmap #66: a caller can hold several roles at once - every one of them must round-trip.
+        string token = JwtTokenProvider.CreateToken(SigningKey, 5, "alice@example.com", new[] { "admin", "Tenant reader", "Tenant Device" }, "0");
+
+        var roles = JwtTokenProvider.ValidateToken(token);
+
+        Assert.Equal(new[] { "admin", "Tenant reader", "Tenant Device" }, roles);
     }
 
     [Fact]
@@ -137,7 +148,7 @@ public class JwtTokenProviderTests
     [Fact]
     public void ValidateToken_RejectsTokenSignedWithADifferentKey()
     {
-        string token = JwtTokenProvider.CreateToken("a-totally-different-signing-key-that-is-long-enough", 5, "eve@example.com", "user", "0");
+        string token = JwtTokenProvider.CreateToken("a-totally-different-signing-key-that-is-long-enough", 5, "eve@example.com", new[] { "user" }, "0");
 
         Assert.Null(JwtTokenProvider.ValidateToken(token));
     }

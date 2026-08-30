@@ -1,5 +1,8 @@
 using api.Dal.Interface;
 using api.Models;
+using api.Security;
+using api.Utils;
+using api.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -64,6 +67,38 @@ namespace api.Controllers.View
 
             await api.UserUpdate(userView.UserUpdate!);
             return View("Details", await api.UserGet(userView.UserUpdate!.IDUser));
+        }
+
+        /// <summary>Roadmap #66: a user can hold several roles at once - this edits the whole set,
+        /// separate from Edit()'s single legacy UserGroupID field (kept for backward compatibility).</summary>
+        public async Task<ActionResult> Roles(int? idUser)
+        {
+            var user = await api.UserGet(idUser);
+            var assigned = await api.UserRolesGet(idUser!.Value);
+            return View(new UserRolesViewModel
+            {
+                IDUser = idUser.Value,
+                Email = user.Email,
+                AllRoles = RoleNames.All,
+                AssignedRoles = assigned,
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> Roles(UserRolesViewModel value)
+        {
+            try
+            {
+                await api.UserRolesSet(new UserRolesUpdate { IDUser = value.IDUser, RoleNames = value.AssignedRoles.ToList() });
+            }
+            catch (ApiException ex)
+            {
+                ModelState.AddModelError(string.Empty, ex.Body);
+                value.AllRoles = RoleNames.All;
+                return View(value);
+            }
+            return RedirectToAction(nameof(Details), new { idUser = value.IDUser });
         }
 
         public async Task<ActionResult> Delete(int? idUser) =>

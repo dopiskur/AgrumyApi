@@ -11,7 +11,13 @@ namespace api.Security
         private static string? signKey = Config.secureKey;
 
 
-        public static string CreateToken(string secureKey, int expiration, string subject, string role, string tenantID)
+        /// <summary>Roadmap #66: a user can hold several roles at once, so <paramref name="roles"/>
+        /// becomes one <see cref="ClaimTypes.Role"/> claim per entry - ASP.NET Core's role
+        /// authorization (<c>[Authorize(Roles=...)]</c>/<c>IsInRole</c>) natively checks across all
+        /// of them, so every pre-#66 single-role check keeps working unmodified as long as the
+        /// caller includes the legacy "admin"/"user" alias in the set (see
+        /// api.Security.RoleNames.ImpliesLegacyAdmin and its callers).</summary>
+        public static string CreateToken(string secureKey, int expiration, string subject, IEnumerable<string> roles, string tenantID)
         {
             var tokenKey = Encoding.UTF8.GetBytes(secureKey);
 
@@ -27,13 +33,14 @@ namespace api.Security
 
             if (!string.IsNullOrEmpty(subject))
             {
-                tokenDescriptor.Subject = new ClaimsIdentity(new Claim[]
+                var claims = new List<Claim>
                 {
-                    new Claim(ClaimTypes.Name, subject),
-                    new Claim(JwtRegisteredClaimNames.Sub, subject),
-                    new Claim(ClaimTypes.Role, role),
-                    new Claim("TenantID", tenantID)
-                });
+                    new(ClaimTypes.Name, subject),
+                    new(JwtRegisteredClaimNames.Sub, subject),
+                    new("TenantID", tenantID),
+                };
+                claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+                tokenDescriptor.Subject = new ClaimsIdentity(claims);
             }
 
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -45,7 +52,11 @@ namespace api.Security
 
 
 
-        public static string? ValidateToken(string token)
+        /// <summary>Every role claim on a valid token (roadmap #66 - a caller can hold several), or
+        /// null if the token itself is invalid/expired/wrongly-signed. An empty (but non-null) list
+        /// means the token validated but carried no role claims at all - callers must treat that as
+        /// "no roles", not "check failed".</summary>
+        public static IReadOnlyList<string>? ValidateToken(string token)
         {
             if (token == null)
                 return null;
@@ -71,9 +82,7 @@ namespace api.Security
                 }, out SecurityToken validatedToken);
 
                 var jwtToken = (JwtSecurityToken)validatedToken;
-                var value = jwtToken.Claims.First(x => x.Type == "role").Value;
-
-                return value;
+                return jwtToken.Claims.Where(x => x.Type == "role").Select(x => x.Value).ToList();
             }
             catch
             {

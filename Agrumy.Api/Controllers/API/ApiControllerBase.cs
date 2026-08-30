@@ -31,7 +31,17 @@ namespace api.Controllers.API
             }
         }
 
-        /// <summary>The caller's role claim ("admin" / "user"), or null.</summary>
+        /// <summary>The caller's FIRST role claim - pre-#66 code (checks against literal "admin"/
+        /// "user") keeps working unmodified because JwtTokenProvider.CreateToken always adds the
+        /// legacy alias claim first. New code should prefer <see cref="CallerHasRole"/> or
+        /// <see cref="CallerRoles"/> instead - a caller can hold several roles at once.</summary>
         protected string? CallerRole => (User.Identity as ClaimsIdentity)?.FindFirst(ClaimTypes.Role)?.Value;
+
+        /// <summary>Every role claim on the caller's token (roadmap #66).</summary>
+        protected IEnumerable<string> CallerRoles =>
+            (User.Identity as ClaimsIdentity)?.FindAll(ClaimTypes.Role).Select(c => c.Value) ?? Enumerable.Empty<string>();
+
+        /// <summary>True if the caller holds this exact role name, among possibly several.</summary>
+        protected bool CallerHasRole(string roleName) => CallerRoles.Contains(roleName);
     }
 }

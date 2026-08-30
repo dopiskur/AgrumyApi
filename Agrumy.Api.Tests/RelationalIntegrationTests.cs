@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using api.Dal;
 using api.Dal.Entities;
 using api.Models;
+using api.Security;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -60,6 +61,14 @@ public sealed class RelationalIntegrationFixture
 
         int regular = db.UserGroups.Where(g => g.GroupName == "users").Select(g => g.IDUserGroup).First();
         int admin = db.UserGroups.Where(g => g.GroupName == "admins").Select(g => g.IDUserGroup).First();
+
+        // Roadmap #66: the composable role catalog - a fresh test DB has none of these, same
+        // reasoning as the admin/user seeding above (EnsureCreated only makes tables, never rows).
+        if (!db.UserRoles.Any(r => r.RoleName == RoleNames.TenantReader))
+        {
+            db.UserRoles.AddRange(RoleNames.All.Select(name => new UserRoleRow { RoleName = name }));
+            db.SaveChanges();
+        }
 
         int deviceType = db.DeviceTypes.Where(t => t.DeviceTypeName == "greenhouse")
                            .Select(t => (int?)t.IDDeviceType).FirstOrDefault() ?? SeedDeviceType(db);
@@ -978,5 +987,61 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
         Assert.Contains(all, u => u.IDUser == userIdA);
         Assert.Contains(all, u => u.IDUser == userIdB);
+    }
+
+    // ---- Composable roles (roadmap #66) --------------------------------------
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task UserRoleNamesGetAsync_NewUser_IsEmpty(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+
+        IReadOnlyList<string> roles = await _repo.UserRoleNamesGetAsync(userId);
+
+        Assert.Empty(roles);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task UserRolesSetAsync_AssignsThenReplacesTheWholeSet(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+
+        await _repo.UserRolesSetAsync(userId, new[] { RoleNames.TenantReader, RoleNames.TenantDevice });
+        Assert.Equal(
+            new[] { RoleNames.TenantReader, RoleNames.TenantDevice }.OrderBy(x => x),
+            (await _repo.UserRoleNamesGetAsync(userId)).OrderBy(x => x));
+
+        // A second call REPLACES, not adds - dropping TenantDevice and adding TenantUser instead.
+        await _repo.UserRolesSetAsync(userId, new[] { RoleNames.TenantReader, RoleNames.TenantUser });
+        Assert.Equal(
+            new[] { RoleNames.TenantReader, RoleNames.TenantUser }.OrderBy(x => x),
+            (await _repo.UserRoleNamesGetAsync(userId)).OrderBy(x => x));
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task UserRolesSetAsync_EmptySet_ClearsEveryRole(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+        await _repo.UserRolesSetAsync(userId, new[] { RoleNames.TenantAdmin });
+
+        await _repo.UserRolesSetAsync(userId, Array.Empty<string>());
+
+        Assert.Empty(await _repo.UserRoleNamesGetAsync(userId));
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task UserRolesSetAsync_DifferentUsers_DoNotShareRoles(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userIdA, _) = await MakeUser(t);
+        var (_, userIdB, _) = await MakeUser(t);
+
+        await _repo.UserRolesSetAsync(userIdA, new[] { RoleNames.GlobalAdmin });
+
+        Assert.Equal(new[] { RoleNames.GlobalAdmin }, await _repo.UserRoleNamesGetAsync(userIdA));
+        Assert.Empty(await _repo.UserRoleNamesGetAsync(userIdB));
     }
 }

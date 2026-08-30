@@ -25,6 +25,7 @@ namespace api.Dal
         public DbSet<UserGroupRow> UserGroups => Set<UserGroupRow>();
         public DbSet<UserRoleRow> UserRoles => Set<UserRoleRow>();
         public DbSet<UserRoleScopeRow> UserRoleScopes => Set<UserRoleScopeRow>();
+        public DbSet<UserUserRoleRow> UserUserRoles => Set<UserUserRoleRow>();
         public DbSet<ServerConfigRow> ServerConfigs => Set<ServerConfigRow>();
 
         public DbSet<DeviceRow> Devices => Set<DeviceRow>();
@@ -70,6 +71,14 @@ namespace api.Dal
                 e.Property(x => x.IDUserRole).ValueGeneratedOnAdd();
                 e.Property(x => x.RoleName).HasMaxLength(45);
                 e.HasOne<UserRoleScopeRow>().WithMany().HasForeignKey(x => x.RoleScopeID).OnDelete(DeleteBehavior.NoAction);
+            });
+
+            b.Entity<UserUserRoleRow>(e =>
+            {
+                e.ToTable("userUserRole");
+                e.HasKey(x => new { x.UserID, x.UserRoleID }); // composite - a user cannot hold the same role twice
+                e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserID).OnDelete(DeleteBehavior.Cascade); // deleting a user drops their role rows
+                e.HasOne<UserRoleRow>().WithMany().HasForeignKey(x => x.UserRoleID).OnDelete(DeleteBehavior.NoAction);
             });
 
             b.Entity<UserGroupRow>(e =>

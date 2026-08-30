@@ -46,6 +46,18 @@ namespace api.Dal.Interface
 
         Task<IList<UserRole>> UserRoleGetAsync();
 
+        // Roadmap #66: a user can hold several roles at once - the userUserRole junction table is
+        // the source of truth for this set, independent of the legacy single UserGroupID/userGroup.
+
+        /// <summary>Every role name currently assigned to this user via userUserRole. Empty (never
+        /// null) for a user nobody has migrated/assigned yet.</summary>
+        Task<IReadOnlyList<string>> UserRoleNamesGetAsync(int idUser);
+
+        /// <summary>Replaces this user's ENTIRE role set with exactly <paramref name="roleNames"/> -
+        /// not incremental. Unknown role names are silently ignored (defensive - the Web UI only
+        /// ever offers api.Security.RoleNames.All as choices).</summary>
+        Task UserRolesSetAsync(int idUser, IEnumerable<string> roleNames);
+
         // Email activation (roadmap #24)
 
         /// <summary>Attaches a fresh activation token to a just-registered user. Always issues - no

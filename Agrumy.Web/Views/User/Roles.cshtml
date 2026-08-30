@@ -1,0 +1,34 @@
+@model api.ViewModels.UserRolesViewModel
+
+@{
+    ViewData["Title"] = "Roles";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Roles - @Model.Email</h3>
+    </div>
+    <div class="card-body">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <p class="text-secondary">
+            A user can hold several roles at once. A Tenant/Global admin already has every
+            capability at its scope - the remaining roles are composable grants on top of a
+            *reader base (roadmap #66).
+        </p>
+        <form asp-action="Roles">
+            <input type="hidden" asp-for="IDUser" />
+            @foreach (var role in Model.AllRoles)
+            {
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="AssignedRoles" value="@role"
+                           id="role_@role.Replace(" ", "_")" checked="@Model.AssignedRoles.Contains(role)" />
+                    <label class="form-check-label" for="role_@role.Replace(" ", "_")">@role</label>
+                </div>
+            }
+            <div class="mb-0 mt-3">
+                <input type="submit" value="Save" class="btn btn-primary" />
+                <a asp-action="Details" asp-route-idUser="@Model.IDUser" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

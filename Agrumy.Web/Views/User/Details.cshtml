@@ -86,6 +86,7 @@
     </div>
     <div class="card-footer">
         @Html.ActionLink("Edit", "Edit", new { idUser = Model.IDUser }, new { @class = "btn btn-primary" })
+        @Html.ActionLink("Roles", "Roles", new { idUser = Model.IDUser }, new { @class = "btn btn-outline-primary" })
         <a asp-action="Index" class="btn btn-outline-secondary">Back to List</a>
     </div>
 </div>

@@ -383,6 +383,36 @@ namespace api.Dal
                 .ToListAsync();
         }
 
+        // ---- Composable roles (roadmap #66) ------------------------------------------
+
+        public async Task<IReadOnlyList<string>> UserRoleNamesGetAsync(int idUser)
+        {
+            await using var db = Db();
+            return await (from ur in db.UserUserRoles.AsNoTracking()
+                          join r in db.UserRoles.AsNoTracking() on ur.UserRoleID equals r.IDUserRole
+                          where ur.UserID == idUser && r.RoleName != null
+                          select r.RoleName!).ToListAsync();
+        }
+
+        public async Task UserRolesSetAsync(int idUser, IEnumerable<string> roleNames)
+        {
+            await using var db = Db();
+            var wanted = roleNames.ToHashSet();
+
+            var roleIds = await db.UserRoles.AsNoTracking()
+                .Where(r => r.RoleName != null && wanted.Contains(r.RoleName))
+                .Select(r => r.IDUserRole)
+                .ToListAsync();
+
+            var existing = await db.UserUserRoles.Where(x => x.UserID == idUser).ToListAsync();
+            db.UserUserRoles.RemoveRange(existing.Where(x => !roleIds.Contains(x.UserRoleID)));
+            db.UserUserRoles.AddRange(roleIds
+                .Where(id => existing.All(x => x.UserRoleID != id))
+                .Select(id => new UserUserRoleRow { UserID = idUser, UserRoleID = id }));
+
+            await db.SaveChangesAsync();
+        }
+
         // ---- Email activation (roadmap #24) -----------------------------------------
 
         public async Task UserSetActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt)

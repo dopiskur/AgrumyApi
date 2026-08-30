@@ -98,14 +98,22 @@ namespace api.Controllers.API
 
             await Repo.UserAddAsync(user, userSecret);
 
-            // Roadmap #24: UserAddAsync doesn't hand back the new IDUser, and the activation token
-            // needs one to attach to - a fresh lookup by the just-inserted, unique email is simplest.
+            // Roadmap #24: UserAddAsync doesn't hand back the new IDUser, and both the activation
+            // token and the roadmap #66 role assignment below need one - a fresh lookup by the
+            // just-inserted, unique email is simplest.
             User? added = await Repo.UserGetAsync(null, value.Email, null);
             if (added?.IDUser is int idUser)
             {
                 var (plaintext, hash) = GenerateOpaqueToken();
                 await Repo.UserSetActivationTokenAsync(idUser, hash, DateTime.UtcNow.AddHours(ActivationTokenValidHours));
                 await SendActivationEmailAsync(user.Email, plaintext);
+
+                // Roadmap #66: the tenant's own creator becomes its admin (nobody else to grant
+                // anything); everyone else starts as a read-only Tenant reader regardless of which
+                // tenant they joined - a Tenant admin composes on additional grants afterwards via
+                // PUT /api/User/UserRoles.
+                string startingRole = isNewTenant ? RoleNames.TenantAdmin : RoleNames.TenantReader;
+                await Repo.UserRolesSetAsync(idUser, new[] { startingRole });
             }
 
             return Ok(user);
@@ -193,6 +201,27 @@ namespace api.Controllers.API
             }
         }
 
+        /// <summary>Roadmap #66: the full set of role-claim values this user's token should carry -
+        /// their real role set from userUserRole, PLUS a prepended legacy "admin"/"user" alias so
+        /// none of the ~34 pre-#66 [Authorize(Roles=...)]/CallerRole=="admin" checks break (they all
+        /// read the FIRST role claim, see ApiControllerBase.CallerRole). Falls back to the old
+        /// UserGroupID-derived single role if userUserRole has nothing for this user yet (an
+        /// account the migration somehow missed) - never returns an empty list for anyone with a
+        /// resolvable role either way.</summary>
+        private async Task<IReadOnlyList<string>> ResolveCallerTokenRolesAsync(User user)
+        {
+            IReadOnlyList<string> roleNames = await Repo.UserRoleNamesGetAsync(user.IDUser!.Value);
+            if (roleNames.Count == 0)
+            {
+                IList<UserRole> groupRoles = await Repo.UserRoleGetAsync();
+                UserRole? legacyRole = groupRoles.FirstOrDefault(m => m.IDUserRole == user.UserRoleID);
+                return legacyRole?.RoleName == null ? Array.Empty<string>() : new[] { legacyRole.RoleName };
+            }
+
+            string legacyAlias = RoleNames.ImpliesLegacyAdmin(roleNames) ? RoleNames.LegacyAdmin : RoleNames.LegacyUser;
+            return new[] { legacyAlias }.Concat(roleNames).ToList();
+        }
+
         [HttpPost("Login")]
         [EnableRateLimiting("login")]
         public async Task<ActionResult<UserLoginResult>> UserLogin([FromBody] UserLogin value)
@@ -219,14 +248,13 @@ namespace api.Controllers.API
                 return StatusCode(403, "Account not yet enabled - waiting for administrator approval.");
             }
 
-            IList<UserRole> roles = await Repo.UserRoleGetAsync();
-            UserRole? role = roles.FirstOrDefault(m => m.IDUserRole == user.UserRoleID);
-            if (role?.RoleName == null)
+            IReadOnlyList<string> tokenRoles = await ResolveCallerTokenRolesAsync(user);
+            if (tokenRoles.Count == 0)
             {
                 return StatusCode(500, "User has no valid role assigned.");
             }
 
-            string token = JwtTokenProvider.CreateToken(SecureKey, AccessTokenMinutes, user.Email, role.RoleName, user.TenantID.ToString());
+            string token = JwtTokenProvider.CreateToken(SecureKey, AccessTokenMinutes, user.Email, tokenRoles, user.TenantID.ToString());
             var (refreshToken, refreshTokenHash) = GenerateOpaqueToken();
             await Repo.RefreshTokenAddAsync(user.IDUser!.Value, refreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
 
@@ -273,9 +301,8 @@ namespace api.Controllers.API
                 return StatusCode(403, "Account is not active.");
             }
 
-            IList<UserRole> roles = await Repo.UserRoleGetAsync();
-            UserRole? role = roles.FirstOrDefault(m => m.IDUserRole == user.UserRoleID);
-            if (role?.RoleName == null)
+            IReadOnlyList<string> tokenRoles = await ResolveCallerTokenRolesAsync(user);
+            if (tokenRoles.Count == 0)
             {
                 return StatusCode(500, "User has no valid role assigned.");
             }
@@ -283,7 +310,7 @@ namespace api.Controllers.API
             var (newRefreshToken, newRefreshTokenHash) = GenerateOpaqueToken();
             await Repo.RefreshTokenRotateAsync(incomingHash, newRefreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
 
-            string newAccessToken = JwtTokenProvider.CreateToken(SecureKey, AccessTokenMinutes, user.Email, role.RoleName, user.TenantID.ToString());
+            string newAccessToken = JwtTokenProvider.CreateToken(SecureKey, AccessTokenMinutes, user.Email, tokenRoles, user.TenantID.ToString());
             return Ok(new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = newAccessToken, RefreshToken = newRefreshToken });
         }
 
@@ -391,6 +418,19 @@ namespace api.Controllers.API
             userSecret.PwdHash = AuthenticationProvider.GetHash(value.Password, userSecret.PwdSalt);
 
             await Repo.UserAddAsync(user, userSecret);
+
+            // Roadmap #66: map the legacy admin/user group choice onto a starting base role - the
+            // admin can layer on Tenant User/Tenant Device (or promote to Global via UserRolesSet)
+            // afterwards, this is just what a brand-new account starts with.
+            User? added = await Repo.UserGetAsync(null, value.Email, null);
+            if (added?.IDUser is int idUser)
+            {
+                string startingRole = value.UserGroupID == 0
+                    ? (IsGlobalAdmin ? RoleNames.GlobalAdmin : RoleNames.TenantAdmin)
+                    : RoleNames.TenantReader;
+                await Repo.UserRolesSetAsync(idUser, new[] { startingRole });
+            }
+
             return Ok("User created successfully: " + user.Email);
         }
 
@@ -467,6 +507,56 @@ namespace api.Controllers.API
         [Authorize(Roles = "admin")]
         public async Task<ActionResult<IEnumerable<UserRole>>> UserRoleGet() =>
             Ok(await Repo.UserRoleGetAsync());
+
+        // ---- composable roles (roadmap #66) -------------------------------------
+
+        /// <summary>Every role name a Tenant admin may grant - Global-* roles are a Global-admin-only
+        /// power (roadmap #65's TenantID==0 carve-out extended to the new role model).</summary>
+        private static readonly string[] TenantScopedGrantableRoles =
+        {
+            RoleNames.TenantAdmin, RoleNames.TenantReader, RoleNames.TenantUser, RoleNames.TenantDevice,
+        };
+
+        [HttpGet("UserRoles")]
+        [Authorize(Roles = "admin")]
+        public async Task<ActionResult<IReadOnlyList<string>>> UserRolesGet(int idUser)
+        {
+            User? target = await Repo.UserGetAsync(idUser, null, null);
+            if (target is null)
+            {
+                return NotFound();
+            }
+            if (target.TenantID != CallerTenantId && !IsGlobalAdmin)
+            {
+                return StatusCode(403, "Target user belongs to a different tenant");
+            }
+            return Ok(await Repo.UserRoleNamesGetAsync(idUser));
+        }
+
+        [HttpPut("UserRoles")]
+        [Authorize(Roles = "admin")]
+        public async Task<ActionResult> UserRolesSet([FromBody] UserRolesUpdate value)
+        {
+            User? target = await Repo.UserGetAsync(value.IDUser, null, null);
+            if (target is null)
+            {
+                return NotFound();
+            }
+            if (target.TenantID != CallerTenantId && !IsGlobalAdmin)
+            {
+                return StatusCode(403, "Target user belongs to a different tenant");
+            }
+
+            HashSet<string> allowed = IsGlobalAdmin ? RoleNames.All.ToHashSet() : TenantScopedGrantableRoles.ToHashSet();
+            string? disallowed = value.RoleNames.FirstOrDefault(r => !allowed.Contains(r));
+            if (disallowed != null)
+            {
+                return StatusCode(403, $"Not allowed to assign role \"{disallowed}\".");
+            }
+
+            await Repo.UserRolesSetAsync(value.IDUser, value.RoleNames);
+            return Ok();
+        }
 
         // ---- groups ----------------------------------------------------------
 

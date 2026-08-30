@@ -151,12 +151,14 @@ public class ApiControllerTests
     // ---- UserApiController.UserRegistration ------------------------------------------------
 
     /// <summary>Common post-UserAddAsync plumbing every UserRegistration call now goes through
-    /// (roadmap #24): a lookup to recover the freshly-inserted IDUser, then an activation token
-    /// write. Neither is the point of most of these tests, so they're stubbed permissively here.</summary>
+    /// (roadmap #24/#66): a lookup to recover the freshly-inserted IDUser, an activation token
+    /// write, and a starting role assignment. None of these are the point of most of these tests,
+    /// so they're stubbed permissively here.</summary>
     private void StubActivationPlumbing(string email, int idUser)
     {
         _repo.Setup(r => r.UserGetAsync(null, email, null)).ReturnsAsync(new User { IDUser = idUser, Email = email });
         _repo.Setup(r => r.UserSetActivationTokenAsync(idUser, It.IsAny<string>(), It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.UserRolesSetAsync(idUser, It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
     }
 
     [Fact]
@@ -271,8 +273,9 @@ public class ApiControllerTests
              .ReturnsAsync(new User { IDUser = 5, Email = "alice@example.com", UserRoleID = 1, TenantID = 0, EmailVerified = true, Enabled = true });
         _repo.Setup(r => r.UserSecretGetAsync(null, "alice@example.com", null))
              .ReturnsAsync(new UserSecret { PwdHash = hash, PwdSalt = salt });
-        _repo.Setup(r => r.UserRoleGetAsync())
-             .ReturnsAsync(new List<UserRole> { new() { IDUserRole = 1, RoleName = "user" } });
+        // Roadmap #66: the real source of truth going forward - a non-empty set here means
+        // UserRoleGetAsync()'s legacy-fallback path is never touched.
+        _repo.Setup(r => r.UserRoleNamesGetAsync(5)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         _repo.Setup(r => r.RefreshTokenAddAsync(5, It.IsAny<string>(), It.IsAny<DateTime>())).ReturnsAsync(1);
 
         var controller = NewUserController();
@@ -284,7 +287,8 @@ public class ApiControllerTests
         Assert.Equal("alice@example.com", login.Email);
         Assert.False(string.IsNullOrEmpty(login.Token));
         Assert.False(string.IsNullOrEmpty(login.RefreshToken));
-        Assert.Equal("user", JwtTokenProvider.ValidateToken(login.Token!)); // token valid, role claim round-trips
+        // Legacy "user" alias first (pre-#66 checks read the first role claim), then the real role.
+        Assert.Equal(new[] { "user", RoleNames.TenantReader }, JwtTokenProvider.ValidateToken(login.Token!));
     }
 
     [Fact]
@@ -376,6 +380,9 @@ public class ApiControllerTests
             new RefreshTokenInfo { UserID = 5, ExpiresAt = DateTime.UtcNow.AddDays(10), RevokedAt = null });
         _repo.Setup(r => r.UserGetAsync(5, null, null))
              .ReturnsAsync(new User { IDUser = 5, Email = "alice@example.com", UserRoleID = 1, TenantID = 0, EmailVerified = true, Enabled = true });
+        // Roadmap #66: empty userUserRole set exercises the legacy UserGroupID-derived fallback in
+        // ResolveCallerTokenRolesAsync - covers an account the migration somehow missed.
+        _repo.Setup(r => r.UserRoleNamesGetAsync(5)).ReturnsAsync(new List<string>());
         _repo.Setup(r => r.UserRoleGetAsync())
              .ReturnsAsync(new List<UserRole> { new() { IDUserRole = 1, RoleName = "user" } });
         _repo.Setup(r => r.RefreshTokenRotateAsync(hash, It.IsAny<string>(), It.IsAny<DateTime>()))
@@ -390,7 +397,7 @@ public class ApiControllerTests
         Assert.False(string.IsNullOrEmpty(login.Token));
         Assert.False(string.IsNullOrEmpty(login.RefreshToken));
         Assert.NotEqual(presented, login.RefreshToken); // rotated, not reissued
-        Assert.Equal("user", JwtTokenProvider.ValidateToken(login.Token!));
+        Assert.Equal(new[] { "user" }, JwtTokenProvider.ValidateToken(login.Token!));
         _repo.Verify(r => r.RefreshTokenRotateAsync(hash, It.IsAny<string>(), It.IsAny<DateTime>()), Times.Once);
     }
 
@@ -531,6 +538,8 @@ public class ApiControllerTests
         _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>()))
              .Callback<User, UserSecret>((u, s) => capturedUser = u)
              .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.UserGetAsync(null, "x@test.local", null)).ReturnsAsync(new User { IDUser = 99, Email = "x@test.local" });
+        _repo.Setup(r => r.UserRolesSetAsync(99, It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 24);
@@ -540,6 +549,60 @@ public class ApiControllerTests
         Assert.IsType<OkObjectResult>(result.Result);
         Assert.NotNull(capturedUser);
         Assert.Equal(24, capturedUser!.TenantID); // not 999 from the payload
+    }
+
+    [Fact]
+    public async Task UserAdd_AdminGroup_TenantAdmin_SeedsTenantAdminRole()
+    {
+        _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.UserGetAsync(null, "boss@test.local", null)).ReturnsAsync(new User { IDUser = 100, Email = "boss@test.local" });
+        List<string>? seededRoles = null;
+        _repo.Setup(r => r.UserRolesSetAsync(100, It.IsAny<IEnumerable<string>>()))
+             .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
+             .Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 24); // NOT tenant 0 - a regular Tenant admin, not Global admin
+        var value = new UserAdd { Email = "boss@test.local", Username = "boss", Password = "pw", UserGroupID = 0, Enabled = true };
+        await controller.UserAdd(value);
+
+        Assert.Equal(new[] { RoleNames.TenantAdmin }, seededRoles);
+    }
+
+    [Fact]
+    public async Task UserAdd_AdminGroup_CallerIsGlobalAdmin_SeedsGlobalAdminRole()
+    {
+        _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.UserGetAsync(null, "boss@test.local", null)).ReturnsAsync(new User { IDUser = 101, Email = "boss@test.local" });
+        List<string>? seededRoles = null;
+        _repo.Setup(r => r.UserRolesSetAsync(101, It.IsAny<IEnumerable<string>>()))
+             .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
+             .Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 0); // Global admin
+        var value = new UserAdd { Email = "boss@test.local", Username = "boss", Password = "pw", UserGroupID = 0, Enabled = true };
+        await controller.UserAdd(value);
+
+        Assert.Equal(new[] { RoleNames.GlobalAdmin }, seededRoles);
+    }
+
+    [Fact]
+    public async Task UserAdd_RegularGroup_SeedsTenantReaderRole()
+    {
+        _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.UserGetAsync(null, "newbie@test.local", null)).ReturnsAsync(new User { IDUser = 102, Email = "newbie@test.local" });
+        List<string>? seededRoles = null;
+        _repo.Setup(r => r.UserRolesSetAsync(102, It.IsAny<IEnumerable<string>>()))
+             .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
+             .Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 24);
+        var value = new UserAdd { Email = "newbie@test.local", Username = "newbie", Password = "pw", UserGroupID = 1, Enabled = true };
+        await controller.UserAdd(value);
+
+        Assert.Equal(new[] { RoleNames.TenantReader }, seededRoles);
     }
 
     [Fact]
@@ -772,6 +835,80 @@ public class ApiControllerTests
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         Assert.Equal("User deleted", ok.Value);
+    }
+
+    // ---- UserApiController.UserRolesGet / UserRolesSet - roadmap #66 (composable roles) ----
+
+    [Fact]
+    public async Task UserRolesGet_DifferentTenant_Returns403()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 99 });
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 1);
+        var result = await controller.UserRolesGet(50);
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+    }
+
+    [Fact]
+    public async Task UserRolesGet_GlobalAdmin_DifferentTenant_ReturnsRoles()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 99 });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 0);
+        var result = await controller.UserRolesGet(50);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(new[] { RoleNames.TenantReader }, ok.Value);
+    }
+
+    [Fact]
+    public async Task UserRolesSet_TenantAdmin_CannotAssignGlobalRole_Returns403AndDoesNotWrite()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1 });
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 1); // regular Tenant admin, not Global admin
+        var result = await controller.UserRolesSet(new UserRolesUpdate { IDUser = 50, RoleNames = new List<string> { RoleNames.GlobalAdmin } });
+
+        var obj = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(403, obj.StatusCode);
+        _repo.Verify(r => r.UserRolesSetAsync(It.IsAny<int>(), It.IsAny<IEnumerable<string>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UserRolesSet_TenantAdmin_CanComposeReaderPlusDeviceGrant()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1 });
+        List<string>? written = null;
+        _repo.Setup(r => r.UserRolesSetAsync(50, It.IsAny<IEnumerable<string>>()))
+             .Callback<int, IEnumerable<string>>((_, roles) => written = roles.ToList())
+             .Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 1);
+        var value = new UserRolesUpdate { IDUser = 50, RoleNames = new List<string> { RoleNames.TenantReader, RoleNames.TenantDevice } };
+        var result = await controller.UserRolesSet(value);
+
+        Assert.IsType<OkResult>(result);
+        Assert.Equal(new[] { RoleNames.TenantReader, RoleNames.TenantDevice }, written);
+    }
+
+    [Fact]
+    public async Task UserRolesSet_GlobalAdmin_CanAssignGlobalRoleToAnyTenant()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 99 });
+        _repo.Setup(r => r.UserRolesSetAsync(50, It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 0);
+        var result = await controller.UserRolesSet(new UserRolesUpdate { IDUser = 50, RoleNames = new List<string> { RoleNames.GlobalReader } });
+
+        Assert.IsType<OkResult>(result);
     }
 }
 

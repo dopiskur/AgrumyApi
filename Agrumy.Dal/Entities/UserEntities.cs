@@ -34,6 +34,17 @@ namespace api.Dal.Entities
         public int? UserRoleID { get; set; }
     }
 
+    /// <summary>Roadmap #66: a user can hold several roles at once (e.g. "Tenant reader" +
+    /// "Tenant Device"), so this many-to-many junction is the actual source of truth for
+    /// authorization going forward - UserGroupID/userGroup above stays untouched for backward
+    /// compatibility (still drives the legacy single "admin"/"user" claim) but no longer the
+    /// only place a role lives.</summary>
+    public class UserUserRoleRow
+    {
+        public int UserID { get; set; }
+        public int UserRoleID { get; set; }
+    }
+
     public class UserRow
     {
         public int IDUser { get; set; }
