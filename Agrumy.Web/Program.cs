@@ -1,9 +1,18 @@
+using System.Globalization;
 using api.Dal.Interface;
 using api.Filters;
 using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Refit;
+
+// Form model binding for double/decimal fields (ServerConfig, DeviceConfigController) parses
+// with CultureInfo.CurrentCulture, which otherwise follows the host OS locale - on a machine
+// where "," is the decimal separator, "8.2" silently parses as 82 (the "." read as a group
+// separator) instead of failing validation. Pin it invariant so "8.2" always means 8.2,
+// regardless of what locale the box (dev or server) happens to be set to.
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 

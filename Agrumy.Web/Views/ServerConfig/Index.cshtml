@@ -1,0 +1,55 @@
+@model api.Models.ServerConfig
+
+@{
+    ViewData["Title"] = "Server Settings";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Server Settings</h3>
+    </div>
+    <div class="card-body">
+        @if (TempData["Message"] is string message)
+        {
+            <div class="alert alert-success">@message</div>
+        }
+        <p class="text-secondary">
+            Hysteresis (dead-zone) defaults a newly-added device's Controller config is seeded
+            with. Changing these has no effect on devices that already exist - edit those
+            individually under Device &rarr; Controller.
+        </p>
+        <form asp-action="Index">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" asp-for="IDServerConfig" />
+
+            <div class="mb-3">
+                <label asp-for="WaterLevelHysteresis" class="control-label"></label>
+                <input asp-for="WaterLevelHysteresis" class="form-control" />
+                <span asp-validation-for="WaterLevelHysteresis" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="TemperatureHysteresis" class="control-label"></label>
+                <input asp-for="TemperatureHysteresis" class="form-control" />
+                <span asp-validation-for="TemperatureHysteresis" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="HumidityHysteresis" class="control-label"></label>
+                <input asp-for="HumidityHysteresis" class="form-control" />
+                <span asp-validation-for="HumidityHysteresis" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="LightHysteresis" class="control-label"></label>
+                <input asp-for="LightHysteresis" class="form-control" />
+                <span asp-validation-for="LightHysteresis" class="text-danger"></span>
+            </div>
+
+            <div class="mb-0">
+                <input type="submit" value="Save" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

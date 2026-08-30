@@ -75,5 +75,11 @@ namespace api.Dal.Entities
         public int? PortHTTP { get; set; }
         public int? PortHTTPS { get; set; }
         public string? ServerConfigCol { get; set; }
+
+        // Server-wide hysteresis defaults - see api.Models.ServerConfig for the full story.
+        public double? WaterLevelHysteresis { get; set; }
+        public double? TemperatureHysteresis { get; set; }
+        public double? HumidityHysteresis { get; set; }
+        public double? LightHysteresis { get; set; }
     }
 }

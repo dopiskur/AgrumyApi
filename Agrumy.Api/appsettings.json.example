@@ -43,6 +43,19 @@
     "FailFastOnDbCheck": false
   },
 
+  "// ServerConfig": "Server-wide defaults (roadmap #10), stored in the DB serverConfig row and editable from the admin Server Settings page - this section only seeds/resets it, the app does not read these values directly at request time.",
+  "ServerConfig": {
+    "// Reload": "false (default) = seed the DB row from Hysteresis below only if it does not exist yet. true = overwrite the DB row's hysteresis fields from Hysteresis on every startup, discarding any admin-UI edit - use to force a reset, then set back to false.",
+    "Reload": false,
+    "// Hysteresis": "Dead-zone margins new devices are seeded with (DeviceConfigController.*Hysteresis) when created; same units as the matching threshold field (WaterLow/TempLow/HumidHigh/LightLow).",
+    "Hysteresis": {
+      "WaterLevel": 5.0,
+      "Temperature": 1.0,
+      "Humidity": 5.0,
+      "Light": 20.0
+    }
+  },
+
   "// Notifications": "Alert delivery channels (roadmap #6). A channel with Enabled=false or missing settings is skipped, never an error.",
   "Notifications": {
     "// Email": "SMTP email via MailKit. Enabled + Host + FromAddress are the minimum to send.",

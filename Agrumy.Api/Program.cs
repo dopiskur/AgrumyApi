@@ -169,6 +169,16 @@ using (var scope = app.Services.CreateScope())
             startupLogger.LogInformation("Startup DB check: database connection OK.");
             await repository.EnsureSchemaAsync();
             startupLogger.LogInformation("Startup DB check: schema verified/provisioned.");
+
+            // ServerConfig:Reload (roadmap #10) - force the DB's hysteresis defaults back to
+            // appsettings.json. Off by default; see Config.serverConfigReload for why. Nested
+            // inside the DB-is-reachable branch so a Reload=true install with the DB down still
+            // falls through to the same failFastOnDbCheck handling below instead of throwing past it.
+            if (api.Config.serverConfigReload)
+            {
+                await repository.ServerConfigReloadFromAppSettingsAsync(1);
+                startupLogger.LogInformation("ServerConfig:Reload was true - serverConfig hysteresis fields overwritten from appsettings.json.");
+            }
         }
         else
         {

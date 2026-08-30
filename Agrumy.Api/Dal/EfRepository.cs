@@ -158,7 +158,9 @@ namespace api.Dal
                 return ToDto(row);
             }
 
-            // No row: generate a default one (mirrors the old ServerConfigGetAsync + ServerConfigAddAsync).
+            // No row: generate a default one (mirrors the old ServerConfigGetAsync + ServerConfigAddAsync),
+            // seeding the hysteresis fields from appsettings.json so a fresh install has sane
+            // defaults before an admin ever visits the settings page.
             var generated = new ServerConfigRow
             {
                 IDServerConfig = idServerConfig,
@@ -166,10 +168,57 @@ namespace api.Dal
                 ConfigKey = Guid.NewGuid().ToString(),
                 PortHTTP = 80,
                 PortHTTPS = 443,
+                WaterLevelHysteresis = Config.hysteresisWaterLevel,
+                TemperatureHysteresis = Config.hysteresisTemperature,
+                HumidityHysteresis = Config.hysteresisHumidity,
+                LightHysteresis = Config.hysteresisLight,
             };
             db.ServerConfigs.Add(generated);
             await db.SaveChangesAsync();
             return ToDto(generated);
+        }
+
+        public async Task ServerConfigUpdateAsync(ServerConfig config)
+        {
+            await using var db = Db();
+            var row = await db.ServerConfigs.FirstOrDefaultAsync(s => s.IDServerConfig == config.IDServerConfig);
+            if (row == null)
+            {
+                return;
+            }
+
+            row.WaterLevelHysteresis = config.WaterLevelHysteresis;
+            row.TemperatureHysteresis = config.TemperatureHysteresis;
+            row.HumidityHysteresis = config.HumidityHysteresis;
+            row.LightHysteresis = config.LightHysteresis;
+            await db.SaveChangesAsync();
+        }
+
+        /// <summary>Forces the DB serverConfig row's hysteresis fields back to appsettings.json's
+        /// ServerConfig:Hysteresis values, creating the row if it does not exist yet. Only called
+        /// at startup when ServerConfig:Reload is true - see Config.serverConfigReload.</summary>
+        public async Task ServerConfigReloadFromAppSettingsAsync(int idServerConfig = 1)
+        {
+            await using var db = Db();
+            var row = await db.ServerConfigs.FirstOrDefaultAsync(s => s.IDServerConfig == idServerConfig);
+            if (row == null)
+            {
+                row = new ServerConfigRow
+                {
+                    IDServerConfig = idServerConfig,
+                    ServerConfigName = "DefaultGenerated" + idServerConfig,
+                    ConfigKey = Guid.NewGuid().ToString(),
+                    PortHTTP = 80,
+                    PortHTTPS = 443,
+                };
+                db.ServerConfigs.Add(row);
+            }
+
+            row.WaterLevelHysteresis = Config.hysteresisWaterLevel;
+            row.TemperatureHysteresis = Config.hysteresisTemperature;
+            row.HumidityHysteresis = Config.hysteresisHumidity;
+            row.LightHysteresis = Config.hysteresisLight;
+            await db.SaveChangesAsync();
         }
 
         // ---- User -------------------------------------------------------------------
@@ -378,11 +427,23 @@ namespace api.Dal
 
         public async Task DeviceAddAsync(Device device)
         {
+            // Outside the transaction below: read-only, and ServerConfigGetAsync opens its own
+            // connection via Db() - auto-generates the row on a brand-new install.
+            ServerConfig serverConfig = await ServerConfigGetAsync();
+
             await using var db = Db();
             await using var tx = await db.Database.BeginTransactionAsync();
 
             var sensorCfg = new DeviceConfigSensorRow();
-            var controllerCfg = new DeviceConfigControllerRow();
+            var controllerCfg = new DeviceConfigControllerRow
+            {
+                // Hysteresis starts at the server-wide default; admin can override per device
+                // afterwards under Device -> Controller.
+                WaterLevelHysteresis = serverConfig.WaterLevelHysteresis,
+                TemperatureHysteresis = serverConfig.TemperatureHysteresis,
+                HumidityHysteresis = serverConfig.HumidityHysteresis,
+                LightHysteresis = serverConfig.LightHysteresis,
+            };
             db.DeviceConfigSensors.Add(sensorCfg);
             db.DeviceConfigControllers.Add(controllerCfg);
             await db.SaveChangesAsync();
@@ -601,6 +662,10 @@ namespace api.Dal
                 row.LightHigh = cfg.LightHigh;
                 row.WaterLow = cfg.WaterLow;
                 row.WaterHigh = cfg.WaterHigh;
+                row.WaterLevelHysteresis = cfg.WaterLevelHysteresis;
+                row.TemperatureHysteresis = cfg.TemperatureHysteresis;
+                row.HumidityHysteresis = cfg.HumidityHysteresis;
+                row.LightHysteresis = cfg.LightHysteresis;
                 row.RelayEnabled = cfg.RelayEnabled;
                 row.Relay1 = cfg.Relay1;
                 row.Relay2 = cfg.Relay2;
@@ -952,6 +1017,10 @@ namespace api.Dal
             ConfigKey = r.ConfigKey,
             PortHTTP = r.PortHTTP,
             PortHTTPS = r.PortHTTPS,
+            WaterLevelHysteresis = r.WaterLevelHysteresis,
+            TemperatureHysteresis = r.TemperatureHysteresis,
+            HumidityHysteresis = r.HumidityHysteresis,
+            LightHysteresis = r.LightHysteresis,
         };
 
         // UserGet / UsersGet joined only userGroup (not userRole), so RoleName stays null and
@@ -1036,6 +1105,10 @@ namespace api.Dal
             LightHigh = c.LightHigh,
             WaterLow = c.WaterLow,
             WaterHigh = c.WaterHigh,
+            WaterLevelHysteresis = c.WaterLevelHysteresis,
+            TemperatureHysteresis = c.TemperatureHysteresis,
+            HumidityHysteresis = c.HumidityHysteresis,
+            LightHysteresis = c.LightHysteresis,
             RelayEnabled = c.RelayEnabled,
             Relay1 = c.Relay1,
             Relay2 = c.Relay2,

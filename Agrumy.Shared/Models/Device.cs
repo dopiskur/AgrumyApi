@@ -149,6 +149,15 @@ namespace api.Models
         public double? LightHigh { get; set; }
         public double? WaterLow { get; set; }
         public double? WaterHigh { get; set; }
+
+        // Hysteresis (dead zone) margins for the threshold-based relay logic - prevents
+        // chattering when a sensor value sits right at its threshold. Seeded from ServerConfig's
+        // matching fields when the device is created; editable per device from here on.
+        public double? WaterLevelHysteresis { get; set; }
+        public double? TemperatureHysteresis { get; set; }
+        public double? HumidityHysteresis { get; set; }
+        public double? LightHysteresis { get; set; }
+
         // Manual timming
         public bool? VentilationIntervalEnabled {  get; set; }
         public int? VentilationInterval {  get; set; }

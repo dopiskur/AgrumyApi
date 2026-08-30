@@ -98,5 +98,13 @@ namespace api.Dal.Interface
 
         [Delete("/api/User/Group")]
         Task UserGroupDelete(int? idUserGroup);
+
+        // ---- Server config (roadmap #10) --------------------------------
+
+        [Get("/api/ServerConfig")]
+        Task<ServerConfig> ServerConfigGet();
+
+        [Put("/api/ServerConfig")]
+        Task ServerConfigUpdate([Body] ServerConfig config);
     }
 }

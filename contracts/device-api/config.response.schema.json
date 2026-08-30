@@ -102,6 +102,7 @@
       "required": [
         "idDeviceConfigController", "tempLow", "tempHigh", "humidLow", "humidHigh", "moistLow",
         "moistHigh", "lightLow", "lightHigh", "waterLow", "waterHigh",
+        "waterLevelHysteresis", "temperatureHysteresis", "humidityHysteresis", "lightHysteresis",
         "ventilationIntervalEnabled", "ventilationInterval", "ventilationIntervalLenght",
         "lightIntervalEnabled", "lightInterval", "lightIntervalLenght",
         "heatingIntervalEnabled", "heatingInterval", "heatingIntervalLenght",
@@ -120,6 +121,22 @@
         "lightHigh": { "type": ["number", "null"] },
         "waterLow": { "type": ["number", "null"] },
         "waterHigh": { "type": ["number", "null"] },
+        "waterLevelHysteresis": {
+          "type": ["number", "null"],
+          "description": "Roadmap #10. Dead-zone margin above waterLow before relayWaterPump turns off."
+        },
+        "temperatureHysteresis": {
+          "type": ["number", "null"],
+          "description": "Roadmap #10. Dead-zone margin above tempLow before relayHeating turns off."
+        },
+        "humidityHysteresis": {
+          "type": ["number", "null"],
+          "description": "Roadmap #10. Dead-zone margin below humidHigh before relayVentilation turns off (opposite direction from the other three - ventilation triggers ON above its threshold)."
+        },
+        "lightHysteresis": {
+          "type": ["number", "null"],
+          "description": "Roadmap #10. Dead-zone margin above lightLow before relayLight turns off."
+        },
         "ventilationIntervalEnabled": { "type": ["boolean", "null"] },
         "ventilationInterval": { "type": ["integer", "null"] },
         "ventilationIntervalLenght": {

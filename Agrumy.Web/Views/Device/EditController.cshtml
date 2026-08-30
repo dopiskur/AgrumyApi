@@ -70,6 +70,27 @@
                 <span asp-validation-for="DeviceConfigController.WaterHigh" class="text-danger"></span>
             </div>
 
+            <div class="mb-3">
+                <label asp-for="DeviceConfigController.WaterLevelHysteresis" class="control-label"></label>
+                <input asp-for="DeviceConfigController.WaterLevelHysteresis" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.WaterLevelHysteresis" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="DeviceConfigController.TemperatureHysteresis" class="control-label"></label>
+                <input asp-for="DeviceConfigController.TemperatureHysteresis" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.TemperatureHysteresis" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="DeviceConfigController.HumidityHysteresis" class="control-label"></label>
+                <input asp-for="DeviceConfigController.HumidityHysteresis" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.HumidityHysteresis" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="DeviceConfigController.LightHysteresis" class="control-label"></label>
+                <input asp-for="DeviceConfigController.LightHysteresis" class="form-control" />
+                <span asp-validation-for="DeviceConfigController.LightHysteresis" class="text-danger"></span>
+            </div>
+
             <div class="mb-3 d-flex justify-content-between align-items-center">
                 <label asp-for="DeviceConfigController.VentilationIntervalEnabled" class="control-label mb-0">Ventilation interval</label>
                 <div class="btn-group" role="group">

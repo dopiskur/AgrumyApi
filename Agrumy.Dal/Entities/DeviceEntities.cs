@@ -67,6 +67,13 @@ namespace api.Dal.Entities
         public double? LightHigh { get; set; }
         public double? WaterLow { get; set; }
         public double? WaterHigh { get; set; }
+
+        // Hysteresis (dead zone) margins - see api.Models.DeviceConfigController.
+        public double? WaterLevelHysteresis { get; set; }
+        public double? TemperatureHysteresis { get; set; }
+        public double? HumidityHysteresis { get; set; }
+        public double? LightHysteresis { get; set; }
+
         public bool? RelayEnabled { get; set; }
         public int? Relay1 { get; set; }
         public int? Relay2 { get; set; }
