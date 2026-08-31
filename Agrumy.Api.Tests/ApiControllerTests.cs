@@ -184,7 +184,7 @@ public class ApiControllerTests
              .ReturnsAsync(new Device { IDDevice = 500, TenantID = 3, ConfigVersion = 66 });
         _repo.Setup(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.IsAny<DeviceConfigPoll>()))
              .Returns(Task.CompletedTask);
-        _cache.Setup(c => c.GetDeviceCache("api-guid")).Returns(new DeviceCache { ConfigVersion = 66 });
+        _cache.Setup(c => c.GetDeviceCacheAsync("api-guid")).ReturnsAsync(new DeviceCache { ConfigVersion = 66 });
 
         var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 66, Rssi = -60 });
 

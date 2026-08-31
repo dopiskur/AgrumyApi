@@ -58,6 +58,11 @@ builder.Services.AddScoped<ITenantRepository>(sp => sp.GetRequiredService<EfRepo
 builder.Services.AddScoped<IRefreshTokenRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IDeviceRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ISensorDataRepository>(sp => sp.GetRequiredService<EfRepository>());
+// Roadmap #72: in-process today (same practical behaviour as the old MemoryCache - lost on
+// restart, not shared across instances), but CacheRepository talks to IDistributedCache, so a
+// real scale-out backend is a swap of this one line (e.g. AddStackExchangeRedisCache(...)), not
+// an application code change.
+builder.Services.AddDistributedMemoryCache();
 builder.Services.AddScoped<ICache, CacheRepository>();
 builder.Services.AddScoped<DbExceptionFilter>();
 

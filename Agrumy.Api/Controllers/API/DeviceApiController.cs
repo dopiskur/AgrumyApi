@@ -197,9 +197,9 @@ namespace api.Controllers.API
                 return;
             }
 
-            DeviceCache entry = Cache.GetDeviceCache(updated.ApiId) ?? new DeviceCache();
+            DeviceCache entry = await Cache.GetDeviceCacheAsync(updated.ApiId);
             entry.ConfigVersion = updated.ConfigVersion;
-            Cache.SetItem(updated.ApiId, entry);
+            await Cache.SetItemAsync(updated.ApiId, entry);
         }
 
         #endregion
@@ -225,9 +225,10 @@ namespace api.Controllers.API
 
             await Repo.DeviceDiagnosticUpsertAsync(device.IDDevice!.Value, device.TenantID ?? 0, value);
 
-            // Null-conditional: a missing cache entry means "unknown", which must send the config.
-            DeviceCache? deviceCache = Cache.GetDeviceCache(apiId);
-            if (value.ConfigVersion == deviceCache?.ConfigVersion)
+            // A cache miss comes back as ConfigVersion=0, which correctly never matches a real
+            // device's version - the device gets the full config instead of a false "up to date".
+            DeviceCache deviceCache = await Cache.GetDeviceCacheAsync(apiId);
+            if (value.ConfigVersion == deviceCache.ConfigVersion)
             {
                 return Ok(); // device is up to date - do nothing
             }
@@ -371,7 +372,7 @@ namespace api.Controllers.API
             // Roadmap #73: apiAuth is a bearer-style session credential (DeviceAuth.SessionPolicy),
             // same CSPRNG requirement as ApiKey above.
             var deviceAuthentication = new DeviceAuthentication { apiAuth = AuthenticationProvider.GetSecureToken() };
-            Cache.SetItem(apiId, new DeviceCache
+            await Cache.SetItemAsync(apiId, new DeviceCache
             {
                 ConfigVersion = device.ConfigVersion,
                 apiAuth = deviceAuthentication.apiAuth,

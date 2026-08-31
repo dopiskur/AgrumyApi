@@ -83,29 +83,27 @@ namespace api.Security
 
     public sealed class DeviceSessionHandler(ICache cache) : AuthorizationHandler<DeviceSessionRequirement>
     {
-        protected override Task HandleRequirementAsync(
+        protected override async Task HandleRequirementAsync(
             AuthorizationHandlerContext context, DeviceSessionRequirement requirement)
         {
             if (context.Resource is not HttpContext http)
             {
-                return Task.CompletedTask;
+                return;
             }
 
             string apiId = http.Request.Headers["apiId"].ToString();
             string token = DeviceAuth.ReadAuthToken(http);
             if (string.IsNullOrEmpty(apiId) || string.IsNullOrEmpty(token))
             {
-                return Task.CompletedTask;
+                return;
             }
 
-            var deviceCache = cache.GetDeviceCache(apiId);
-            if (DeviceAuth.ConstantTimeEquals(token, deviceCache?.apiAuth))
+            var deviceCache = await cache.GetDeviceCacheAsync(apiId);
+            if (DeviceAuth.ConstantTimeEquals(token, deviceCache.apiAuth))
             {
                 http.Items[DeviceAuth.ApiIdItemKey] = apiId;
                 context.Succeed(requirement);
             }
-
-            return Task.CompletedTask;
         }
     }
 }
