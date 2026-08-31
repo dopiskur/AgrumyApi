@@ -12,10 +12,12 @@
         </div>
     </div>
     <div class="card-body table-responsive p-0">
-        <table id="groupsTable" class="table table-hover text-nowrap">
+        @* No table-wide text-nowrap, and the numeric ID collapses below md - GroupName is the
+           human-readable identifier, same reasoning as Fleet's column collapse (roadmap #22). *@
+        <table id="groupsTable" class="table table-hover">
             <thead>
                 <tr>
-                    <th>
+                    <th class="d-none d-md-table-cell">
                         @Html.DisplayNameFor(model => model.IDUserGroup)
                     </th>
                     <th>
@@ -30,7 +32,7 @@
             <tbody>
 @foreach (var item in Model) {
                 <tr>
-                    <td>
+                    <td class="d-none d-md-table-cell">
                         @Html.DisplayFor(modelItem => item.IDUserGroup)
                     </td>
                     <td>
@@ -40,8 +42,11 @@
                         @Html.DisplayFor(modelItem => item.RoleName)
                     </td>
                     <td>
-                        <a asp-action="Details" asp-route-idUserGroup="@item.IDUserGroup" class="btn btn-sm btn-primary">Details</a>
-                        <a asp-action="Delete" asp-route-idUserGroup="@item.IDUserGroup" class="btn btn-sm btn-danger">Delete</a>
+                        @* Icon-only + btn-group, same pattern as Fleet (roadmap #22). *@
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Group actions">
+                            <a asp-action="Details" asp-route-idUserGroup="@item.IDUserGroup" class="btn btn-primary" title="Details" aria-label="Details"><i class="bi bi-info-circle"></i></a>
+                            <a asp-action="Delete" asp-route-idUserGroup="@item.IDUserGroup" class="btn btn-danger" title="Delete" aria-label="Delete"><i class="bi bi-trash"></i></a>
+                        </div>
                     </td>
                 </tr>
 }
