@@ -30,6 +30,11 @@ namespace api.Dal.Interface
         // MANAGE USER
         Task UserAddAsync(User user, UserSecret userHash);
         Task UserUpdateAsync(User user);
+
+        /// <summary>Self-service profile write - only FirstName/LastName/TimeZone, never any
+        /// authorization-bearing column (see EfRepository.UserProfileSetAsync). False if no such user.</summary>
+        Task<bool> UserProfileSetAsync(string email, string? firstName, string? lastName, string? timeZone);
+
         Task<bool> UserDeleteAsync(int? idUser);
 
         /// <summary>The user matched by id / email / username, or null if none matches (or no key was given).</summary>

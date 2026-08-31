@@ -1,6 +1,7 @@
 using api.Dal.Interface;
 using api.Models;
 using api.Security;
+using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -52,12 +53,27 @@ namespace api.Controllers.View
 
         // #66 Phase 2: events are a read-only diagnostic - any authenticated caller (Tenant
         // reader included); the API scopes to the caller's tenant.
-        public async Task<ActionResult> Events(int? idDevice) =>
-            View(new DeviceView
+        public async Task<ActionResult> Events(int? idDevice)
+        {
+            var view = new DeviceView
             {
                 Device = await api.DeviceGet(idDevice),
                 Events = await api.DeviceEventsGet(idDevice),
-            });
+            };
+
+            // Roadmap #71 follow-up: CreatedAt is stored/served in UTC - convert for display only.
+            string? timeZone = (await api.UserGetSelf()).TimeZone;
+            foreach (var e in view.Events ?? [])
+            {
+                if (e.CreatedAt is DateTime utc)
+                {
+                    e.CreatedAt = TimeZoneHelper.ToUserLocalTime(utc, timeZone);
+                }
+            }
+            ViewBag.DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone;
+
+            return View(view);
+        }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> Delete(int? idDevice) =>

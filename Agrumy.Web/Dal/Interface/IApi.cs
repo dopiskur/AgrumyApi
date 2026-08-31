@@ -36,6 +36,21 @@ namespace api.Dal.Interface
         [Get("/api/User/All")]
         Task<IEnumerable<User>> UsersGet();
 
+        /// <summary>The caller's own record (self-scoped by the JWT server-side) - profile page
+        /// prefill and the display time zone for UTC-to-local conversion (roadmap #71 follow-up).</summary>
+        [Get("/api/User/Self")]
+        Task<User> UserGetSelf();
+
+        /// <summary>Self-service profile write - FirstName/LastName/TimeZone only, identity from
+        /// the attached JWT (see Agrumy.Api's UserApiController.UserProfileSet).</summary>
+        [Put("/api/User/Profile")]
+        Task UserProfileSet([Body] UserProfileUpdate value);
+
+        /// <summary>Existing password-change flow that proves identity with the old password -
+        /// reused by the profile page rather than a parallel mechanism.</summary>
+        [Post("/api/User/ChangePassword")]
+        Task ChangePassword([Body] UserSetPassword value);
+
         [Get("/api/User/Roles")]
         Task<IEnumerable<UserRole>> UserRoleGet();
 

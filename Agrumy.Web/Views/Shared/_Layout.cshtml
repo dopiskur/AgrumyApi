@@ -49,8 +49,19 @@
                 <ul class="navbar-nav ms-auto align-items-center">
                     @if (!string.IsNullOrEmpty(currentUserEmail))
                     {
-                        <li class="nav-item d-none d-sm-block me-2 text-secondary">
-                            <i class="bi bi-person-circle me-1"></i>@currentUserEmail
+                        @* Self-service entry point lives under the user's own identity, not in the
+                           main (admin-oriented) sidebar - see ProfileController. *@
+                        <li class="nav-item dropdown me-2">
+                            <a class="nav-link" href="#" id="user-menu" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-person-circle me-1"></i><span class="d-none d-sm-inline">@currentUserEmail</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="user-menu">
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Profile" asp-action="Index">
+                                        <i class="bi bi-person-gear me-2"></i>My Profile
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
                     }
                     <li class="nav-item dropdown">

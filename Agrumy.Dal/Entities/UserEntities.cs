@@ -70,6 +70,11 @@ namespace api.Dal.Entities
 
         // Resend-cooldown bookkeeping only - never surfaced on the public User DTO.
         public DateTime? ActivationLastSentAt { get; set; }
+
+        // Roadmap #71 follow-up: IANA zone id (e.g. "Europe/Zagreb"), never a raw UTC offset -
+        // offsets shift with DST, TimeZoneInfo resolves the IANA id correctly year-round.
+        // Null = user never chose one, presented as UTC (see api.Utils.TimeZoneHelper).
+        public string? TimeZone { get; set; }
     }
 
     /// <summary>One issued JWT refresh token. Single-use: a rotation marks the row revoked and

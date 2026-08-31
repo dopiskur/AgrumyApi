@@ -439,6 +439,37 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Null(await _repo.UserSecretGetAsync(null, "missing_" + U() + "@x.com", null));
     }
 
+    /// <summary>Regression gate for the self-service profile endpoint: UserProfileSetAsync must
+    /// write ONLY FirstName/LastName/TimeZone - if it ever starts touching Enabled/UserGroupID/
+    /// TenantID (or the password), a user could self-escalate through PUT /api/User/Profile.</summary>
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task UserProfileSet_Writes_Only_Profile_Fields(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, userId, email) = await MakeUser(t);
+
+        Assert.True(await _repo.UserProfileSetAsync(email, "NewFirst", "NewLast", "Europe/Zagreb"));
+        Assert.False(await _repo.UserProfileSetAsync("missing_" + U() + "@x.com", "X", "Y", null));
+
+        var back = await _repo.UserGetAsync(userId, null, null);
+        Assert.NotNull(back);
+        Assert.Equal("NewFirst", back.FirstName);
+        Assert.Equal("NewLast", back.LastName);
+        Assert.Equal("Europe/Zagreb", back.TimeZone);
+
+        // Everything authorization-bearing stays exactly as MakeUser created it.
+        Assert.Equal(tenantId, back.TenantID);
+        Assert.Equal(t.RegularGroupId, back.UserGroupID);
+        Assert.True(back.Enabled);
+        var secret = await _repo.UserSecretGetAsync(userId, null, null);
+        Assert.NotNull(secret);
+        Assert.Equal("h", secret.PwdHash);
+
+        // Clearing the zone (back to "no preference" = UTC display) round-trips as null.
+        Assert.True(await _repo.UserProfileSetAsync(email, "NewFirst", "NewLast", null));
+        Assert.Null((await _repo.UserGetAsync(userId, null, null))!.TimeZone);
+    }
+
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task User_Update_Changes_Fields(DbProviderKind provider)
     {
@@ -647,7 +678,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(26.13, rows[0].Temperature);
         Assert.Equal(new DateTime(2026, 8, 29, 9, 50, 0), rows[0].DateCreated);
         Assert.NotNull(rows[1].DateCreated);
-        Assert.True(rows[1].DateCreated > DateTime.Now.AddMinutes(-5));
+        // UtcNow, matching SensorDataPushAsync's UTC fallback (roadmap #71) — local Now would be ahead of it.
+        Assert.True(rows[1].DateCreated > DateTime.UtcNow.AddMinutes(-5));
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -812,6 +844,37 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
         Assert.Empty(await _repo.SensorDataReportGetAsync(tenantId + 999, 0, d.IDDevice, null));
         Assert.Empty(await _repo.SensorDataReportGetAsync(tenantId, -1, d.IDDevice, null));
+    }
+
+    /// <summary>The exact pipeline Agrumy.Web's SensorData views run (roadmap #71 follow-up):
+    /// UTC rows from the DB, shaped to JSON, then dateCreated localized for display - proves the
+    /// chart payload shifts by the user's zone while a null zone passes UTC through untouched.</summary>
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task SensorDataGet_Then_Localize_Shifts_Chart_Dates_By_User_Zone(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+
+        // Mid-minute UTC anchor, same reasoning as the bucketing test above.
+        DateTime n = DateTime.UtcNow;
+        var utcStamp = new DateTime(n.Year, n.Month, n.Day, n.Hour, n.Minute, 30);
+        await using (var db = _fx.NewContext(t))
+        {
+            db.SensorData.Add(new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 400, Temperature = 20, DateCreated = utcStamp });
+            await db.SaveChangesAsync();
+        }
+
+        string json = await _repo.SensorDataGetAsync(tenantId, d.IDDevice, 10, 0, 0);
+        Assert.Contains(utcStamp.ToString("yyyy-MM-dd HH:mm:ss"), json);
+
+        string? localized = api.Utils.SensorDataTimeLocalizer.LocalizeDates(json, "Europe/Zagreb");
+        var expectedLocal = api.Utils.TimeZoneHelper.ToUserLocalTime(utcStamp, "Europe/Zagreb");
+        Assert.NotEqual(utcStamp, expectedLocal); // Zagreb is never UTC+0, so the shift must show
+        Assert.Contains(expectedLocal.ToString("yyyy-MM-dd HH:mm:ss"), localized);
+
+        // A user with no zone preference keeps the raw UTC payload byte-for-byte.
+        Assert.Equal(json, api.Utils.SensorDataTimeLocalizer.LocalizeDates(json, null));
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]

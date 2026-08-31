@@ -105,6 +105,7 @@ namespace api.Dal
                 e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.Property(x => x.DateModified).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.Property(x => x.ActivationTokenHash).HasMaxLength(64); // SHA-256 hex, same shape as userRefreshToken.TokenHash
+                e.Property(x => x.TimeZone).HasMaxLength(64); // longest IANA ids are ~30 chars; 64 leaves headroom
                 e.HasIndex(x => x.Email).IsUnique().HasDatabaseName("email_UNIQUE");
                 e.HasIndex(x => x.Username).IsUnique().HasDatabaseName("Username_UNIQUE");
                 e.HasIndex(x => x.ActivationTokenHash).IsUnique().HasDatabaseName("ActivationTokenHash_UNIQUE");

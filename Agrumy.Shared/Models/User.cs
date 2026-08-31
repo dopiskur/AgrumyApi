@@ -26,6 +26,10 @@ namespace api.Models
 
         // Roadmap #24: has this user proven they own their email address yet.
         public bool? EmailVerified { get; set; }
+
+        // IANA time zone id (e.g. "Europe/Zagreb") for display conversion of stored-UTC
+        // timestamps; null = show UTC (see api.Utils.TimeZoneHelper).
+        public string? TimeZone { get; set; }
     }
 
     public class UserSecret
@@ -127,6 +131,18 @@ namespace api.Models
         public string? OldPassword { get; set; }
         [Required(ErrorMessage = "New password is required")]
         public string? NewPassword { get; set; }
+    }
+
+    /// <summary>Body of PUT /api/User/Profile - the ONLY fields a user may change on their own
+    /// account (identity comes from the JWT, never from here - roadmap #47 pattern). Deliberately
+    /// has no Enabled/UserGroupID/TenantID so self-service can never touch authorization; the
+    /// password goes through the separate ChangePassword flow that proves the old password.</summary>
+    public class UserProfileUpdate
+    {
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        [Display(Name = "Time Zone")]
+        public string? TimeZone { get; set; }
     }
 
     /// <summary>Roadmap #24. Deliberately the same shape as <see cref="UserLogin"/>'s Login field

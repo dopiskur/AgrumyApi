@@ -286,7 +286,27 @@ namespace api.Dal
             row.Phone = user.Phone;
             row.UserGroupID = user.UserGroupID;
             row.Enabled = user.Enabled;
+            row.TimeZone = user.TimeZone;
             await db.SaveChangesAsync();
+        }
+
+        /// <summary>Self-service profile write (roadmap #71 follow-up): deliberately touches ONLY the
+        /// three profile columns so the endpoint can never alter Enabled/UserGroupID/TenantID even if
+        /// the controller mis-binds - the column list here IS the authorization boundary.</summary>
+        public async Task<bool> UserProfileSetAsync(string email, string? firstName, string? lastName, string? timeZone)
+        {
+            await using var db = Db();
+            var row = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if (row == null)
+            {
+                return false;
+            }
+
+            row.FirstName = firstName;
+            row.LastName = lastName;
+            row.TimeZone = timeZone;
+            await db.SaveChangesAsync();
+            return true;
         }
 
         public async Task<bool> UserDeleteAsync(int? idUser)
@@ -967,8 +987,8 @@ namespace api.Dal
                     WaterLevel = ReadInt(o, "waterLevel"),
                     Wind = ReadInt(o, "wind"),
                     // Replaces the sensorData_SetDateTimeOnNull trigger: a missing/blank timestamp
-                    // becomes "now".
-                    DateCreated = dc ?? DateTime.Now,
+                    // becomes "now". UTC, not local: device timestamps are UTC (roadmap #71).
+                    DateCreated = dc ?? DateTime.UtcNow,
                 });
             }
 
@@ -989,7 +1009,8 @@ namespace api.Dal
                 return ""; // proc: ELSE branch / NULL interval -> SQL NULL -> read as ""
             }
 
-            DateTime now = DateTime.Now;
+            // UTC so the cutoff compares against UTC DateCreated without a DST-sized skew (roadmap #71).
+            DateTime now = DateTime.UtcNow;
             DateTime cutoff = timeMDMY switch
             {
                 0 => now.AddMinutes(-timeRange.Value),
@@ -1067,7 +1088,8 @@ namespace api.Dal
                 return; // proc CASE has no ELSE
             }
 
-            DateTime now = DateTime.Now;
+            // UTC so the delete cutoff compares against UTC DateCreated (roadmap #71).
+            DateTime now = DateTime.UtcNow;
             DateTime cutoff = timeMDMY switch
             {
                 0 => now.AddMinutes(-timeRange.Value),
@@ -1251,6 +1273,7 @@ namespace api.Dal
             DateCreated = u.DateCreated,
             DateModified = u.DateModified,
             EmailVerified = u.EmailVerified,
+            TimeZone = u.TimeZone,
         };
 
         private static Device ToDto(DeviceRow d) => new()

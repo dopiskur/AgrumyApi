@@ -379,6 +379,38 @@ namespace api.Controllers.API
             return user is null ? NotFound() : Ok(user);
         }
 
+        /// <summary>Self-scoped counterpart to the admin-only UserUpdate: identity comes ONLY from
+        /// the JWT (roadmap #47 pattern), and the payload has no authorization-bearing fields -
+        /// Enabled/UserGroupID/TenantID stay untouchable by construction because
+        /// Repo.UserProfileSetAsync writes nothing but FirstName/LastName/TimeZone. Passwords go
+        /// through the separate ChangePassword flow that proves the old password.</summary>
+        [HttpPut("Profile")]
+        [Authorize]
+        public async Task<ActionResult<bool>> UserProfileSet([FromBody] UserProfileUpdate value)
+        {
+            string? name = User.Identity?.Name;
+            if (string.IsNullOrEmpty(name))
+            {
+                return Unauthorized();
+            }
+
+            string? timeZone = null;
+            if (!string.IsNullOrWhiteSpace(value.TimeZone))
+            {
+                // Normalized to the IANA id before storing, so a Windows-id submission can never
+                // persist a value the Linux server's ICU catalog would not resolve.
+                if (!TimeZoneHelper.TryNormalizeToIana(value.TimeZone, out string iana))
+                {
+                    return BadRequest("Unknown time zone: " + value.TimeZone);
+                }
+                timeZone = iana;
+            }
+
+            return await Repo.UserProfileSetAsync(name, value.FirstName, value.LastName, timeZone)
+                ? Ok(true)
+                : NotFound();
+        }
+
         [HttpGet]
         [Authorize]
         public async Task<ActionResult<User>> UserGet(int idUser)

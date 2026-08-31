@@ -1,0 +1,52 @@
+@model api.ViewModels.ProfileViewModel
+
+@{
+    ViewData["Title"] = "My Profile";
+}
+
+@if (TempData["ProfileMessage"] is string msg)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @msg
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Profile - @Model.Email</h3>
+            </div>
+            <div class="card-body">
+                <form asp-action="Index">
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                    <div class="mb-3">
+                        <label asp-for="Profile.FirstName" class="control-label">First Name</label>
+                        <input asp-for="Profile.FirstName" class="form-control" />
+                        <span asp-validation-for="Profile.FirstName" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Profile.LastName" class="control-label">Last Name</label>
+                        <input asp-for="Profile.LastName" class="form-control" />
+                        <span asp-validation-for="Profile.LastName" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Profile.TimeZone" class="control-label"></label>
+                        <select asp-for="Profile.TimeZone" asp-items="Model.TimeZones" class="form-select">
+                            <option value="">UTC (no time zone selected)</option>
+                        </select>
+                        <span asp-validation-for="Profile.TimeZone" class="text-danger"></span>
+                        <div class="form-text">Timestamps (sensor charts, device events) are stored in UTC and shown in this time zone.</div>
+                    </div>
+                    <div class="mb-0">
+                        <input type="submit" value="Save" class="btn btn-primary" />
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <partial name="_ChangePassword" model="new api.ViewModels.ChangePasswordViewModel()" />
+    </div>
+</div>
