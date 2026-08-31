@@ -22,7 +22,7 @@ function renderSensorChart(containerId, sensorPayload, fieldName, label) {
     }
 
     if (points.length === 0) {
-        container.innerHTML = '<div class="text-center text-secondary py-5">Nema podataka za ovu metriku</div>';
+        container.innerHTML = '<div class="text-center text-secondary py-5">No data for this metric</div>';
         return;
     }
 

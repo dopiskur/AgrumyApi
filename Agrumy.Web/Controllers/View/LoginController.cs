@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace api.Controllers.View
 {
     [AllowAnonymous]
-    public class LoginController(IApi api, IAuthApi authApi) : Controller
+    public class LoginController(IApi api, IAuthApi authApi, ILogger<LoginController> logger) : Controller
     {
         public ActionResult Index(bool sessionExpired = false)
         {
@@ -33,8 +33,18 @@ namespace api.Controllers.View
                 result = await api.UserLogin(userLogin);
                 roles = result?.Token is { } token ? JwtTokenProvider.ValidateToken(token) : null;
             }
-            catch (Exception)
+            catch (ApiException ex)
             {
+                // Wrong credentials also land here (the API answers 4xx) - expected, so only a warning.
+                logger.LogWarning("Login rejected by Agrumy.Api ({StatusCode}).", ex.StatusCode);
+                result = null;
+                roles = null;
+            }
+            catch (Exception ex)
+            {
+                // An unreachable/broken API must be distinguishable from a wrong password in the log -
+                // both render the same generic message below (see roadmap #48 debugging history).
+                logger.LogError(ex, "Login call to Agrumy.Api failed.");
                 result = null;
                 roles = null;
             }

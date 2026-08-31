@@ -67,7 +67,8 @@ namespace api.Controllers.View
             }
 
             await api.UserUpdate(userView.UserUpdate!);
-            return View("Details", await api.UserGet(userView.UserUpdate!.IDUser));
+            // PRG: redirect so a refresh re-fetches Details instead of re-submitting the update.
+            return RedirectToAction(nameof(Details), new { idUser = userView.UserUpdate!.IDUser });
         }
 
         /// <summary>Roadmap #66: a user can hold several roles at once - this edits the whole set,

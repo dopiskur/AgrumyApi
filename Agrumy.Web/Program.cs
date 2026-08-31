@@ -35,7 +35,10 @@ builder.Services
         options.Cookie.Name = "authorization";
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Strict;
-        // SecurePolicy defaults to SameAsRequest: Secure over HTTPS, not over plain-HTTP dev.
+        // Deployed behind a TLS-terminating proxy, Kestrel itself only ever sees plain HTTP -
+        // the SameAsRequest default would therefore never mark the auth cookie Secure. Always is
+        // safe for local dev too: browsers accept Secure cookies on localhost.
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         options.LoginPath = "/Login";
         options.LogoutPath = "/Login/Logout";
         options.AccessDeniedPath = "/Device"; // non-admin hitting an admin page -> back to devices

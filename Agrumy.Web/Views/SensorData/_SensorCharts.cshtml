@@ -1,4 +1,17 @@
 @model api.Models.DeviceView
+@using System.Text.Json.Nodes
+
+@{
+    // Never trust SensorDataJson for direct <script> interpolation: re-serializing through
+    // System.Text.Json escapes HTML-sensitive characters (<, >, &), so Html.Raw below can't
+    // break out of the script block even if a raw API payload slipped through unlocalized.
+    var safePayload = "{\"sensorData\":[]}";
+    if (!string.IsNullOrWhiteSpace(Model.SensorDataJson))
+    {
+        try { safePayload = JsonNode.Parse(Model.SensorDataJson)!.ToJsonString(); }
+        catch (System.Text.Json.JsonException) { }
+    }
+}
 
 <div class="text-secondary small mb-2">Chart times shown in @(ViewBag.DisplayTimeZone ?? "UTC")</div>
 <div class="row">
@@ -63,7 +76,7 @@
 <script src="~/lib/echarts/echarts.min.js"></script>
 <script src="~/js/sensor-charts.js"></script>
 <script>
-    const sensorPayload = @Html.Raw(string.IsNullOrWhiteSpace(Model.SensorDataJson) ? "{\"sensorData\":[]}" : Model.SensorDataJson);
+    const sensorPayload = @Html.Raw(safePayload);
     renderSensorChart('chart-temperature', sensorPayload, 'temperature', 'Temperature');
     renderSensorChart('chart-humidity', sensorPayload, 'humidity', 'Humidity');
     renderSensorChart('chart-barometer', sensorPayload, 'barometer', 'Barometer');

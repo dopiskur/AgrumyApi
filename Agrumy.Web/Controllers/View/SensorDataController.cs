@@ -10,7 +10,7 @@ namespace api.Controllers.View
     [Authorize]
     public class SensorDataController(IApi api) : Controller
     {
-        public async Task<ActionResult> Index(int? idDevice, int? timeRange = 60, int? timeMDMY = 0, int? buildReport = 0)
+        public async Task<ActionResult> Index(int? idDevice, int? timeRange = 60, int? timeMDMY = 0)
         {
             if (timeRange > 1440)
             {
@@ -22,9 +22,10 @@ namespace api.Controllers.View
 
             ViewBag.EnumList = new SelectList(
                 Enum.GetValues<TimeRangeMDMY>().Select(e => new { ID = (int)e, Name = e.ToString() }),
-                "ID", "Name");
+                "ID", "Name", timeMDMY);
+            ViewBag.TimeMDMY = timeMDMY; // the report form snapshots the currently displayed period
 
-            deviceView.SensorDataJson = await api.SensorDataGet(idDevice, timeRange, timeMDMY, buildReport);
+            deviceView.SensorDataJson = await api.SensorDataGet(idDevice, timeRange, timeMDMY, 0);
 
             // Roadmap #71 follow-up: chart x-axis shows the user's local time; storage stays UTC.
             string? timeZone = (await api.UserGetSelf()).TimeZone;
@@ -32,6 +33,22 @@ namespace api.Controllers.View
             ViewBag.DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone;
 
             return View(deviceView);
+        }
+
+        /// <summary>Report generation writes a sensorDataReport row, so it must be a POST with an
+        /// antiforgery token - it used to ride along as a buildReport=1 flag on the GET Index.</summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> GenerateReport(int? idDevice, int? timeRange = 60, int? timeMDMY = 0)
+        {
+            if (timeRange > 1440)
+            {
+                timeRange = 1440;
+            }
+
+            await api.SensorDataGet(idDevice, timeRange, timeMDMY, 1);
+            TempData["Message"] = "Report generated.";
+            return RedirectToAction(nameof(Report), new { idDevice });
         }
 
         public async Task<ActionResult> Report(int? idDevice, int? idSensorDataReport = 0)

@@ -3,7 +3,7 @@
 @using Microsoft.AspNetCore.Mvc.Rendering
 
 @{
-    ViewData["Title"] = "EditSensor";
+    ViewData["Title"] = "Sensor config";
     var sensorCfg = Model.DeviceConfigSensor!;
     string SensorField(string name) => $"{nameof(Model.DeviceConfigSensor)}.{name}";
 

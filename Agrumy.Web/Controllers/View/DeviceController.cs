@@ -47,8 +47,8 @@ namespace api.Controllers.View
             };
 
             await api.DeviceUpdate(device);
-            // Re-fetch so ConfigVersion reflects what the database actually stored.
-            return View("Details", await api.DeviceGet(device.IDDevice));
+            // PRG: redirect so a refresh re-fetches Details instead of re-submitting the update.
+            return RedirectToAction(nameof(Details), new { idDevice = device.IDDevice });
         }
 
         // #66 Phase 2: events are a read-only diagnostic - any authenticated caller (Tenant
@@ -105,12 +105,19 @@ namespace api.Controllers.View
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> EditSensor(DeviceView deviceView)
         {
+            if (!ModelState.IsValid)
+            {
+                deviceView.Device = await api.DeviceGet(deviceView.Device!.IDDevice);
+                deviceView.DeviceTypeSensor = await api.DeviceTypeSensorGet();
+                return View(deviceView);
+            }
+
             await api.DeviceConfigSensorUpdate(new DeviceUpdate
             {
                 Device = deviceView.Device,
                 Sensor = deviceView.DeviceConfigSensor,
             });
-            return View("Details", await api.DeviceGet(deviceView.Device!.IDDevice));
+            return RedirectToAction(nameof(Details), new { idDevice = deviceView.Device!.IDDevice });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -130,12 +137,19 @@ namespace api.Controllers.View
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> EditController(DeviceView deviceView)
         {
+            if (!ModelState.IsValid)
+            {
+                deviceView.Device = await api.DeviceGet(deviceView.Device!.IDDevice);
+                deviceView.DeviceTypeRelay = await api.DeviceTypeRelayGet();
+                return View(deviceView);
+            }
+
             await api.DeviceConfigControllerUpdate(new DeviceUpdate
             {
                 Device = deviceView.Device,
                 Controller = deviceView.DeviceConfigController,
             });
-            return View("Details", await api.DeviceGet(deviceView.Device!.IDDevice));
+            return RedirectToAction(nameof(Details), new { idDevice = deviceView.Device!.IDDevice });
         }
     }
 }

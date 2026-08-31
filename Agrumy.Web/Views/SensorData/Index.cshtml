@@ -1,7 +1,7 @@
 @model api.Models.DeviceView
 
 @{
-    ViewData["Title"] = "Index";
+    ViewData["Title"] = "Sensor data";
 }
 
 <div class="card">
@@ -9,56 +9,42 @@
         <h3 class="card-title">Sensor data: @Html.DisplayFor(model => model.Device.DeviceName)</h3>
     </div>
     <div class="card-body">
-        @using (Html.BeginForm("Index", "SensorData", FormMethod.Get))
-        {
-            @Html.Hidden("idDevice", Model.Device.IDDevice, new { @id = "idDevice" })
+        <form asp-action="Index" method="get">
+            <input type="hidden" name="idDevice" value="@Model.Device!.IDDevice" />
             <div class="row g-2 align-items-end">
                 <div class="col-auto">
                     <label class="form-label" for="timeRange">Time range</label>
                     <div class="input-group">
-                        @Html.TextBox("timeRange", Model.TimeRange.Range, new { @id = "timeRange", @class = "form-control" })
+                        @* Plain input on purpose: TimeRange.Range carries a stale [Range(1,30)]
+                           attribute that binding with asp-for would enforce against the real
+                           1-1440 minute usage. *@
+                        <input type="number" min="1" max="1440" id="timeRange" name="timeRange" value="@Model.TimeRange!.Range" class="form-control" />
                         <div class="input-group-text"><span class="bi bi-clock-history"></span></div>
                     </div>
-                    @Html.ValidationMessageFor(model => model.TimeRange.Range, "", new { @class = "text-danger" })
                 </div>
                 <div class="col-auto">
                     <label class="form-label" for="timeMDMY">Period</label>
-                    @Html.DropDownList("timeMDMY", ViewBag.EnumList as SelectList, new { @class = "form-select" })
+                    <select id="timeMDMY" name="timeMDMY" class="form-select" asp-items="ViewBag.EnumList"></select>
                 </div>
                 <div class="col-auto">
-                    <button type="Index" class="btn btn-success">Load live data </button>
+                    <button type="submit" class="btn btn-success">Load live data</button>
                 </div>
             </div>
-        }
+        </form>
 
         <hr class="my-3" />
 
-        @using (Html.BeginForm("Index", "SensorData", FormMethod.Get))
-        {
-            @Html.Hidden("idDevice", Model.Device.IDDevice, new { @id = "idDevice" })
-            <div class="row g-2 align-items-end">
-                <div class="col-auto">
-                    <label class="form-label" for="timeRange">Time range</label>
-                    <div class="input-group">
-                        @Html.TextBox("timeRange", Model.TimeRange.Range, new { @id = "timeRange", @class = "form-control" })
-                        <div class="input-group-text"><span class="bi bi-clock-history"></span></div>
-                    </div>
-                    @Html.ValidationMessageFor(model => model.TimeRange.Range, "", new { @class = "text-danger" })
-                </div>
-                <div class="col-auto">
-                    <label class="form-label" for="timeMDMY">Period</label>
-                    @Html.DropDownList("timeMDMY", ViewBag.EnumList as SelectList, new { @class = "form-select" })
-                </div>
-                @Html.Hidden("buildReport", 1, new { @id = "buildReport" })
-                <div class="col-auto">
-                    <button type="Index" class="btn btn-danger">Generate report</button>
-                </div>
-            </div>
-        }
+        @* Snapshots the range/period the charts below are actually showing - a write (new
+           sensorDataReport row), so a POST, unlike the read-only load above. *@
+        <form asp-action="GenerateReport" method="post">
+            <input type="hidden" name="idDevice" value="@Model.Device!.IDDevice" />
+            <input type="hidden" name="timeRange" value="@Model.TimeRange!.Range" />
+            <input type="hidden" name="timeMDMY" value="@(ViewBag.TimeMDMY ?? 0)" />
+            <button type="submit" class="btn btn-danger">Generate report from shown data</button>
+        </form>
     </div>
     <div class="card-footer">
-        @Html.ActionLink("Back", "Index", "Device", new { idDevice = Model.Device.IDDevice }, new { @class = "btn btn-primary" })
-        @Html.HiddenFor(model => model.Device.IDDevice)
+        <a asp-controller="Device" asp-action="Index" class="btn btn-primary">Back</a>
     </div>
 </div>
 
