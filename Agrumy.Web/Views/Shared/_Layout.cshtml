@@ -109,7 +109,7 @@
                                 <p>Devices</p>
                             </a>
                         </li>
-                        @if (hasAnyRole(api.Security.RoleNames.UserManagers))
+                        @if (hasAnyRole(RoleNames.UserManagers))
                         {
                             <li class="nav-item">
                                 <a asp-area="" asp-controller="User" asp-action="Index" class="nav-link @navActive("User")">
@@ -118,7 +118,7 @@
                                 </a>
                             </li>
                         }
-                        @if (hasAnyRole(api.Security.RoleNames.Admins))
+                        @if (hasAnyRole(RoleNames.Admins))
                         {
                             <li class="nav-item">
                                 <a asp-area="" asp-controller="Group" asp-action="Index" class="nav-link @navActive("Group")">
@@ -127,7 +127,7 @@
                                 </a>
                             </li>
                         }
-                        @if (User.IsInRole(api.Security.RoleNames.GlobalAdmin))
+                        @if (User.IsInRole(RoleNames.GlobalAdmin))
                         {
                             <li class="nav-item">
                                 <a asp-area="" asp-controller="ServerConfig" asp-action="Index" class="nav-link @navActive("ServerConfig")">

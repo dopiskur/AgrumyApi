@@ -1,10 +1,9 @@
 @model api.Models.GroupView
-@using Microsoft.AspNetCore.Mvc.Rendering
 
 @{
     ViewData["Title"] = "Create";
     var userRoleItems = new SelectList(Model.UserRoles, nameof(UserRole.IDUserRole), nameof(UserRole.RoleName));
-    var userRoleSelect = new SelectFieldViewModel { Name = $"{nameof(Model.UserGroup)}.{nameof(Model.UserGroup.UserRoleID)}", Label = nameof(Model.UserGroup.RoleName), Items = userRoleItems };
+    var userRoleSelect = new SelectFieldViewModel { Name = $"{nameof(Model.UserGroup)}.{nameof(Model.UserGroup.UserRoleID)}", Label = "Role", Items = userRoleItems };
 }
 
 <div class="card">
@@ -15,7 +14,7 @@
         <form asp-action="Create">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             <div class="mb-3">
-                <label asp-for="UserGroup.GroupName" class="control-label"></label>
+                <label asp-for="UserGroup.GroupName" class="form-label"></label>
                 <input asp-for="UserGroup.GroupName" class="form-control" />
                 <span asp-validation-for="UserGroup.GroupName" class="text-danger"></span>
             </div>

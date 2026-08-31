@@ -10,7 +10,6 @@
         public IEnumerable<DeviceTypeRelay>? DeviceTypeRelay { get; set; }
         public IEnumerable<DeviceTypeSensor>? DeviceTypeSensor { get; set; }
 
-        public IEnumerable<SensorData>? SensorData;
         public IEnumerable<SensorDataReport>? SensorDataReport { get; set; }
         public String? SensorDataJson { get; set; }
         public TimeRange? TimeRange { get; set; } = new TimeRange();

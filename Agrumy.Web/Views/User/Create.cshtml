@@ -1,5 +1,4 @@
 @model api.Models.UserView
-@using Microsoft.AspNetCore.Mvc.Rendering
 
 @{
     ViewData["Title"] = "Create";
@@ -19,32 +18,32 @@
         <form asp-action="Create">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             <div class="mb-3">
-                <label asp-for="UserAdd.Email" class="control-label"></label>
+                <label asp-for="UserAdd.Email" class="form-label"></label>
                 <input asp-for="UserAdd.Email" class="form-control" />
                 <span asp-validation-for="UserAdd.Email" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="UserAdd.Username" class="control-label"></label>
+                <label asp-for="UserAdd.Username" class="form-label"></label>
                 <input asp-for="UserAdd.Username" class="form-control" />
                 <span asp-validation-for="UserAdd.Username" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="UserAdd.Password" class="control-label"></label>
+                <label asp-for="UserAdd.Password" class="form-label"></label>
                 <input asp-for="UserAdd.Password" class="form-control" />
                 <span asp-validation-for="UserAdd.Password" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="UserAdd.FirstName" class="control-label"></label>
+                <label asp-for="UserAdd.FirstName" class="form-label"></label>
                 <input asp-for="UserAdd.FirstName" class="form-control" />
                 <span asp-validation-for="UserAdd.FirstName" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="UserAdd.LastName" class="control-label"></label>
+                <label asp-for="UserAdd.LastName" class="form-label"></label>
                 <input asp-for="UserAdd.LastName" class="form-control" />
                 <span asp-validation-for="UserAdd.LastName" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="UserAdd.Phone" class="control-label"></label>
+                <label asp-for="UserAdd.Phone" class="form-label"></label>
                 <input asp-for="UserAdd.Phone" class="form-control" />
                 <span asp-validation-for="UserAdd.Phone" class="text-danger"></span>
             </div>

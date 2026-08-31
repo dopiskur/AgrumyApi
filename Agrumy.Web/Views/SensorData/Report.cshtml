@@ -6,7 +6,7 @@
 
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Reports: @Html.DisplayFor(model => model.Device.DeviceName)</h3>
+        <h3 class="card-title">Reports: @Html.DisplayFor(model => model.Device!.DeviceName)</h3>
     </div>
     <div class="card-body">
         @if (TempData["Message"] is string message)
@@ -32,4 +32,4 @@
     </div>
 </div>
 
-@await Html.PartialAsync("_SensorCharts", Model)
+<partial name="_SensorCharts" model="Model" />

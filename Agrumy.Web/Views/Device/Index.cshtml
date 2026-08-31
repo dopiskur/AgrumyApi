@@ -43,9 +43,9 @@
                         @Html.DisplayFor(modelItem => item.DateModified)
                     </td>
                     <td>
-                        @Html.ActionLink("Sensor data", "Index", "SensorData", new { idDevice = item.IDDevice }, new { @class = "btn btn-sm btn-success" })
-                        @Html.ActionLink("Reports", "Report", "SensorData", new { idDevice = item.IDDevice }, new { @class = "btn btn-sm btn-danger" })
-                        @Html.ActionLink("Details", "Details", new { idDevice = item.IDDevice }, new { @class = "btn btn-sm btn-primary" })
+                        <a asp-controller="SensorData" asp-action="Index" asp-route-idDevice="@item.IDDevice" class="btn btn-sm btn-success">Sensor data</a>
+                        <a asp-controller="SensorData" asp-action="Report" asp-route-idDevice="@item.IDDevice" class="btn btn-sm btn-danger">Reports</a>
+                        <a asp-action="Details" asp-route-idDevice="@item.IDDevice" class="btn btn-sm btn-primary">Details</a>
                     </td>
                 </tr>
 }
@@ -55,16 +55,5 @@
 </div>
 
 @section Scripts {
-    <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.min.js"></script>
-    <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.bootstrap5.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            new DataTable('#devicesTable', {
-                paging: true,
-                searching: true,
-                order: [[0, 'asc']],
-                columnDefs: [{ orderable: false, targets: -1 }]
-            });
-        });
-    </script>
+    <partial name="_DataTableScripts" model="@("devicesTable")" />
 }

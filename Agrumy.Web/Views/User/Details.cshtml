@@ -10,22 +10,22 @@
     </div>
     <div class="card-body">
         <dl class="row">
-            <dt class = "col-sm-3">
+            <dt class="col-sm-3">
                 @Html.DisplayNameFor(model => model.IDUser)
             </dt>
-            <dd class = "col-sm-9">
+            <dd class="col-sm-9">
                 @Html.DisplayFor(model => model.IDUser)
             </dd>
-            <dt class = "col-sm-3">
+            <dt class="col-sm-3">
                 @Html.DisplayNameFor(model => model.TenantID)
             </dt>
-            <dd class = "col-sm-9">
+            <dd class="col-sm-9">
                 @Html.DisplayFor(model => model.TenantID)
             </dd>
-            <dt class = "col-sm-3">
+            <dt class="col-sm-3">
                 @Html.DisplayNameFor(model => model.Email)
             </dt>
-            <dd class = "col-sm-9">
+            <dd class="col-sm-9">
                 @Html.DisplayFor(model => model.Email)
             </dd>
             <dt class="col-sm-3">
@@ -34,59 +34,59 @@
             <dd class="col-sm-9">
                 @Html.DisplayFor(model => model.DevicePin)
             </dd>
-            <dt class = "col-sm-3">
+            <dt class="col-sm-3">
                 @Html.DisplayNameFor(model => model.Username)
             </dt>
-            <dd class = "col-sm-9">
+            <dd class="col-sm-9">
                 @Html.DisplayFor(model => model.Username)
             </dd>
-            <dt class = "col-sm-3">
+            <dt class="col-sm-3">
                 @Html.DisplayNameFor(model => model.FirstName)
             </dt>
-            <dd class = "col-sm-9">
+            <dd class="col-sm-9">
                 @Html.DisplayFor(model => model.FirstName)
             </dd>
-            <dt class = "col-sm-3">
+            <dt class="col-sm-3">
                 @Html.DisplayNameFor(model => model.LastName)
             </dt>
-            <dd class = "col-sm-9">
+            <dd class="col-sm-9">
                 @Html.DisplayFor(model => model.LastName)
             </dd>
-            <dt class = "col-sm-3">
+            <dt class="col-sm-3">
                 @Html.DisplayNameFor(model => model.Phone)
             </dt>
-            <dd class = "col-sm-9">
+            <dd class="col-sm-9">
                 @Html.DisplayFor(model => model.Phone)
             </dd>
-            <dt class = "col-sm-3">
+            <dt class="col-sm-3">
                 @Html.DisplayNameFor(model => model.GroupName)
             </dt>
-            <dd class = "col-sm-9">
+            <dd class="col-sm-9">
                 @Html.DisplayFor(model => model.GroupName)
             </dd>
-            <dt class = "col-sm-3">
+            <dt class="col-sm-3">
                 @Html.DisplayNameFor(model => model.Enabled)
             </dt>
-            <dd class = "col-sm-9">
+            <dd class="col-sm-9">
                 @Html.DisplayFor(model => model.Enabled)
             </dd>
-            <dt class = "col-sm-3">
+            <dt class="col-sm-3">
                 @Html.DisplayNameFor(model => model.DateCreated)
             </dt>
-            <dd class = "col-sm-9">
+            <dd class="col-sm-9">
                 @Html.DisplayFor(model => model.DateCreated)
             </dd>
-            <dt class = "col-sm-3">
+            <dt class="col-sm-3">
                 @Html.DisplayNameFor(model => model.DateModified)
             </dt>
-            <dd class = "col-sm-9">
+            <dd class="col-sm-9">
                 @Html.DisplayFor(model => model.DateModified)
             </dd>
         </dl>
     </div>
     <div class="card-footer">
-        @Html.ActionLink("Edit", "Edit", new { idUser = Model.IDUser }, new { @class = "btn btn-primary" })
-        @Html.ActionLink("Roles", "Roles", new { idUser = Model.IDUser }, new { @class = "btn btn-outline-primary" })
+        <a asp-action="Edit" asp-route-idUser="@Model.IDUser" class="btn btn-primary">Edit</a>
+        <a asp-action="Roles" asp-route-idUser="@Model.IDUser" class="btn btn-outline-primary">Roles</a>
         <a asp-action="Index" class="btn btn-outline-secondary">Back to List</a>
     </div>
 </div>

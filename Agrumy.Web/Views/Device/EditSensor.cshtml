@@ -1,6 +1,5 @@
 @model api.Models.DeviceView
 @using Microsoft.AspNetCore.Html
-@using Microsoft.AspNetCore.Mvc.Rendering
 
 @{
     ViewData["Title"] = "Sensor config";
@@ -30,7 +29,7 @@
 
     Task<IHtmlContent> RenderSlot((string Name, Func<DeviceTypeSensor, int?> SupportsFlag, int? Selected, string Tab) slot)
     {
-        var items = new SelectList(Model.DeviceTypeSensor.Where(s => slot.SupportsFlag(s) == 1).ToList(), nameof(DeviceTypeSensor.IDDeviceTypeSensor), nameof(DeviceTypeSensor.SensorName), slot.Selected);
+        var items = new SelectList(Model.DeviceTypeSensor!.Where(s => slot.SupportsFlag(s) == 1).ToList(), nameof(DeviceTypeSensor.IDDeviceTypeSensor), nameof(DeviceTypeSensor.SensorName), slot.Selected);
         var selectModel = new SelectFieldViewModel { Name = SensorField(slot.Name), Label = slot.Name, Items = items };
         return Html.PartialAsync("_SelectField", selectModel);
     }
@@ -38,16 +37,18 @@
 
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Edit Sensor - @Html.DisplayFor(model => model.Device.DeviceName)</h3>
+        <h3 class="card-title">Edit Sensor - @Html.DisplayFor(model => model.Device!.DeviceName)</h3>
     </div>
     <div class="card-body">
         <form asp-action="EditSensor">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             <div class="mb-3">
+                <label asp-for="Device.IDDevice" class="form-label"></label>
                 <input asp-for="Device.IDDevice" class="form-control" />
                 <span asp-validation-for="Device.IDDevice" class="text-danger"></span>
             </div>
             <div class="mb-3">
+                <label asp-for="DeviceConfigSensor.IDDeviceConfigSensor" class="form-label"></label>
                 <input asp-for="DeviceConfigSensor.IDDeviceConfigSensor" class="form-control" />
                 <span asp-validation-for="DeviceConfigSensor.IDDeviceConfigSensor" class="text-danger"></span>
             </div>

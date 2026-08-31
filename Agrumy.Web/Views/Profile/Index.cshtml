@@ -22,17 +22,17 @@
                 <form asp-action="Index">
                     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                     <div class="mb-3">
-                        <label asp-for="Profile.FirstName" class="control-label">First Name</label>
+                        <label asp-for="Profile.FirstName" class="form-label">First Name</label>
                         <input asp-for="Profile.FirstName" class="form-control" />
                         <span asp-validation-for="Profile.FirstName" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="Profile.LastName" class="control-label">Last Name</label>
+                        <label asp-for="Profile.LastName" class="form-label">Last Name</label>
                         <input asp-for="Profile.LastName" class="form-control" />
                         <span asp-validation-for="Profile.LastName" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="Profile.TimeZone" class="control-label"></label>
+                        <label asp-for="Profile.TimeZone" class="form-label"></label>
                         <select asp-for="Profile.TimeZone" asp-items="Model.TimeZones" class="form-select">
                             <option value="">UTC (no time zone selected)</option>
                         </select>

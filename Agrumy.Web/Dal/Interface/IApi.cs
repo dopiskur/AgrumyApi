@@ -18,8 +18,10 @@ namespace api.Dal.Interface
         [Post("/api/User/Login")]
         Task<UserLoginResult?> UserLogin([Body] UserLogin userLogin);
 
+        // Task (not Task<User>) on purpose: no caller reads the created record, same convention
+        // as the other write endpoints whose response bodies nobody consumed.
         [Post("/api/User/Register")]
-        Task<User> UserRegister([Body] UserRegistration registration);
+        Task UserRegister([Body] UserRegistration registration);
 
         [Post("/api/User")]
         Task UserAdd([Body] UserAdd user);

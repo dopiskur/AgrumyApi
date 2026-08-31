@@ -40,8 +40,8 @@
                         @Html.DisplayFor(modelItem => item.RoleName)
                     </td>
                     <td>
-                        @Html.ActionLink("Details", "Details", new { idUserGroup = item.IDUserGroup }, new { @class = "btn btn-sm btn-primary" })
-                        @Html.ActionLink("Delete", "Delete", new { idUserGroup = item.IDUserGroup }, new { @class = "btn btn-sm btn-danger" })
+                        <a asp-action="Details" asp-route-idUserGroup="@item.IDUserGroup" class="btn btn-sm btn-primary">Details</a>
+                        <a asp-action="Delete" asp-route-idUserGroup="@item.IDUserGroup" class="btn btn-sm btn-danger">Delete</a>
                     </td>
                 </tr>
 }
@@ -51,16 +51,5 @@
 </div>
 
 @section Scripts {
-    <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.min.js"></script>
-    <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.bootstrap5.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            new DataTable('#groupsTable', {
-                paging: true,
-                searching: true,
-                order: [[0, 'asc']],
-                columnDefs: [{ orderable: false, targets: -1 }]
-            });
-        });
-    </script>
+    <partial name="_DataTableScripts" model="@("groupsTable")" />
 }

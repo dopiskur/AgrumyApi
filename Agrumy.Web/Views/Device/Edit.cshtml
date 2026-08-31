@@ -1,5 +1,4 @@
 @model api.Models.DeviceView
-@using Microsoft.AspNetCore.Mvc.Rendering
 
 @{
     ViewData["Title"] = "Edit";
@@ -7,10 +6,10 @@
     string DeviceField(string name) => $"{nameof(Model.Device)}.{name}";
 
     var deviceTypeItems = new SelectList(Model.DeviceType, nameof(DeviceType.IDDeviceType), nameof(DeviceType.DeviceTypeName), device.DeviceTypeID);
-    var deviceTypeSelect = new SelectFieldViewModel { Name = DeviceField(nameof(device.DeviceTypeID)), Label = nameof(device.DeviceTypeID), Items = deviceTypeItems };
+    var deviceTypeSelect = new SelectFieldViewModel { Name = DeviceField(nameof(device.DeviceTypeID)), Label = "Device type", Items = deviceTypeItems };
 
     var deviceTypeServiceItems = new SelectList(Model.DeviceTypeService, nameof(DeviceTypeService.IDDeviceTypeService), nameof(DeviceTypeService.ServiceType), device.DeviceTypeServiceID);
-    var deviceTypeServiceSelect = new SelectFieldViewModel { Name = DeviceField(nameof(device.DeviceTypeServiceID)), Label = nameof(device.DeviceTypeServiceID), Items = deviceTypeServiceItems };
+    var deviceTypeServiceSelect = new SelectFieldViewModel { Name = DeviceField(nameof(device.DeviceTypeServiceID)), Label = "Service type", Items = deviceTypeServiceItems };
 
     var sleepDeepToggle = new EnabledToggleFieldViewModel { Name = DeviceField(nameof(device.SleepDeepEnabled)), Label = "SleepDeep", Value = device.SleepDeepEnabled };
     var batteryToggle = new EnabledToggleFieldViewModel { Name = DeviceField(nameof(device.BatteryEnabled)), Label = "Device battery", Value = device.BatteryEnabled };
@@ -26,10 +25,12 @@
         <form asp-action="Edit">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             <div class="mb-3">
+                <label asp-for="Device.IDDevice" class="form-label"></label>
                 <input asp-for="Device.IDDevice" class="form-control" />
                 <span asp-validation-for="Device.IDDevice" class="text-danger"></span>
             </div>
             <div class="mb-3">
+                <label asp-for="Device.TenantID" class="form-label"></label>
                 <input asp-for="Device.TenantID" class="form-control" />
                 <span asp-validation-for="Device.TenantID" class="text-danger"></span>
             </div>
@@ -37,43 +38,48 @@
             <partial name="_SelectField" model="deviceTypeSelect" />
 
             <div class="mb-3">
+                <label asp-for="Device.DeviceUnitID" class="form-label"></label>
                 <input asp-for="Device.DeviceUnitID" class="form-control" />
                 <span asp-validation-for="Device.DeviceUnitID" class="text-danger"></span>
             </div>
             <div class="mb-3">
+                <label asp-for="Device.DeviceUnitZoneID" class="form-label"></label>
                 <input asp-for="Device.DeviceUnitZoneID" class="form-control" />
                 <span asp-validation-for="Device.DeviceUnitZoneID" class="text-danger"></span>
             </div>
             <div class="mb-3">
+                <label asp-for="Device.DeviceConfigSensorID" class="form-label"></label>
                 <input asp-for="Device.DeviceConfigSensorID" class="form-control" />
                 <span asp-validation-for="Device.DeviceConfigSensorID" class="text-danger"></span>
             </div>
             <div class="mb-3">
+                <label asp-for="Device.DeviceConfigControllerID" class="form-label"></label>
                 <input asp-for="Device.DeviceConfigControllerID" class="form-control" />
                 <span asp-validation-for="Device.DeviceConfigControllerID" class="text-danger"></span>
             </div>
 
             <div class="mb-3">
-                <label asp-for="Device.DeviceName" class="control-label"></label>
+                <label asp-for="Device.DeviceName" class="form-label"></label>
                 <input asp-for="Device.DeviceName" class="form-control" />
                 <span asp-validation-for="Device.DeviceName" class="text-danger"></span>
             </div>
             <div class="mb-3">
+                <label asp-for="Device.MacAddress" class="form-label"></label>
                 <input asp-for="Device.MacAddress" class="form-control" />
                 <span asp-validation-for="Device.MacAddress" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="Device.ApiId" class="control-label"></label>
+                <label asp-for="Device.ApiId" class="form-label"></label>
                 <input asp-for="Device.ApiId" class="form-control" />
                 <span asp-validation-for="Device.ApiId" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="Device.ApiKey" class="control-label"></label>
+                <label asp-for="Device.ApiKey" class="form-label"></label>
                 <input asp-for="Device.ApiKey" class="form-control" />
                 <span asp-validation-for="Device.ApiKey" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="Device.ServicePoint" class="control-label"></label>
+                <label asp-for="Device.ServicePoint" class="form-label"></label>
                 <input asp-for="Device.ServicePoint" class="form-control" />
                 <span asp-validation-for="Device.ServicePoint" class="text-danger"></span>
             </div>
@@ -81,21 +87,25 @@
             <partial name="_SelectField" model="deviceTypeServiceSelect" />
 
             <div class="mb-3">
-                <label asp-for="Device.ServicePublicKey" class="control-label"></label>
+                <label asp-for="Device.ServicePublicKey" class="form-label"></label>
                 <input asp-for="Device.ServicePublicKey" class="form-control" />
                 <span asp-validation-for="Device.ServicePublicKey" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="Device.SleepSeconds" class="control-label"></label>
+                <label asp-for="Device.SleepSeconds" class="form-label"></label>
                 <input asp-for="Device.SleepSeconds" class="form-control" />
                 <span asp-validation-for="Device.SleepSeconds" class="text-danger"></span>
             </div>
 
+            @* Recomputed from DeviceTypeID in DeviceController.Edit POST for every known type -
+               shown for transparency, but edits only survive for unknown type ids. *@
             <div class="mb-3">
+                <label asp-for="Device.DeviceSensorEnabled" class="form-label"></label>
                 <input asp-for="Device.DeviceSensorEnabled" class="form-control" />
                 <span asp-validation-for="Device.DeviceSensorEnabled" class="text-danger"></span>
             </div>
             <div class="mb-3">
+                <label asp-for="Device.DeviceControllerEnabled" class="form-label"></label>
                 <input asp-for="Device.DeviceControllerEnabled" class="form-control" />
                 <span asp-validation-for="Device.DeviceControllerEnabled" class="text-danger"></span>
             </div>
@@ -106,7 +116,7 @@
             <partial name="_EnabledToggleField" model="enabledToggle" />
 
             <div class="mb-3">
-                @Html.HiddenFor(model => model.Device.ConfigVersion)
+                @Html.HiddenFor(model => model.Device!.ConfigVersion)
             </div>
             <div class="mb-0">
                 <input type="submit" value="Save" class="btn btn-primary" />

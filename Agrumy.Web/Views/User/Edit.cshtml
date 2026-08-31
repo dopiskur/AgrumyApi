@@ -1,5 +1,4 @@
 @model api.Models.UserView
-@using Microsoft.AspNetCore.Mvc.Rendering
 
 @{
     ViewData["Title"] = "Edit";
@@ -20,42 +19,44 @@
         <form asp-action="Edit">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             <div class="mb-3">
+                <label asp-for="UserUpdate.IDUser" class="form-label"></label>
                 <input asp-for="UserUpdate.IDUser" class="form-control" />
                 <span asp-validation-for="UserUpdate.IDUser" class="text-danger"></span>
             </div>
             <div class="mb-3">
+                <label asp-for="UserUpdate.TenantID" class="form-label"></label>
                 <input asp-for="UserUpdate.TenantID" class="form-control" />
                 <span asp-validation-for="UserUpdate.TenantID" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="UserUpdate.Email" class="control-label"></label>
+                <label asp-for="UserUpdate.Email" class="form-label"></label>
                 <input asp-for="UserUpdate.Email" class="form-control" />
                 <span asp-validation-for="UserUpdate.Email" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="UserUpdate.Password" class="control-label"></label>
+                <label asp-for="UserUpdate.Password" class="form-label"></label>
                 <input asp-for="UserUpdate.Password" class="form-control" />
                 <span asp-validation-for="UserUpdate.Password" class="text-danger"></span>
             </div>
             @* Roadmap #70: DevicePin is no longer editable - it is a generated, single-use,
                expiring secret the user rotates from their own My Profile page. *@
             <div class="mb-3">
-                <label asp-for="UserUpdate.Username" class="control-label"></label>
+                <label asp-for="UserUpdate.Username" class="form-label"></label>
                 <input asp-for="UserUpdate.Username" class="form-control" />
                 <span asp-validation-for="UserUpdate.Username" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="UserUpdate.FirstName" class="control-label"></label>
+                <label asp-for="UserUpdate.FirstName" class="form-label"></label>
                 <input asp-for="UserUpdate.FirstName" class="form-control" />
                 <span asp-validation-for="UserUpdate.FirstName" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="UserUpdate.LastName" class="control-label"></label>
+                <label asp-for="UserUpdate.LastName" class="form-label"></label>
                 <input asp-for="UserUpdate.LastName" class="form-control" />
                 <span asp-validation-for="UserUpdate.LastName" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="UserUpdate.Phone" class="control-label"></label>
+                <label asp-for="UserUpdate.Phone" class="form-label"></label>
                 <input asp-for="UserUpdate.Phone" class="form-control" />
                 <span asp-validation-for="UserUpdate.Phone" class="text-danger"></span>
             </div>

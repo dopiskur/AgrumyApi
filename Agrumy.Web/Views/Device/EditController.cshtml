@@ -1,5 +1,4 @@
 @model api.Models.DeviceView
-@using Microsoft.AspNetCore.Mvc.Rendering
 
 @{
     ViewData["Title"] = "Controller config";
@@ -25,16 +24,18 @@
 
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Edit Controller - @Html.DisplayFor(model => model.Device.DeviceName)</h3>
+        <h3 class="card-title">Edit Controller - @Html.DisplayFor(model => model.Device!.DeviceName)</h3>
     </div>
     <div class="card-body">
         <form asp-action="EditController">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             <div class="mb-3">
+                <label asp-for="Device.IDDevice" class="form-label"></label>
                 <input asp-for="Device.IDDevice" class="form-control" />
                 <span asp-validation-for="Device.IDDevice" class="text-danger"></span>
             </div>
             <div class="mb-3">
+                <label asp-for="DeviceConfigController.IDDeviceConfigController" class="form-label"></label>
                 <input asp-for="DeviceConfigController.IDDeviceConfigController" class="form-control" />
                 <span asp-validation-for="DeviceConfigController.IDDeviceConfigController" class="text-danger"></span>
             </div>
@@ -71,52 +72,52 @@
 
                 <div class="tab-pane fade" id="tab-thresholds" role="tabpanel">
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.TempLow" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.TempLow" class="form-label"></label>
                         <input asp-for="DeviceConfigController.TempLow" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.TempLow" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.TempHigh" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.TempHigh" class="form-label"></label>
                         <input asp-for="DeviceConfigController.TempHigh" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.TempHigh" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.HumidLow" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.HumidLow" class="form-label"></label>
                         <input asp-for="DeviceConfigController.HumidLow" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.HumidLow" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.HumidHigh" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.HumidHigh" class="form-label"></label>
                         <input asp-for="DeviceConfigController.HumidHigh" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.HumidHigh" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.MoistLow" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.MoistLow" class="form-label"></label>
                         <input asp-for="DeviceConfigController.MoistLow" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.MoistLow" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.MoistHigh" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.MoistHigh" class="form-label"></label>
                         <input asp-for="DeviceConfigController.MoistHigh" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.MoistHigh" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.LightLow" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.LightLow" class="form-label"></label>
                         <input asp-for="DeviceConfigController.LightLow" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.LightLow" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.LightHigh" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.LightHigh" class="form-label"></label>
                         <input asp-for="DeviceConfigController.LightHigh" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.LightHigh" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.WaterLow" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.WaterLow" class="form-label"></label>
                         <input asp-for="DeviceConfigController.WaterLow" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.WaterLow" class="text-danger"></span>
                     </div>
                     <div class="mb-0">
-                        <label asp-for="DeviceConfigController.WaterHigh" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.WaterHigh" class="form-label"></label>
                         <input asp-for="DeviceConfigController.WaterHigh" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.WaterHigh" class="text-danger"></span>
                     </div>
@@ -125,48 +126,48 @@
                 <div class="tab-pane fade" id="tab-intervals" role="tabpanel">
                     <partial name="_EnabledToggleField" model="ventilationIntervalToggle" />
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.VentilationInterval" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.VentilationInterval" class="form-label"></label>
                         <input asp-for="DeviceConfigController.VentilationInterval" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.VentilationInterval" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.VentilationIntervalLenght" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.VentilationIntervalLenght" class="form-label"></label>
                         <input asp-for="DeviceConfigController.VentilationIntervalLenght" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.VentilationIntervalLenght" class="text-danger"></span>
                     </div>
 
                     <partial name="_EnabledToggleField" model="lightIntervalToggle" />
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.LightInterval" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.LightInterval" class="form-label"></label>
                         <input asp-for="DeviceConfigController.LightInterval" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.LightInterval" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.LightIntervalLenght" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.LightIntervalLenght" class="form-label"></label>
                         <input asp-for="DeviceConfigController.LightIntervalLenght" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.LightIntervalLenght" class="text-danger"></span>
                     </div>
 
                     <partial name="_EnabledToggleField" model="heatingIntervalToggle" />
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.HeatingInterval" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.HeatingInterval" class="form-label"></label>
                         <input asp-for="DeviceConfigController.HeatingInterval" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.HeatingInterval" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.HeatingIntervalLenght" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.HeatingIntervalLenght" class="form-label"></label>
                         <input asp-for="DeviceConfigController.HeatingIntervalLenght" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.HeatingIntervalLenght" class="text-danger"></span>
                     </div>
 
                     <partial name="_EnabledToggleField" model="waterPumpIntervalToggle" />
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.WaterPumpInterval" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.WaterPumpInterval" class="form-label"></label>
                         <input asp-for="DeviceConfigController.WaterPumpInterval" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.WaterPumpInterval" class="text-danger"></span>
                     </div>
                     <div class="mb-0">
-                        <label asp-for="DeviceConfigController.WaterPumpIntervalLenght" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.WaterPumpIntervalLenght" class="form-label"></label>
                         <input asp-for="DeviceConfigController.WaterPumpIntervalLenght" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.WaterPumpIntervalLenght" class="text-danger"></span>
                     </div>
@@ -174,22 +175,22 @@
 
                 <div class="tab-pane fade" id="tab-hysteresis" role="tabpanel">
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.WaterLevelHysteresis" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.WaterLevelHysteresis" class="form-label"></label>
                         <input asp-for="DeviceConfigController.WaterLevelHysteresis" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.WaterLevelHysteresis" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.TemperatureHysteresis" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.TemperatureHysteresis" class="form-label"></label>
                         <input asp-for="DeviceConfigController.TemperatureHysteresis" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.TemperatureHysteresis" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DeviceConfigController.HumidityHysteresis" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.HumidityHysteresis" class="form-label"></label>
                         <input asp-for="DeviceConfigController.HumidityHysteresis" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.HumidityHysteresis" class="text-danger"></span>
                     </div>
                     <div class="mb-0">
-                        <label asp-for="DeviceConfigController.LightHysteresis" class="control-label"></label>
+                        <label asp-for="DeviceConfigController.LightHysteresis" class="form-label"></label>
                         <input asp-for="DeviceConfigController.LightHysteresis" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.LightHysteresis" class="text-danger"></span>
                     </div>
