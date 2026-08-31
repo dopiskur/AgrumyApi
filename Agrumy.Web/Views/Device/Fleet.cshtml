@@ -26,16 +26,22 @@
         <span class="float-end text-secondary small">Times shown in @(ViewBag.DisplayTimeZone ?? "UTC")</span>
     </div>
     <div class="card-body table-responsive p-0">
-        <table id="fleetTable" class="table table-hover text-nowrap">
+        @* No table-wide text-nowrap (unlike before) - on a phone the two Status badges need to
+           wrap onto a second line instead of forcing the column wider than the badges themselves
+           (roadmap #22, found by actually rendering this at a 390px viewport). *@
+        <table id="fleetTable" class="table table-hover">
             <thead>
                 <tr>
                     <th>Device</th>
                     <th>Status</th>
-                    <th>Last seen</th>
-                    <th>Signal</th>
-                    <th>Uptime</th>
-                    <th>Firmware</th>
-                    <th>Battery</th>
+                    @* Device/Status/Actions are the only columns you need to triage a fleet at a
+                       glance - the rest are drill-down detail, so they collapse below md and only
+                       cost you a horizontal scroll on a phone instead of always taking one (roadmap #22). *@
+                    <th class="d-none d-md-table-cell">Last seen</th>
+                    <th class="d-none d-md-table-cell">Signal</th>
+                    <th class="d-none d-md-table-cell">Uptime</th>
+                    <th class="d-none d-md-table-cell">Firmware</th>
+                    <th class="d-none d-md-table-cell">Battery</th>
                     <th></th>
                 </tr>
             </thead>
@@ -63,17 +69,17 @@
                             <span class="badge text-bg-light border ms-1">Disabled</span>
                         }
                     </td>
-                    <td>@(item.LastSeenAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</td>
-                    <td>
+                    <td class="d-none d-md-table-cell">@(item.LastSeenAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</td>
+                    <td class="d-none d-md-table-cell">
                         <span class="@signalCss">@signalLabel</span>
                         @if (item.RssiDbm is int rssi)
                         {
                             <span class="text-secondary small">(@rssi dBm)</span>
                         }
                     </td>
-                    <td>@Uptime(item.UptimeSeconds)</td>
-                    <td>@(item.FirmwareVersion ?? "-")</td>
-                    <td>@(item.Battery?.ToString() ?? "-")</td>
+                    <td class="d-none d-md-table-cell">@Uptime(item.UptimeSeconds)</td>
+                    <td class="d-none d-md-table-cell">@(item.FirmwareVersion ?? "-")</td>
+                    <td class="d-none d-md-table-cell">@(item.Battery?.ToString() ?? "-")</td>
                     <td>
                         @* Icon-only + btn-group on purpose: four full-text buttons made this the widest
                            column on the table, forcing the most horizontal scroll on a phone (roadmap #22) -
@@ -81,7 +87,7 @@
                         <div class="btn-group btn-group-sm" role="group" aria-label="Device actions">
                             <a asp-controller="SensorData" asp-action="Index" asp-route-idDevice="@item.IDDevice" class="btn btn-success" title="Sensor data" aria-label="Sensor data"><i class="bi bi-graph-up"></i></a>
                             <a asp-controller="SensorData" asp-action="Report" asp-route-idDevice="@item.IDDevice" class="btn btn-danger" title="Reports" aria-label="Reports"><i class="bi bi-file-earmark-bar-graph"></i></a>
-                            <a asp-action="Details" asp-route-idDevice="@item.IDDevice" class="btn btn-primary" title="Details" aria-label="Details"><i class="bi bi-info-circle"></i></a>
+                            <a asp-action="Details" asp-route-idDevice="@item.IDDevice" class="btn btn-primary" title="Settings" aria-label="Settings"><i class="bi bi-gear"></i></a>
                             <a asp-action="Events" asp-route-idDevice="@item.IDDevice" class="btn btn-outline-secondary" title="Events" aria-label="Events"><i class="bi bi-clock-history"></i></a>
                         </div>
                     </td>
