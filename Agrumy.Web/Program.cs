@@ -53,17 +53,27 @@ builder.Services.AddAuthorization();
 // this code is published under) has no profile directory for on this Linux deployment - keys
 // silently regenerate as ephemeral (in-memory only) on every process start. That logs out every
 // signed-in user (cookie auth reads the encrypted ticket) and invalidates any open antiforgery-
-// protected form on every "build na server" restart. The path is a SIBLING of ContentRootPath,
-// not a subdirectory of it - "build na server" wipes bin/ (ContentRootPath on this deployment)
-// entirely on every publish, which would erase the keys again immediately.
+// protected form on every "build na server" restart.
+//
+// DataProtection:KeyPath is optional config (appsettings.json/env var), not just a hardcoded
+// relative path - the current server happens to run this out of /home/adminagrumy/bin, so
+// "sibling of ContentRootPath" resolves to /home/adminagrumy/dataprotection-keys today, but a
+// future self-hosted install (roadmap #30) will pick its own user/directory layout and needs to
+// be able to point this somewhere its install script actually provisioned (chown'd to the real
+// service user) without a code change. The relative-sibling path is only the fallback for when
+// nothing is configured - it must still land OUTSIDE ContentRootPath, since "build na server"
+// wipes bin/ (ContentRootPath on this deployment) entirely on every publish, which would erase
+// keys stored inside it again immediately.
 // Directory.CreateDirectory below covers local dev and any host where the parent is already
 // writable; if it throws (e.g. www-data lacking permission on the parent directory), keys fall
 // back to the previous ephemeral behavior instead of crashing startup - the server still needs a
-// one-time `mkdir -p <path> && chown www-data:www-data <path>` for this fix to actually take
-// effect there.
+// one-time `mkdir -p <path> && chmod` (or a real `chown` if run as root) for this to take effect.
 try
 {
-    var keyRingPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "dataprotection-keys"));
+    var configuredKeyPath = builder.Configuration["DataProtection:KeyPath"];
+    var keyRingPath = string.IsNullOrWhiteSpace(configuredKeyPath)
+        ? Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "dataprotection-keys"))
+        : Path.GetFullPath(configuredKeyPath);
     Directory.CreateDirectory(keyRingPath);
     builder.Services.AddDataProtection()
         .PersistKeysToFileSystem(new DirectoryInfo(keyRingPath))

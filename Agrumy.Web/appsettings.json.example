@@ -15,6 +15,12 @@
     "Audience": "agrumy-api"
   },
 
+  "// DataProtection": "Optional (roadmap #79) - where cookie-auth/antiforgery encryption keys persist to disk. Omit to fall back to a 'dataprotection-keys' directory next to (not inside) the app's own folder.",
+  "DataProtection": {
+    "// KeyPath": "MUST be outside the folder a redeploy overwrites/wipes (e.g. NOT inside bin/), and the account the service actually runs as must be able to read+write it.",
+    "KeyPath": "/home/adminagrumy/dataprotection-keys"
+  },
+
   "// Logging": "Standard ASP.NET Core logging configuration.",
   "Logging": {
     "LogLevel": {
