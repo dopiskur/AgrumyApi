@@ -159,15 +159,16 @@ public class ContractTests
     [Fact]
     public void RegisterRequest_FirmwareShapedPayload_MatchesSchemaAndBinds()
     {
-        // registerDevice(): macAddress/email/devicePin/serviceType, devicePin as a STRING.
+        // registerDevice(): macAddress/email/devicePin/serviceType, devicePin as a STRING
+        // (6-char alphanumeric since roadmap #70).
         const string payload =
-            """{"macAddress":"240AC4040AF8","email":"admin@agrumy.local","devicePin":"1234","serviceType":1}""";
+            """{"macAddress":"240AC4040AF8","email":"admin@agrumy.local","devicePin":"AB23CD","serviceType":1}""";
 
         AssertValid("register.request.schema.json", payload);
 
         var bound = JsonSerializer.Deserialize<DeviceRegistration>(payload, Mvc)!;
         Assert.Equal("240AC4040AF8", bound.MacAddress);
-        Assert.Equal(1234, bound.DevicePin);   // proves Web-defaults parse the string PIN
+        Assert.Equal("AB23CD", bound.DevicePin);
         Assert.Equal(1, bound.ServiceType);
     }
 

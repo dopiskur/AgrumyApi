@@ -11,7 +11,11 @@ namespace api.Models
         public int? TenantID { get; set; }
         public string? Email { get; set; }
         public string? Username { get; set; }
-        public int? DevicePin { get; set; } = AuthenticationProvider.GetPin();
+        public string? DevicePin { get; set; } = AuthenticationProvider.GetPin();
+
+        // Roadmap #70: a PIN is only registerable while unexpired; null (legacy rows, or a PIN
+        // consumed by a successful device registration) means "generate a new one first".
+        public DateTime? DevicePinExpires { get; set; } = DateTime.UtcNow.AddHours(AuthenticationProvider.PinValidHours);
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public string? Phone { get; set; }
@@ -46,7 +50,6 @@ namespace api.Models
         public string? Email { get; set; }
         public string? Username { get; set; }
         public string? Password { get; set; }
-        public int? DevicePin { get; set; } = AuthenticationProvider.GetPin();
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public string? Phone { get; set; }
@@ -67,7 +70,6 @@ namespace api.Models
         public string? Email { get; set; }
         public string? Username { get; set; }
         public string? Password { get; set; }
-        public int? DevicePin { get; set; }
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         [Phone(ErrorMessage = "Provide a correct phone number")]
@@ -143,6 +145,15 @@ namespace api.Models
         public string? LastName { get; set; }
         [Display(Name = "Time Zone")]
         public string? TimeZone { get; set; }
+    }
+
+    /// <summary>Roadmap #70: response of POST /api/User/DevicePin - the freshly generated PIN and
+    /// when it stops being accepted by POST /api/Device/Register. The PIN is consumed by the first
+    /// successful registration, so registering another device always starts here.</summary>
+    public class DevicePinResult
+    {
+        public string? DevicePin { get; set; }
+        public DateTime? ExpiresAt { get; set; }
     }
 
     /// <summary>Roadmap #24. Deliberately the same shape as <see cref="UserLogin"/>'s Login field

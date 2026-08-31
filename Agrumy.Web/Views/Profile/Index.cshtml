@@ -48,5 +48,35 @@
     </div>
     <div class="col-md-6">
         <partial name="_ChangePassword" model="new api.ViewModels.ChangePasswordViewModel()" />
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Device Registration PIN</h3>
+            </div>
+            <div class="card-body">
+                @* Roadmap #70: single-use PIN - consumed by the first successful device
+                   registration, expires after 24h, so "no PIN" is the normal steady state. *@
+                @if (string.IsNullOrEmpty(Model.DevicePin))
+                {
+                    <p class="mb-2">No active PIN. Generate one right before registering a new device.</p>
+                }
+                else if (Model.DevicePinExpires is DateTime expired && expired < DateTime.UtcNow)
+                {
+                    <p class="mb-2">Your PIN has expired. Generate a new one to register a device.</p>
+                }
+                else
+                {
+                    <p class="mb-1">Enter this PIN on the device's setup portal:</p>
+                    <p class="mb-2"><code class="fs-4">@Model.DevicePin</code></p>
+                    @if (Model.DevicePinExpires is DateTime expires)
+                    {
+                        <p class="text-muted mb-2">Valid until @expires.ToString("yyyy-MM-dd HH:mm") UTC, or until a device registers with it.</p>
+                    }
+                }
+                <form asp-action="DevicePin" class="mb-0">
+                    <input type="submit" value="Generate new PIN" class="btn btn-outline-primary" />
+                </form>
+            </div>
+        </div>
     </div>
 </div>

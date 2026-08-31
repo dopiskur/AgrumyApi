@@ -32,10 +32,12 @@ patches applied to the pre-existing legacy database, unrelated to EF.
 ## How it works
 
 1. **Registration.** A device calls `POST /api/Device/Register` with the owning
-   user's email, that user's `DevicePin` (a 4-digit PIN generated at user
-   creation), and its MAC address. The pin has to match; on success the API
-   creates the device row (if it doesn't exist yet) under that user's tenant and
-   hands back an `ApiId`/`ApiKey` pair plus its current config.
+   user's email, that user's `DevicePin` (a single-use 6-char alphanumeric code
+   the user generates from My Profile / `POST /api/User/DevicePin`, valid 24
+   hours), and its MAC address. The pin has to match and be unexpired; on
+   success the API creates the device row (if it doesn't exist yet) under that
+   user's tenant, consumes the PIN, and hands back an `ApiId`/`ApiKey` pair
+   plus its current config.
 2. **Auth.** The device authenticates with `ApiId`/`ApiKey` via
    `POST /api/Device/Authenticate` (constant-time comparison,
    `DeviceAuthenticationProvider.VerifyDeviceAsync`) and gets back a short-lived

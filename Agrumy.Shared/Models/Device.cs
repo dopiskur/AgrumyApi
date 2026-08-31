@@ -60,7 +60,9 @@ namespace api.Models
     {
         public string? MacAddress { get; set; }
         public string? Email { get; set; }
-        public int? DevicePin { get; set; }
+        // Roadmap #70: string, not int - the firmware always sent it as a string (char devicePin[8]),
+        // the int? binding only worked via Web-defaults number-from-string parsing.
+        public string? DevicePin { get; set; }
         public string? ServicePoint { get; set; } = "api.agrumy.com";
         public int? ServiceType { get; set; } = 1;
 

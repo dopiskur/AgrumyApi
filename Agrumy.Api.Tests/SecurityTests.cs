@@ -38,6 +38,40 @@ public class AuthenticationProviderTests
         Assert.NotEqual(a, b);
     }
 
+    // ---- device-registration PIN (roadmap #70) -----------------------------------------
+
+    [Fact]
+    public void GetPin_SixChars_FromUnambiguousAlphabet()
+    {
+        // 100 samples make an alphabet leak (O/I/0/1 sneaking in) overwhelmingly likely to surface.
+        for (int i = 0; i < 100; i++)
+        {
+            string pin = AuthenticationProvider.GetPin();
+            Assert.Equal(AuthenticationProvider.PinLength, pin.Length);
+            Assert.All(pin, c => Assert.Contains(c, "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"));
+        }
+    }
+
+    [Fact]
+    public void VerifyPin_Matches_CaseInsensitively_WhileUnexpired()
+    {
+        DateTime valid = DateTime.UtcNow.AddHours(1);
+        Assert.True(AuthenticationProvider.VerifyPin("ABC234", valid, "ABC234"));
+        Assert.True(AuthenticationProvider.VerifyPin("ABC234", valid, "abc234")); // captive portal is free text
+        Assert.True(AuthenticationProvider.VerifyPin("ABC234", valid, " ABC234 "));
+        Assert.False(AuthenticationProvider.VerifyPin("ABC234", valid, "ABC235"));
+        Assert.False(AuthenticationProvider.VerifyPin("ABC234", valid, "ABC23"));
+    }
+
+    [Fact]
+    public void VerifyPin_Expired_Consumed_Or_Missing_NeverMatches()
+    {
+        Assert.False(AuthenticationProvider.VerifyPin("ABC234", DateTime.UtcNow.AddMinutes(-1), "ABC234")); // expired
+        Assert.False(AuthenticationProvider.VerifyPin("ABC234", null, "ABC234")); // legacy row: expiry never set => invalid, not valid-forever
+        Assert.False(AuthenticationProvider.VerifyPin(null, DateTime.UtcNow.AddHours(1), "ABC234"));        // consumed
+        Assert.False(AuthenticationProvider.VerifyPin("ABC234", DateTime.UtcNow.AddHours(1), null));
+    }
+
     [Fact]
     public void GetHash_DifferentSalt_ProducesDifferentHash()
     {

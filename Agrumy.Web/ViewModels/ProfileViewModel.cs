@@ -12,6 +12,11 @@ namespace api.ViewModels
         public string? Email { get; set; }
         public UserProfileUpdate Profile { get; set; } = new();
         public IEnumerable<SelectListItem> TimeZones { get; set; } = [];
+
+        // Roadmap #70: current single-use device-registration PIN, display-only - a new one is
+        // issued via the page's "Generate new PIN" post, never typed in by hand.
+        public string? DevicePin { get; set; }
+        public DateTime? DevicePinExpires { get; set; }
     }
 
     /// <summary>Separate from UserSetPassword because the API model requires a Login field the page

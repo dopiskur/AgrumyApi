@@ -102,6 +102,7 @@ namespace api.Dal
                 e.Property(x => x.FirstName).HasMaxLength(100);
                 e.Property(x => x.LastName).HasMaxLength(100);
                 e.Property(x => x.Phone).HasMaxLength(15);
+                e.Property(x => x.DevicePin).HasMaxLength(8); // 6 today; the firmware buffer (char devicePin[8]) caps what a device can echo back at 7 anyway
                 e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.Property(x => x.DateModified).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.Property(x => x.ActivationTokenHash).HasMaxLength(64); // SHA-256 hex, same shape as userRefreshToken.TokenHash

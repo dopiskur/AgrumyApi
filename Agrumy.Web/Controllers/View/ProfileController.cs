@@ -16,18 +16,7 @@ namespace api.Controllers.View
     {
         public async Task<ActionResult> Index()
         {
-            User self = await api.UserGetSelf();
-            return View(new ProfileViewModel
-            {
-                Email = self.Email,
-                Profile = new UserProfileUpdate
-                {
-                    FirstName = self.FirstName,
-                    LastName = self.LastName,
-                    TimeZone = self.TimeZone,
-                },
-                TimeZones = TimeZoneOptions(self.TimeZone),
-            });
+            return View(await BuildViewModelAsync());
         }
 
         [HttpPost]
@@ -36,8 +25,7 @@ namespace api.Controllers.View
         {
             if (!ModelState.IsValid)
             {
-                value.TimeZones = TimeZoneOptions(value.Profile.TimeZone);
-                return View(value);
+                return View(await RestoreDisplayFieldsAsync(value));
             }
 
             try
@@ -49,11 +37,21 @@ namespace api.Controllers.View
                 // Field-keyed (not string.Empty) so the error renders once, in this form - the page
                 // holds a second form (_ChangePassword) whose summary would otherwise repeat it.
                 ModelState.AddModelError("Profile.TimeZone", ex.Body);
-                value.TimeZones = TimeZoneOptions(value.Profile.TimeZone);
-                return View(value);
+                return View(await RestoreDisplayFieldsAsync(value));
             }
 
             TempData["ProfileMessage"] = "Profile saved.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        /// <summary>Roadmap #70: rotates the caller's device-registration PIN via the self-scoped
+        /// API endpoint; the redirect re-renders the page with the fresh PIN and its expiry.</summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> DevicePin()
+        {
+            await api.DevicePinGenerate();
+            TempData["ProfileMessage"] = "New device PIN generated - it is valid for 24 hours and is consumed by the first successful device registration.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -85,17 +83,35 @@ namespace api.Controllers.View
             }
 
             // Re-render the combined page with the password errors visible and profile prefilled.
-            return View(nameof(Index), new ProfileViewModel
+            return View(nameof(Index), BuildViewModel(self));
+        }
+
+        private async Task<ProfileViewModel> BuildViewModelAsync() => BuildViewModel(await api.UserGetSelf());
+
+        private static ProfileViewModel BuildViewModel(User self) => new()
+        {
+            Email = self.Email,
+            Profile = new UserProfileUpdate
             {
-                Email = self.Email,
-                Profile = new UserProfileUpdate
-                {
-                    FirstName = self.FirstName,
-                    LastName = self.LastName,
-                    TimeZone = self.TimeZone,
-                },
-                TimeZones = TimeZoneOptions(self.TimeZone),
-            });
+                FirstName = self.FirstName,
+                LastName = self.LastName,
+                TimeZone = self.TimeZone,
+            },
+            TimeZones = TimeZoneOptions(self.TimeZone),
+            DevicePin = self.DevicePin,
+            DevicePinExpires = self.DevicePinExpires,
+        };
+
+        /// <summary>The PIN fields are display-only (never posted back), so an error re-render must
+        /// refetch them or the card would go blank while the user fixes a validation message.</summary>
+        private async Task<ProfileViewModel> RestoreDisplayFieldsAsync(ProfileViewModel value)
+        {
+            User self = await api.UserGetSelf();
+            value.Email = self.Email;
+            value.DevicePin = self.DevicePin;
+            value.DevicePinExpires = self.DevicePinExpires;
+            value.TimeZones = TimeZoneOptions(value.Profile.TimeZone);
+            return value;
         }
 
         private static List<SelectListItem> TimeZoneOptions(string? selected) =>

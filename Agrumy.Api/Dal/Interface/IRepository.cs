@@ -35,6 +35,10 @@ namespace api.Dal.Interface
         /// authorization-bearing column (see EfRepository.UserProfileSetAsync). False if no such user.</summary>
         Task<bool> UserProfileSetAsync(string email, string? firstName, string? lastName, string? timeZone);
 
+        /// <summary>Roadmap #70: sole writer of the device-registration PIN - nulls consume it
+        /// (successful registration), a value+expiry (re)issues it. False if no such user.</summary>
+        Task<bool> UserSetDevicePinAsync(int idUser, string? devicePin, DateTime? expiresAtUtc);
+
         Task<bool> UserDeleteAsync(int? idUser);
 
         /// <summary>The user matched by id / email / username, or null if none matches (or no key was given).</summary>

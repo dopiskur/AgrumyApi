@@ -53,7 +53,9 @@ namespace api.Dal.Entities
         public string? Username { get; set; }
         public string PwdHash { get; set; } = "";
         public string PwdSalt { get; set; } = "";
-        public int? DevicePin { get; set; }
+        // Roadmap #70: 6-char generated code (was a 4-digit int); null = consumed or never issued.
+        public string? DevicePin { get; set; }
+        public DateTime? DevicePinExpires { get; set; }
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public string? Phone { get; set; }

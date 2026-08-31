@@ -19,8 +19,8 @@
     },
     "devicePin": {
       "type": "string",
-      "pattern": "^[0-9]+$",
-      "description": "The user's device PIN. Firmware sends it as a STRING (char devicePin[8]); the server property is int? and relies on System.Text.Json Web-defaults (NumberHandling.AllowReadingFromString) to parse it. Keep it digits-only."
+      "pattern": "^[0-9A-Za-z]{1,7}$",
+      "description": "The user's single-use device PIN. Firmware sends it as a STRING (char devicePin[8], so at most 7 chars); since roadmap #70 the server generates a 6-char uppercase alphanumeric code (no O/I/0/1), compares case-insensitively, expires it after 24h and consumes it on the first successful registration. The server property is string? (DeviceRegistration.DevicePin)."
     },
     "serviceType": {
       "type": "integer",

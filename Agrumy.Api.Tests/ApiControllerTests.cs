@@ -140,7 +140,7 @@ public class ApiControllerTests
         var result = await controller.DeviceRegistration(new DeviceRegistration
         {
             Email = "ghost@example.com",
-            DevicePin = 1234,
+            DevicePin = "ABC234",
             MacAddress = "AABBCCDDEEFF",
         });
 
@@ -148,6 +148,59 @@ public class ApiControllerTests
         Assert.Equal(401, obj.StatusCode);
         Assert.Equal("Wrong user or pin", obj.Value);
         _repo.Verify(r => r.DeviceAddAsync(It.IsAny<Device>()), Times.Never);
+    }
+
+    // ---- roadmap #70: PIN expiry + single-use -----------------------------------------------
+
+    private static DeviceRegistration PinRegistration(string pin) => new()
+    {
+        Email = "owner@example.com",
+        DevicePin = pin,
+        MacAddress = "AABBCCDDEEFF",
+    };
+
+    private void StubOwner(string? storedPin, DateTime? expiresAt) =>
+        _repo.Setup(r => r.UserGetAsync(null, "owner@example.com", null))
+             .ReturnsAsync(new User { IDUser = 77, TenantID = 1, DevicePin = storedPin, DevicePinExpires = expiresAt });
+
+    [Theory]
+    [InlineData("ABC234", -5)]  // right PIN, expired 5 minutes ago
+    [InlineData("WRONG9", 60)]  // wrong PIN, unexpired
+    public async Task DeviceRegistration_ExpiredOrWrongPin_Returns401_WithTheSameGenericMessage(string sentPin, int expiresInMinutes)
+    {
+        StubOwner("ABC234", DateTime.UtcNow.AddMinutes(expiresInMinutes));
+
+        var result = await NewDeviceController().DeviceRegistration(PinRegistration(sentPin));
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(401, obj.StatusCode);
+        Assert.Equal("Wrong user or pin", obj.Value); // an expired PIN must not confirm the email exists
+        _repo.Verify(r => r.DeviceAddAsync(It.IsAny<Device>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeviceRegistration_ConsumedPin_Returns401()
+    {
+        StubOwner(null, null); // a previous successful registration nulled both columns
+
+        var result = await NewDeviceController().DeviceRegistration(PinRegistration("ABC234"));
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(401, obj.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeviceRegistration_ValidPin_LowercaseAccepted_AndConsumedOnSuccess()
+    {
+        StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
+        _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF"))
+             .ReturnsAsync(new Device { IDDevice = 500, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
+        _repo.Setup(r => r.UserSetDevicePinAsync(77, null, null)).ReturnsAsync(true);
+
+        var result = await NewDeviceController().DeviceRegistration(PinRegistration("abc234"));
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        _repo.Verify(r => r.UserSetDevicePinAsync(77, null, null), Times.Once);
     }
 
     // ---- UserApiController.UserRegistration ------------------------------------------------

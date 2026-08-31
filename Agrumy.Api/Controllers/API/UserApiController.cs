@@ -411,6 +411,33 @@ namespace api.Controllers.API
                 : NotFound();
         }
 
+        /// <summary>Roadmap #70: (re)issues the caller's single-use device-registration PIN -
+        /// self-scoped like Profile above (identity only from the JWT) because the PIN registers
+        /// devices into the caller's own tenant and is shown to nobody else. POST, not GET: every
+        /// call rotates the PIN, which also serves as the only revocation mechanism.</summary>
+        [HttpPost("DevicePin")]
+        [Authorize]
+        public async Task<ActionResult<DevicePinResult>> DevicePinGenerate()
+        {
+            string? name = User.Identity?.Name;
+            if (string.IsNullOrEmpty(name))
+            {
+                return Unauthorized();
+            }
+
+            User? user = await Repo.UserGetAsync(null, name, null);
+            if (user?.IDUser is not int idUser)
+            {
+                return NotFound();
+            }
+
+            string pin = AuthenticationProvider.GetPin();
+            DateTime expiresAt = DateTime.UtcNow.AddHours(AuthenticationProvider.PinValidHours);
+            await Repo.UserSetDevicePinAsync(idUser, pin, expiresAt);
+
+            return Ok(new DevicePinResult { DevicePin = pin, ExpiresAt = expiresAt });
+        }
+
         [HttpGet]
         [Authorize]
         public async Task<ActionResult<User>> UserGet(int idUser)

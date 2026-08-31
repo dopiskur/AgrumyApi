@@ -249,8 +249,10 @@ namespace api.Controllers.API
                 return BadRequest("macAddress is required.");
             }
 
+            // Roadmap #70: expiry and match failures share one generic 401 - a distinct "pin
+            // expired" reply would confirm the email exists to an unauthenticated caller.
             User? user = await Repo.UserGetAsync(null, value.Email, null);
-            if (user is null || user.DevicePin != value.DevicePin)
+            if (user is null || !AuthenticationProvider.VerifyPin(user.DevicePin, user.DevicePinExpires, value.DevicePin))
             {
                 return StatusCode(401, "Wrong user or pin");
             }
@@ -276,6 +278,14 @@ namespace api.Controllers.API
                 {
                     return StatusCode(500, "Device registration did not persist.");
                 }
+            }
+
+            // Roadmap #70: the PIN is single-use - consumed here so a leaked/shoulder-surfed one
+            // is worthless afterwards; the next device registration needs a fresh PIN from
+            // POST /api/User/DevicePin.
+            if (user.IDUser is int idUser)
+            {
+                await Repo.UserSetDevicePinAsync(idUser, null, null);
             }
 
             return Ok(await BuildDeviceConfigAsync(device));

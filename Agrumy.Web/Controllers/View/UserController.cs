@@ -45,7 +45,6 @@ namespace api.Controllers.View
                     IDUser = user.IDUser,
                     TenantID = user.TenantID,
                     Email = user.Email,
-                    DevicePin = user.DevicePin,
                     Username = user.Username,
                     FirstName = user.FirstName,
                     LastName = user.LastName,

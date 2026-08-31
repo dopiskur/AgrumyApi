@@ -256,6 +256,7 @@ namespace api.Dal
                 Email = user.Email ?? "",
                 Username = user.Username,
                 DevicePin = user.DevicePin,
+                DevicePinExpires = user.DevicePinExpires,
                 PwdHash = userSecret.PwdHash ?? "",
                 PwdSalt = userSecret.PwdSalt ?? "",
                 FirstName = user.FirstName,
@@ -279,7 +280,9 @@ namespace api.Dal
 
             row.TenantID = user.TenantID ?? 0;
             row.Email = user.Email ?? "";
-            row.DevicePin = user.DevicePin;
+            // Roadmap #70: DevicePin deliberately NOT written here - the PIN lifecycle (generate/
+            // expire/consume) lives exclusively in UserSetDevicePinAsync below, so an admin edit
+            // can never resurrect a consumed PIN or hand-craft a weak one.
             row.Username = user.Username;
             row.FirstName = user.FirstName;
             row.LastName = user.LastName;
@@ -305,6 +308,23 @@ namespace api.Dal
             row.FirstName = firstName;
             row.LastName = lastName;
             row.TimeZone = timeZone;
+            await db.SaveChangesAsync();
+            return true;
+        }
+
+        /// <summary>Roadmap #70: the ONLY writer of DevicePin/DevicePinExpires - pass nulls to
+        /// consume a PIN after a successful device registration, a value+expiry to (re)issue one.</summary>
+        public async Task<bool> UserSetDevicePinAsync(int idUser, string? devicePin, DateTime? expiresAtUtc)
+        {
+            await using var db = Db();
+            var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == idUser);
+            if (row == null)
+            {
+                return false;
+            }
+
+            row.DevicePin = devicePin;
+            row.DevicePinExpires = expiresAtUtc;
             await db.SaveChangesAsync();
             return true;
         }
@@ -1263,6 +1283,7 @@ namespace api.Dal
             Email = u.Email,
             Username = u.Username,
             DevicePin = u.DevicePin,
+            DevicePinExpires = u.DevicePinExpires,
             FirstName = u.FirstName,
             LastName = u.LastName,
             Phone = u.Phone,

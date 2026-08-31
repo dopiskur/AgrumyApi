@@ -160,7 +160,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             FirstName = "F",
             LastName = "L",
             Phone = "123",
-            DevicePin = 4321,
+            DevicePin = "PIN234",
             Enabled = enabled,
         };
         await _repo.UserAddAsync(user, new UserSecret { PwdHash = "h", PwdSalt = "s" });
@@ -479,7 +479,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await _repo.UserUpdateAsync(new User
         {
             IDUser = userId, TenantID = 7, Email = "upd_" + U() + "@x.com", Username = "n_" + U(),
-            FirstName = "New", LastName = "Name", Phone = "999", UserGroupID = t.RegularGroupId, Enabled = false, DevicePin = 1,
+            FirstName = "New", LastName = "Name", Phone = "999", UserGroupID = t.RegularGroupId, Enabled = false, DevicePin = "HACKED",
         });
 
         var back = await _repo.UserGetAsync(userId, null, null);
@@ -487,6 +487,30 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal("New", back.FirstName);
         Assert.Equal(7, back.TenantID);
         Assert.False(back.Enabled);
+        // Roadmap #70: UserUpdateAsync must never touch the PIN - its lifecycle belongs solely to
+        // UserSetDevicePinAsync, so the MakeUser value survives the update above unchanged.
+        Assert.Equal("PIN234", back.DevicePin);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task User_SetDevicePin_Issues_And_Consumes(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+
+        DateTime expires = DateTime.UtcNow.AddHours(24);
+        Assert.True(await _repo.UserSetDevicePinAsync(userId, "ABC234", expires));
+        var issued = await _repo.UserGetAsync(userId, null, null);
+        Assert.Equal("ABC234", issued!.DevicePin);
+        Assert.NotNull(issued.DevicePinExpires);
+
+        // Consuming (a successful device registration) nulls both columns.
+        Assert.True(await _repo.UserSetDevicePinAsync(userId, null, null));
+        var consumed = await _repo.UserGetAsync(userId, null, null);
+        Assert.Null(consumed!.DevicePin);
+        Assert.Null(consumed.DevicePinExpires);
+
+        Assert.False(await _repo.UserSetDevicePinAsync(-1, "ABC234", expires));
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -1023,15 +1047,15 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         string tag = U();
         int tenantId = await _repo.TenantAddAsync("T_" + tag);
 
-        var admin = new User { TenantID = tenantId, UserGroupID = t.AdminGroupId, Email = tag + "-admin@ex.com", Username = "admin_" + tag, DevicePin = 1 };
-        var regular = new User { TenantID = tenantId, UserGroupID = t.RegularGroupId, Email = tag + "-user@ex.com", Username = "user_" + tag, DevicePin = 2 };
+        var admin = new User { TenantID = tenantId, UserGroupID = t.AdminGroupId, Email = tag + "-admin@ex.com", Username = "admin_" + tag, DevicePin = "PIN2A2" };
+        var regular = new User { TenantID = tenantId, UserGroupID = t.RegularGroupId, Email = tag + "-user@ex.com", Username = "user_" + tag, DevicePin = "PIN2B2" };
         await _repo.UserAddAsync(admin, new UserSecret { PwdHash = "h", PwdSalt = "s" });
         await _repo.UserAddAsync(regular, new UserSecret { PwdHash = "h", PwdSalt = "s" });
 
         // A tenant admin elsewhere must never show up for THIS tenant's lookup.
         var (_, _, _) = await MakeUser(t); // creates its own tenant + a regular user, unrelated
         int otherTenantId = await _repo.TenantAddAsync("T_" + U());
-        var otherAdmin = new User { TenantID = otherTenantId, UserGroupID = t.AdminGroupId, Email = U() + "@ex.com", Username = "u_" + U(), DevicePin = 3 };
+        var otherAdmin = new User { TenantID = otherTenantId, UserGroupID = t.AdminGroupId, Email = U() + "@ex.com", Username = "u_" + U(), DevicePin = "PIN2C2" };
         await _repo.UserAddAsync(otherAdmin, new UserSecret { PwdHash = "h", PwdSalt = "s" });
 
         IList<User> admins = await _repo.TenantAdminsGetAsync(tenantId);

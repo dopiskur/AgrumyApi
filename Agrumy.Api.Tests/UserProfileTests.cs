@@ -3,6 +3,7 @@ using api.Controllers.API;
 using api.Dal.Interface;
 using api.Models;
 using api.Notifications;
+using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -198,5 +199,36 @@ public class UserProfileTests
     {
         var names = typeof(UserProfileUpdate).GetProperties().Select(p => p.Name).ToList();
         Assert.Equal(new[] { "FirstName", "LastName", "TimeZone" }.OrderBy(n => n), names.OrderBy(n => n));
+    }
+
+    // ---- POST /api/User/DevicePin (roadmap #70) ----------------------------------------
+
+    [Fact]
+    public async Task DevicePinGenerate_StoresAndReturns_FreshPin_WithExpiry()
+    {
+        _repo.Setup(r => r.UserGetAsync(null, "me@x.com", null)).ReturnsAsync(new User { IDUser = 5, Email = "me@x.com" });
+
+        string? storedPin = null;
+        DateTime? storedExpiry = null;
+        _repo.Setup(r => r.UserSetDevicePinAsync(5, It.IsAny<string?>(), It.IsAny<DateTime?>()))
+             .Callback<int, string?, DateTime?>((_, pin, exp) => { storedPin = pin; storedExpiry = exp; })
+             .ReturnsAsync(true);
+
+        var result = await NewController("me@x.com").DevicePinGenerate();
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var body = Assert.IsType<DevicePinResult>(ok.Value);
+        Assert.Equal(storedPin, body.DevicePin);       // the caller sees exactly what was stored
+        Assert.Equal(storedExpiry, body.ExpiresAt);
+        Assert.Equal(AuthenticationProvider.PinLength, body.DevicePin!.Length);
+        Assert.True(body.ExpiresAt > DateTime.UtcNow.AddHours(23)); // ~PinValidHours out
+    }
+
+    [Fact]
+    public async Task DevicePinGenerate_NoIdentity_Returns401_And_StoresNothing()
+    {
+        var result = await NewController(null).DevicePinGenerate();
+        Assert.IsType<UnauthorizedResult>(result.Result);
+        _repo.Verify(r => r.UserSetDevicePinAsync(It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<DateTime?>()), Times.Never);
     }
 }
