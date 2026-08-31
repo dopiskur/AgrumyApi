@@ -2,6 +2,7 @@ using api.Dal.Interface;
 using api.Models;
 using api.Security;
 using api.Utils;
+using api.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -29,6 +30,37 @@ namespace api.Controllers.View
             ViewBag.DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone;
 
             return View(fleet);
+        }
+
+        /// <summary>Roadmap #76: one click gets the caller a PIN ready to type into the device's
+        /// setup portal - reuses their still-valid PIN if they have one (roadmap #70: multi-use,
+        /// so there is usually one sitting around from the last device) instead of always
+        /// rotating, which would invalidate a PIN mid-way through registering several sensors.</summary>
+        public async Task<ActionResult> AddDevice()
+        {
+            User self = await api.UserGetSelf();
+            bool stillValid = !string.IsNullOrEmpty(self.DevicePin) &&
+                self.DevicePinExpires is DateTime expires && expires > DateTime.UtcNow;
+
+            return View(stillValid
+                ? new AddDeviceViewModel { DevicePin = self.DevicePin, ExpiresAt = self.DevicePinExpires }
+                : await GenerateNewPinAsync());
+        }
+
+        /// <summary>Roadmap #76: the conscious "throw away my current PIN" action - AddDevice's own
+        /// GET never rotates a still-valid PIN on its own.</summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> RegenerateDevicePin()
+        {
+            await GenerateNewPinAsync();
+            return RedirectToAction(nameof(AddDevice));
+        }
+
+        private async Task<AddDeviceViewModel> GenerateNewPinAsync()
+        {
+            DevicePinResult pin = await api.DevicePinGenerate();
+            return new AddDeviceViewModel { DevicePin = pin.DevicePin, ExpiresAt = pin.ExpiresAt };
         }
 
         public async Task<ActionResult> Details(int? idDevice)

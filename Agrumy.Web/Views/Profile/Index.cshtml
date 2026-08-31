@@ -71,7 +71,7 @@
                     <p class="mb-2"><code class="fs-4">@Model.DevicePin</code></p>
                     @if (Model.DevicePinExpires is DateTime expires)
                     {
-                        <p class="text-muted mb-2">Valid until @expires.ToString("yyyy-MM-dd HH:mm") UTC, or until a device registers with it.</p>
+                        <p class="text-muted mb-2">Valid until @expires.ToString("yyyy-MM-dd HH:mm") UTC - reusable for as many devices as you register in that window.</p>
                     }
                 }
                 <form asp-action="DevicePin" class="mb-0">

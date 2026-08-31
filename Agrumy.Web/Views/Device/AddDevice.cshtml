@@ -1,0 +1,27 @@
+@model api.ViewModels.AddDeviceViewModel
+
+@{
+    ViewData["Title"] = "Add New Device";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Add New Device</h3>
+    </div>
+    <div class="card-body">
+        <p class="mb-1">Enter this PIN during setup on the new Agrumy device's captive portal:</p>
+        <p class="mb-2"><code class="fs-3">@Model.DevicePin</code></p>
+        @if (Model.ExpiresAt is DateTime expires)
+        {
+            <p class="text-muted mb-3">
+                Valid until @expires.ToString("yyyy-MM-dd HH:mm") UTC - reusable for as many devices
+                as you need to set up in that window, no need to come back here between each one.
+            </p>
+        }
+
+        <form asp-action="RegenerateDevicePin" class="mb-0">
+            <input type="submit" value="Regenerate" class="btn btn-outline-secondary" />
+            <a asp-action="Fleet" class="btn btn-outline-secondary">Back to Fleet</a>
+        </form>
+    </div>
+</div>
