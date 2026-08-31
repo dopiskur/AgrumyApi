@@ -1,3 +1,4 @@
+using api.BackgroundWorkers;
 using api.Dal;
 using api.Dal.Interface;
 using api.Filters;
@@ -72,6 +73,11 @@ builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection
 builder.Services.AddScoped<INotificationChannel, EmailNotificationChannel>();
 builder.Services.AddScoped<INotificationChannel, FcmPushNotificationChannel>();
 builder.Services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
+
+// Roadmap #40 (infra) + #6 (offline alert type). Scoped, not singleton - it resolves scoped
+// repositories/dispatcher itself and PeriodicBackgroundService creates a fresh DI scope per tick.
+builder.Services.AddScoped<OfflineAlertEvaluator>();
+builder.Services.AddHostedService<OfflineAlertBackgroundService>();
 
 builder.Services.AddControllers(options => options.Filters.AddService<DbExceptionFilter>());
 

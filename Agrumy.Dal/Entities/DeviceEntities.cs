@@ -162,6 +162,11 @@ namespace api.Dal.Entities
         public long? UptimeSeconds { get; set; }
         public int? RssiDbm { get; set; }
         public long? FreeHeapBytes { get; set; }
+        // Roadmap #40: when OfflineAlertBackgroundService last notified admins about this device's
+        // CURRENT offline streak - null means either never offline, or back online since the last
+        // alert (cleared on the tick that observes it's reachable again). One notification per
+        // streak, not one per tick, without a separate dedup table.
+        public DateTime? OfflineNotifiedAt { get; set; }
         public string? FirmwareVersion { get; set; }
     }
 

@@ -1,4 +1,5 @@
 using api.Dal.Entities;
+using api.Dal.Interface;
 using api.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -492,6 +493,34 @@ namespace api.Dal
                 .Take(limit)
                 .ToListAsync();
             return rows.Select(ToDto).ToList();
+        }
+
+        // ---- Offline alert background worker (roadmap #40) --------------------------
+
+        public async Task<IList<OfflineAlertCandidate>> OfflineAlertCandidatesGetAsync()
+        {
+            await using var db = Db();
+            return await db.Devices.AsNoTracking()
+                .Where(d => d.Enabled == true) // a disabled device is expected to be silent
+                .Select(d => new OfflineAlertCandidate(
+                    d.IDDevice,
+                    d.TenantID,
+                    d.DeviceName,
+                    d.SleepSeconds,
+                    db.DeviceDiagnostics.AsNoTracking().Where(x => x.DeviceID == d.IDDevice).Select(x => x.LastSeenAt).FirstOrDefault(),
+                    db.DeviceDiagnostics.AsNoTracking().Where(x => x.DeviceID == d.IDDevice).Select(x => x.OfflineNotifiedAt).FirstOrDefault()))
+                .ToListAsync();
+        }
+
+        public async Task DeviceOfflineNotifiedSetAsync(int deviceID, DateTime? notifiedAt)
+        {
+            await using var db = Db();
+            // A device with no diagnostic row at all has never polled, so it cannot have just
+            // transitioned to offline (OfflineAlertCandidatesGetAsync's LastSeenAt would be null,
+            // which ComputeOnline already treats as offline-forever) - nothing to set.
+            await db.DeviceDiagnostics
+                .Where(x => x.DeviceID == deviceID)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.OfflineNotifiedAt, notifiedAt));
         }
 
         private static DeviceEvent ToDto(EventDeviceRow e) => new()

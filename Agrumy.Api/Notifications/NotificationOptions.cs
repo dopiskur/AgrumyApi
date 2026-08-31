@@ -7,6 +7,12 @@ namespace api.Notifications
 
         public EmailChannelOptions Email { get; set; } = new();
         public PushChannelOptions Push { get; set; } = new();
+
+        // Roadmap #40: how often OfflineAlertBackgroundService sweeps every device. Independent of
+        // any one device's own SleepSeconds (there is no single "right" value across a fleet with
+        // mixed poll intervals) - 5 minutes comfortably beats ComputeOnline's minimum ~90s grace
+        // window without hammering the DB on every tick.
+        public int OfflineCheckIntervalMinutes { get; set; } = 5;
     }
 
     public sealed class EmailChannelOptions

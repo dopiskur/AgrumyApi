@@ -123,6 +123,7 @@ listens on (5000 by default, set in `Agrumy.Api/Properties/launchSettings.json`)
 | `Startup:FailFastOnDbCheck` | no (default `false`) | `true` = stop the app if the DB check / provisioning fails |
 | `Notifications:Email:*` | no (default off) | SMTP alert email (roadmap #6). `Enabled` + `Host` + `FromAddress` are the minimum; `Port`/`UseStartTls`/`Username`/`Password`/`FromName` optional. Disabled or incomplete = channel skipped, not an error. |
 | `Notifications:Push:*` | no (default off) | FCM push channel - **prepared but inert**. Stays skipped until the Android app registers device tokens and the OAuth step in `FcmPushNotificationChannel` is wired. Leave `Enabled=false`. |
+| `Notifications:OfflineCheckIntervalMinutes` | no (default `5`) | roadmap #40 - how often `OfflineAlertBackgroundService` sweeps every device for a newly-offline one and notifies its tenant's admins via whatever `Notifications:*` channels are configured above. |
 | `WebView:Enabled`, `WebView:ApiService` | no | present in `appsettings.json.example` as a documented switch for a possible combined API+UI deployment, but **not currently read by any code** - `Agrumy.Web` is what actually serves the admin UI today |
 
 **`Agrumy.Web/appsettings.json`**

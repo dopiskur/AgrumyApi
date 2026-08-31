@@ -699,6 +699,41 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task OfflineAlertCandidates_Reflect_Diagnostics_And_NotifiedAt_RoundTrips(DbProviderKind provider)
+    {
+        // Roadmap #40: OfflineAlertCandidatesGetAsync uses two correlated subqueries (LastSeenAt,
+        // OfflineNotifiedAt) and DeviceOfflineNotifiedSetAsync uses ExecuteUpdateAsync - both need
+        // real translation-correctness verification against each provider, not just a mock.
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+        // MakeDevice leaves Enabled null - OfflineAlertCandidatesGetAsync only considers Enabled ==
+        // true (same "null reads as disabled" convention Fleet.cshtml's badge already uses).
+        d.Enabled = true;
+        await _repo.DeviceUpdateAsync(d);
+
+        // Never-seen device: still a candidate (enabled), but with null LastSeenAt/OfflineNotifiedAt.
+        var candidate = Assert.Single(await _repo.OfflineAlertCandidatesGetAsync(), c => c.IDDevice == d.IDDevice);
+        Assert.Equal(tenantId, candidate.TenantID);
+        Assert.Null(candidate.LastSeenAt);
+        Assert.Null(candidate.OfflineNotifiedAt);
+
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice!.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
+        candidate = Assert.Single(await _repo.OfflineAlertCandidatesGetAsync(), c => c.IDDevice == d.IDDevice);
+        Assert.NotNull(candidate.LastSeenAt);
+        Assert.Null(candidate.OfflineNotifiedAt);
+
+        DateTime notifiedAt = DateTime.UtcNow;
+        await _repo.DeviceOfflineNotifiedSetAsync(d.IDDevice.Value, notifiedAt);
+        candidate = Assert.Single(await _repo.OfflineAlertCandidatesGetAsync(), c => c.IDDevice == d.IDDevice);
+        Assert.NotNull(candidate.OfflineNotifiedAt);
+
+        await _repo.DeviceOfflineNotifiedSetAsync(d.IDDevice.Value, null);
+        candidate = Assert.Single(await _repo.OfflineAlertCandidatesGetAsync(), c => c.IDDevice == d.IDDevice);
+        Assert.Null(candidate.OfflineNotifiedAt);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceFirmwareLatest_Picks_Newest_By_DateAdded(DbProviderKind provider)
     {
         var t = Use(provider);

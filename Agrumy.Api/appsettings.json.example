@@ -81,7 +81,9 @@
       "Enabled": false,
       "FcmProjectId": "",
       "FcmCredentialsPath": ""
-    }
+    },
+    "// OfflineCheckIntervalMinutes": "Roadmap #40 - how often OfflineAlertBackgroundService sweeps every device for a newly-offline one. Independent of any device's own poll interval (SleepSeconds) - there is no single right value across a fleet with mixed intervals.",
+    "OfflineCheckIntervalMinutes": 5
   },
 
   "// Logging": "Standard ASP.NET Core logging configuration.",

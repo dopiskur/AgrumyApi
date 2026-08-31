@@ -14,6 +14,10 @@ namespace api.Models
         // Roadmap #9: the device dropped buffered sensor data because its LittleFS partition hit
         // the 70% cap - deliberate loss on the device's side, but the operator should know.
         BufferDiscarded = 7,
+        // Roadmap #40: server-detected, not device-pushed - written by OfflineAlertBackgroundService
+        // when a device crosses ComputeOnline's threshold, so the transition shows in the same
+        // Events timeline as every device-reported event.
+        Offline = 8,
     }
 
     /// <summary>Body of POST /api/Device/Event. Deliberately carries no device/tenant identity field -

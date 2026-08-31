@@ -2,6 +2,19 @@ using api.Models;
 
 namespace api.Dal.Interface
 {
+    /// <summary>Roadmap #40: the minimal shape OfflineAlertBackgroundService needs to decide
+    /// whether a notification is due - not the full Fleet dashboard DTO (DeviceFleetStatus),
+    /// since OfflineNotifiedAt is alert-bookkeeping state the Web UI has no business displaying.
+    /// TenantID is nullable to mirror DeviceRow.TenantID as stored - a null one is skipped by the
+    /// worker rather than crashing it.</summary>
+    public sealed record OfflineAlertCandidate(
+        int IDDevice,
+        int? TenantID,
+        string? DeviceName,
+        int? SleepSeconds,
+        DateTime? LastSeenAt,
+        DateTime? OfflineNotifiedAt);
+
     /// <summary>Device facet of the data layer (roadmap #74): device CRUD, sensor/controller
     /// configs, firmware (OTA, roadmap #3), the fixed type lists, and device events (roadmap #28).</summary>
     public interface IDeviceRepository
@@ -74,5 +87,15 @@ namespace api.Dal.Interface
         /// tenantID is the caller's own tenant, not trusted from the request - a device belonging to
         /// another tenant simply matches zero rows rather than leaking another tenant's events.</summary>
         Task<IList<DeviceEvent>> EventDeviceGetAsync(int? deviceID, int? tenantID, int limit = 100);
+
+        // Offline alert background worker (roadmap #40)
+
+        /// <summary>Every enabled device, across every tenant - the worker is not tenant-scoped,
+        /// it runs once for the whole install.</summary>
+        Task<IList<OfflineAlertCandidate>> OfflineAlertCandidatesGetAsync();
+
+        /// <summary>Sets (or clears, notifiedAt: null) OfflineNotifiedAt on one device's diagnostic
+        /// row - see OfflineAlertCandidate for what that field means.</summary>
+        Task DeviceOfflineNotifiedSetAsync(int deviceID, DateTime? notifiedAt);
     }
 }
