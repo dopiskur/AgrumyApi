@@ -75,10 +75,15 @@
                     <td>@(item.FirmwareVersion ?? "-")</td>
                     <td>@(item.Battery?.ToString() ?? "-")</td>
                     <td>
-                        <a asp-controller="SensorData" asp-action="Index" asp-route-idDevice="@item.IDDevice" class="btn btn-sm btn-success">Sensor data</a>
-                        <a asp-controller="SensorData" asp-action="Report" asp-route-idDevice="@item.IDDevice" class="btn btn-sm btn-danger">Reports</a>
-                        <a asp-action="Details" asp-route-idDevice="@item.IDDevice" class="btn btn-sm btn-primary">Details</a>
-                        <a asp-action="Events" asp-route-idDevice="@item.IDDevice" class="btn btn-sm btn-outline-secondary">Events</a>
+                        @* Icon-only + btn-group on purpose: four full-text buttons made this the widest
+                           column on the table, forcing the most horizontal scroll on a phone (roadmap #22) -
+                           title= gives back the label as a hover/long-press tooltip. *@
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Device actions">
+                            <a asp-controller="SensorData" asp-action="Index" asp-route-idDevice="@item.IDDevice" class="btn btn-success" title="Sensor data" aria-label="Sensor data"><i class="bi bi-graph-up"></i></a>
+                            <a asp-controller="SensorData" asp-action="Report" asp-route-idDevice="@item.IDDevice" class="btn btn-danger" title="Reports" aria-label="Reports"><i class="bi bi-file-earmark-bar-graph"></i></a>
+                            <a asp-action="Details" asp-route-idDevice="@item.IDDevice" class="btn btn-primary" title="Details" aria-label="Details"><i class="bi bi-info-circle"></i></a>
+                            <a asp-action="Events" asp-route-idDevice="@item.IDDevice" class="btn btn-outline-secondary" title="Events" aria-label="Events"><i class="bi bi-clock-history"></i></a>
+                        </div>
                     </td>
                 </tr>
 }
