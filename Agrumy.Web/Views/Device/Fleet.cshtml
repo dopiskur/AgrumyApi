@@ -23,7 +23,12 @@
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">Fleet status</h3>
-        <span class="float-end text-secondary small">Times shown in @(ViewBag.DisplayTimeZone ?? "UTC")</span>
+        <div class="float-end d-flex align-items-center gap-3">
+            <span class="text-secondary small">Times shown in @(ViewBag.DisplayTimeZone ?? "UTC")</span>
+            <a asp-action="AddDevice" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-lg"></i> Add New Device
+            </a>
+        </div>
     </div>
     <div class="card-body table-responsive p-0">
         @* No table-wide text-nowrap (unlike before) - on a phone the two Status badges need to
@@ -50,12 +55,7 @@
 {
                 var (signalLabel, signalCss) = SignalQuality(item.RssiDbm);
                 <tr>
-                    <td>
-                        @* Truncated so the default "Agrumy_<MAC>" name (roadmap #7 mobile pass found
-                           it's the common case, not an edge case) doesn't push this always-visible
-                           column wider than it needs to be - title= gives the full name back on hover/tap. *@
-                        <span class="d-inline-block text-truncate align-bottom" style="max-width: 140px;" title="@item.DeviceName">@item.DeviceName</span>
-                    </td>
+                    <td>@item.DeviceName</td>
                     <td>
                         @* No separate "never seen" state - a device only ever exists via device-side
                            self-registration (there's no manual "add device" flow), so a null LastSeenAt
