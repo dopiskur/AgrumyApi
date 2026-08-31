@@ -10,9 +10,9 @@ namespace api.Controllers.View
     [Authorize]
     public class DeviceController(IApi api) : Controller
     {
-        public async Task<ActionResult> Index() => View(await api.DevicesGet());
-
         // Roadmap #8: read-only fleet status - any authenticated caller, same reasoning as Events.
+        // Supersedes the old plain device list (DevicesGet is no longer called from the Web) - Fleet
+        // shows the same devices plus online/diagnostic state, so there was nothing the old list had left to offer.
         public async Task<ActionResult> Fleet()
         {
             IList<DeviceFleetStatus> fleet = await api.DeviceFleetGet();
@@ -104,7 +104,7 @@ namespace api.Controllers.View
         public async Task<ActionResult> DeleteConfirm(int? idDevice)
         {
             await api.DeviceDelete(idDevice);
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Fleet));
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]

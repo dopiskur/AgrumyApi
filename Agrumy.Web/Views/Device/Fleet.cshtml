@@ -77,6 +77,8 @@
                     <td>@(item.FirmwareVersion ?? "-")</td>
                     <td>@(item.Battery?.ToString() ?? "-")</td>
                     <td>
+                        <a asp-controller="SensorData" asp-action="Index" asp-route-idDevice="@item.IDDevice" class="btn btn-sm btn-success">Sensor data</a>
+                        <a asp-controller="SensorData" asp-action="Report" asp-route-idDevice="@item.IDDevice" class="btn btn-sm btn-danger">Reports</a>
                         <a asp-action="Details" asp-route-idDevice="@item.IDDevice" class="btn btn-sm btn-primary">Details</a>
                         <a asp-action="Events" asp-route-idDevice="@item.IDDevice" class="btn btn-sm btn-outline-secondary">Events</a>
                     </td>
