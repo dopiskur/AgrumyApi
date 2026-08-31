@@ -92,6 +92,14 @@ namespace api.Controllers.API
             return Ok(await Repo.DeviceConfigControllerGetAsync(deviceConfigControllerID));
         }
 
+        /// <summary>Roadmap #8 fleet dashboard - read-only status of every device at once, so it is
+        /// open to any authenticated caller (same reasoning as DeviceEventsGet); tenant scoping
+        /// mirrors DevicesGet, with global readers seeing all tenants.</summary>
+        [Authorize]
+        [HttpGet("Fleet")]
+        public async Task<ActionResult<IList<DeviceFleetStatus>>> DeviceFleetGet() =>
+            Ok(await Repo.DeviceFleetGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
+
         /// <summary>Roadmap #28 diagnostic view - #66 Phase 2 opened it from admin-only to any
         /// authenticated caller (a Tenant reader may look at their tenant's event log); tenant
         /// ownership still enforced the same way as every other Device sub-resource GET.</summary>
@@ -199,21 +207,32 @@ namespace api.Controllers.API
 
         #region Device communication
 
+        /// <summary>Roadmap #7: the poll body carries live diagnostics and the poll itself is the
+        /// heartbeat - recorded before the version check so an up-to-date device still bumps
+        /// LastSeenAt, which is what offline detection (#6/#8) stands on.</summary>
         [HttpPost("Config")]
         [EnableRateLimiting("device-auth")]
         [Authorize(Policy = DeviceAuth.SessionPolicy)]
-        public async Task<ActionResult<DeviceConfig>> GetConfig([FromBody] Device value)
+        public async Task<ActionResult<DeviceConfig>> GetConfig([FromBody] DeviceConfigPoll value)
         {
             string apiId = HttpContext.DeviceApiId()!;
 
+            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            if (device is null)
+            {
+                return NotFound();
+            }
+
+            await Repo.DeviceDiagnosticUpsertAsync(device.IDDevice!.Value, device.TenantID ?? 0, value);
+
+            // Null-conditional: a missing cache entry means "unknown", which must send the config.
             DeviceCache? deviceCache = Cache.GetDeviceCache(apiId);
-            if (value.ConfigVersion == deviceCache.ConfigVersion)
+            if (value.ConfigVersion == deviceCache?.ConfigVersion)
             {
                 return Ok(); // device is up to date - do nothing
             }
 
-            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
-            return device is null ? NotFound() : Ok(await BuildDeviceConfigAsync(device));
+            return Ok(await BuildDeviceConfigAsync(device));
         }
 
         /// <summary>Roadmap #28. No identity field in the body by design - see DeviceEventPush;

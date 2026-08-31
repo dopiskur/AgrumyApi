@@ -151,6 +151,20 @@ namespace api.Dal.Entities
         public DateTime? DateModified { get; set; }
     }
 
+    /// <summary>One row per device, upserted on every config poll (roadmap #7) - the poll itself is
+    /// the heartbeat, so LastSeenAt needs no extra endpoint or firmware request. Keyed by DeviceID
+    /// (1:1 with device) rather than an identity column so the upsert is a plain read-or-insert.</summary>
+    public class DeviceDiagnosticRow
+    {
+        public int DeviceID { get; set; }
+        public int? TenantID { get; set; }
+        public DateTime? LastSeenAt { get; set; }
+        public long? UptimeSeconds { get; set; }
+        public int? RssiDbm { get; set; }
+        public long? FreeHeapBytes { get; set; }
+        public string? FirmwareVersion { get; set; }
+    }
+
     public class DeviceFirmwareRow
     {
         public int IDDeviceFirmware { get; set; }

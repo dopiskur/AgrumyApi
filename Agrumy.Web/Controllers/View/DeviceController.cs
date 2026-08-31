@@ -12,6 +12,25 @@ namespace api.Controllers.View
     {
         public async Task<ActionResult> Index() => View(await api.DevicesGet());
 
+        // Roadmap #8: read-only fleet status - any authenticated caller, same reasoning as Events.
+        public async Task<ActionResult> Fleet()
+        {
+            IList<DeviceFleetStatus> fleet = await api.DeviceFleetGet();
+
+            // Roadmap #71 follow-up: LastSeenAt is stored/served in UTC - convert for display only.
+            string? timeZone = (await api.UserGetSelf()).TimeZone;
+            foreach (var d in fleet)
+            {
+                if (d.LastSeenAt is DateTime utc)
+                {
+                    d.LastSeenAt = TimeZoneHelper.ToUserLocalTime(utc, timeZone);
+                }
+            }
+            ViewBag.DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone;
+
+            return View(fleet);
+        }
+
         public async Task<ActionResult> Details(int? idDevice) =>
             View(await api.DeviceGet(idDevice));
 

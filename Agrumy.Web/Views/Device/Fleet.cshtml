@@ -1,0 +1,92 @@
+@model IList<api.Models.DeviceFleetStatus>
+
+@{
+    ViewData["Title"] = "Fleet";
+
+    // RSSI buckets follow the usual WiFi rule of thumb; the raw dBm stays visible next to the label.
+    static (string Label, string Css) SignalQuality(int? rssi) => rssi switch
+    {
+        null => ("-", "text-secondary"),
+        >= -60 => ("Good", "text-success"),
+        >= -75 => ("Fair", "text-warning"),
+        _ => ("Weak", "text-danger"),
+    };
+
+    static string Uptime(long? seconds)
+    {
+        if (seconds is not long s || s < 0) { return "-"; }
+        var t = TimeSpan.FromSeconds(s);
+        return t.Days > 0 ? $"{t.Days}d {t.Hours}h" : t.Hours > 0 ? $"{t.Hours}h {t.Minutes}m" : $"{t.Minutes}m {t.Seconds}s";
+    }
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Fleet status</h3>
+        <span class="float-end text-secondary small">Times shown in @(ViewBag.DisplayTimeZone ?? "UTC")</span>
+    </div>
+    <div class="card-body table-responsive p-0">
+        <table id="fleetTable" class="table table-hover text-nowrap">
+            <thead>
+                <tr>
+                    <th>Device</th>
+                    <th>Status</th>
+                    <th>Last seen</th>
+                    <th>Signal</th>
+                    <th>Uptime</th>
+                    <th>Free heap</th>
+                    <th>Firmware</th>
+                    <th>Battery</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+@foreach (var item in Model)
+{
+                var (signalLabel, signalCss) = SignalQuality(item.RssiDbm);
+                <tr>
+                    <td>@item.DeviceName</td>
+                    <td>
+                        @if (item.Online)
+                        {
+                            <span class="badge text-bg-success">Online</span>
+                        }
+                        else if (item.LastSeenAt == null)
+                        {
+                            <span class="badge text-bg-secondary">Never seen</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-danger">Offline</span>
+                        }
+                        @if (item.Enabled != true)
+                        {
+                            <span class="badge text-bg-light border ms-1">Disabled</span>
+                        }
+                    </td>
+                    <td>@(item.LastSeenAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</td>
+                    <td>
+                        <span class="@signalCss">@signalLabel</span>
+                        @if (item.RssiDbm is int rssi)
+                        {
+                            <span class="text-secondary small">(@rssi dBm)</span>
+                        }
+                    </td>
+                    <td>@Uptime(item.UptimeSeconds)</td>
+                    <td>@(item.FreeHeapBytes is long heap ? $"{heap / 1024} KB" : "-")</td>
+                    <td>@(item.FirmwareVersion ?? "-")</td>
+                    <td>@(item.Battery?.ToString() ?? "-")</td>
+                    <td>
+                        <a asp-action="Details" asp-route-idDevice="@item.IDDevice" class="btn btn-sm btn-primary">Details</a>
+                        <a asp-action="Events" asp-route-idDevice="@item.IDDevice" class="btn btn-sm btn-outline-secondary">Events</a>
+                    </td>
+                </tr>
+}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_DataTableScripts" model="@("fleetTable")" />
+}

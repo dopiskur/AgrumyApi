@@ -175,13 +175,19 @@ public class ContractTests
     [Fact]
     public void ConfigRequest_FirmwareShapedPayload_MatchesSchemaAndBinds()
     {
-        // apiConfig(): a single PascalCase "ConfigVersion" key, value sent as a STRING.
-        const string payload = """{"ConfigVersion":"66"}""";
+        // apiConfig(): PascalCase keys, ConfigVersion sent as a STRING; the diagnostics fields
+        // (roadmap #7) ride along as JSON numbers/string.
+        const string payload =
+            """{"ConfigVersion":"66","Uptime":3661,"Rssi":-67,"FreeHeap":153212,"FirmwareVersion":"0.1.2"}""";
 
         AssertValid("config.request.schema.json", payload);
 
-        var bound = JsonSerializer.Deserialize<Device>(payload, Mvc)!;
+        var bound = JsonSerializer.Deserialize<DeviceConfigPoll>(payload, Mvc)!;
         Assert.Equal(66, bound.ConfigVersion);
+        Assert.Equal(3661, bound.Uptime);
+        Assert.Equal(-67, bound.Rssi);
+        Assert.Equal(153212, bound.FreeHeap);
+        Assert.Equal("0.1.2", bound.FirmwareVersion);
     }
 
     [Fact]

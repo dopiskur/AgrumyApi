@@ -111,6 +111,11 @@ namespace api.Dal.Interface
         [Get("/api/Device/Events")]
         Task<IList<DeviceEvent>> DeviceEventsGet(int? idDevice);
 
+        // ---- Fleet dashboard (roadmap #8) ----------------------------------
+
+        [Get("/api/Device/Fleet")]
+        Task<IList<DeviceFleetStatus>> DeviceFleetGet();
+
         // ---- SensorData ---------------------------------------------------
 
         [Get("/api/SensorData")]

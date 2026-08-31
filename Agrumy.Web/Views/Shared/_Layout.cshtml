@@ -109,6 +109,12 @@
                                 <p>Devices</p>
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a asp-area="" asp-controller="Device" asp-action="Fleet" class="nav-link">
+                                <i class="nav-icon bi bi-broadcast"></i>
+                                <p>Fleet</p>
+                            </a>
+                        </li>
                         @if (hasAnyRole(RoleNames.UserManagers))
                         {
                             <li class="nav-item">

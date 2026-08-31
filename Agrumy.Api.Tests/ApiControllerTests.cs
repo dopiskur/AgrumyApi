@@ -150,6 +150,49 @@ public class ApiControllerTests
         _repo.Verify(r => r.DeviceAddAsync(It.IsAny<Device>()), Times.Never);
     }
 
+    // ---- roadmap #7/#8: fleet online threshold ---------------------------------------------
+
+    [Theory]
+    // 60s poll: window is 60*3 + 90 = 270s.
+    [InlineData(60, 269, true)]
+    [InlineData(60, 271, false)]
+    // Slow poller (deep-sleep node): the window scales with SleepSeconds instead of a fixed cutoff.
+    [InlineData(3600, 10000, true)]
+    [InlineData(3600, 11000, false)]
+    // SleepSeconds null falls back to the 60s default; 0 is floored by the grace window.
+    [InlineData(null, 269, true)]
+    [InlineData(0, 89, true)]
+    [InlineData(0, 91, false)]
+    public void FleetComputeOnline_Thresholds(int? sleepSeconds, int ageSeconds, bool expected)
+    {
+        DateTime now = new(2026, 8, 31, 12, 0, 0, DateTimeKind.Utc);
+        Assert.Equal(expected, DeviceFleetStatus.ComputeOnline(now.AddSeconds(-ageSeconds), sleepSeconds, now));
+    }
+
+    [Fact]
+    public void FleetComputeOnline_NeverSeen_IsOffline() =>
+        Assert.False(DeviceFleetStatus.ComputeOnline(null, 60, DateTime.UtcNow));
+
+    [Fact]
+    public async Task GetConfig_RecordsHeartbeat_EvenWhenConfigIsUpToDate()
+    {
+        var controller = NewDeviceController();
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        controller.HttpContext.Items[DeviceAuth.ApiIdItemKey] = "api-guid";
+
+        _repo.Setup(r => r.DeviceGetByApiIdAsync("api-guid"))
+             .ReturnsAsync(new Device { IDDevice = 500, TenantID = 3, ConfigVersion = 66 });
+        _repo.Setup(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.IsAny<DeviceConfigPoll>()))
+             .Returns(Task.CompletedTask);
+        _cache.Setup(c => c.GetDeviceCache("api-guid")).Returns(new DeviceCache { ConfigVersion = 66 });
+
+        var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 66, Rssi = -60 });
+
+        // The matching version path must still land the heartbeat - that's what LastSeenAt is for.
+        _repo.Verify(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.Is<DeviceConfigPoll>(p => p.Rssi == -60)), Times.Once);
+        Assert.IsType<OkResult>(result.Result); // empty body: device is up to date
+    }
+
     // ---- roadmap #70: PIN expiry + single-use -----------------------------------------------
 
     private static DeviceRegistration PinRegistration(string pin) => new()

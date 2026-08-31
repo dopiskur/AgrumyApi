@@ -207,8 +207,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         foreach (var name in new[] { "tenant", "user", "userGroup", "userRole", "userRoleScope",
             "device", "deviceUnit", "deviceUnitZone", "deviceType", "deviceTypeService",
             "deviceTypeRelay", "deviceTypeSensor", "deviceConfigSensor", "deviceConfigController",
-            "deviceFirmware", "sensorData", "sensorDataReport", "eventDevice", "eventService",
-            "serverConfig" })
+            "deviceFirmware", "deviceDiagnostic", "sensorData", "sensorDataReport", "eventDevice",
+            "eventService", "serverConfig" })
         {
             Assert.Contains(name, tables);
         }
@@ -638,12 +638,63 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (tenantId, _, _) = await MakeUser(t);
         var d = await MakeDevice(t, tenantId);
 
+        // A diagnostic row must not block the delete (its FK to device is NoAction, roadmap #7).
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice!.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
+
         await _repo.DeviceDeleteAsync(d.IDDevice, tenantId);
 
         Assert.Null(await _repo.DeviceGetByIdAsync(d.IDDevice));
         await using var db = _fx.NewContext(t);
         Assert.False(await db.DeviceConfigSensors.AnyAsync(c => c.IDDeviceConfigSensor == d.DeviceConfigSensorID));
         Assert.False(await db.DeviceConfigControllers.AnyAsync(c => c.IDDeviceConfigController == d.DeviceConfigControllerID));
+        Assert.False(await db.DeviceDiagnostics.AnyAsync(x => x.DeviceID == d.IDDevice));
+    }
+
+    // ---- device diagnostics / fleet (roadmap #7 + #8) -----------------------
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceDiagnostic_Upsert_Records_Heartbeat_And_Fleet_Reports_It(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+
+        // Never-seen device still shows on the dashboard, as offline.
+        var row = Assert.Single(await _repo.DeviceFleetGetAsync(tenantId), f => f.IDDevice == d.IDDevice);
+        Assert.False(row.Online);
+        Assert.Null(row.LastSeenAt);
+
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice!.Value, tenantId, new DeviceConfigPoll
+        {
+            ConfigVersion = 1, Uptime = 3600, Rssi = -67, FreeHeap = 153212, FirmwareVersion = "0.1.2",
+        });
+
+        row = Assert.Single(await _repo.DeviceFleetGetAsync(tenantId), f => f.IDDevice == d.IDDevice);
+        Assert.True(row.Online);
+        Assert.NotNull(row.LastSeenAt);
+        Assert.Equal(3600, row.UptimeSeconds);
+        Assert.Equal(-67, row.RssiDbm);
+        Assert.Equal(153212, row.FreeHeapBytes);
+        Assert.Equal("0.1.2", row.FirmwareVersion);
+
+        // A pre-#7 poll (ConfigVersion only) bumps LastSeenAt but keeps the earlier diagnostics.
+        DateTime firstSeen = row.LastSeenAt!.Value;
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
+        row = Assert.Single(await _repo.DeviceFleetGetAsync(tenantId), f => f.IDDevice == d.IDDevice);
+        Assert.True(row.LastSeenAt >= firstSeen);
+        Assert.Equal("0.1.2", row.FirmwareVersion);
+        Assert.Equal(-67, row.RssiDbm);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceFleet_Is_Tenant_Scoped_And_Null_Means_All(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+
+        Assert.DoesNotContain(await _repo.DeviceFleetGetAsync(tenantId + 12345), f => f.IDDevice == d.IDDevice);
+        Assert.Contains(await _repo.DeviceFleetGetAsync(null), f => f.IDDevice == d.IDDevice);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]

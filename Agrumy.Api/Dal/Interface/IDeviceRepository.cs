@@ -44,6 +44,21 @@ namespace api.Dal.Interface
         Task<IList<DeviceTypeRelay>> DeviceTypeRelayGetAsync();
         Task<IList<DeviceTypeSensor>> DeviceTypeSensorGetAsync();
 
+        // Device diagnostics / fleet (roadmap #7 + #8)
+
+        /// <summary>
+        /// Records the diagnostics a device reported with its config poll (roadmap #7) - LastSeenAt
+        /// is set to the server clock, making the poll itself the heartbeat. deviceID/tenantID come
+        /// from the authenticated device identity, same rule as SensorDataPushAsync (#47). Null
+        /// diagnostic fields (pre-#7 firmware) still bump LastSeenAt without erasing earlier values.
+        /// </summary>
+        Task DeviceDiagnosticUpsertAsync(int deviceID, int tenantID, DeviceConfigPoll poll);
+
+        /// <summary>Fleet status for every device in the tenant, or every device everywhere when
+        /// tenantID is null (roadmap #8) - callers must check CallerReadsDevicesGlobally before
+        /// passing null. Online is computed against the server clock via DeviceFleetStatus.ComputeOnline.</summary>
+        Task<IList<DeviceFleetStatus>> DeviceFleetGetAsync(int? tenantID);
+
         // Device events (roadmap #28)
 
         /// <summary>

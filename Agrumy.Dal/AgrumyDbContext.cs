@@ -38,6 +38,7 @@ namespace api.Dal
         public DbSet<DeviceConfigSensorRow> DeviceConfigSensors => Set<DeviceConfigSensorRow>();
         public DbSet<DeviceConfigControllerRow> DeviceConfigControllers => Set<DeviceConfigControllerRow>();
         public DbSet<DeviceFirmwareRow> DeviceFirmwares => Set<DeviceFirmwareRow>();
+        public DbSet<DeviceDiagnosticRow> DeviceDiagnostics => Set<DeviceDiagnosticRow>();
 
         public DbSet<SensorDataRow> SensorData => Set<SensorDataRow>();
         public DbSet<SensorDataReportRow> SensorDataReports => Set<SensorDataReportRow>();
@@ -243,6 +244,16 @@ namespace api.Dal
                 e.HasOne<DeviceTypeServiceRow>().WithMany().HasForeignKey(x => x.DeviceTypeServiceID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<TenantRow>().WithMany().HasForeignKey(x => x.TenantID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
+            });
+
+            b.Entity<DeviceDiagnosticRow>(e =>
+            {
+                e.ToTable("deviceDiagnostic");
+                // DeviceID is the PK (1:1 with device, roadmap #7) - deliberately NOT ValueGeneratedOnAdd.
+                e.HasKey(x => x.DeviceID);
+                e.Property(x => x.DeviceID).ValueGeneratedNever();
+                e.Property(x => x.FirmwareVersion).HasMaxLength(20); // same cap as deviceFirmware.Version
+                e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 
             b.Entity<DeviceFirmwareRow>(e =>

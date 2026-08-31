@@ -2,14 +2,33 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/config.request.schema.json",
   "title": "Device Config - request  (firmware -> POST /api/Device/Config)",
-  "description": "Body built by ServiceController::apiConfig(): a single key 'ConfigVersion' - PascalCase, unlike every other firmware payload - whose value is the device's current config version sent as a STRING (String(deviceConfig.configVersion)). The server binds it to api.Models.Device.ConfigVersion (int?) via System.Text.Json case-insensitive property matching plus NumberHandling.AllowReadingFromString. Credentials travel as HTTP HEADERS: 'apiId' (device GUID) and 'Authorization' (the apiAuth token from /Authenticate).",
+  "description": "Body built by ServiceController::apiConfig(). 'ConfigVersion' - PascalCase, unlike every other firmware payload - is the device's current config version sent as a STRING (String(deviceConfig.configVersion)). Since roadmap #7 the poll doubles as the heartbeat and also carries live diagnostics: 'Uptime' (seconds since boot, from esp_timer_get_time), 'Rssi' (WiFi.RSSI() dBm, negative), 'FreeHeap' (ESP.getFreeHeap() bytes) and 'FirmwareVersion' (the RUNNING image's version string, not the offered OTA one). The server binds the body to api.Models.DeviceConfigPoll via System.Text.Json case-insensitive matching plus NumberHandling.AllowReadingFromString, and upserts the diagnostics into deviceDiagnostic with LastSeenAt = server clock. Credentials travel as HTTP HEADERS: 'apiId' (device GUID) and 'Authorization' (the apiAuth token from /Authenticate).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["ConfigVersion"],
+  "required": ["ConfigVersion", "Uptime", "Rssi", "FreeHeap", "FirmwareVersion"],
   "properties": {
     "ConfigVersion": {
       "type": ["string", "integer"],
       "description": "Firmware sends a string (e.g. \"66\"); an integer is also accepted by the server. If the value differs from the server's stored ConfigVersion, the response is the full config object (config.response.schema.json). If it is equal, the server returns HTTP 200 with an EMPTY body."
+    },
+    "Uptime": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Seconds since the device booted (64-bit microsecond timer divided down, so it does not wrap at the 49-day millis() boundary)."
+    },
+    "Rssi": {
+      "type": "integer",
+      "description": "WiFi.RSSI() of the current association, in dBm - typically -30 (excellent) to -90 (unusable)."
+    },
+    "FreeHeap": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "ESP.getFreeHeap() in bytes at the start of the config poll."
+    },
+    "FirmwareVersion": {
+      "type": "string",
+      "maxLength": 20,
+      "description": "Version string of the image currently RUNNING (main.cpp's 'firmware' constant) - lets the server verify an OTA actually took, independent of the offered firmwareVersion in the response."
     }
   },
   "$comment": "Required request headers (contract record only): 'apiId': device ApiId GUID; 'Authorization': apiAuth token from POST /api/Device/Authenticate."

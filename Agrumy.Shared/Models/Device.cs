@@ -102,6 +102,56 @@ namespace api.Models
 
     }
 
+    /// <summary>Body of POST /api/Device/Config (roadmap #7): the poll doubles as the heartbeat, so
+    /// besides ConfigVersion the firmware reports its live diagnostics every cycle. All fields are
+    /// nullable so a pre-#7 firmware that sends only ConfigVersion still binds cleanly.</summary>
+    public class DeviceConfigPoll()
+    {
+        public int? ConfigVersion { get; set; }
+        public long? Uptime { get; set; }
+        public int? Rssi { get; set; }
+        public long? FreeHeap { get; set; }
+        public string? FirmwareVersion { get; set; }
+    }
+
+    /// <summary>One device's row on the fleet dashboard (roadmap #8). Battery comes from the latest
+    /// sensorData row, not the heartbeat - the firmware battery sensor is a stub until roadmap #12,
+    /// and telemetry is where a real reading will land anyway.</summary>
+    public class DeviceFleetStatus()
+    {
+        public int? IDDevice { get; set; }
+        public int? TenantID { get; set; }
+        public string? DeviceName { get; set; }
+        public bool? Enabled { get; set; }
+        public int? SleepSeconds { get; set; }
+        public DateTime? LastSeenAt { get; set; }
+        public long? UptimeSeconds { get; set; }
+        public int? RssiDbm { get; set; }
+        public long? FreeHeapBytes { get; set; }
+        public string? FirmwareVersion { get; set; }
+        public int? Battery { get; set; }
+        public bool Online { get; set; }
+
+        // 3 missed polls + fixed grace, not a bare multiple of SleepSeconds: a cycle is sleep time
+        // PLUS work time (TLS handshakes, sensor reads), and a single dropped poll on a flaky WiFi
+        // link should not flip a device to offline. Grace also floors the window for SleepSeconds=0.
+        public const int OfflineMissedPolls = 3;
+        public const int OfflineGraceSeconds = 90;
+
+        /// <summary>Whether a device that last polled at <paramref name="lastSeenAt"/> (UTC) should
+        /// count as online at <paramref name="utcNow"/>, given how often it is configured to poll.
+        /// Static and time-injected so the threshold rule is unit-testable without a repository.</summary>
+        public static bool ComputeOnline(DateTime? lastSeenAt, int? sleepSeconds, DateTime utcNow)
+        {
+            if (lastSeenAt is not DateTime seen)
+            {
+                return false;
+            }
+            double windowSeconds = (sleepSeconds ?? 60) * (double)OfflineMissedPolls + OfflineGraceSeconds;
+            return (utcNow - seen).TotalSeconds <= windowSeconds;
+        }
+    }
+
     public class DeviceUpdate()
     {
         public Device? Device {  get; set; }

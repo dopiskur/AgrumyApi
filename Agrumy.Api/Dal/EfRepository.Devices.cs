@@ -68,6 +68,8 @@ namespace api.Dal
             }
 
             await using var tx = await db.Database.BeginTransactionAsync();
+            // Diagnostics first: its FK to device is NoAction, so leaving the row would block the delete.
+            await db.DeviceDiagnostics.Where(x => x.DeviceID == idDevice).ExecuteDeleteAsync();
             await db.Devices.Where(d => d.IDDevice == idDevice && d.TenantID == tenantID).ExecuteDeleteAsync();
             if (target.DeviceConfigSensorID != null)
             {
@@ -381,6 +383,74 @@ namespace api.Dal
                     Wind = s.Wind,
                 })
                 .ToListAsync();
+        }
+
+        // ---- Device diagnostics / fleet (roadmap #7 + #8) --------------------------
+
+        public async Task DeviceDiagnosticUpsertAsync(int deviceID, int tenantID, DeviceConfigPoll poll)
+        {
+            await using var db = Db();
+            var row = await db.DeviceDiagnostics.FirstOrDefaultAsync(d => d.DeviceID == deviceID);
+            if (row == null)
+            {
+                row = new DeviceDiagnosticRow { DeviceID = deviceID };
+                db.DeviceDiagnostics.Add(row);
+            }
+
+            row.TenantID = tenantID;
+            row.LastSeenAt = DateTime.UtcNow; // server clock - device clocks drift and may lack NTP, same rule as EventDevicePushAsync
+            // Keep the last known value when a field is missing (pre-#7 firmware sends only
+            // ConfigVersion) so upgrading the server alone doesn't blank existing diagnostics.
+            row.UptimeSeconds = poll.Uptime ?? row.UptimeSeconds;
+            row.RssiDbm = poll.Rssi ?? row.RssiDbm;
+            row.FreeHeapBytes = poll.FreeHeap ?? row.FreeHeapBytes;
+            row.FirmwareVersion = poll.FirmwareVersion ?? row.FirmwareVersion;
+            await db.SaveChangesAsync();
+        }
+
+        public async Task<IList<DeviceFleetStatus>> DeviceFleetGetAsync(int? tenantID)
+        {
+            await using var db = Db();
+            IQueryable<DeviceRow> devices = db.Devices.AsNoTracking();
+            if (tenantID != null)
+            {
+                devices = devices.Where(d => d.TenantID == tenantID);
+            }
+
+            // Left-join diagnostics (a never-seen device still shows on the dashboard) and pull the
+            // newest telemetry battery as a correlated scalar subquery - translates to a plain
+            // ORDER BY ... LIMIT 1 subselect on both providers, no LATERAL needed (MariaDB lacks it).
+            var rows = await devices
+                .Select(d => new
+                {
+                    Device = d,
+                    Diag = db.DeviceDiagnostics.AsNoTracking()
+                        .Where(x => x.DeviceID == d.IDDevice)
+                        .FirstOrDefault(),
+                    Battery = db.SensorData.AsNoTracking()
+                        .Where(s => s.DeviceID == d.IDDevice)
+                        .OrderByDescending(s => s.DateCreated)
+                        .Select(s => s.Battery)
+                        .FirstOrDefault(),
+                })
+                .ToListAsync();
+
+            DateTime utcNow = DateTime.UtcNow;
+            return rows.Select(r => new DeviceFleetStatus
+            {
+                IDDevice = r.Device.IDDevice,
+                TenantID = r.Device.TenantID,
+                DeviceName = r.Device.DeviceName,
+                Enabled = r.Device.Enabled,
+                SleepSeconds = r.Device.SleepSeconds,
+                LastSeenAt = r.Diag?.LastSeenAt,
+                UptimeSeconds = r.Diag?.UptimeSeconds,
+                RssiDbm = r.Diag?.RssiDbm,
+                FreeHeapBytes = r.Diag?.FreeHeapBytes,
+                FirmwareVersion = r.Diag?.FirmwareVersion,
+                Battery = r.Battery,
+                Online = DeviceFleetStatus.ComputeOnline(r.Diag?.LastSeenAt, r.Device.SleepSeconds, utcNow),
+            }).ToList();
         }
 
         // ---- Device events (roadmap #28) -------------------------------------------
