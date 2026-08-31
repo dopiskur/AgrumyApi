@@ -15,10 +15,13 @@ jobs:
       contents: read #This is required for actions/checkout
 
     steps:
-      - uses: actions/checkout@v4
+      # Roadmap #75: SHA-pinned instead of a version tag - a tag can be moved to point at a
+      # different (compromised) commit after the fact, a commit hash cannot. Comment names the
+      # version the hash currently resolves to, purely for humans bumping it later.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up .NET Core
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: '10.0'
 

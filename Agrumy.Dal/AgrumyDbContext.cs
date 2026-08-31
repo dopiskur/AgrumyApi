@@ -45,9 +45,9 @@ namespace api.Dal
         public DbSet<EventDeviceRow> EventDevices => Set<EventDeviceRow>();
         public DbSet<EventServiceRow> EventServices => Set<EventServiceRow>();
 
-        protected override void OnModelCreating(ModelBuilder b)
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            b.Entity<TenantRow>(e =>
+            modelBuilder.Entity<TenantRow>(e =>
             {
                 e.ToTable("tenant");
                 e.HasKey(x => x.IDTenant);
@@ -57,7 +57,7 @@ namespace api.Dal
                 e.HasIndex(x => x.TenantName).IsUnique().HasDatabaseName("Name_UNIQUE");
             });
 
-            b.Entity<UserRoleScopeRow>(e =>
+            modelBuilder.Entity<UserRoleScopeRow>(e =>
             {
                 e.ToTable("userRoleScope");
                 e.HasKey(x => x.IDRoleScope);
@@ -65,7 +65,7 @@ namespace api.Dal
                 e.Property(x => x.RoleScopeName).HasMaxLength(45);
             });
 
-            b.Entity<UserRoleRow>(e =>
+            modelBuilder.Entity<UserRoleRow>(e =>
             {
                 e.ToTable("userRole");
                 e.HasKey(x => x.IDUserRole);
@@ -74,7 +74,7 @@ namespace api.Dal
                 e.HasOne<UserRoleScopeRow>().WithMany().HasForeignKey(x => x.RoleScopeID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            b.Entity<UserUserRoleRow>(e =>
+            modelBuilder.Entity<UserUserRoleRow>(e =>
             {
                 e.ToTable("userUserRole");
                 e.HasKey(x => new { x.UserID, x.UserRoleID }); // composite - a user cannot hold the same role twice
@@ -82,7 +82,7 @@ namespace api.Dal
                 e.HasOne<UserRoleRow>().WithMany().HasForeignKey(x => x.UserRoleID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            b.Entity<UserGroupRow>(e =>
+            modelBuilder.Entity<UserGroupRow>(e =>
             {
                 e.ToTable("userGroup");
                 e.HasKey(x => x.IDUserGroup);
@@ -91,7 +91,7 @@ namespace api.Dal
                 e.HasOne<UserRoleRow>().WithMany().HasForeignKey(x => x.UserRoleID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            b.Entity<UserRow>(e =>
+            modelBuilder.Entity<UserRow>(e =>
             {
                 e.ToTable("user");
                 e.HasKey(x => x.IDUser);
@@ -115,7 +115,7 @@ namespace api.Dal
                 e.HasOne<UserGroupRow>().WithMany().HasForeignKey(x => x.UserGroupID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            b.Entity<RefreshTokenRow>(e =>
+            modelBuilder.Entity<RefreshTokenRow>(e =>
             {
                 e.ToTable("userRefreshToken");
                 e.HasKey(x => x.IDRefreshToken);
@@ -128,7 +128,7 @@ namespace api.Dal
                 e.HasOne<UserRow>().WithMany().HasForeignKey(x => x.UserID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            b.Entity<ServerConfigRow>(e =>
+            modelBuilder.Entity<ServerConfigRow>(e =>
             {
                 e.ToTable("serverConfig");
                 e.HasKey(x => x.IDServerConfig);
@@ -138,7 +138,7 @@ namespace api.Dal
                 e.Property(x => x.ServerConfigCol).HasColumnName("serverConfigcol").HasMaxLength(45);
             });
 
-            b.Entity<DeviceUnitZoneRow>(e =>
+            modelBuilder.Entity<DeviceUnitZoneRow>(e =>
             {
                 e.ToTable("deviceUnitZone");
                 e.HasKey(x => x.IDDeviceUnitZone);
@@ -146,7 +146,7 @@ namespace api.Dal
                 e.Property(x => x.DeviceUnitZoneName).HasMaxLength(120);
             });
 
-            b.Entity<DeviceUnitRow>(e =>
+            modelBuilder.Entity<DeviceUnitRow>(e =>
             {
                 e.ToTable("deviceUnit");
                 e.HasKey(x => x.IDDeviceUnit);
@@ -155,7 +155,7 @@ namespace api.Dal
                 e.HasOne<DeviceUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceUnitZoneID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            b.Entity<DeviceTypeRow>(e =>
+            modelBuilder.Entity<DeviceTypeRow>(e =>
             {
                 e.ToTable("deviceType");
                 e.HasKey(x => x.IDDeviceType);
@@ -163,7 +163,7 @@ namespace api.Dal
                 e.Property(x => x.DeviceTypeName).HasMaxLength(100);
             });
 
-            b.Entity<DeviceTypeServiceRow>(e =>
+            modelBuilder.Entity<DeviceTypeServiceRow>(e =>
             {
                 e.ToTable("deviceTypeService");
                 e.HasKey(x => x.IDDeviceTypeService);
@@ -171,7 +171,7 @@ namespace api.Dal
                 e.Property(x => x.ServiceType).HasMaxLength(5);
             });
 
-            b.Entity<DeviceTypeRelayRow>(e =>
+            modelBuilder.Entity<DeviceTypeRelayRow>(e =>
             {
                 e.ToTable("deviceTypeRelay");
                 e.HasKey(x => x.IDDeviceTypeRelay);
@@ -179,7 +179,7 @@ namespace api.Dal
                 e.Property(x => x.RelayName).HasMaxLength(128);
             });
 
-            b.Entity<DeviceTypeSensorRow>(e =>
+            modelBuilder.Entity<DeviceTypeSensorRow>(e =>
             {
                 e.ToTable("deviceTypeSensor");
                 e.HasKey(x => x.IDDeviceTypeSensor);
@@ -187,7 +187,7 @@ namespace api.Dal
                 e.Property(x => x.SensorName).HasMaxLength(128);
             });
 
-            b.Entity<DeviceConfigControllerRow>(e =>
+            modelBuilder.Entity<DeviceConfigControllerRow>(e =>
             {
                 e.ToTable("deviceConfigController");
                 e.HasKey(x => x.IDDeviceConfigController);
@@ -203,7 +203,7 @@ namespace api.Dal
                 e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay8).OnDelete(DeleteBehavior.NoAction);
             });
 
-            b.Entity<DeviceConfigSensorRow>(e =>
+            modelBuilder.Entity<DeviceConfigSensorRow>(e =>
             {
                 e.ToTable("deviceConfigSensor");
                 e.HasKey(x => x.IDDeviceConfigSensor);
@@ -224,7 +224,7 @@ namespace api.Dal
                 e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorWind).OnDelete(DeleteBehavior.NoAction);
             });
 
-            b.Entity<DeviceRow>(e =>
+            modelBuilder.Entity<DeviceRow>(e =>
             {
                 e.ToTable("device");
                 e.HasKey(x => x.IDDevice);
@@ -246,7 +246,7 @@ namespace api.Dal
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            b.Entity<DeviceDiagnosticRow>(e =>
+            modelBuilder.Entity<DeviceDiagnosticRow>(e =>
             {
                 e.ToTable("deviceDiagnostic");
                 // DeviceID is the PK (1:1 with device, roadmap #7) - deliberately NOT ValueGeneratedOnAdd.
@@ -256,7 +256,7 @@ namespace api.Dal
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            b.Entity<DeviceFirmwareRow>(e =>
+            modelBuilder.Entity<DeviceFirmwareRow>(e =>
             {
                 e.ToTable("deviceFirmware");
                 e.HasKey(x => x.IDDeviceFirmware);
@@ -265,7 +265,7 @@ namespace api.Dal
                 e.Property(x => x.DateAdded).HasDefaultValueSql("CURRENT_TIMESTAMP");
             });
 
-            b.Entity<SensorDataRow>(e =>
+            modelBuilder.Entity<SensorDataRow>(e =>
             {
                 e.ToTable("sensorData");
                 e.HasKey(x => x.IDSensorData);
@@ -279,7 +279,7 @@ namespace api.Dal
                 e.HasOne<DeviceUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceUnitZoneID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            b.Entity<SensorDataReportRow>(e =>
+            modelBuilder.Entity<SensorDataReportRow>(e =>
             {
                 e.ToTable("sensorDataReport");
                 e.HasKey(x => x.IDSensorDataReport);
@@ -291,14 +291,14 @@ namespace api.Dal
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            b.Entity<EventDeviceRow>(e =>
+            modelBuilder.Entity<EventDeviceRow>(e =>
             {
                 e.ToTable("eventDevice");
                 e.HasKey(x => x.IDEventDevice);
                 e.Property(x => x.IDEventDevice).ValueGeneratedOnAdd();
             });
 
-            b.Entity<EventServiceRow>(e =>
+            modelBuilder.Entity<EventServiceRow>(e =>
             {
                 e.ToTable("eventService");
                 e.HasKey(x => x.IDEventService);

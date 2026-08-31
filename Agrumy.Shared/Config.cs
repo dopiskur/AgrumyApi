@@ -11,32 +11,32 @@ namespace api
            .Build();
 
         // SQL settings
-        public static string? defaultSqlCon = configuration.GetConnectionString("DefaultConnection");
+        public static readonly string? defaultSqlCon = configuration.GetConnectionString("DefaultConnection");
 
         /// <summary>Raw value of <c>Database:Provider</c> (mysql | mariadb | postgres | postgresql). Null/empty =&gt; mysql. Parsed by api.Dal.DbProviderKindParser.</summary>
-        public static string? dbProvider =
+        public static readonly string? dbProvider =
             Environment.GetEnvironmentVariable("AGRUMY_DB_PROVIDER")
             ?? configuration.GetSection("Database:Provider").Value;
-        public static string? secureKey = configuration.GetSection("JWT:SecureKey").Value;
-        public static string? jwtIssuer = configuration.GetSection("JWT:Issuer").Value;
-        public static string? jwtAudience = configuration.GetSection("JWT:Audience").Value;
+        public static readonly string? secureKey = configuration.GetSection("JWT:SecureKey").Value;
+        public static readonly string? jwtIssuer = configuration.GetSection("JWT:Issuer").Value;
+        public static readonly string? jwtAudience = configuration.GetSection("JWT:Audience").Value;
 
-        public static string? apiService = configuration.GetSection("WebView:ApiService").Value;
+        public static readonly string? apiService = configuration.GetSection("WebView:ApiService").Value;
 
         // ServerConfig:Reload (roadmap #10 hysteresis) - if true, overwrite the DB serverConfig
         // row's hysteresis fields from ServerConfig:Hysteresis on every startup instead of only
         // seeding them once when the row is first created. An operator flips this to force the
         // DB back to the file's values; leaving it true keeps clobbering any admin-UI edit on
         // every restart, so it defaults to false.
-        public static bool serverConfigReload =
+        public static readonly bool serverConfigReload =
             bool.TryParse(configuration.GetSection("ServerConfig:Reload").Value, out var reload) && reload;
 
         // Fallback hysteresis defaults if ServerConfig:Hysteresis is missing from appsettings.json
         // entirely (upgrade from an older config file) - same values the firmware used to hardcode.
-        public static double hysteresisWaterLevel = ParseDoubleOr("ServerConfig:Hysteresis:WaterLevel", 5.0);
-        public static double hysteresisTemperature = ParseDoubleOr("ServerConfig:Hysteresis:Temperature", 1.0);
-        public static double hysteresisHumidity = ParseDoubleOr("ServerConfig:Hysteresis:Humidity", 5.0);
-        public static double hysteresisLight = ParseDoubleOr("ServerConfig:Hysteresis:Light", 20.0);
+        public static readonly double hysteresisWaterLevel = ParseDoubleOr("ServerConfig:Hysteresis:WaterLevel", 5.0);
+        public static readonly double hysteresisTemperature = ParseDoubleOr("ServerConfig:Hysteresis:Temperature", 1.0);
+        public static readonly double hysteresisHumidity = ParseDoubleOr("ServerConfig:Hysteresis:Humidity", 5.0);
+        public static readonly double hysteresisLight = ParseDoubleOr("ServerConfig:Hysteresis:Light", 20.0);
 
         // IConfiguration stores every value as its literal JSON text (e.g. "20.0"). Parsing that
         // with the ambient CultureInfo.CurrentCulture is wrong on any host whose locale uses "."
@@ -48,14 +48,14 @@ namespace api
                 : fallback;
 
         // Roadmap #28: how long a device's identical repeated event is ignored server-side.
-        public static int eventDedupeMinutes = ParseIntOr("ServerConfig:EventDedupeMinutes", 10);
+        public static readonly int eventDedupeMinutes = ParseIntOr("ServerConfig:EventDedupeMinutes", 10);
 
         // Roadmap #24: how long a user must wait between "resend activation email" requests.
-        public static int activationResendCooldownMinutes = ParseIntOr("ServerConfig:ActivationResendCooldownMinutes", 10);
+        public static readonly int activationResendCooldownMinutes = ParseIntOr("ServerConfig:ActivationResendCooldownMinutes", 10);
 
         // Roadmap #64: off by default - UserRegistration rejects an unknown tenant name instead of
         // silently creating one until an admin opts in.
-        public static bool allowSelfServiceTenantCreation = ParseBoolOr("ServerConfig:AllowSelfServiceTenantCreation", false);
+        public static readonly bool allowSelfServiceTenantCreation = ParseBoolOr("ServerConfig:AllowSelfServiceTenantCreation", false);
 
         private static int ParseIntOr(string key, int fallback) =>
             int.TryParse(configuration.GetSection(key).Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)

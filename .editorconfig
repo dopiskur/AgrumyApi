@@ -1,0 +1,44 @@
+# Roadmap #75: agreed style, IDE-suggestion severity only (none of this is wired into
+# TreatWarningsAsErrors via EnforceCodeStyleInBuild) - it nudges an editor, it never breaks CI.
+# Reflects conventions already in use across the codebase rather than introducing new ones.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.{cs,csx}]
+indent_size = 4
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.cshtml]
+indent_size = 4
+
+[*.{sln}]
+indent_style = tab
+
+[*.cs]
+# Matches the codebase as written: namespace X { ... }, not the newer namespace X; form.
+csharp_style_namespace_declarations = block:suggestion
+csharp_new_line_before_open_brace = all
+csharp_prefer_braces = true:suggestion
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+dotnet_sort_system_directives_first = true
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+
+# Naming: PascalCase for types/members, camelCase for locals/parameters - already how the
+# codebase reads; this just makes the convention explicit instead of tribal knowledge.
+dotnet_naming_rule.types_pascal_case.severity = suggestion
+dotnet_naming_rule.types_pascal_case.symbols = types
+dotnet_naming_rule.types_pascal_case.style = pascal_case
+dotnet_naming_symbols.types.applicable_kinds = class, struct, interface, enum
+dotnet_naming_style.pascal_case.capitalization = pascal_case

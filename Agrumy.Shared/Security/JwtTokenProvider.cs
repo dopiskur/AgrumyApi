@@ -7,7 +7,7 @@ using System.Text;
 
 namespace api.Security
 {
-    public class JwtTokenProvider
+    public partial class JwtTokenProvider
     {
         private static string? signKey = Config.secureKey;
 
@@ -16,6 +16,18 @@ namespace api.Security
         /// each host assigns it once at startup (see both Program.cs). Null (e.g. unit tests, an
         /// unwired host) means rejections stay silent, exactly the pre-#69 behaviour.</summary>
         public static ILogger? Logger { get; set; }
+
+        // Roadmap #75 (CA1848): source-generated LoggerMessage delegates instead of the
+        // LogWarning(string, object[]) extension - avoids a params-array/boxing allocation on
+        // every JWT rejection, which on a busy device-auth endpoint is every failed request.
+        [LoggerMessage(Level = LogLevel.Warning, Message = "JWT rejected: expired.")]
+        private static partial void LogTokenExpired(ILogger logger);
+
+        [LoggerMessage(Level = LogLevel.Warning, Message = "JWT rejected: invalid signature - key value or key-encoding mismatch between issuer and validator.")]
+        private static partial void LogInvalidSignature(ILogger logger);
+
+        [LoggerMessage(Level = LogLevel.Warning, Message = "JWT rejected: {ExceptionType} - malformed or otherwise invalid token.")]
+        private static partial void LogMalformedToken(ILogger logger, string exceptionType);
 
 
         /// <summary>Roadmap #66: a user can hold several roles at once, so <paramref name="roles"/>
@@ -70,7 +82,7 @@ namespace api.Security
         /// hard-bound to Config.secureKey via the static field); production callers never pass a key.</summary>
         public static IReadOnlyList<string>? ValidateToken(string token, string? secureKey)
         {
-            if (token == null)
+            if (token == null || secureKey == null)
                 return null;
 
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -105,17 +117,17 @@ namespace api.Security
             // indistinguishable between clock skew, a key mismatch and a mangled token.
             catch (SecurityTokenExpiredException)
             {
-                Logger?.LogWarning("JWT rejected: expired.");
+                if (Logger is not null) { LogTokenExpired(Logger); }
                 return null;
             }
             catch (SecurityTokenInvalidSignatureException)
             {
-                Logger?.LogWarning("JWT rejected: invalid signature - key value or key-encoding mismatch between issuer and validator.");
+                if (Logger is not null) { LogInvalidSignature(Logger); }
                 return null;
             }
             catch (Exception ex)
             {
-                Logger?.LogWarning("JWT rejected: {ExceptionType} - malformed or otherwise invalid token.", ex.GetType().Name);
+                if (Logger is not null) { LogMalformedToken(Logger, ex.GetType().Name); }
                 return null;
             }
         }

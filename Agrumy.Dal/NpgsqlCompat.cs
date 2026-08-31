@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace api.Dal
@@ -12,6 +13,7 @@ namespace api.Dal
         /// instead of the UTC-only <c>timestamp with time zone</c> default. Roadmap #42 Phase 2.
         /// </summary>
         [ModuleInitializer]
+        [SuppressMessage("Usage", "CA2255", Justification = "Deliberate: Agrumy.Dal is a library, but this switch must be set before any Npgsql type mapping runs, and there is no earlier library-safe hook than a module initializer.")]
         internal static void Init()
         {
             AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);

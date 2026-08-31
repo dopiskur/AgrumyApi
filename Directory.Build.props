@@ -1,0 +1,19 @@
+<Project>
+  <!-- Roadmap #75: catches future mistakes as build errors instead of warnings nobody reads -
+       same rationale as scaleTrigger's setup. Applies to every project under this directory
+       (picked up automatically by the SDK, no per-csproj change needed). -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisMode>Minimum</AnalysisMode>
+  </PropertyGroup>
+
+  <!-- Agrumy.Api.Tests excluded: Minimum's CA1861/CA1822 (cache this literal array / mark this
+       method static) fire constantly on ordinary Assert.Equal(new[] {...}, ...) test code and
+       one-off test helpers - real noise, not the "future mistake" this file exists to catch, and
+       xunit's own generated Program.cs isn't nullable-clean either. Warnings still show; they
+       just don't fail the build. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Agrumy.Api.Tests'">
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AnalysisMode>Default</AnalysisMode>
+  </PropertyGroup>
+</Project>
