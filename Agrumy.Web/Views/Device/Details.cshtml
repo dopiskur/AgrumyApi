@@ -114,6 +114,12 @@
                 @Html.DisplayFor(model => model.ConfigVersion)
             </dd>
             <dt class="col-sm-3">
+                Free heap
+            </dt>
+            <dd class="col-sm-9">
+                @(ViewBag.FreeHeapBytes is long heap ? $"{heap / 1024} KB" : "-")
+            </dd>
+            <dt class="col-sm-3">
                 @Html.DisplayNameFor(model => model.DateCreated)
             </dt>
             <dd class="col-sm-9">

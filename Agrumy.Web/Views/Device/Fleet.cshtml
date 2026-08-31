@@ -34,7 +34,6 @@
                     <th>Last seen</th>
                     <th>Signal</th>
                     <th>Uptime</th>
-                    <th>Free heap</th>
                     <th>Firmware</th>
                     <th>Battery</th>
                     <th></th>
@@ -73,7 +72,6 @@
                         }
                     </td>
                     <td>@Uptime(item.UptimeSeconds)</td>
-                    <td>@(item.FreeHeapBytes is long heap ? $"{heap / 1024} KB" : "-")</td>
                     <td>@(item.FirmwareVersion ?? "-")</td>
                     <td>@(item.Battery?.ToString() ?? "-")</td>
                     <td>

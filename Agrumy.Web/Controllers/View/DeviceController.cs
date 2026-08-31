@@ -31,8 +31,18 @@ namespace api.Controllers.View
             return View(fleet);
         }
 
-        public async Task<ActionResult> Details(int? idDevice) =>
-            View(await api.DeviceGet(idDevice));
+        public async Task<ActionResult> Details(int? idDevice)
+        {
+            Device device = await api.DeviceGet(idDevice);
+
+            // Free heap is a per-device diagnostic drill-down, not a fleet-wide health signal - it
+            // belongs here, not as a Fleet column. Fleet's own endpoint already computes it; find
+            // this one device in the same caller-scoped list rather than adding a single-device API.
+            IList<DeviceFleetStatus> fleet = await api.DeviceFleetGet();
+            ViewBag.FreeHeapBytes = fleet.FirstOrDefault(f => f.IDDevice == idDevice)?.FreeHeapBytes;
+
+            return View(device);
+        }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> Edit(int? idDevice) =>
