@@ -15,6 +15,19 @@ namespace api.Security
             return b64Salt;
         }
 
+        // Roadmap #73: device credentials (ApiKey, session apiAuth) need a CSPRNG source -
+        // Guid.NewGuid() is documented by Microsoft as not guaranteed cryptographically secure,
+        // only "sufficiently random" for identifiers. Same RandomNumberGenerator source as
+        // GetSalt() above; 256 bits (vs. GetSalt()'s 128) because these values ARE the credential
+        // itself, not combined with a password. Base64 output is a valid HTTP header value as-is
+        // (ApiKey/apiAuth are sent in custom headers, not URL segments, so no URL-safe encoding
+        // is needed).
+        public static string GetSecureToken()
+        {
+            byte[] token = RandomNumberGenerator.GetBytes(256 / 8);
+            return Convert.ToBase64String(token);
+        }
+
         public static string GetHash(string password, string b64salt)
         {
             byte[] salt = Convert.FromBase64String(b64salt);
