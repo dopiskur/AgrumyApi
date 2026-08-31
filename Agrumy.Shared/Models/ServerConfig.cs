@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace api.Models
 {
     public class ServerConfig
@@ -29,7 +31,12 @@ namespace api.Models
 
         // Roadmap #64: off by default. When true, UserRegistration is allowed to create a brand
         // new tenant for a name it doesn't recognize instead of rejecting the registration.
-        public bool? AllowSelfServiceTenantCreation { get; set; }
+        // Non-nullable: the row always carries a concrete value (seeded on first read, see
+        // EfRepository.ServerConfigGetAsync) - bool? here made asp-for render a text box
+        // ("True"/"False") instead of a checkbox, since the InputTagHelper only auto-detects
+        // a checkbox for a non-nullable bool.
+        [Display(Name = "Allow self-service tenant creation")]
+        public bool AllowSelfServiceTenantCreation { get; set; }
     }
 
     /// <summary>The only two fields of <see cref="ServerConfig"/> a pre-login, unauthenticated page

@@ -48,7 +48,7 @@ namespace api.Controllers.API
         public async Task<ActionResult<PublicServerConfig>> GetPublic()
         {
             ServerConfig config = await Repo.ServerConfigGetAsync(1);
-            return Ok(new PublicServerConfig { AllowSelfServiceTenantCreation = config.AllowSelfServiceTenantCreation ?? Config.allowSelfServiceTenantCreation });
+            return Ok(new PublicServerConfig { AllowSelfServiceTenantCreation = config.AllowSelfServiceTenantCreation });
         }
     }
 }

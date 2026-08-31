@@ -54,8 +54,7 @@ namespace api.Controllers.API
                 // Roadmap #64: self-service tenant creation is opt-in, and when it's on the name
                 // still needs to be long enough that it wasn't just a typo of an existing one.
                 ServerConfig serverConfig = await Repo.ServerConfigGetAsync(1);
-                bool allowSelfService = serverConfig.AllowSelfServiceTenantCreation ?? Config.allowSelfServiceTenantCreation;
-                if (!allowSelfService)
+                if (!serverConfig.AllowSelfServiceTenantCreation)
                 {
                     return StatusCode(403, "Unknown tenant name, and self-service tenant creation is disabled.");
                 }

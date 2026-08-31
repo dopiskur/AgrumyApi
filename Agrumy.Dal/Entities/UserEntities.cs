@@ -114,6 +114,6 @@ namespace api.Dal.Entities
 
         // Roadmap #24/#64 - see api.Models.ServerConfig.
         public int? ActivationResendCooldownMinutes { get; set; }
-        public bool? AllowSelfServiceTenantCreation { get; set; }
+        public bool AllowSelfServiceTenantCreation { get; set; }
     }
 }
