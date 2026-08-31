@@ -52,7 +52,8 @@ namespace api.Security
 
     public sealed class DeviceApiKeyRequirement : IAuthorizationRequirement;
 
-    public sealed class DeviceApiKeyHandler(IRepository repo) : AuthorizationHandler<DeviceApiKeyRequirement>
+    // Narrow IDeviceRepository facet (roadmap #74) - the only data-layer call here is the ApiId lookup.
+    public sealed class DeviceApiKeyHandler(IDeviceRepository repo) : AuthorizationHandler<DeviceApiKeyRequirement>
     {
         protected override async Task HandleRequirementAsync(
             AuthorizationHandlerContext context, DeviceApiKeyRequirement requirement)

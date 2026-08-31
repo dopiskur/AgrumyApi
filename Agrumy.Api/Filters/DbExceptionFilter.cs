@@ -8,11 +8,12 @@ namespace api.Filters
     /// <summary>
     /// Turns any exception escaping an API action into a response: a named unique-constraint hit
     /// (email/username) becomes a 500 business message; anything else goes through
-    /// <see cref="IRepository.ClassifyException"/> to the DbErrorResponse shape with the status
+    /// <see cref="ISystemRepository.ClassifyException"/> to the DbErrorResponse shape with the status
     /// <see cref="DbErrorResponse.StatusCodeFor"/> picks (409 for a constraint violation, 500 for an
-    /// unrecognised error, else 503). Registered globally in Program.cs.
+    /// unrecognised error, else 503). Registered globally in Program.cs. Takes the narrow
+    /// ISystemRepository facet (roadmap #74) - classification is the only data-layer touchpoint here.
     /// </summary>
-    public sealed class DbExceptionFilter(IRepository repo, ILogger<DbExceptionFilter> logger) : IExceptionFilter
+    public sealed class DbExceptionFilter(ISystemRepository repo, ILogger<DbExceptionFilter> logger) : IExceptionFilter
     {
         public void OnException(ExceptionContext context)
         {

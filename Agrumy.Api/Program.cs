@@ -46,7 +46,18 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddScoped<IAuthorizationHandler, DeviceApiKeyHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, DeviceSessionHandler>();
 
-builder.Services.AddScoped<IRepository, EfRepository>();
+// Roadmap #74: one scoped EfRepository instance, exposed as the full IRepository (controllers)
+// and forwarded to every per-domain facet, so a narrow consumer (DbExceptionFilter,
+// DeviceApiKeyHandler, future background workers) can inject just the interface it needs.
+builder.Services.AddScoped<EfRepository>();
+builder.Services.AddScoped<IRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<ISystemRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<IServerConfigRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<IUserRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<ITenantRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<IRefreshTokenRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<IDeviceRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<ISensorDataRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ICache, CacheRepository>();
 builder.Services.AddScoped<DbExceptionFilter>();
 
