@@ -38,8 +38,8 @@
                 <input asp-for="UserUpdate.Password" class="form-control" />
                 <span asp-validation-for="UserUpdate.Password" class="text-danger"></span>
             </div>
-            @* Roadmap #70: DevicePin is no longer editable - it is a generated, single-use,
-               expiring secret the user rotates from their own My Profile page. *@
+            @* Roadmap #70: DevicePin is no longer editable - it is a generated, expiring
+               secret the user rotates from their own My Profile page. *@
             <div class="mb-3">
                 <label asp-for="UserUpdate.Username" class="form-label"></label>
                 <input asp-for="UserUpdate.Username" class="form-control" />

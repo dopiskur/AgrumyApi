@@ -53,8 +53,8 @@ namespace api.Dal.Interface
         [Post("/api/User/ChangePassword")]
         Task ChangePassword([Body] UserSetPassword value);
 
-        /// <summary>Roadmap #70: rotates the caller's single-use device-registration PIN (24h
-        /// validity, consumed by the first successful device registration).</summary>
+        /// <summary>Roadmap #70: rotates the caller's device-registration PIN (24h validity,
+        /// multi-use - not consumed by the first successful device registration).</summary>
         [Post("/api/User/DevicePin")]
         Task<DevicePinResult> DevicePinGenerate();
 

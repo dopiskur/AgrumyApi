@@ -13,8 +13,9 @@ namespace api.Models
         public string? Username { get; set; }
         public string? DevicePin { get; set; } = AuthenticationProvider.GetPin();
 
-        // Roadmap #70: a PIN is only registerable while unexpired; null (legacy rows, or a PIN
-        // consumed by a successful device registration) means "generate a new one first".
+        // Roadmap #70: a PIN is only registerable while unexpired; null (legacy rows, or one
+        // never generated / explicitly cleared) means "generate a new one first". Multi-use
+        // within the 24h window - not consumed by a successful device registration.
         public DateTime? DevicePinExpires { get; set; } = DateTime.UtcNow.AddHours(AuthenticationProvider.PinValidHours);
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
@@ -49,6 +50,11 @@ namespace api.Models
         public int? TenantID { get; set; } = 0;
         public string? Email { get; set; }
         public string? Username { get; set; }
+        // Unlike UserUpdate.Password (optional there - null means "don't change"), a brand-new
+        // account must start with a password - UserApiController.UserAdd has no fallback for a
+        // missing one, so this was a latent null-argument crash on an admin submitting the Create
+        // form with the field left blank (roadmap #75, caught by enabling nullable warnings-as-errors).
+        [Required(ErrorMessage = "Password is required")]
         [DataType(DataType.Password)]
         public string? Password { get; set; }
         public string? FirstName { get; set; }
@@ -150,8 +156,8 @@ namespace api.Models
     }
 
     /// <summary>Roadmap #70: response of POST /api/User/DevicePin - the freshly generated PIN and
-    /// when it stops being accepted by POST /api/Device/Register. The PIN is consumed by the first
-    /// successful registration, so registering another device always starts here.</summary>
+    /// when it stops being accepted by POST /api/Device/Register. Valid for repeated registrations
+    /// until that expiry (not consumed by the first one), so bulk sensor setup needs only one PIN.</summary>
     public class DevicePinResult
     {
         public string? DevicePin { get; set; }

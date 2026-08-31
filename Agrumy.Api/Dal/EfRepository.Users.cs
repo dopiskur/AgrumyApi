@@ -41,8 +41,8 @@ namespace api.Dal
             row.TenantID = user.TenantID ?? 0;
             row.Email = user.Email ?? "";
             // Roadmap #70: DevicePin deliberately NOT written here - the PIN lifecycle (generate/
-            // expire/consume) lives exclusively in UserSetDevicePinAsync below, so an admin edit
-            // can never resurrect a consumed PIN or hand-craft a weak one.
+            // expire) lives exclusively in UserSetDevicePinAsync below, so an admin edit can never
+            // resurrect an expired PIN or hand-craft a weak one.
             row.Username = user.Username;
             row.FirstName = user.FirstName;
             row.LastName = user.LastName;
@@ -72,8 +72,10 @@ namespace api.Dal
             return true;
         }
 
-        /// <summary>Roadmap #70: the ONLY writer of DevicePin/DevicePinExpires - pass nulls to
-        /// consume a PIN after a successful device registration, a value+expiry to (re)issue one.</summary>
+        /// <summary>Roadmap #70: the ONLY writer of DevicePin/DevicePinExpires - a value+expiry to
+        /// (re)issue a PIN, nulls to explicitly clear one. A successful device registration does
+        /// NOT call this (the PIN is multi-use within its 24h window, not consumed on first use -
+        /// see the follow-up note on DeviceApiController.DeviceRegistration).</summary>
         public async Task<bool> UserSetDevicePinAsync(int idUser, string? devicePin, DateTime? expiresAtUtc)
         {
             await using var db = Db();

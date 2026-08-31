@@ -51,7 +51,7 @@ namespace api.Controllers.View
         public async Task<ActionResult> DevicePin()
         {
             await api.DevicePinGenerate();
-            TempData["ProfileMessage"] = "New device PIN generated - it is valid for 24 hours and is consumed by the first successful device registration.";
+            TempData["ProfileMessage"] = "New device PIN generated - it is valid for 24 hours and can be used to register as many devices as you need in that window.";
             return RedirectToAction(nameof(Index));
         }
 

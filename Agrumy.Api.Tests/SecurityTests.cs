@@ -64,11 +64,11 @@ public class AuthenticationProviderTests
     }
 
     [Fact]
-    public void VerifyPin_Expired_Consumed_Or_Missing_NeverMatches()
+    public void VerifyPin_Expired_NeverIssued_Or_Missing_NeverMatches()
     {
         Assert.False(AuthenticationProvider.VerifyPin("ABC234", DateTime.UtcNow.AddMinutes(-1), "ABC234")); // expired
         Assert.False(AuthenticationProvider.VerifyPin("ABC234", null, "ABC234")); // legacy row: expiry never set => invalid, not valid-forever
-        Assert.False(AuthenticationProvider.VerifyPin(null, DateTime.UtcNow.AddHours(1), "ABC234"));        // consumed
+        Assert.False(AuthenticationProvider.VerifyPin(null, DateTime.UtcNow.AddHours(1), "ABC234"));        // never issued / explicitly cleared
         Assert.False(AuthenticationProvider.VerifyPin("ABC234", DateTime.UtcNow.AddHours(1), null));
     }
 

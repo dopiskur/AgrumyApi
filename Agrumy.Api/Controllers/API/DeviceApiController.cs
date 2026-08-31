@@ -285,8 +285,8 @@ namespace api.Controllers.API
                     TenantID = user.TenantID,
                     DeviceName = "Agrumy_" + value.MacAddress.ToUpper(),
                     MacAddress = value.MacAddress,
-                    ApiId = Guid.NewGuid().ToString(),
-                    ApiKey = Guid.NewGuid().ToString(),
+                    ApiId = Guid.NewGuid().ToString(), // identifier, not a secret - Guid is fine
+                    ApiKey = AuthenticationProvider.GetSecureToken(), // roadmap #73: credential, needs a CSPRNG source
                     ServicePoint = value.ServicePoint,
                     DeviceSensorEnabled = false,
                     DeviceControllerEnabled = false,
@@ -299,14 +299,11 @@ namespace api.Controllers.API
                 }
             }
 
-            // Roadmap #70: the PIN is single-use - consumed here so a leaked/shoulder-surfed one
-            // is worthless afterwards; the next device registration needs a fresh PIN from
-            // POST /api/User/DevicePin.
-            if (user.IDUser is int idUser)
-            {
-                await Repo.UserSetDevicePinAsync(idUser, null, null);
-            }
-
+            // Roadmap #70 follow-up: the PIN is deliberately NOT consumed here - single-use made
+            // registering many sensors in one session require regenerating a PIN between every
+            // device, which the user judged "suludo" (absurd). It stays valid for repeated
+            // registrations until its own 24h expiry; the 32^6 keyspace is what makes leaked/
+            // shoulder-surfed reuse economically unattractive to brute-force, not single-use.
             return Ok(await BuildDeviceConfigAsync(device));
         }
 
@@ -371,7 +368,9 @@ namespace api.Controllers.API
                 return NotFound();
             }
 
-            var deviceAuthentication = new DeviceAuthentication { apiAuth = Guid.NewGuid().ToString() };
+            // Roadmap #73: apiAuth is a bearer-style session credential (DeviceAuth.SessionPolicy),
+            // same CSPRNG requirement as ApiKey above.
+            var deviceAuthentication = new DeviceAuthentication { apiAuth = AuthenticationProvider.GetSecureToken() };
             Cache.SetItem(apiId, new DeviceCache
             {
                 ConfigVersion = device.ConfigVersion,

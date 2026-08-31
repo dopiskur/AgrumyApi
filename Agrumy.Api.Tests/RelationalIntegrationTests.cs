@@ -493,7 +493,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task User_SetDevicePin_Issues_And_Consumes(DbProviderKind provider)
+    public async Task User_SetDevicePin_Issues_And_Clears(DbProviderKind provider)
     {
         var t = Use(provider);
         var (_, userId, _) = await MakeUser(t);
@@ -504,11 +504,12 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal("ABC234", issued!.DevicePin);
         Assert.NotNull(issued.DevicePinExpires);
 
-        // Consuming (a successful device registration) nulls both columns.
+        // Roadmap #70 follow-up: a successful device registration no longer calls this - the PIN
+        // is multi-use within its own expiry. Nulls remain a supported explicit-clear operation.
         Assert.True(await _repo.UserSetDevicePinAsync(userId, null, null));
-        var consumed = await _repo.UserGetAsync(userId, null, null);
-        Assert.Null(consumed!.DevicePin);
-        Assert.Null(consumed.DevicePinExpires);
+        var cleared = await _repo.UserGetAsync(userId, null, null);
+        Assert.Null(cleared!.DevicePin);
+        Assert.Null(cleared.DevicePinExpires);
 
         Assert.False(await _repo.UserSetDevicePinAsync(-1, "ABC234", expires));
     }

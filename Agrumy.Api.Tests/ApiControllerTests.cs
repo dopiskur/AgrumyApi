@@ -193,7 +193,7 @@ public class ApiControllerTests
         Assert.IsType<OkResult>(result.Result); // empty body: device is up to date
     }
 
-    // ---- roadmap #70: PIN expiry + single-use -----------------------------------------------
+    // ---- roadmap #70: PIN expiry + multi-use (follow-up: no longer consumed on first use) ----
 
     private static DeviceRegistration PinRegistration(string pin) => new()
     {
@@ -222,9 +222,9 @@ public class ApiControllerTests
     }
 
     [Fact]
-    public async Task DeviceRegistration_ConsumedPin_Returns401()
+    public async Task DeviceRegistration_NoPinEverGenerated_Returns401()
     {
-        StubOwner(null, null); // a previous successful registration nulled both columns
+        StubOwner(null, null); // DevicePin/DevicePinExpires default null until the user ever generates one
 
         var result = await NewDeviceController().DeviceRegistration(PinRegistration("ABC234"));
 
@@ -233,17 +233,39 @@ public class ApiControllerTests
     }
 
     [Fact]
-    public async Task DeviceRegistration_ValidPin_LowercaseAccepted_AndConsumedOnSuccess()
+    public async Task DeviceRegistration_ValidPin_LowercaseAccepted()
     {
         StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
         _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF"))
              .ReturnsAsync(new Device { IDDevice = 500, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
-        _repo.Setup(r => r.UserSetDevicePinAsync(77, null, null)).ReturnsAsync(true);
 
         var result = await NewDeviceController().DeviceRegistration(PinRegistration("abc234"));
 
         Assert.IsType<OkObjectResult>(result.Result);
-        _repo.Verify(r => r.UserSetDevicePinAsync(77, null, null), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeviceRegistration_ValidPin_NotConsumed_ReusableForASecondDevice()
+    {
+        // Roadmap #70 follow-up: single-use made bulk sensor registration a chore of regenerating
+        // the PIN between every device - it must now survive repeated use until its own expiry.
+        StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
+        _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF"))
+             .ReturnsAsync(new Device { IDDevice = 500, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
+        _repo.Setup(r => r.DeviceGetAsync(1, null, null, "112233445566"))
+             .ReturnsAsync(new Device { IDDevice = 501, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
+
+        var first = await NewDeviceController().DeviceRegistration(PinRegistration("ABC234"));
+        var second = await NewDeviceController().DeviceRegistration(new DeviceRegistration
+        {
+            Email = "owner@example.com",
+            DevicePin = "ABC234",
+            MacAddress = "112233445566",
+        });
+
+        Assert.IsType<OkObjectResult>(first.Result);
+        Assert.IsType<OkObjectResult>(second.Result);
+        _repo.Verify(r => r.UserSetDevicePinAsync(It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<DateTime?>()), Times.Never);
     }
 
     // ---- UserApiController.UserRegistration ------------------------------------------------

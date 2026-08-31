@@ -75,7 +75,7 @@ namespace api.Controllers.API
             };
 
             var userSecret = new UserSecret { PwdSalt = AuthenticationProvider.GetSalt() };
-            userSecret.PwdHash = AuthenticationProvider.GetHash(value.Password, userSecret.PwdSalt);
+            userSecret.PwdHash = AuthenticationProvider.GetHash(value.Password!, userSecret.PwdSalt); // [Required], guaranteed by ModelState.IsValid above
 
             if (isNewTenant)
             {
@@ -253,7 +253,7 @@ namespace api.Controllers.API
                 return StatusCode(500, "User has no valid role assigned.");
             }
 
-            string token = JwtTokenProvider.CreateToken(SecureKey, AccessTokenMinutes, user.Email, tokenRoles, user.TenantID.ToString());
+            string token = JwtTokenProvider.CreateToken(SecureKey!, AccessTokenMinutes, user.Email!, tokenRoles, user.TenantID.ToString()!);
             var (refreshToken, refreshTokenHash) = GenerateOpaqueToken();
             await Repo.RefreshTokenAddAsync(user.IDUser!.Value, refreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
 
@@ -309,7 +309,7 @@ namespace api.Controllers.API
             var (newRefreshToken, newRefreshTokenHash) = GenerateOpaqueToken();
             await Repo.RefreshTokenRotateAsync(incomingHash, newRefreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
 
-            string newAccessToken = JwtTokenProvider.CreateToken(SecureKey, AccessTokenMinutes, user.Email, tokenRoles, user.TenantID.ToString());
+            string newAccessToken = JwtTokenProvider.CreateToken(SecureKey!, AccessTokenMinutes, user.Email!, tokenRoles, user.TenantID.ToString()!);
             return Ok(new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = newAccessToken, RefreshToken = newRefreshToken });
         }
 
@@ -344,7 +344,7 @@ namespace api.Controllers.API
             }
 
             secret.PwdSalt = AuthenticationProvider.GetSalt();
-            secret.PwdHash = AuthenticationProvider.GetHash(value.NewPassword, secret.PwdSalt);
+            secret.PwdHash = AuthenticationProvider.GetHash(value.NewPassword!, secret.PwdSalt); // [Required], guaranteed by ModelState.IsValid above
 
             return await Repo.UserSetPasswordAsync(user.Email, secret)
                 ? Ok("Password changed successfully for: " + user.Email)
@@ -410,7 +410,8 @@ namespace api.Controllers.API
                 : NotFound();
         }
 
-        /// <summary>Roadmap #70: (re)issues the caller's single-use device-registration PIN -
+        /// <summary>Roadmap #70: (re)issues the caller's device-registration PIN (multi-use within
+        /// its 24h window, not consumed on first use) -
         /// self-scoped like Profile above (identity only from the JWT) because the PIN registers
         /// devices into the caller's own tenant and is shown to nobody else. POST, not GET: every
         /// call rotates the PIN, which also serves as the only revocation mechanism.</summary>
@@ -473,7 +474,7 @@ namespace api.Controllers.API
             };
 
             var userSecret = new UserSecret { PwdSalt = AuthenticationProvider.GetSalt() };
-            userSecret.PwdHash = AuthenticationProvider.GetHash(value.Password, userSecret.PwdSalt);
+            userSecret.PwdHash = AuthenticationProvider.GetHash(value.Password!, userSecret.PwdSalt); // [Required], guaranteed by ModelState.IsValid above
 
             await Repo.UserAddAsync(user, userSecret);
 

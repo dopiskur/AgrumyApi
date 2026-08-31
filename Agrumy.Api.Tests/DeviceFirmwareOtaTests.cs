@@ -22,7 +22,6 @@ public class DeviceFirmwareOtaTests
              .ReturnsAsync(new User { IDUser = 77, TenantID = device.TenantID, DevicePin = "ABC234", DevicePinExpires = DateTime.UtcNow.AddHours(1) });
         _repo.Setup(r => r.DeviceGetAsync(device.TenantID, null, null, "AABBCCDDEEFF"))
              .ReturnsAsync(device); // IDDevice set => controller skips DeviceAddAsync
-        _repo.Setup(r => r.UserSetDevicePinAsync(77, null, null)).ReturnsAsync(true); // roadmap #70: success consumes the PIN
 
         var controller = new DeviceApiController(_repo.Object, _cache.Object);
         var result = controller.DeviceRegistration(new DeviceRegistration
