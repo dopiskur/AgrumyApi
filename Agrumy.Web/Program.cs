@@ -4,6 +4,7 @@ using api.Filters;
 using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Refit;
 
 // Form model binding for double/decimal fields (ServerConfig, DeviceConfigController) parses
@@ -46,6 +47,32 @@ builder.Services
         options.SlidingExpiration = true;
     });
 builder.Services.AddAuthorization();
+
+// Roadmap #79: default DataProtection key storage falls back to the OS user profile, which the
+// account the systemd service actually runs as (www-data, per CLAUDE.md - NOT the deploy account
+// this code is published under) has no profile directory for on this Linux deployment - keys
+// silently regenerate as ephemeral (in-memory only) on every process start. That logs out every
+// signed-in user (cookie auth reads the encrypted ticket) and invalidates any open antiforgery-
+// protected form on every "build na server" restart. The path is a SIBLING of ContentRootPath,
+// not a subdirectory of it - "build na server" wipes bin/ (ContentRootPath on this deployment)
+// entirely on every publish, which would erase the keys again immediately.
+// Directory.CreateDirectory below covers local dev and any host where the parent is already
+// writable; if it throws (e.g. www-data lacking permission on the parent directory), keys fall
+// back to the previous ephemeral behavior instead of crashing startup - the server still needs a
+// one-time `mkdir -p <path> && chown www-data:www-data <path>` for this fix to actually take
+// effect there.
+try
+{
+    var keyRingPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "dataprotection-keys"));
+    Directory.CreateDirectory(keyRingPath);
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(keyRingPath))
+        .SetApplicationName("Agrumy.Web");
+}
+catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+{
+    Console.Error.WriteLine($"[DataProtection] Could not set up persisted keys, falling back to ephemeral: {ex.Message}");
+}
 
 // Refresh-token plumbing: IAuthApi has no BearerTokenHandler (it authenticates by possessing the
 // refresh token itself), RefreshCoordinator serializes concurrent refreshes of the same stale token.
