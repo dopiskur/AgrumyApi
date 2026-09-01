@@ -242,6 +242,13 @@ namespace api.Dal
                 e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.Property(x => x.DateModified).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.HasIndex(x => x.ApiId).IsUnique().HasDatabaseName("ApiID_UNIQUE");
+                // Roadmap #102: composite, not a bare MacAddress unique - a physical device is
+                // legitimately resold across tenants (old tenant keeps its historical row, new
+                // tenant registers a "new" row with the same MAC), but a duplicate register
+                // request within the SAME tenant (double click, firmware retry) must not create
+                // two rows for one device. NULL MacAddress/TenantID rows never collide under this
+                // index on either MySQL or PostgreSQL, so pre-registration rows are unaffected.
+                e.HasIndex(x => new { x.MacAddress, x.TenantID }).IsUnique().HasDatabaseName("MacAddress_TenantID_UNIQUE");
                 // Legacy device FKs (fk_device_*). DeviceUnitZoneID has no FK on device.
                 e.HasOne<DeviceConfigControllerRow>().WithMany().HasForeignKey(x => x.DeviceConfigControllerID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceConfigSensorRow>().WithMany().HasForeignKey(x => x.DeviceConfigSensorID).OnDelete(DeleteBehavior.NoAction);

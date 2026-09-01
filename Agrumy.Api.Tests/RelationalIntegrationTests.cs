@@ -625,6 +625,62 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(d.IDDevice, (await _repo.DeviceGetByDeviceConfigControllerIdAsync(d.DeviceConfigControllerID))!.IDDevice);
     }
 
+    // Roadmap #102: DB-level guard against the DeviceAddAsync/DeviceGetAsync check-then-act race
+    // (two parallel registration requests for the same MAC+tenant both pass the "doesn't exist"
+    // check before either commits) - the second insert must fail at the DB, not silently create a
+    // duplicate row.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceAdd_DuplicateMacAddress_SameTenant_ThrowsConstraintViolation(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d1 = await MakeDevice(t, tenantId);
+
+        var d2 = new Device
+        {
+            TenantID = tenantId,
+            DeviceTypeID = t.DeviceTypeId,
+            DeviceTypeServiceID = 1,
+            ConfigVersion = 1,
+            DeviceName = "dev_" + U(),
+            MacAddress = d1.MacAddress, // same MAC, same tenant - must collide
+            ApiId = Guid.NewGuid().ToString(),
+            ApiKey = Guid.NewGuid().ToString(),
+            ServicePoint = "api.agrumy.com",
+        };
+
+        var ex = await Assert.ThrowsAsync<DbUpdateException>(() => _repo.DeviceAddAsync(d2));
+        Assert.Equal(DbFailureKind.ConstraintViolation, _repo.ClassifyException(ex));
+    }
+
+    // Same MAC, different tenant is the legitimate "device resold" case (roadmap #102's own
+    // reasoning for why the constraint is composite, not a bare MacAddress unique) - must succeed.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceAdd_SameMacAddress_DifferentTenant_Succeeds(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenant1, _, _) = await MakeUser(t);
+        var (tenant2, _, _) = await MakeUser(t);
+        var d1 = await MakeDevice(t, tenant1);
+
+        var d2 = new Device
+        {
+            TenantID = tenant2,
+            DeviceTypeID = t.DeviceTypeId,
+            DeviceTypeServiceID = 1,
+            ConfigVersion = 1,
+            DeviceName = "dev_" + U(),
+            MacAddress = d1.MacAddress,
+            ApiId = Guid.NewGuid().ToString(),
+            ApiKey = Guid.NewGuid().ToString(),
+            ServicePoint = "api.agrumy.com",
+        };
+
+        await _repo.DeviceAddAsync(d2); // must not throw
+        var back = await _repo.DeviceGetAsync(tenant2, null, null, d1.MacAddress);
+        Assert.NotNull(back);
+    }
+
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceGet_Lookups_Are_Tenant_Scoped(DbProviderKind provider)
     {
