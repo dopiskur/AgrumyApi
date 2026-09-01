@@ -218,6 +218,34 @@ public class ApiControllerTests
         _cache.Verify(c => c.SetItemAsync(It.IsAny<string>(), It.IsAny<DeviceCache>()), Times.Never);
     }
 
+    // Roadmap #109: the old fixed 5-min sliding TTL meant a device sleeping longer than that (the
+    // #89 dropdown goes up to 24h) lost its session every cycle - Authenticate must size the TTL
+    // to the device's own SleepSeconds instead.
+    [Theory]
+    [InlineData(null, 1800)]    // no SleepSeconds on record - 30-min floor
+    [InlineData(60, 1800)]      // short poll - 2x60=120s would be far too short, floor applies
+    [InlineData(3600, 7200)]    // 1h sleep - 2x
+    [InlineData(86400, 172800)] // 24h, the #89 dropdown's max option - 2x
+    public async Task Authenticate_SizesSessionTtlToDeviceSleepInterval(int? sleepSeconds, int expectedTtlSeconds)
+    {
+        var controller = NewDeviceController();
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        controller.HttpContext.Items[DeviceAuth.ApiIdItemKey] = "api-guid";
+
+        _repo.Setup(r => r.DeviceGetByApiIdAsync("api-guid"))
+             .ReturnsAsync(new Device { IDDevice = 500, TenantID = 3, SleepSeconds = sleepSeconds });
+
+        TimeSpan? capturedTtl = null;
+        _cache.Setup(c => c.SetItemAsync(It.IsAny<string>(), It.IsAny<DeviceCache>(), It.IsAny<TimeSpan?>()))
+              .Callback<string, DeviceCache, TimeSpan?>((_, _, ttl) => capturedTtl = ttl)
+              .Returns(Task.CompletedTask);
+
+        var result = await controller.ReqAuth();
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(TimeSpan.FromSeconds(expectedTtlSeconds), capturedTtl);
+    }
+
     // ---- roadmap #70: PIN expiry + multi-use (follow-up: no longer consumed on first use) ----
 
     private static DeviceRegistration PinRegistration(string pin) => new()

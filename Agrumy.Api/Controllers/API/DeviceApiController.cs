@@ -420,10 +420,21 @@ namespace api.Controllers.API
             // Roadmap #73: apiAuth is a bearer-style session credential (DeviceAuth.SessionPolicy),
             // same CSPRNG requirement as ApiKey above.
             var deviceAuthentication = new DeviceAuthentication { apiAuth = AuthenticationProvider.GetSecureToken() };
-            await Cache.SetItemAsync(apiId, new DeviceCache { apiAuth = deviceAuthentication.apiAuth });
+            await Cache.SetItemAsync(apiId, new DeviceCache { apiAuth = deviceAuthentication.apiAuth }, SessionTtlFor(device.SleepSeconds));
 
             return Ok(deviceAuthentication);
         }
+
+        /// <summary>Roadmap #109: the old fixed 5-min sliding TTL meant a device sleeping longer
+        /// than that (the #89 dropdown goes up to 24h, #26 deep sleep) lost its session every
+        /// single cycle - two TLS handshakes (Authenticate+Config) on every wake instead of one,
+        /// real battery cost on the solar/battery nodes that actually use long sleeps. 2x
+        /// sleepSeconds absorbs a late wake without needing a session past the device's own next
+        /// scheduled contact; the 30-min floor keeps short-poll devices on the same cadence as
+        /// before. Safe now that #106 removed ConfigVersion from the cache entry - nothing here
+        /// goes stale by living longer, only apiAuth remains.</summary>
+        private static TimeSpan SessionTtlFor(int? sleepSeconds) =>
+            TimeSpan.FromSeconds(Math.Max((sleepSeconds ?? 0) * 2, 1800));
 
         #endregion
 

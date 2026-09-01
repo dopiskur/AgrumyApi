@@ -14,10 +14,9 @@ namespace api.Dal
     /// </summary>
     internal class CacheRepository(IDistributedCache cache) : ICache
     {
-        private static readonly DistributedCacheEntryOptions Options = new()
-        {
-            SlidingExpiration = TimeSpan.FromMinutes(5), // drop the item after 5 min of inactivity
-        };
+        // Roadmap #109: fallback for a caller that doesn't size its own TTL (SetItemAsync's ttl
+        // param) - kept as the default so a short-poll device's behaviour is unchanged.
+        private static readonly TimeSpan DefaultTtl = TimeSpan.FromMinutes(5);
 
         public async Task<DeviceCache> GetDeviceCacheAsync(string key)
         {
@@ -27,7 +26,8 @@ namespace api.Dal
                 : JsonSerializer.Deserialize<DeviceCache>(bytes)!;
         }
 
-        public Task SetItemAsync(string key, DeviceCache deviceCache) =>
-            cache.SetAsync(key, JsonSerializer.SerializeToUtf8Bytes(deviceCache), Options);
+        public Task SetItemAsync(string key, DeviceCache deviceCache, TimeSpan? ttl = null) =>
+            cache.SetAsync(key, JsonSerializer.SerializeToUtf8Bytes(deviceCache),
+                new DistributedCacheEntryOptions { SlidingExpiration = ttl ?? DefaultTtl });
     }
 }
