@@ -46,6 +46,17 @@ builder.Services
         options.ExpireTimeSpan = TimeSpan.FromDays(7);
         options.SlidingExpiration = true;
     });
+// Live incident 2026-09-01 (admin.agrumy.com): a stale cookie whose DataProtection key is gone
+// crashed every [Authorize] request with an unhandled CryptographicException instead of just
+// redirecting to /Login - see SafeTicketDataFormat. PostConfigure so this wraps the REAL default
+// TicketDataFormat AddCookie() sets up above, not a null placeholder (registration order matters:
+// AddCookie's own PostConfigureOptions runs first because it was added first).
+builder.Services.AddOptions<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme)
+    .PostConfigure<ILoggerFactory>((options, loggerFactory) =>
+    {
+        options.TicketDataFormat = new SafeTicketDataFormat(
+            options.TicketDataFormat, loggerFactory.CreateLogger<SafeTicketDataFormat>());
+    });
 builder.Services.AddAuthorization();
 
 // Roadmap #79: default DataProtection key storage falls back to the OS user profile, which the
