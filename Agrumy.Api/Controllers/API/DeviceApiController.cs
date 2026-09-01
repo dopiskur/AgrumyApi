@@ -116,8 +116,10 @@ namespace api.Controllers.API
             }
 
             // The device's own tenant (== the caller's for a tenant-scoped caller; the ensure call
-            // above already authorized a cross-tenant global reader).
-            return Ok(await Repo.EventDeviceGetAsync(device!.IDDevice, device.TenantID));
+            // above already authorized a cross-tenant global reader). Same ?? 0 fallback as
+            // EventDevicePushAsync's caller - roadmap #96, a null TenantID otherwise never matches
+            // the TenantID=0 row the push side actually wrote.
+            return Ok(await Repo.EventDeviceGetAsync(device!.IDDevice, device.TenantID ?? 0));
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]

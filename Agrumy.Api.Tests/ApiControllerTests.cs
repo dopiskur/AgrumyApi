@@ -1332,6 +1332,23 @@ public class ApiControllerTests
     }
 
     [Fact]
+    public async Task DeviceEventsGet_NullTenantDevice_UsesSameZeroFallbackAsPush()
+    {
+        // Roadmap #96: a device row with TenantID=null was written as TenantID=0 by
+        // EventDevicePushAsync's own ?? 0 fallback - the get side must apply the identical
+        // fallback or it queries TenantID==null and never matches the row that was actually written.
+        _repo.Setup(r => r.DeviceGetByIdAsync(5)).ReturnsAsync(new Device { IDDevice = 5, TenantID = null });
+        _repo.Setup(r => r.EventDeviceGetAsync(5, 0, 100)).ReturnsAsync(new List<DeviceEvent>());
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 0, "admin", RoleNames.GlobalAdmin);
+        var result = await controller.DeviceEventsGet(5);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        _repo.Verify(r => r.EventDeviceGetAsync(5, 0, 100), Times.Once);
+    }
+
+    [Fact]
     public async Task DeviceEventsGet_TenantReader_ForeignTenant_Returns403()
     {
         _repo.Setup(r => r.DeviceGetByIdAsync(5)).ReturnsAsync(new Device { IDDevice = 5, TenantID = 99 });
