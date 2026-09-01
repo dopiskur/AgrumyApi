@@ -74,6 +74,37 @@
         (nameof(cfg.Relay5), cfg.Relay5), (nameof(cfg.Relay6), cfg.Relay6),
         (nameof(cfg.Relay7), cfg.Relay7), (nameof(cfg.Relay8), cfg.Relay8),
     };
+
+    // Roadmap #89: fixed granularity set for the interval "how often" period - the value stored
+    // and sent to the device is still plain seconds (#85's epoch-modulo formula on the device
+    // doesn't care what produced it, contract unchanged), only this dropdown's option list is new.
+    // 1min/5min dropped when the device deep-sleeps (#26): fine-grained scheduling contradicts a
+    // device that sleeps between cycles specifically to save battery.
+    var intervalGranularities = new (string Label, int Seconds)[]
+    {
+        ("1 min", 60), ("5 min", 300), ("15 min", 900), ("30 min", 1800), ("60 min", 3600),
+        ("2 h", 7200), ("3 h", 10800), ("4 h", 14400), ("6 h", 21600), ("8 h", 28800),
+        ("12 h", 43200), ("24 h", 86400),
+    };
+    bool sleepDeep = Model.Device?.SleepDeepEnabled == true;
+    var allowedGranularities = sleepDeep
+        ? intervalGranularities.Where(g => g.Seconds > 300)
+        : intervalGranularities;
+
+    SelectFieldViewModel IntervalGranularitySelect(string fieldName, int? currentValue)
+    {
+        var items = allowedGranularities
+            .Select(g => new SelectListItem(g.Label, g.Seconds.ToString(), currentValue == g.Seconds))
+            .ToList();
+        // A value that predates this dropdown (or came from some other source) won't match any
+        // fixed option - keep it selectable instead of silently swapping it for the top option
+        // the moment this form is saved.
+        if (currentValue.HasValue && !allowedGranularities.Any(g => g.Seconds == currentValue))
+        {
+            items.Insert(0, new SelectListItem($"{currentValue} s (current)", currentValue.ToString(), true));
+        }
+        return new SelectFieldViewModel { Name = ControllerField(fieldName), Label = fieldName, Items = items };
+    }
 }
 
 <div class="card">
@@ -181,12 +212,12 @@
                 </div>
 
                 <div class="tab-pane fade" id="tab-intervals" role="tabpanel">
+                    @if (sleepDeep)
+                    {
+                        <p class="text-muted small">This device deep-sleeps between cycles - 1 min / 5 min periods are hidden below (roadmap #26/#85).</p>
+                    }
                     <partial name="_EnabledToggleField" model="ventilationIntervalToggle" />
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.VentilationInterval" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.VentilationInterval" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.VentilationInterval" class="text-danger"></span>
-                    </div>
+                    <partial name="_SelectField" model="IntervalGranularitySelect(nameof(cfg.VentilationInterval), cfg.VentilationInterval)" />
                     <div class="mb-3">
                         <label asp-for="DeviceConfigController.VentilationIntervalLenght" class="form-label"></label>
                         <input asp-for="DeviceConfigController.VentilationIntervalLenght" class="form-control" />
@@ -194,11 +225,7 @@
                     </div>
 
                     <partial name="_EnabledToggleField" model="lightIntervalToggle" />
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.LightInterval" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.LightInterval" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.LightInterval" class="text-danger"></span>
-                    </div>
+                    <partial name="_SelectField" model="IntervalGranularitySelect(nameof(cfg.LightInterval), cfg.LightInterval)" />
                     <div class="mb-3">
                         <label asp-for="DeviceConfigController.LightIntervalLenght" class="form-label"></label>
                         <input asp-for="DeviceConfigController.LightIntervalLenght" class="form-control" />
@@ -206,11 +233,7 @@
                     </div>
 
                     <partial name="_EnabledToggleField" model="heatingIntervalToggle" />
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.HeatingInterval" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.HeatingInterval" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.HeatingInterval" class="text-danger"></span>
-                    </div>
+                    <partial name="_SelectField" model="IntervalGranularitySelect(nameof(cfg.HeatingInterval), cfg.HeatingInterval)" />
                     <div class="mb-3">
                         <label asp-for="DeviceConfigController.HeatingIntervalLenght" class="form-label"></label>
                         <input asp-for="DeviceConfigController.HeatingIntervalLenght" class="form-control" />
@@ -218,11 +241,7 @@
                     </div>
 
                     <partial name="_EnabledToggleField" model="waterPumpIntervalToggle" />
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.WaterPumpInterval" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.WaterPumpInterval" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.WaterPumpInterval" class="text-danger"></span>
-                    </div>
+                    <partial name="_SelectField" model="IntervalGranularitySelect(nameof(cfg.WaterPumpInterval), cfg.WaterPumpInterval)" />
                     <div class="mb-0">
                         <label asp-for="DeviceConfigController.WaterPumpIntervalLenght" class="form-label"></label>
                         <input asp-for="DeviceConfigController.WaterPumpIntervalLenght" class="form-control" />
