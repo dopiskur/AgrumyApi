@@ -184,13 +184,38 @@ public class ApiControllerTests
              .ReturnsAsync(new Device { IDDevice = 500, TenantID = 3, ConfigVersion = 66 });
         _repo.Setup(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.IsAny<DeviceConfigPoll>()))
              .Returns(Task.CompletedTask);
-        _cache.Setup(c => c.GetDeviceCacheAsync("api-guid")).ReturnsAsync(new DeviceCache { ConfigVersion = 66 });
 
         var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 66, Rssi = -60 });
 
         // The matching version path must still land the heartbeat - that's what LastSeenAt is for.
         _repo.Verify(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.Is<DeviceConfigPoll>(p => p.Rssi == -60)), Times.Once);
         Assert.IsType<OkResult>(result.Result); // empty body: device is up to date
+    }
+
+    // Roadmap #106: the version check must use the device row GetConfig already read for the #7
+    // diagnostics upsert, not a session-cache copy - proven here by never stubbing Cache at all
+    // (a loose mock, so an untouched GetDeviceCacheAsync/SetItemAsync would silently return
+    // defaults rather than fail) and verifying neither is ever called.
+    [Fact]
+    public async Task GetConfig_NeverTouchesSessionCache()
+    {
+        var controller = NewDeviceController();
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        controller.HttpContext.Items[DeviceAuth.ApiIdItemKey] = "api-guid";
+
+        _repo.Setup(r => r.DeviceGetByApiIdAsync("api-guid"))
+             .ReturnsAsync(new Device { IDDevice = 500, TenantID = 3, ConfigVersion = 66 });
+        _repo.Setup(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.IsAny<DeviceConfigPoll>()))
+             .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // BuildDeviceConfigAsync always reads this
+
+        // Version mismatch (65 sent, DB has 66) - must return the full config, sourced from the
+        // DB read, not a cache lookup that no longer carries ConfigVersion at all.
+        var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 65 });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        _cache.Verify(c => c.GetDeviceCacheAsync(It.IsAny<string>()), Times.Never);
+        _cache.Verify(c => c.SetItemAsync(It.IsAny<string>(), It.IsAny<DeviceCache>()), Times.Never);
     }
 
     // ---- roadmap #70: PIN expiry + multi-use (follow-up: no longer consumed on first use) ----
@@ -1085,8 +1110,6 @@ public class ApiControllerTests
     [Fact]
     public async Task DeviceUpdate_TenantDevice_OwnTenant_Succeeds()
     {
-        // ApiId left null so RefreshConfigVersionCacheAsync's early-return path fires - the cache
-        // side of an update is not what this test is about.
         _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 1 });
         _repo.Setup(r => r.DeviceUpdateAsync(It.IsAny<Device>())).Returns(Task.CompletedTask);
 

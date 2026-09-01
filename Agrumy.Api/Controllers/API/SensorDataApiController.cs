@@ -35,10 +35,9 @@ namespace api.Controllers.API
             await Repo.SensorDataPushAsync(jsonArray, device.IDDevice!.Value, device.TenantID ?? 0,
                 device.DeviceUnitID, device.DeviceUnitZoneID);
 
-            // DeviceSessionHandler already found this apiId's cache entry to authorize the request -
-            // a ConfigVersion=0 miss here means it expired in the sliver of time since (sliding
-            // expiration), not a real error; the device just resyncs on its next poll.
-            return Ok((await Cache.GetDeviceCacheAsync(apiId)).ConfigVersion);
+            // Roadmap #106: the device row already in hand is the authoritative ConfigVersion - no
+            // reason to route this through the session cache (which no longer carries it at all).
+            return Ok(device.ConfigVersion);
         }
 
         /// <summary>#66 Phase 2: deleting telemetry is device management, so the gate moved from the

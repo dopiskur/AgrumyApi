@@ -23,7 +23,7 @@ namespace api.Dal
         {
             byte[]? bytes = await cache.GetAsync(key);
             return bytes is null
-                ? new DeviceCache { ConfigVersion = 0, apiAuth = null }
+                ? new DeviceCache { apiAuth = null }
                 : JsonSerializer.Deserialize<DeviceCache>(bytes)!;
         }
 

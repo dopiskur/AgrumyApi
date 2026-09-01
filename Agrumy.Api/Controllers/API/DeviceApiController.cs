@@ -44,7 +44,6 @@ namespace api.Controllers.API
             device.TenantID = existing!.TenantID; // payload cannot move a device to another tenant
 
             await Repo.DeviceUpdateAsync(device);
-            await RefreshConfigVersionCacheAsync(device.IDDevice);
             return true;
         }
 
@@ -139,7 +138,6 @@ namespace api.Controllers.API
             }
 
             await Repo.DeviceConfigSensorUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Sensor);
-            await RefreshConfigVersionCacheAsync(deviceUpdate.Device.IDDevice);
             return true;
         }
 
@@ -168,7 +166,6 @@ namespace api.Controllers.API
             }
 
             await Repo.DeviceConfigControllerUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Controller);
-            await RefreshConfigVersionCacheAsync(deviceUpdate.Device.IDDevice);
             return true;
         }
 
@@ -237,24 +234,6 @@ namespace api.Controllers.API
             return (device, null);
         }
 
-        /// <summary>
-        /// Re-reads the device and writes its authoritative ConfigVersion into the cache, so the
-        /// next config poll from that device sees the bump the update just made in the database.
-        /// Preserves the device's current apiAuth session token.
-        /// </summary>
-        private async Task RefreshConfigVersionCacheAsync(int? idDevice)
-        {
-            Device? updated = await Repo.DeviceGetByIdAsync(idDevice);
-            if (updated?.ApiId == null)
-            {
-                return;
-            }
-
-            DeviceCache entry = await Cache.GetDeviceCacheAsync(updated.ApiId);
-            entry.ConfigVersion = updated.ConfigVersion;
-            await Cache.SetItemAsync(updated.ApiId, entry);
-        }
-
         #endregion
 
 
@@ -278,10 +257,12 @@ namespace api.Controllers.API
 
             await Repo.DeviceDiagnosticUpsertAsync(device.IDDevice!.Value, device.TenantID ?? 0, value);
 
-            // A cache miss comes back as ConfigVersion=0, which correctly never matches a real
-            // device's version - the device gets the full config instead of a false "up to date".
-            DeviceCache deviceCache = await Cache.GetDeviceCacheAsync(apiId);
-            if (value.ConfigVersion == deviceCache.ConfigVersion)
+            // Roadmap #106: compare against the device row just read above, not a session-cache
+            // copy - the cache entry can be stale/absent (5-min sliding TTL, #109) or written by a
+            // different instance (#72), and this DB read already happens unconditionally for the
+            // diagnostics upsert, so a second, independently-staled ConfigVersion added risk with
+            // no savings.
+            if (value.ConfigVersion == device.ConfigVersion)
             {
                 return Ok(); // device is up to date - do nothing
             }
@@ -433,11 +414,7 @@ namespace api.Controllers.API
             // Roadmap #73: apiAuth is a bearer-style session credential (DeviceAuth.SessionPolicy),
             // same CSPRNG requirement as ApiKey above.
             var deviceAuthentication = new DeviceAuthentication { apiAuth = AuthenticationProvider.GetSecureToken() };
-            await Cache.SetItemAsync(apiId, new DeviceCache
-            {
-                ConfigVersion = device.ConfigVersion,
-                apiAuth = deviceAuthentication.apiAuth,
-            });
+            await Cache.SetItemAsync(apiId, new DeviceCache { apiAuth = deviceAuthentication.apiAuth });
 
             return Ok(deviceAuthentication);
         }

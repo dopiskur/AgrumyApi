@@ -319,10 +319,12 @@ namespace api.Models
 
     }
 
+    // Roadmap #106: ConfigVersion used to live here too, but GetConfig now compares against the
+    // device row it already reads for the #7 diagnostics upsert - a second, independently-staled
+    // copy in the session cache was pure risk (root cause of #100 and the multi-instance drift
+    // #72 raised) with no benefit once that DB read became mandatory on every poll.
     public class DeviceCache()
     {
-        public int? ConfigVersion { get; set; }
-        public string? apiAuth { get; set; }        
-        
+        public string? apiAuth { get; set; }
     }
 }

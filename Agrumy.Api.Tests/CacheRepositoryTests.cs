@@ -27,7 +27,6 @@ public class CacheRepositoryTests
         DeviceCache result = await repo.GetDeviceCacheAsync("no-such-key");
 
         Assert.NotNull(result);
-        Assert.Equal(0, result.ConfigVersion);
         Assert.Null(result.apiAuth);
     }
 
@@ -36,10 +35,9 @@ public class CacheRepositoryTests
     {
         var repo = new CacheRepository(NewBackingStore());
 
-        await repo.SetItemAsync("api-guid", new DeviceCache { ConfigVersion = 42, apiAuth = "session-token" });
+        await repo.SetItemAsync("api-guid", new DeviceCache { apiAuth = "session-token" });
         DeviceCache result = await repo.GetDeviceCacheAsync("api-guid");
 
-        Assert.Equal(42, result.ConfigVersion);
         Assert.Equal("session-token", result.apiAuth);
     }
 
@@ -56,10 +54,9 @@ public class CacheRepositoryTests
         var writer = new CacheRepository(sharedStore);
         var reader = new CacheRepository(sharedStore);
 
-        await writer.SetItemAsync("shared-key", new DeviceCache { ConfigVersion = 7, apiAuth = "auth-abc" });
+        await writer.SetItemAsync("shared-key", new DeviceCache { apiAuth = "auth-abc" });
         DeviceCache result = await reader.GetDeviceCacheAsync("shared-key");
 
-        Assert.Equal(7, result.ConfigVersion);
         Assert.Equal("auth-abc", result.apiAuth);
     }
 
@@ -68,11 +65,10 @@ public class CacheRepositoryTests
     {
         var repo = new CacheRepository(NewBackingStore());
 
-        await repo.SetItemAsync("api-guid", new DeviceCache { ConfigVersion = 1, apiAuth = "old" });
-        await repo.SetItemAsync("api-guid", new DeviceCache { ConfigVersion = 2, apiAuth = "new" });
+        await repo.SetItemAsync("api-guid", new DeviceCache { apiAuth = "old" });
+        await repo.SetItemAsync("api-guid", new DeviceCache { apiAuth = "new" });
         DeviceCache result = await repo.GetDeviceCacheAsync("api-guid");
 
-        Assert.Equal(2, result.ConfigVersion);
         Assert.Equal("new", result.apiAuth);
     }
 }
