@@ -3,6 +3,7 @@ using api.Dal.Interface;
 using api.Models;
 using api.Security;
 using api.Utils;
+using api.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -13,8 +14,15 @@ namespace api.Controllers.View
     [AllowAnonymous]
     public class LoginController(IApi api, IAuthApi authApi, ILogger<LoginController> logger) : Controller
     {
-        public ActionResult Index(bool sessionExpired = false)
+        public async Task<ActionResult> Index(bool sessionExpired = false)
         {
+            // Roadmap #91: checked fresh on every load (not cached anywhere) so this redirect stops
+            // firing the instant SetupAdmin below succeeds - see BootstrapPendingSafeAsync.
+            if (await BootstrapPendingSafeAsync())
+            {
+                return RedirectToAction(nameof(SetupAdmin));
+            }
+
             if (sessionExpired)
             {
                 ModelState.AddModelError(string.Empty, "Your session expired - please sign in again.");
@@ -100,6 +108,62 @@ namespace api.Controllers.View
 
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return RedirectToAction("Index", "Login");
+        }
+
+        /// <summary>Roadmap #91: first-run "set password" screen for the bootstrap Global Admin.
+        /// CRITICAL - re-checks BootstrapPending on every load (GET and POST alike, not just once at
+        /// the Index redirect above) and bounces to the normal login form the moment it's false, so
+        /// this can never become a standing unauthenticated password-reset route once the real admin
+        /// account has a password.</summary>
+        public async Task<ActionResult> SetupAdmin()
+        {
+            if (!await BootstrapPendingSafeAsync())
+            {
+                return RedirectToAction(nameof(Index));
+            }
+            return View(new SetupAdminViewModel());
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> SetupAdmin(SetupAdminViewModel value)
+        {
+            if (!await BootstrapPendingSafeAsync())
+            {
+                return RedirectToAction(nameof(Index));
+            }
+            if (!ModelState.IsValid)
+            {
+                return View(value);
+            }
+
+            try
+            {
+                await api.BootstrapSetPassword(new BootstrapAdminSetPassword { NewPassword = value.NewPassword });
+            }
+            catch (ApiException ex)
+            {
+                ModelState.AddModelError(string.Empty, ex.Body);
+                return View(value);
+            }
+
+            TempData["Message"] = "Admin password set - you can now sign in.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        /// <summary>Fails closed to the normal login form on any error - an unreachable API is not a
+        /// reason to show (or hide) the unauthenticated set-password screen by guesswork, same
+        /// reasoning as SetTenantCreationViewBagAsync below.</summary>
+        private async Task<bool> BootstrapPendingSafeAsync()
+        {
+            try
+            {
+                return await api.BootstrapPending();
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         public async Task<ActionResult> Register()

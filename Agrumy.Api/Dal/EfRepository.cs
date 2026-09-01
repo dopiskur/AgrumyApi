@@ -86,6 +86,109 @@ namespace api.Dal
                 db.UserRoles.AddRange(missing.Select(name => new UserRoleRow { RoleName = name }));
                 await db.SaveChangesAsync();
             }
+
+            await SeedDeviceTypeLookupsAsync(db);
+            await SeedBootstrapAdminAsync(db);
+        }
+
+        /// <summary>Roadmap #91: EnsureCreatedAsync makes the four deviceType* tables, never rows -
+        /// left empty, every device Add/Edit dropdown in Agrumy.Web is blank and the admin can't
+        /// assign a type/service/relay/sensor to anything. Values are the original product's fixed
+        /// catalog (db/agrumyDB-final.sql) verbatim, not invented: AgrumyDevice's firmware hardcodes
+        /// these same IDs (ControllerController.h's RelayFunctionType enum for deviceTypeRelay,
+        /// DeviceController.cpp's serviceType() switch for deviceTypeService), and Agrumy.Web's
+        /// DeviceController.Edit switches on the literal deviceType IDs 0/1/2/3 - drifting from this
+        /// seed would silently desync the dropdown from what the device/web code actually does with
+        /// the ID. Insert-if-missing per table (independent of each other and of the role catalog
+        /// above) so a partially-migrated DB that already has some of these rows is a no-op for
+        /// that table only.</summary>
+        private static async Task SeedDeviceTypeLookupsAsync(AgrumyDbContext db)
+        {
+            if (!await db.DeviceTypes.AnyAsync())
+            {
+                db.DeviceTypes.AddRange(
+                    new DeviceTypeRow { IDDeviceType = 0, DeviceTypeName = "Basic", SensorEnabled = false, ControllerEnabled = false },
+                    new DeviceTypeRow { IDDeviceType = 1, DeviceTypeName = "Sensor", SensorEnabled = true, ControllerEnabled = false },
+                    new DeviceTypeRow { IDDeviceType = 3, DeviceTypeName = "Sensor+Controller", SensorEnabled = true, ControllerEnabled = true });
+            }
+
+            if (!await db.DeviceTypeServices.AnyAsync())
+            {
+                db.DeviceTypeServices.AddRange(
+                    new DeviceTypeServiceRow { IDDeviceTypeService = 0, ServiceType = "HTTP" },
+                    new DeviceTypeServiceRow { IDDeviceTypeService = 1, ServiceType = "HTTPS" },
+                    new DeviceTypeServiceRow { IDDeviceTypeService = 2, ServiceType = "MQTT" });
+            }
+
+            if (!await db.DeviceTypeRelays.AnyAsync())
+            {
+                db.DeviceTypeRelays.AddRange(
+                    new DeviceTypeRelayRow { IDDeviceTypeRelay = 0, RelayName = "Disabled" },
+                    new DeviceTypeRelayRow { IDDeviceTypeRelay = 1, RelayName = "Ventilation" },
+                    new DeviceTypeRelayRow { IDDeviceTypeRelay = 2, RelayName = "Light" },
+                    new DeviceTypeRelayRow { IDDeviceTypeRelay = 3, RelayName = "Heating" },
+                    new DeviceTypeRelayRow { IDDeviceTypeRelay = 4, RelayName = "Water pump" });
+            }
+
+            if (!await db.DeviceTypeSensors.AnyAsync())
+            {
+                db.DeviceTypeSensors.AddRange(
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 0, SensorName = "Disabled", Battery = 1, Temperature = 1, TemperatureSoil = 1, Humidity = 1, Moisture = 1, Light = 1, Co2 = 1, Tvoc = 1, Barometer = 1, WaterPH = 1, WaterTankLevel = 1, RainLevel = 1, Wind = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1001, SensorName = "DHT11", Temperature = 1, Humidity = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1002, SensorName = "DHT22", Temperature = 1, Humidity = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1003, SensorName = "BMP180", Temperature = 1, Barometer = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1004, SensorName = "BMP280", Temperature = 1, Barometer = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1005, SensorName = "BME280", Temperature = 1, Humidity = 1, Barometer = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1006, SensorName = "CCS811", Co2 = 1, Tvoc = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1007, SensorName = "DS18B20", TemperatureSoil = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1008, SensorName = "BH1750", Light = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 2001, SensorName = "Analog voltage", Battery = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 2002, SensorName = "Analog moisture", Moisture = 1 });
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        /// <summary>Roadmap #91: the other half of "fresh install has nothing to log in with" -
+        /// EnsureCreatedAsync/the seeding above populate tables and lookups but never an account,
+        /// so a genuinely empty `user` table (only true on the very first run against a brand-new
+        /// database - never on a DB that already has accounts, invent.hr included) gets exactly one
+        /// row: a Global Admin at TenantID=0 with PwdHash/PwdSalt left NULL. That NULL is
+        /// deliberate, not a bug - see UserRow.PwdHash - and is what makes
+        /// Agrumy.Web's first-run "set password" screen (BootstrapAdminPendingAsync/
+        /// BootstrapAdminSetPasswordAsync below) meaningful: there is nothing to authenticate with
+        /// until an operator sets a password through that screen, and once they do the row is
+        /// indistinguishable from any other account. No generic "Global User" row is seeded
+        /// alongside it - that concept was retired for the default schema (roadmap #91 design note).</summary>
+        private static async Task SeedBootstrapAdminAsync(AgrumyDbContext db)
+        {
+            if (await db.Users.AnyAsync())
+            {
+                return;
+            }
+
+            var admin = new UserRow
+            {
+                TenantID = 0,
+                Email = "admin@agrumy.local",
+                Username = "admin",
+                PwdHash = null,
+                PwdSalt = null,
+                FirstName = "Global",
+                LastName = "Admin",
+                Enabled = true,
+                EmailVerified = true, // bootstrap account - nobody to send/click an activation link
+            };
+            db.Users.Add(admin);
+            await db.SaveChangesAsync();
+
+            int globalAdminRoleId = await db.UserRoles.AsNoTracking()
+                .Where(r => r.RoleName == RoleNames.GlobalAdmin)
+                .Select(r => r.IDUserRole)
+                .FirstAsync(); // guaranteed present - the role-catalog seed above always runs first
+
+            db.UserUserRoles.Add(new UserUserRoleRow { UserID = admin.IDUser, UserRoleID = globalAdminRoleId });
+            await db.SaveChangesAsync();
         }
 
         public DbFailureKind ClassifyException(Exception ex)

@@ -146,6 +146,18 @@ environment, no repeated work against an existing one. Whether a *failed* check
 stops the app or just logs a warning is controlled by `Startup:FailFastOnDbCheck`
 (see Configuration above).
 
+`EnsureSchemaAsync` also seeds rows, never just tables (roadmap #91, continuing the
+#66 role-catalog pattern): the four `deviceType*` lookup tables get the product's
+fixed catalog (device types, service types, relay types, sensor types) if empty,
+and a completely empty `user` table gets exactly one bootstrap **Global Admin**
+account (`TenantID=0`, `PwdHash`/`PwdSalt` left `NULL` on purpose). A `NULL`
+password hash means nothing can log in as that account yet -
+`POST /api/User/BootstrapSetPassword` is the one-shot call that gives it a real
+password (Agrumy.Web shows a "set password" screen instead of the login form while
+`GET /api/User/BootstrapPending` is true). None of this runs against a database
+that already has any users - existing installs, including api.agrumy.com, are
+unaffected.
+
 ### Schema evolution
 
 Pre-beta there are no EF migrations. The project has no real users or data to
@@ -184,6 +196,8 @@ apiId/apiKey/apiAuth scheme described in "How it works", not JWT.
 | --- | --- | --- |
 | `POST /api/User/Register` | rate-limited, no auth | Self-service registration; new users are disabled by default |
 | `POST /api/User/Login` | rate-limited, no auth | Returns a JWT bearer token |
+| `GET /api/User/BootstrapPending` | no auth | Roadmap #91: true while the fresh-install bootstrap Global Admin still has no password |
+| `POST /api/User/BootstrapSetPassword` | rate-limited, no auth | Roadmap #91: one-shot - sets the bootstrap Global Admin's password, then this always returns 403 |
 | `POST /api/User/ChangePassword` | rate-limited, JWT (self) | Change the caller's own password (identity from JWT, old password required) |
 | `GET /api/User/All` | admin | List every user |
 | `GET /api/User/Self` | admin | Fetch the caller's own user record (see README note: currently admin-only, not "admin or the user themselves") |

@@ -51,8 +51,12 @@ namespace api.Dal.Entities
         public int TenantID { get; set; }
         public string Email { get; set; } = "";
         public string? Username { get; set; }
-        public string PwdHash { get; set; } = "";
-        public string PwdSalt { get; set; } = "";
+        // Roadmap #91: null on the fresh-install bootstrap Global Admin seed row only - every
+        // other insert path (UserAddAsync, UserApiController.UserAdd) always supplies a real
+        // hash+salt. AuthenticationProvider.VerifyHash already treats a null hash as "reject",
+        // so nothing can authenticate as this row until BootstrapAdminSetPasswordAsync runs.
+        public string? PwdHash { get; set; }
+        public string? PwdSalt { get; set; }
         // Roadmap #70: 6-char generated code (was a 4-digit int); null = never issued (or explicitly cleared).
         public string? DevicePin { get; set; }
         public DateTime? DevicePinExpires { get; set; }

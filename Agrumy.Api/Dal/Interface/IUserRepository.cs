@@ -33,6 +33,21 @@ namespace api.Dal.Interface
 
         Task<bool> UserSetPasswordAsync(string? email, UserSecret userSecret);
 
+        /// <summary>Roadmap #91: true while the fresh-install bootstrap Global Admin (seeded by
+        /// EfRepository.SeedBootstrapAdminAsync with PwdHash=NULL) still has no password - drives
+        /// Agrumy.Web's first-run "set password" screen. Always false once
+        /// BootstrapAdminSetPasswordAsync has succeeded once, since nothing else ever leaves
+        /// PwdHash NULL again.</summary>
+        Task<bool> BootstrapAdminPendingAsync();
+
+        /// <summary>Sets the password on the pending bootstrap admin (the row with PwdHash IS
+        /// NULL) - the ONLY writer of that row's password, and the WHERE clause itself is the
+        /// permanent-unavailability guarantee roadmap #91 asks for: once this succeeds, no row
+        /// matches it again, so calling it a second time is a no-op that returns false. False also
+        /// when there was never a pending row to begin with (e.g. an existing, already-populated
+        /// database).</summary>
+        Task<bool> BootstrapAdminSetPasswordAsync(UserSecret secret);
+
         Task<IList<UserRole>> UserRoleGetAsync();
 
         // Roadmap #66: a user can hold several roles at once - the userUserRole junction table is

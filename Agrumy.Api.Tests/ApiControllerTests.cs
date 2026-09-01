@@ -487,6 +487,50 @@ public class ApiControllerTests
         Assert.Equal(403, obj.StatusCode);
     }
 
+    // ---- UserApiController.BootstrapPending / BootstrapSetPassword (roadmap #91) ------
+
+    [Fact]
+    public async Task BootstrapPending_DelegatesToRepo()
+    {
+        _repo.Setup(r => r.BootstrapAdminPendingAsync()).ReturnsAsync(true);
+
+        var controller = NewUserController();
+        var result = await controller.BootstrapPending();
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.True((bool)ok.Value!);
+    }
+
+    [Fact]
+    public async Task BootstrapSetPassword_PendingAdminExists_HashesAndReturnsOk()
+    {
+        UserSecret? captured = null;
+        _repo.Setup(r => r.BootstrapAdminSetPasswordAsync(It.IsAny<UserSecret>()))
+             .Callback<UserSecret>(s => captured = s)
+             .ReturnsAsync(true);
+
+        var controller = NewUserController();
+        var result = await controller.BootstrapSetPassword(new BootstrapAdminSetPassword { NewPassword = "hunter2!" });
+
+        Assert.IsType<OkResult>(result);
+        // The plaintext must never reach the repo - only a freshly generated hash+salt.
+        Assert.NotNull(captured);
+        Assert.NotEqual("hunter2!", captured!.PwdHash);
+        Assert.Equal(captured.PwdHash, AuthenticationProvider.GetHash("hunter2!", captured.PwdSalt!));
+    }
+
+    [Fact]
+    public async Task BootstrapSetPassword_NoPendingAdmin_Returns403()
+    {
+        _repo.Setup(r => r.BootstrapAdminSetPasswordAsync(It.IsAny<UserSecret>())).ReturnsAsync(false);
+
+        var controller = NewUserController();
+        var result = await controller.BootstrapSetPassword(new BootstrapAdminSetPassword { NewPassword = "hunter2!" });
+
+        var obj = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(403, obj.StatusCode);
+    }
+
     // ---- UserApiController.RefreshToken / RevokeRefreshToken --------------------------
 
     private static string HashRefreshToken(string plaintext) =>

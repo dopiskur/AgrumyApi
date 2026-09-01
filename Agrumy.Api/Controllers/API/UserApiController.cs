@@ -326,6 +326,33 @@ namespace api.Controllers.API
             return Ok();
         }
 
+        /// <summary>Roadmap #91: lets the anonymous Agrumy.Web login page decide, on every load (not
+        /// just once), whether to show the normal login form or the first-run "set password"
+        /// screen - checked fresh each time rather than cached because this route itself must go
+        /// dark the instant BootstrapSetPassword below succeeds.</summary>
+        [HttpGet("BootstrapPending")]
+        [AllowAnonymous]
+        public async Task<ActionResult<bool>> BootstrapPending() => Ok(await Repo.BootstrapAdminPendingAsync());
+
+        /// <summary>Roadmap #91: the only way the fresh-install bootstrap Global Admin (seeded with
+        /// PwdHash=NULL) gets a real password - see BootstrapAdminSetPasswordAsync for why this can
+        /// never be replayed once it has succeeded. Rate-limited the same as Login/ChangePassword
+        /// even though it is a one-shot per install, since it is still an anonymous endpoint.</summary>
+        [HttpPost("BootstrapSetPassword")]
+        [AllowAnonymous]
+        [EnableRateLimiting("login")]
+        public async Task<ActionResult> BootstrapSetPassword([FromBody] BootstrapAdminSetPassword value)
+        {
+            if (!ModelState.IsValid) { return BadRequest(ModelState); }
+
+            string salt = AuthenticationProvider.GetSalt();
+            var secret = new UserSecret { PwdSalt = salt, PwdHash = AuthenticationProvider.GetHash(value.NewPassword!, salt) };
+
+            return await Repo.BootstrapAdminSetPasswordAsync(secret)
+                ? Ok()
+                : StatusCode(403, "No pending bootstrap admin - a password has already been set.");
+        }
+
         /// <summary>Roadmap #83: identity comes ONLY from the JWT (same pattern as UserProfileSet
         /// above), not a Login field in the body - previously this took Login from the request and
         /// had neither [Authorize] nor rate limiting, making it an unauthenticated, unthrottled

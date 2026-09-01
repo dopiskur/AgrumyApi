@@ -18,6 +18,17 @@ namespace api.Dal.Interface
         [Post("/api/User/Login")]
         Task<UserLoginResult?> UserLogin([Body] UserLogin userLogin);
 
+        /// <summary>Roadmap #91: whether the fresh-install bootstrap Global Admin still has no
+        /// password - LoginController checks this on every anonymous page load to decide whether to
+        /// show the normal login form or the first-run "set password" screen.</summary>
+        [Get("/api/User/BootstrapPending")]
+        Task<bool> BootstrapPending();
+
+        /// <summary>Roadmap #91: the one-shot call that gives the bootstrap Global Admin a real
+        /// password - see api.Models.BootstrapAdminSetPassword for why it takes no login/email.</summary>
+        [Post("/api/User/BootstrapSetPassword")]
+        Task BootstrapSetPassword([Body] BootstrapAdminSetPassword value);
+
         // Task (not Task<User>) on purpose: no caller reads the created record, same convention
         // as the other write endpoints whose response bodies nobody consumed.
         [Post("/api/User/Register")]

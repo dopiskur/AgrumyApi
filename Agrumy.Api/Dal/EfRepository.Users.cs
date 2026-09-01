@@ -192,6 +192,24 @@ namespace api.Dal
             return rows > 0;
         }
 
+        public async Task<bool> BootstrapAdminPendingAsync()
+        {
+            await using var db = Db();
+            return await db.Users.AsNoTracking().AnyAsync(u => u.PwdHash == null);
+        }
+
+        public async Task<bool> BootstrapAdminSetPasswordAsync(UserSecret secret)
+        {
+            await using var db = Db();
+            // WHERE PwdHash IS NULL, not a Login/email match - see IUserRepository for why this is
+            // deliberately the only key: it is what makes the door close permanently once used.
+            int rows = await db.Users.Where(u => u.PwdHash == null)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(u => u.PwdHash, secret.PwdHash)
+                    .SetProperty(u => u.PwdSalt, secret.PwdSalt));
+            return rows > 0;
+        }
+
         public async Task<IList<UserRole>> UserRoleGetAsync()
         {
             await using var db = Db();

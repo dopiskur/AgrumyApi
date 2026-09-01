@@ -1,0 +1,41 @@
+@model api.ViewModels.SetupAdminViewModel
+
+@{
+    ViewData["Title"] = "Set Admin Password";
+    Layout = "_AuthLayout";
+    ViewData["AuthBoxClass"] = "login-box";
+    ViewData["AuthBodyClass"] = "login-page";
+}
+
+<div class="card-body login-card-body">
+    <p class="login-box-msg">
+        First run - set a password for the Global Admin account before signing in.
+    </p>
+
+    <form asp-action="SetupAdmin">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <div class="mb-3">
+            <label asp-for="NewPassword" class="visually-hidden"></label>
+            <div class="input-group">
+                <input type="password" asp-for="NewPassword" class="form-control" placeholder="New password" />
+                <div class="input-group-text"><span class="bi bi-lock-fill"></span></div>
+            </div>
+            <span asp-validation-for="NewPassword" class="text-danger"></span>
+        </div>
+        <div class="mb-3">
+            <label asp-for="ConfirmPassword" class="visually-hidden"></label>
+            <div class="input-group">
+                <input type="password" asp-for="ConfirmPassword" class="form-control" placeholder="Confirm password" />
+                <div class="input-group-text"><span class="bi bi-lock-fill"></span></div>
+            </div>
+            <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <div class="d-grid gap-2">
+                    <input type="submit" value="Set Password" class="btn btn-primary" />
+                </div>
+            </div>
+        </div>
+    </form>
+</div>

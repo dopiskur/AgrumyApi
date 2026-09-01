@@ -102,7 +102,9 @@ public sealed class RelationalIntegrationFixture
 
     private static int SeedDeviceType(AgrumyDbContext db)
     {
-        var t = new DeviceTypeRow { DeviceTypeName = "greenhouse" };
+        // Roadmap #91: deviceType is now ValueGeneratedNever (IDs 0/1/2/3 are reserved by
+        // Agrumy.Web's hardcoded switch) - pick an ID clearly outside that reserved range.
+        var t = new DeviceTypeRow { IDDeviceType = 999, DeviceTypeName = "greenhouse" };
         db.DeviceTypes.Add(t);
         db.SaveChanges();
         return t.IDDeviceType;
@@ -453,6 +455,47 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal("h2", s2.PwdHash);
 
         Assert.Null(await _repo.UserSecretGetAsync(null, "missing_" + U() + "@x.com", null));
+    }
+
+    /// <summary>Roadmap #91: BootstrapAdminSetPasswordAsync's WHERE PwdHash IS NULL clause is the
+    /// entire "permanently unavailable once set" guarantee - this proves it actually closes:
+    /// pending while a NULL-hash row exists, settable exactly once, false (not just a no-op) on
+    /// a second call once nothing matches anymore. Inserts the NULL-hash row directly (not via
+    /// EnsureSchemaAsync, whose "only when Users is entirely empty" gate the shared fixture DB
+    /// can't satisfy once other tests have added rows) so this is independent of test ordering.</summary>
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task BootstrapAdmin_Pending_SetOnce_ThenPermanentlyUnavailable(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, normalUserId, _) = await MakeUser(t); // a real account never counts as "pending"
+
+        string tag = U();
+        await using (var db = _fx.NewContext(t))
+        {
+            db.Users.Add(new UserRow
+            {
+                TenantID = 0,
+                Email = tag + "_admin@ex.com",
+                Username = "boot_" + tag,
+                PwdHash = null,
+                PwdSalt = null,
+                Enabled = true,
+                EmailVerified = true,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        Assert.True(await _repo.BootstrapAdminPendingAsync());
+
+        Assert.True(await _repo.BootstrapAdminSetPasswordAsync(new UserSecret { PwdHash = "boot-h", PwdSalt = "boot-s" }));
+        Assert.False(await _repo.BootstrapAdminPendingAsync());
+
+        // Second call: nothing left with PwdHash IS NULL, so this must be false, not another success.
+        Assert.False(await _repo.BootstrapAdminSetPasswordAsync(new UserSecret { PwdHash = "again-h", PwdSalt = "again-s" }));
+
+        // The normal account made at the top is untouched by any of this.
+        var normalSecret = await _repo.UserSecretGetAsync(normalUserId, null, null);
+        Assert.Equal("h", normalSecret!.PwdHash);
     }
 
     /// <summary>Regression gate for the self-service profile endpoint: UserProfileSetAsync must

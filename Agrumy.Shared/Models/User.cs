@@ -144,6 +144,16 @@ namespace api.Models
         public string? NewPassword { get; set; }
     }
 
+    /// <summary>Body of POST /api/User/BootstrapSetPassword (roadmap #91) - no Login/email field,
+    /// same reasoning as UserSetPassword's missing one: there is at most one pending bootstrap
+    /// admin row (PwdHash IS NULL) for this to ever apply to, so identifying one by email would
+    /// only add an unauthenticated way to probe for a specific account's email.</summary>
+    public class BootstrapAdminSetPassword
+    {
+        [Required(ErrorMessage = "New password is required")]
+        public string? NewPassword { get; set; }
+    }
+
     /// <summary>Body of PUT /api/User/Profile - the ONLY fields a user may change on their own
     /// account (identity comes from the JWT, never from here - roadmap #47 pattern). Deliberately
     /// has no Enabled/UserGroupID/TenantID so self-service can never touch authorization; the

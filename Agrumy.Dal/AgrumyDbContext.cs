@@ -98,8 +98,8 @@ namespace api.Dal
                 e.Property(x => x.IDUser).ValueGeneratedOnAdd();
                 e.Property(x => x.Email).HasMaxLength(100).IsRequired();
                 e.Property(x => x.Username).HasMaxLength(100);
-                e.Property(x => x.PwdHash).IsRequired();
-                e.Property(x => x.PwdSalt).HasMaxLength(128).IsRequired();
+                // Roadmap #91: nullable now - see UserRow.PwdHash for why.
+                e.Property(x => x.PwdSalt).HasMaxLength(128);
                 e.Property(x => x.FirstName).HasMaxLength(100);
                 e.Property(x => x.LastName).HasMaxLength(100);
                 e.Property(x => x.Phone).HasMaxLength(15);
@@ -160,7 +160,11 @@ namespace api.Dal
             {
                 e.ToTable("deviceType");
                 e.HasKey(x => x.IDDeviceType);
-                e.Property(x => x.IDDeviceType).ValueGeneratedOnAdd();
+                // Roadmap #91: fixed catalog, not an admin-creatable list (like its three
+                // deviceType* siblings below) - Agrumy.Web.Controllers.View.DeviceController.Edit
+                // switches on the literal IDs 0/1/2/3, so the seed must control them exactly the
+                // same way deviceTypeRelay/Service/Sensor already do.
+                e.Property(x => x.IDDeviceType).ValueGeneratedNever();
                 e.Property(x => x.DeviceTypeName).HasMaxLength(100);
             });
 
