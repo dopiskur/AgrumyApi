@@ -14,7 +14,14 @@ namespace api.Controllers.View
         // Roadmap #8: read-only fleet status - any authenticated caller, same reasoning as Events.
         // Supersedes the old plain device list (DevicesGet is no longer called from the Web) - Fleet
         // shows the same devices plus online/diagnostic state, so there was nothing the old list had left to offer.
-        public async Task<ActionResult> Fleet()
+        public async Task<ActionResult> Fleet() => View(await GetFleetForDisplayAsync());
+
+        /// <summary>Roadmap #90: same data as Fleet(), rendered as just the table rows -
+        /// Fleet.cshtml's live-refresh script polls this instead of reloading the whole page, so an
+        /// open dashboard stays current without losing scroll position or DataTables paging state.</summary>
+        public async Task<ActionResult> FleetRows() => PartialView("_FleetRows", await GetFleetForDisplayAsync());
+
+        private async Task<IList<DeviceFleetStatus>> GetFleetForDisplayAsync()
         {
             IList<DeviceFleetStatus> fleet = await api.DeviceFleetGet();
 
@@ -29,7 +36,7 @@ namespace api.Controllers.View
             }
             ViewBag.DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone;
 
-            return View(fleet);
+            return fleet;
         }
 
         /// <summary>Roadmap #76: one click gets the caller a PIN ready to type into the device's
@@ -114,17 +121,24 @@ namespace api.Controllers.View
 
         // #66 Phase 2: events are a read-only diagnostic - any authenticated caller (Tenant
         // reader included); the API scopes to the caller's tenant.
-        public async Task<ActionResult> Events(int? idDevice)
+        public async Task<ActionResult> Events(int? idDevice) => View(new DeviceView
         {
-            var view = new DeviceView
-            {
-                Device = await api.DeviceGet(idDevice),
-                Events = await api.DeviceEventsGet(idDevice),
-            };
+            Device = await api.DeviceGet(idDevice),
+            Events = await GetEventsForDisplayAsync(idDevice),
+        });
+
+        /// <summary>Roadmap #90: same event list as Events(), rendered as just the table rows -
+        /// Events.cshtml's live-refresh script polls this instead of reloading the whole page.</summary>
+        public async Task<ActionResult> EventsRows(int? idDevice) =>
+            PartialView("_EventsRows", await GetEventsForDisplayAsync(idDevice));
+
+        private async Task<IList<DeviceEvent>?> GetEventsForDisplayAsync(int? idDevice)
+        {
+            IList<DeviceEvent>? events = await api.DeviceEventsGet(idDevice);
 
             // Roadmap #71 follow-up: CreatedAt is stored/served in UTC - convert for display only.
             string? timeZone = (await api.UserGetSelf()).TimeZone;
-            foreach (var e in view.Events ?? [])
+            foreach (var e in events ?? [])
             {
                 if (e.CreatedAt is DateTime utc)
                 {
@@ -133,7 +147,7 @@ namespace api.Controllers.View
             }
             ViewBag.DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone;
 
-            return View(view);
+            return events;
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]

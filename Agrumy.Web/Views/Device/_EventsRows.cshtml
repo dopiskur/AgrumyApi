@@ -1,0 +1,23 @@
+@model IList<api.Models.DeviceEvent>?
+
+@* Roadmap #90: this partial IS the events table's tbody content, shared by Events.cshtml's
+   initial render and DeviceController.EventsRows' polling refresh. Message is left wrappable on
+   purpose - it's free text and can run long, so forcing text-nowrap on it (like the other
+   columns) just made the whole table scroll further sideways on a phone for no benefit (roadmap #22). *@
+@if (Model is { Count: > 0 })
+{
+    foreach (var item in Model)
+    {
+        <tr>
+            <td class="text-nowrap">@item.CreatedAt</td>
+            <td class="text-nowrap">@item.EventType</td>
+            <td>@item.Message</td>
+        </tr>
+    }
+}
+else
+{
+    <tr>
+        <td colspan="3" class="text-center text-secondary">No events recorded for this device yet.</td>
+    </tr>
+}

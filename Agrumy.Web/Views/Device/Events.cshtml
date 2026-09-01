@@ -13,7 +13,7 @@
         @* Message is left wrappable on purpose - it's free text and can run long, so forcing
            text-nowrap on it (like the other columns) just made the whole table scroll further
            sideways on a phone for no benefit (roadmap #22). *@
-        <table class="table table-hover">
+        <table id="eventsTable" class="table table-hover">
             <thead>
                 <tr>
                     <th class="text-nowrap">Date</th>
@@ -22,23 +22,7 @@
                 </tr>
             </thead>
             <tbody>
-@if (Model.Events is { Count: > 0 })
-{
-    foreach (var item in Model.Events)
-    {
-                <tr>
-                    <td class="text-nowrap">@item.CreatedAt</td>
-                    <td class="text-nowrap">@item.EventType</td>
-                    <td>@item.Message</td>
-                </tr>
-    }
-}
-else
-{
-                <tr>
-                    <td colspan="3" class="text-center text-secondary">No events recorded for this device yet.</td>
-                </tr>
-}
+                <partial name="_EventsRows" model="Model.Events" />
             </tbody>
         </table>
     </div>
@@ -46,3 +30,18 @@ else
         <a asp-action="Details" asp-route-idDevice="@Model.Device!.IDDevice" class="btn btn-outline-secondary">Back to Details</a>
     </div>
 </div>
+
+@section Scripts {
+    <script src="~/js/live-refresh.js"></script>
+    <script>
+        // Roadmap #90: no DataTables here (unlike Fleet) - a plain tbody innerHTML swap is enough.
+        document.addEventListener('DOMContentLoaded', function () {
+            startLiveRefresh({
+                url: '@Url.Action("EventsRows", new { idDevice = Model.Device!.IDDevice })',
+                applyHtml: function (html) {
+                    document.querySelector('#eventsTable tbody').innerHTML = html;
+                }
+            });
+        });
+    </script>
+}

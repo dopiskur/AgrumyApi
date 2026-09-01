@@ -2,22 +2,6 @@
 
 @{
     ViewData["Title"] = "Fleet";
-
-    // RSSI buckets follow the usual WiFi rule of thumb; the raw dBm stays visible next to the label.
-    static (string Label, string Css) SignalQuality(int? rssi) => rssi switch
-    {
-        null => ("-", "text-secondary"),
-        >= -60 => ("Good", "text-success"),
-        >= -75 => ("Fair", "text-warning"),
-        _ => ("Weak", "text-danger"),
-    };
-
-    static string Uptime(long? seconds)
-    {
-        if (seconds is not long s || s < 0) { return "-"; }
-        var t = TimeSpan.FromSeconds(s);
-        return t.Days > 0 ? $"{t.Days}d {t.Hours}h" : t.Hours > 0 ? $"{t.Hours}h {t.Minutes}m" : $"{t.Minutes}m {t.Seconds}s";
-    }
 }
 
 <div class="card">
@@ -51,58 +35,42 @@
                 </tr>
             </thead>
             <tbody>
-@foreach (var item in Model)
-{
-                var (signalLabel, signalCss) = SignalQuality(item.RssiDbm);
-                <tr>
-                    <td>@item.DeviceName</td>
-                    <td>
-                        @* No separate "never seen" state - a device only ever exists via device-side
-                           self-registration (there's no manual "add device" flow), so a null LastSeenAt
-                           just means it hasn't reported in yet or its diagnostic row predates roadmap #7 -
-                           either way it reads the same as any other silent device: Offline. *@
-                        @if (item.Online)
-                        {
-                            <span class="badge text-bg-success">Online</span>
-                        }
-                        else
-                        {
-                            <span class="badge text-bg-danger">Offline</span>
-                        }
-                        @if (item.Enabled != true)
-                        {
-                            <span class="badge text-bg-light border ms-1">Disabled</span>
-                        }
-                    </td>
-                    <td class="d-none d-md-table-cell">@(item.LastSeenAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</td>
-                    <td class="d-none d-md-table-cell">
-                        <span class="@signalCss">@signalLabel</span>
-                        @if (item.RssiDbm is int rssi)
-                        {
-                            <span class="text-secondary small">(@rssi dBm)</span>
-                        }
-                    </td>
-                    <td class="d-none d-md-table-cell">@Uptime(item.UptimeSeconds)</td>
-                    <td class="d-none d-md-table-cell">@(item.FirmwareVersion ?? "-")</td>
-                    <td class="d-none d-md-table-cell">@(item.Battery?.ToString() ?? "-")</td>
-                    <td>
-                        @* Icon-only + btn-group on purpose: four full-text buttons made this the widest
-                           column on the table, forcing the most horizontal scroll on a phone (roadmap #22) -
-                           title= gives back the label as a hover/long-press tooltip. *@
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Device actions">
-                            <a asp-controller="SensorData" asp-action="Index" asp-route-idDevice="@item.IDDevice" class="btn btn-success" title="Sensor data" aria-label="Sensor data"><i class="bi bi-graph-up"></i></a>
-                            <a asp-controller="SensorData" asp-action="Report" asp-route-idDevice="@item.IDDevice" class="btn btn-danger" title="Reports" aria-label="Reports"><i class="bi bi-file-earmark-bar-graph"></i></a>
-                            <a asp-action="Details" asp-route-idDevice="@item.IDDevice" class="btn btn-primary" title="Settings" aria-label="Settings"><i class="bi bi-gear"></i></a>
-                            <a asp-action="Events" asp-route-idDevice="@item.IDDevice" class="btn btn-outline-secondary" title="Events" aria-label="Events"><i class="bi bi-clock-history"></i></a>
-                        </div>
-                    </td>
-                </tr>
-}
+                <partial name="_FleetRows" model="Model" />
             </tbody>
         </table>
     </div>
 </div>
 
 @section Scripts {
-    <partial name="_DataTableScripts" model="@("fleetTable")" />
+    <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.min.js"></script>
+    <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.bootstrap5.min.js"></script>
+    <script src="~/js/live-refresh.js"></script>
+    <script>
+        // Not the shared _DataTableScripts partial (roadmap #90): this table's live-refresh
+        // callback below has to destroy and reinitialize DataTables on every poll tick - it keeps
+        // its own internal row cache, which a raw tbody innerHTML swap would silently desync from
+        // the DOM - and the shared partial has no hook for that.
+        function initFleetTable() {
+            return new DataTable(document.getElementById('fleetTable'), {
+                paging: true,
+                searching: true,
+                order: [[0, 'asc']],
+                columnDefs: [{ orderable: false, targets: -1 }]
+            });
+        }
+
+        let fleetTable;
+        document.addEventListener('DOMContentLoaded', function () {
+            fleetTable = initFleetTable();
+
+            startLiveRefresh({
+                url: '@Url.Action("FleetRows")',
+                applyHtml: function (html) {
+                    fleetTable.destroy();
+                    document.querySelector('#fleetTable tbody').innerHTML = html;
+                    fleetTable = initFleetTable();
+                }
+            });
+        });
+    </script>
 }
