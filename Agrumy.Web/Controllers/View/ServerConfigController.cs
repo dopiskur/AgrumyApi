@@ -1,8 +1,10 @@
 using api.Dal.Interface;
 using api.Models;
 using api.Security;
+using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace api.Controllers.View
 {
@@ -12,7 +14,12 @@ namespace api.Controllers.View
     [Authorize(Roles = RoleNames.GlobalAdmin)]
     public class ServerConfigController(IApi api) : Controller
     {
-        public async Task<ActionResult> Index() => View(await api.ServerConfigGet());
+        public async Task<ActionResult> Index()
+        {
+            ServerConfig config = await api.ServerConfigGet();
+            ViewBag.TimeZones = TimeZoneOptions(config.ScheduleTimeZone);
+            return View(config);
+        }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -20,12 +27,34 @@ namespace api.Controllers.View
         {
             if (!ModelState.IsValid)
             {
+                ViewBag.TimeZones = TimeZoneOptions(serverConfig.ScheduleTimeZone);
                 return View(serverConfig);
             }
 
-            await api.ServerConfigUpdate(serverConfig);
+            try
+            {
+                await api.ServerConfigUpdate(serverConfig);
+            }
+            catch (ApiException ex)
+            {
+                ModelState.AddModelError(nameof(ServerConfig.ScheduleTimeZone), ex.Body);
+                ViewBag.TimeZones = TimeZoneOptions(serverConfig.ScheduleTimeZone);
+                return View(serverConfig);
+            }
+
             TempData["Message"] = "Server settings saved.";
             return RedirectToAction(nameof(Index));
+        }
+
+        /// <summary>Roadmap #39: same source/shape as ProfileController's per-user dropdown - one
+        /// extra "not set" option up top, since a blank ScheduleTimeZone (unlike a user's display
+        /// TimeZone) is a real, intentional state (see api.Models.ServerConfig's comment).</summary>
+        private static List<SelectListItem> TimeZoneOptions(string? selected)
+        {
+            var options = new List<SelectListItem> { new("(not set - schedules evaluate as UTC)", "") };
+            options.AddRange(TimeZoneHelper.GetTimeZoneOptions()
+                .Select(o => new SelectListItem(o.DisplayName, o.Id, string.Equals(o.Id, selected, StringComparison.OrdinalIgnoreCase))));
+            return options;
         }
     }
 }

@@ -219,11 +219,26 @@ namespace api.Controllers.View
                 return View(deviceView);
             }
 
-            await api.DeviceConfigControllerUpdate(new DeviceUpdate
+            try
             {
-                Device = deviceView.Device,
-                Controller = deviceView.DeviceConfigController,
-            });
+                await api.DeviceConfigControllerUpdate(new DeviceUpdate
+                {
+                    Device = deviceView.Device,
+                    Controller = deviceView.DeviceConfigController,
+                });
+            }
+            catch (ApiException ex)
+            {
+                // Roadmap #39: the only current source is DeviceApiController.ScheduleWindowError -
+                // an empty key (not a specific field) because the message already names which of the
+                // four schedule groups failed, and asp-validation-summary="ModelOnly" on this form
+                // renders empty-keyed errors, same convention as ServerConfigController.Index.
+                ModelState.AddModelError(string.Empty, ex.Body);
+                deviceView.Device = await api.DeviceGet(deviceView.Device!.IDDevice);
+                deviceView.DeviceTypeRelay = await api.DeviceTypeRelayGet();
+                return View(deviceView);
+            }
+
             return RedirectToAction(nameof(Details), new { idDevice = deviceView.Device!.IDDevice });
         }
     }

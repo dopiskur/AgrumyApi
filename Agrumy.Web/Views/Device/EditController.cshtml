@@ -11,6 +11,60 @@
     var waterPumpIntervalToggle = new EnabledToggleFieldViewModel { Name = ControllerField(nameof(cfg.WaterPumpIntervalEnabled)), Label = "Water pump interval", Value = cfg.WaterPumpIntervalEnabled };
     var relayEnabledToggle = new EnabledToggleFieldViewModel { Name = ControllerField(nameof(cfg.RelayEnabled)), Label = "Relay", Value = cfg.RelayEnabled };
 
+    // Roadmap #39: same (field name, current value) pairing idea as relaySlots below, one entry
+    // per relay function - EditController.cshtml only wires the loop, _ScheduleField.cshtml renders it.
+    var scheduleGroups = new ScheduleFieldViewModel[]
+    {
+        new()
+        {
+            EnabledFieldName = ControllerField(nameof(cfg.VentilationScheduleEnabled)),
+            DaysOfWeekFieldName = ControllerField(nameof(cfg.VentilationScheduleDaysOfWeek)),
+            StartFieldName = ControllerField(nameof(cfg.VentilationScheduleStart)),
+            DurationFieldName = ControllerField(nameof(cfg.VentilationScheduleDuration)),
+            Label = "Ventilation",
+            EnabledValue = cfg.VentilationScheduleEnabled,
+            DaysOfWeekValue = cfg.VentilationScheduleDaysOfWeek,
+            StartValue = cfg.VentilationScheduleStart,
+            DurationValue = cfg.VentilationScheduleDuration,
+        },
+        new()
+        {
+            EnabledFieldName = ControllerField(nameof(cfg.LightScheduleEnabled)),
+            DaysOfWeekFieldName = ControllerField(nameof(cfg.LightScheduleDaysOfWeek)),
+            StartFieldName = ControllerField(nameof(cfg.LightScheduleStart)),
+            DurationFieldName = ControllerField(nameof(cfg.LightScheduleDuration)),
+            Label = "Light",
+            EnabledValue = cfg.LightScheduleEnabled,
+            DaysOfWeekValue = cfg.LightScheduleDaysOfWeek,
+            StartValue = cfg.LightScheduleStart,
+            DurationValue = cfg.LightScheduleDuration,
+        },
+        new()
+        {
+            EnabledFieldName = ControllerField(nameof(cfg.HeatingScheduleEnabled)),
+            DaysOfWeekFieldName = ControllerField(nameof(cfg.HeatingScheduleDaysOfWeek)),
+            StartFieldName = ControllerField(nameof(cfg.HeatingScheduleStart)),
+            DurationFieldName = ControllerField(nameof(cfg.HeatingScheduleDuration)),
+            Label = "Heating",
+            EnabledValue = cfg.HeatingScheduleEnabled,
+            DaysOfWeekValue = cfg.HeatingScheduleDaysOfWeek,
+            StartValue = cfg.HeatingScheduleStart,
+            DurationValue = cfg.HeatingScheduleDuration,
+        },
+        new()
+        {
+            EnabledFieldName = ControllerField(nameof(cfg.WaterPumpScheduleEnabled)),
+            DaysOfWeekFieldName = ControllerField(nameof(cfg.WaterPumpScheduleDaysOfWeek)),
+            StartFieldName = ControllerField(nameof(cfg.WaterPumpScheduleStart)),
+            DurationFieldName = ControllerField(nameof(cfg.WaterPumpScheduleDuration)),
+            Label = "Water pump",
+            EnabledValue = cfg.WaterPumpScheduleEnabled,
+            DaysOfWeekValue = cfg.WaterPumpScheduleDaysOfWeek,
+            StartValue = cfg.WaterPumpScheduleStart,
+            DurationValue = cfg.WaterPumpScheduleDuration,
+        },
+    };
+
     // Same SelectList source for all 8 relay slots - only the bound property and its current
     // value differ, so build the (field name, selected value) pairs once and loop below.
     var relaySlots = new (string Name, int? Selected)[]
@@ -49,6 +103,9 @@
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-intervals" type="button" role="tab">Intervals</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-schedules" type="button" role="tab">Schedules</button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-hysteresis" type="button" role="tab">Hysteresis</button>
@@ -173,6 +230,24 @@
                     </div>
                 </div>
 
+                <div class="tab-pane fade" id="tab-schedules" role="tabpanel">
+                    @* Roadmap #39: a third relay-control mode alongside Thresholds and Intervals
+                       above - "be on during this wall-clock window on these days", evaluated in
+                       ServerConfig.ScheduleTimeZone (see Server Settings), independent of any
+                       sensor reading. If more than one mode is enabled for the same relay function,
+                       whichever runs last in ControllerController::initController wins for that
+                       tick - same "last write wins" behavior Thresholds/Intervals already have
+                       between each other, not something new #39 introduces. *@
+                    @foreach (var group in scheduleGroups)
+                    {
+                        <partial name="_ScheduleField" model="group" />
+                        @if (group != scheduleGroups[^1])
+                        {
+                            <hr />
+                        }
+                    }
+                </div>
+
                 <div class="tab-pane fade" id="tab-hysteresis" role="tabpanel">
                     <div class="mb-3">
                         <label asp-for="DeviceConfigController.WaterLevelHysteresis" class="form-label"></label>
@@ -204,3 +279,7 @@
         </form>
     </div>
 </div>
+
+@section Scripts {
+    <script src="~/js/schedule-fields.js"></script>
+}

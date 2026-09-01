@@ -91,6 +91,24 @@ namespace api.Dal.Entities
         public int? WaterPumpInterval { get; set; } = 0;
         public int? WaterPumpIntervalLenght { get; set; } = 0;
 
+        // Roadmap #39 - see api.Models.DeviceConfigController for the full field-shape story.
+        public bool? VentilationScheduleEnabled { get; set; } = false;
+        public int? VentilationScheduleDaysOfWeek { get; set; } = 0;
+        public int? VentilationScheduleStart { get; set; } = 0;
+        public int? VentilationScheduleDuration { get; set; } = 0;
+        public bool? LightScheduleEnabled { get; set; } = false;
+        public int? LightScheduleDaysOfWeek { get; set; } = 0;
+        public int? LightScheduleStart { get; set; } = 0;
+        public int? LightScheduleDuration { get; set; } = 0;
+        public bool? HeatingScheduleEnabled { get; set; } = false;
+        public int? HeatingScheduleDaysOfWeek { get; set; } = 0;
+        public int? HeatingScheduleStart { get; set; } = 0;
+        public int? HeatingScheduleDuration { get; set; } = 0;
+        public bool? WaterPumpScheduleEnabled { get; set; } = false;
+        public int? WaterPumpScheduleDaysOfWeek { get; set; } = 0;
+        public int? WaterPumpScheduleStart { get; set; } = 0;
+        public int? WaterPumpScheduleDuration { get; set; } = 0;
+
         public bool? RelayEnabled { get; set; }
         public int? Relay1 { get; set; }
         public int? Relay2 { get; set; }

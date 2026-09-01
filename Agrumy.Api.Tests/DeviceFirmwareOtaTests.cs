@@ -22,6 +22,10 @@ public class DeviceFirmwareOtaTests
              .ReturnsAsync(new User { IDUser = 77, TenantID = device.TenantID, DevicePin = "ABC234", DevicePinExpires = DateTime.UtcNow.AddHours(1) });
         _repo.Setup(r => r.DeviceGetAsync(device.TenantID, null, null, "AABBCCDDEEFF"))
              .ReturnsAsync(device); // IDDevice set => controller skips DeviceAddAsync
+        // Roadmap #39: BuildDeviceConfigAsync always reads ServerConfig now (UtcOffsetSeconds) -
+        // no ScheduleTimeZone configured, so the response's offset is 0/UTC (see UtcOffsetSecondsTests
+        // below for the actual offset-computation behavior).
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var controller = new DeviceApiController(_repo.Object, _cache.Object);
         var result = controller.DeviceRegistration(new DeviceRegistration

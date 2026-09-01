@@ -1,5 +1,6 @@
 using api.Dal.Interface;
 using api.Models;
+using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -35,6 +36,24 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Server-wide settings require the Global admin role");
             }
+
+            // Roadmap #39: same normalize-or-reject rule as UserApiController.UserProfileSet's
+            // TimeZone - a bad id here would silently degrade every device's schedule mode to UTC
+            // (TimeZoneHelper.GetUtcOffsetSeconds' fallback) rather than fail loudly at save time.
+            // Blank/null clears it back to "not configured" - a valid, intentional state.
+            if (!string.IsNullOrWhiteSpace(config.ScheduleTimeZone))
+            {
+                if (!TimeZoneHelper.TryNormalizeToIana(config.ScheduleTimeZone, out string iana))
+                {
+                    return BadRequest("Unknown time zone: " + config.ScheduleTimeZone);
+                }
+                config.ScheduleTimeZone = iana;
+            }
+            else
+            {
+                config.ScheduleTimeZone = null;
+            }
+
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await Repo.ServerConfigUpdateAsync(config);
             return Ok();

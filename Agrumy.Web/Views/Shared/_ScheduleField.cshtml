@@ -1,0 +1,46 @@
+@model api.ViewModels.ScheduleFieldViewModel
+
+@{
+    var enabledToggle = new api.ViewModels.EnabledToggleFieldViewModel
+    {
+        Name = Model.EnabledFieldName,
+        Label = Model.Label + " schedule",
+        Value = Model.EnabledValue,
+    };
+    // Same id-flattening rule as _EnabledToggleField/_SelectField - dots aren't valid in a bare id.
+    string FlatId(string name) => name.Replace(".", "_");
+    string[] dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    int mask = Model.DaysOfWeekValue ?? 0;
+}
+
+<partial name="_EnabledToggleField" model="enabledToggle" />
+
+<div class="mb-3">
+    <label class="form-label d-block">@Model.Label days of week</label>
+    @* Roadmap #39: model binding has no native "N checkboxes -> one bitmask int" support - these
+       post through the hidden input below, kept in sync by wwwroot/js/schedule-fields.js instead of
+       a bespoke model binder. Bit 0 = Sunday .. bit 6 = Saturday (C's tm_wday, see
+       api.Models.DeviceConfigController's comment) - the loop below relies on that 1:1 order. *@
+    <div class="btn-group flex-wrap" role="group" data-schedule-days-for="@Model.DaysOfWeekFieldName">
+        @for (int bit = 0; bit < 7; bit++)
+        {
+            string id = $"{FlatId(Model.DaysOfWeekFieldName)}_bit{bit}";
+            bool isChecked = ((mask >> bit) & 1) == 1;
+            <input type="checkbox" class="btn-check" id="@id" value="@(1 << bit)" checked="@isChecked" autocomplete="off" />
+            <label class="btn btn-outline-primary btn-sm" for="@id">@dayLabels[bit]</label>
+        }
+    </div>
+    <input type="hidden" name="@Model.DaysOfWeekFieldName" data-schedule-days-hidden="@Model.DaysOfWeekFieldName" value="@mask" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label" for="@FlatId(Model.StartFieldName)">@Model.Label start</label>
+    <input type="number" name="@Model.StartFieldName" id="@FlatId(Model.StartFieldName)" value="@Model.StartValue" class="form-control" min="0" max="86399" />
+    <div class="form-text">Seconds since local midnight, e.g. 21600 = 06:00.</div>
+</div>
+
+<div class="mb-3">
+    <label class="form-label" for="@FlatId(Model.DurationFieldName)">@Model.Label duration</label>
+    <input type="number" name="@Model.DurationFieldName" id="@FlatId(Model.DurationFieldName)" value="@Model.DurationValue" class="form-control" min="1" max="86400" />
+    <div class="form-text">Seconds. Start + duration must not cross local midnight.</div>
+</div>

@@ -1,6 +1,7 @@
 using api.Dal.Interface;
 using api.Models;
 using api.Security;
+using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -149,6 +150,14 @@ namespace api.Controllers.API
                 return BadRequest("Device is required.");
             }
 
+            // Roadmap #39: reject here, not on the device - a device that received a malformed
+            // window would just have scheduleRelayFunction() silently treat it as "never on"
+            // (positionInCycle can never be negative), which is a confusing way to discover a typo.
+            if (ScheduleWindowError(deviceUpdate.Controller) is string scheduleError)
+            {
+                return BadRequest(scheduleError);
+            }
+
             var (_, error) = await EnsureOwnedDeviceAsync(
                 () => Repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice), "Device", forWrite: true);
             if (error != null)
@@ -159,6 +168,48 @@ namespace api.Controllers.API
             await Repo.DeviceConfigControllerUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Controller);
             await RefreshConfigVersionCacheAsync(deviceUpdate.Device.IDDevice);
             return true;
+        }
+
+        /// <summary>Roadmap #39: v1 deliberately does not support a schedule window crossing local
+        /// midnight (see api.Models.DeviceConfigController's comment) - Start+Duration must fit in
+        /// one calendar day, and DaysOfWeek must fit the 7-bit mask AgrumyDevice's
+        /// ControllerController::scheduleRelayFunction expects (bit 0 = Sunday .. bit 6 = Saturday).
+        /// Returns the first validation failure found, or null if every enabled schedule is sound.</summary>
+        private static string? ScheduleWindowError(DeviceConfigController? cfg)
+        {
+            if (cfg == null)
+            {
+                return null;
+            }
+
+            (bool? Enabled, int? Days, int? Start, int? Duration, string Label)[] schedules =
+            [
+                (cfg.VentilationScheduleEnabled, cfg.VentilationScheduleDaysOfWeek, cfg.VentilationScheduleStart, cfg.VentilationScheduleDuration, "Ventilation"),
+                (cfg.LightScheduleEnabled, cfg.LightScheduleDaysOfWeek, cfg.LightScheduleStart, cfg.LightScheduleDuration, "Light"),
+                (cfg.HeatingScheduleEnabled, cfg.HeatingScheduleDaysOfWeek, cfg.HeatingScheduleStart, cfg.HeatingScheduleDuration, "Heating"),
+                (cfg.WaterPumpScheduleEnabled, cfg.WaterPumpScheduleDaysOfWeek, cfg.WaterPumpScheduleStart, cfg.WaterPumpScheduleDuration, "Water pump"),
+            ];
+
+            foreach (var (enabled, days, start, duration, label) in schedules)
+            {
+                if (enabled != true)
+                {
+                    continue;
+                }
+                if (days is not int d || d < 0 || d > 0b1111111)
+                {
+                    return $"{label} schedule: days of week must be a value from 0 to 127.";
+                }
+                if (start is not int s || s < 0 || s > 86399)
+                {
+                    return $"{label} schedule: start must be between 0 and 86399 seconds since local midnight.";
+                }
+                if (duration is not int len || len < 1 || start + len > 86400)
+                {
+                    return $"{label} schedule: duration must be at least 1 second and not cross local midnight (start + duration <= 86400).";
+                }
+            }
+            return null;
         }
 
         /// <summary>
@@ -310,6 +361,13 @@ namespace api.Controllers.API
 
         private async Task<DeviceConfig> BuildDeviceConfigAsync(Device device)
         {
+            // Roadmap #39: computed fresh on every Config/Register response (cheap - one TimeZoneInfo
+            // lookup) rather than cached, so a DST transition or an admin changing
+            // ServerConfig.ScheduleTimeZone reaches every device on its very next poll. Sent
+            // regardless of DeviceControllerEnabled - harmless for a sensor-only device, and one
+            // fewer conditional for the firmware to reason about.
+            int utcOffsetSeconds = TimeZoneHelper.GetUtcOffsetSeconds(DateTime.UtcNow, (await Repo.ServerConfigGetAsync(1)).ScheduleTimeZone);
+
             var deviceConfig = new DeviceConfig
             {
                 ConfigVersion = device.ConfigVersion,
@@ -322,6 +380,7 @@ namespace api.Controllers.API
                 ServicePoint = device.ServicePoint,
                 DeviceTypeServiceID = device.DeviceTypeServiceID,
                 ServicePublicKey = device.ServicePublicKey,
+                UtcOffsetSeconds = utcOffsetSeconds,
                 DeviceSensorEnabled = device.DeviceSensorEnabled,
                 DeviceControllerEnabled = device.DeviceControllerEnabled,
                 BatteryEnabled = device.BatteryEnabled,

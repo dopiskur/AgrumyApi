@@ -31,6 +31,33 @@ namespace api.Utils
             }
         }
 
+        /// <summary>Roadmap #39: the device-side half of schedule-mode relay control - a plain
+        /// integer offset needs no timezone database on an ESP32, unlike an IANA id. Null/unknown
+        /// zone falls back to 0 (UTC), same "degrade, never throw" rule as ToUserLocalTime.
+        /// Recomputed on every call (not cached) so a DST transition is picked up by the very next
+        /// config poll that calls this - offsets are cheap to compute, no reason to go stale.</summary>
+        public static int GetUtcOffsetSeconds(DateTime utcNow, string? timeZoneId)
+        {
+            if (string.IsNullOrWhiteSpace(timeZoneId))
+            {
+                return 0;
+            }
+
+            try
+            {
+                TimeZoneInfo tz = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+                return (int)tz.GetUtcOffset(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc)).TotalSeconds;
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return 0;
+            }
+            catch (InvalidTimeZoneException)
+            {
+                return 0;
+            }
+        }
+
         /// <summary>Validates a caller-supplied zone id and normalizes it to IANA form, so a Windows
         /// id picked from a Windows-hosted dropdown still stores as "Europe/Zagreb" - the DB holds
         /// one canonical format regardless of which OS served the page.</summary>

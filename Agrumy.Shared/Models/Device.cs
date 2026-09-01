@@ -85,6 +85,13 @@ namespace api.Models
         public int? SleepSeconds { get; set; } = 60;
         public bool? SleepDeep { get; set; } = false;
 
+        // Roadmap #39: current UTC offset (seconds, positive east of UTC) for
+        // ServerConfig.ScheduleTimeZone, computed fresh on every config sync
+        // (DeviceApiController.BuildDeviceConfigAsync via TimeZoneHelper.GetUtcOffsetSeconds) so a
+        // DST transition reaches every device within one poll cycle without the firmware needing a
+        // timezone database of its own. 0 (UTC) when no ScheduleTimeZone is configured yet.
+        public int? UtcOffsetSeconds { get; set; }
+
         public bool? DeviceSensorEnabled { get; set; } = false;
         public bool? DeviceControllerEnabled { get; set; } = false;
         public bool? BatteryEnabled { get; set; } = false;
@@ -226,6 +233,36 @@ namespace api.Models
         public bool? WaterPumpIntervalEnabled { get; set; }
         public int? WaterPumpInterval { get; set; }
         public int? WaterPumpIntervalLenght { get; set; }
+
+        // Roadmap #39: a third relay-control mode alongside threshold (dead-zone) and interval
+        // (duty-cycle) above - "be on during this wall-clock window on these days", independent of
+        // any sensor reading. DaysOfWeek is a 7-bit mask matching C's tm_wday convention (bit 0 =
+        // Sunday .. bit 6 = Saturday - see AgrumyDevice's ControllerController::scheduleRelayFunction),
+        // so the firmware needs zero day-numbering translation. Start/Duration are seconds since
+        // LOCAL midnight (not UTC) - "local" resolved via ServerConfig.ScheduleTimeZone and delivered
+        // to the device as a plain UTC offset (DeviceConfig.UtcOffsetSeconds) rather than an IANA id,
+        // so the firmware needs no timezone database, just integer math refreshed every config poll.
+        // v1 deliberately does not support a window crossing local midnight (Start + Duration must
+        // stay within the same calendar day) - see DeviceApiController's validation.
+        public bool? VentilationScheduleEnabled { get; set; }
+        public int? VentilationScheduleDaysOfWeek { get; set; }
+        public int? VentilationScheduleStart { get; set; }
+        public int? VentilationScheduleDuration { get; set; }
+
+        public bool? LightScheduleEnabled { get; set; }
+        public int? LightScheduleDaysOfWeek { get; set; }
+        public int? LightScheduleStart { get; set; }
+        public int? LightScheduleDuration { get; set; }
+
+        public bool? HeatingScheduleEnabled { get; set; }
+        public int? HeatingScheduleDaysOfWeek { get; set; }
+        public int? HeatingScheduleStart { get; set; }
+        public int? HeatingScheduleDuration { get; set; }
+
+        public bool? WaterPumpScheduleEnabled { get; set; }
+        public int? WaterPumpScheduleDaysOfWeek { get; set; }
+        public int? WaterPumpScheduleStart { get; set; }
+        public int? WaterPumpScheduleDuration { get; set; }
 
         // Relay
         public bool? RelayEnabled { get; set; }

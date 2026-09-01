@@ -35,6 +35,7 @@ namespace api.Dal
                 EventDedupeMinutes = Config.eventDedupeMinutes,
                 ActivationResendCooldownMinutes = Config.activationResendCooldownMinutes,
                 AllowSelfServiceTenantCreation = Config.allowSelfServiceTenantCreation,
+                ScheduleTimeZone = Config.scheduleTimeZone,
             };
             db.ServerConfigs.Add(generated);
             await db.SaveChangesAsync();
@@ -57,6 +58,7 @@ namespace api.Dal
             row.EventDedupeMinutes = config.EventDedupeMinutes;
             row.ActivationResendCooldownMinutes = config.ActivationResendCooldownMinutes;
             row.AllowSelfServiceTenantCreation = config.AllowSelfServiceTenantCreation;
+            row.ScheduleTimeZone = config.ScheduleTimeZone;
             await db.SaveChangesAsync();
         }
 
@@ -87,6 +89,7 @@ namespace api.Dal
             row.EventDedupeMinutes = Config.eventDedupeMinutes;
             row.ActivationResendCooldownMinutes = Config.activationResendCooldownMinutes;
             row.AllowSelfServiceTenantCreation = Config.allowSelfServiceTenantCreation;
+            row.ScheduleTimeZone = Config.scheduleTimeZone;
             await db.SaveChangesAsync();
         }
 
@@ -104,6 +107,7 @@ namespace api.Dal
             EventDedupeMinutes = r.EventDedupeMinutes,
             ActivationResendCooldownMinutes = r.ActivationResendCooldownMinutes,
             AllowSelfServiceTenantCreation = r.AllowSelfServiceTenantCreation,
+            ScheduleTimeZone = r.ScheduleTimeZone,
         };
     }
 }

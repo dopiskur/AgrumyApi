@@ -57,6 +57,13 @@ namespace api
         // silently creating one until an admin opts in.
         public static readonly bool allowSelfServiceTenantCreation = ParseBoolOr("ServerConfig:AllowSelfServiceTenantCreation", false);
 
+        // Roadmap #39: no fallback constant - unlike the numeric defaults above, there is no
+        // universally-reasonable default IANA zone to assume for a fleet's physical location.
+        // Null (unset) is a valid, common state: TimeZoneHelper.GetUtcOffsetSeconds treats it as
+        // UTC (offset 0) rather than throwing, so schedule mode is inert-but-safe until an admin
+        // sets this on the Server Settings page.
+        public static readonly string? scheduleTimeZone = configuration.GetSection("ServerConfig:ScheduleTimeZone").Value;
+
         private static int ParseIntOr(string key, int fallback) =>
             int.TryParse(configuration.GetSection(key).Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
                 ? value

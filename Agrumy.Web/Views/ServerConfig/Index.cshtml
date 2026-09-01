@@ -73,6 +73,16 @@
                 <label asp-for="AllowSelfServiceTenantCreation" class="form-check-label"></label>
             </div>
 
+            <p class="text-secondary">
+                Local wall-clock zone schedule-mode relay windows (Device &rarr; Controller &rarr;
+                Schedules) are evaluated against (roadmap #39). Not set = windows evaluate as UTC.
+            </p>
+            <div class="mb-3">
+                <label asp-for="ScheduleTimeZone" class="form-label"></label>
+                <select asp-for="ScheduleTimeZone" asp-items="(IEnumerable<SelectListItem>)ViewBag.TimeZones" class="form-select"></select>
+                <span asp-validation-for="ScheduleTimeZone" class="text-danger"></span>
+            </div>
+
             <div class="mb-0">
                 <input type="submit" value="Save" class="btn btn-primary" />
             </div>

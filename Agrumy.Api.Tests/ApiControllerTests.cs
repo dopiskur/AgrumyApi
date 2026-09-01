@@ -238,6 +238,7 @@ public class ApiControllerTests
         StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
         _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF"))
              .ReturnsAsync(new Device { IDDevice = 500, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // roadmap #39: BuildDeviceConfigAsync always reads this now
 
         var result = await NewDeviceController().DeviceRegistration(PinRegistration("abc234"));
 
@@ -254,6 +255,7 @@ public class ApiControllerTests
              .ReturnsAsync(new Device { IDDevice = 500, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
         _repo.Setup(r => r.DeviceGetAsync(1, null, null, "112233445566"))
              .ReturnsAsync(new Device { IDDevice = 501, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // roadmap #39: BuildDeviceConfigAsync always reads this now
 
         var first = await NewDeviceController().DeviceRegistration(PinRegistration("ABC234"));
         var second = await NewDeviceController().DeviceRegistration(new DeviceRegistration
@@ -1090,6 +1092,127 @@ public class ApiControllerTests
 
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(403, obj.StatusCode);
+    }
+
+    // ---- DeviceApiController.DeviceConfigControllerUpdate - roadmap #39 schedule validation ----
+
+    [Fact]
+    public async Task DeviceConfigControllerUpdate_ScheduleCrossesMidnight_Returns400_AndNeverTouchesRepo()
+    {
+        var controller = NewDeviceController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
+        {
+            Device = new Device { IDDevice = 8 },
+            Controller = new DeviceConfigController
+            {
+                VentilationScheduleEnabled = true,
+                VentilationScheduleDaysOfWeek = 0b1111111,
+                VentilationScheduleStart = 86000,
+                VentilationScheduleDuration = 1000, // 86000 + 1000 > 86400 - crosses local midnight
+            },
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        // MockBehavior.Strict: DeviceGetByIdAsync has no setup, so reaching this point already
+        // proves validation ran BEFORE the ownership lookup/DB write, not after.
+    }
+
+    [Fact]
+    public async Task DeviceConfigControllerUpdate_ScheduleDisabled_SkipsValidation_EvenWithOutOfRangeFields()
+    {
+        // A disabled schedule's stale/garbage fields must not block saving something else on the
+        // same form - only an ENABLED schedule's window is validated.
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 0 });
+        _repo.Setup(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>())).Returns(Task.CompletedTask);
+
+        var controller = NewDeviceController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
+        {
+            Device = new Device { IDDevice = 8 },
+            Controller = new DeviceConfigController { VentilationScheduleEnabled = false, VentilationScheduleStart = 99999, VentilationScheduleDuration = 99999 },
+        });
+
+        Assert.True(result.Value);
+    }
+
+    [Fact]
+    public async Task DeviceConfigControllerUpdate_ValidSchedule_Persists()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 0 });
+        _repo.Setup(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>())).Returns(Task.CompletedTask);
+
+        var controller = NewDeviceController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
+        {
+            Device = new Device { IDDevice = 8 },
+            Controller = new DeviceConfigController
+            {
+                LightScheduleEnabled = true,
+                LightScheduleDaysOfWeek = 0b0111110, // Mon-Fri
+                LightScheduleStart = 21600,           // 06:00
+                LightScheduleDuration = 43200,        // 12h -> ends 18:00, same calendar day
+            },
+        });
+
+        Assert.True(result.Value);
+        _repo.Verify(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>()), Times.Once);
+    }
+
+    // ---- ServerConfigApiController.Update - roadmap #39 ScheduleTimeZone validation -------------
+
+    [Fact]
+    public async Task ServerConfigUpdate_UnknownScheduleTimeZone_Returns400_AndNeverWrites()
+    {
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.Update(new ServerConfig { ScheduleTimeZone = "Not/AZone" });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        // MockBehavior.Strict: ServerConfigUpdateAsync has no setup, so reaching this point already
+        // proves the bad id was rejected before any write.
+    }
+
+    [Fact]
+    public async Task ServerConfigUpdate_ValidScheduleTimeZone_NormalizesToIana_AndPersists()
+    {
+        ServerConfig? saved = null;
+        _repo.Setup(r => r.ServerConfigUpdateAsync(It.IsAny<ServerConfig>()))
+             .Callback<ServerConfig>(c => saved = c)
+             .Returns(Task.CompletedTask);
+
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.Update(new ServerConfig { ScheduleTimeZone = "Europe/Zagreb" });
+
+        Assert.IsType<OkResult>(result);
+        Assert.Equal("Europe/Zagreb", saved!.ScheduleTimeZone);
+    }
+
+    [Fact]
+    public async Task ServerConfigUpdate_BlankScheduleTimeZone_ClearsToNull()
+    {
+        // Blank is a valid, intentional "not configured" state (api.Models.ServerConfig's comment) -
+        // must not be rejected the way an actually-unknown id is.
+        ServerConfig? saved = null;
+        _repo.Setup(r => r.ServerConfigUpdateAsync(It.IsAny<ServerConfig>()))
+             .Callback<ServerConfig>(c => saved = c)
+             .Returns(Task.CompletedTask);
+
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.Update(new ServerConfig { ScheduleTimeZone = "   " });
+
+        Assert.IsType<OkResult>(result);
+        Assert.Null(saved!.ScheduleTimeZone);
     }
 
     [Fact]

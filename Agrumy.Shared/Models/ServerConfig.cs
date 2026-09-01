@@ -37,6 +37,16 @@ namespace api.Models
         // a checkbox for a non-nullable bool.
         [Display(Name = "Allow self-service tenant creation")]
         public bool AllowSelfServiceTenantCreation { get; set; }
+
+        // Roadmap #39: single install-wide IANA zone id (e.g. "Europe/Zagreb") schedule-mode relay
+        // windows (DeviceConfigController.*ScheduleStart/Duration) are evaluated against. Null =
+        // not configured yet - BuildDeviceConfigAsync then sends every device UtcOffsetSeconds=0
+        // (UTC), so an admin who enables a schedule before setting this just gets UTC-anchored
+        // windows rather than a hard failure. One zone for the whole install (not per-device/tenant)
+        // is a deliberate v1 simplification - nothing in the roadmap design asked for finer scope,
+        // and every fleet observed so far lives in one geographic timezone.
+        [Display(Name = "Schedule time zone")]
+        public string? ScheduleTimeZone { get; set; }
     }
 
     /// <summary>The only two fields of <see cref="ServerConfig"/> a pre-login, unauthenticated page

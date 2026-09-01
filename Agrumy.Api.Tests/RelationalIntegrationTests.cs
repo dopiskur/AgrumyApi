@@ -276,6 +276,22 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(443, a.PortHTTPS);
     }
 
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task ServerConfig_ScheduleTimeZone_UpdateAndGet_RoundTrips(DbProviderKind provider)
+    {
+        // Roadmap #39.
+        Use(provider);
+        int id = new Random().Next(1000, 9_000_000);
+        var config = await _repo.ServerConfigGetAsync(id);
+        Assert.Null(config.ScheduleTimeZone); // not configured yet - a real column, not a computed default
+
+        config.ScheduleTimeZone = "Europe/Zagreb";
+        await _repo.ServerConfigUpdateAsync(config);
+
+        var back = await _repo.ServerConfigGetAsync(id);
+        Assert.Equal("Europe/Zagreb", back.ScheduleTimeZone);
+    }
+
     // ---- refresh tokens -----------------------------------------------------
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -620,6 +636,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await _repo.DeviceConfigControllerUpdateAsync(d.IDDevice, new DeviceConfigController
         {
             IDDeviceConfigController = d.DeviceConfigControllerID, TempLow = 5.5, TempHigh = 30.25, RelayEnabled = true, Relay1 = 2,
+            // Roadmap #39.
+            LightScheduleEnabled = true, LightScheduleDaysOfWeek = 0b0111110, LightScheduleStart = 21600, LightScheduleDuration = 43200,
         });
         var back = await _repo.DeviceGetByIdAsync(d.IDDevice);
         Assert.NotNull(back);
@@ -629,6 +647,10 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(5.5, ctrl!.TempLow);   // real double (proc truncated via int params)
         Assert.Equal(30.25, ctrl.TempHigh);
         Assert.True(ctrl.RelayEnabled);
+        Assert.True(ctrl.LightScheduleEnabled);
+        Assert.Equal(0b0111110, ctrl.LightScheduleDaysOfWeek);
+        Assert.Equal(21600, ctrl.LightScheduleStart);
+        Assert.Equal(43200, ctrl.LightScheduleDuration);
         Assert.Equal(1, (await _repo.DeviceConfigSensorGetAsync(d.DeviceConfigSensorID))!.SensorTemp);
     }
 

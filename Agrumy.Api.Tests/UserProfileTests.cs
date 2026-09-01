@@ -57,6 +57,29 @@ public class UserProfileTests
         Assert.Equal(utc, TimeZoneHelper.ToUserLocalTime(utc, zone));
     }
 
+    // ---- TimeZoneHelper.GetUtcOffsetSeconds (roadmap #39) -------------------------------
+
+    [Theory]
+    // Europe/Zagreb: +2h (7200s) in summer (CEST), +1h (3600s) in winter (CET) - same DST
+    // boundary as the ToUserLocalTime cases above, proving GetUtcOffsetSeconds resolves the same
+    // transition rather than a fixed offset.
+    [InlineData("2026-07-15 10:00:00", 7200)]
+    [InlineData("2026-01-15 10:00:00", 3600)]
+    public void GetUtcOffsetSeconds_Zagreb_Applies_Correct_DST_Offset(string utc, int expectedSeconds)
+    {
+        Assert.Equal(expectedSeconds, TimeZoneHelper.GetUtcOffsetSeconds(DateTime.Parse(utc), "Europe/Zagreb"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("Not/AZone")]
+    public void GetUtcOffsetSeconds_NoOrUnknownZone_FallsBackToZero_WithoutThrowing(string? zone)
+    {
+        Assert.Equal(0, TimeZoneHelper.GetUtcOffsetSeconds(DateTime.UtcNow, zone));
+    }
+
     // ---- TimeZoneHelper.TryNormalizeToIana ---------------------------------------------
 
     [Fact]

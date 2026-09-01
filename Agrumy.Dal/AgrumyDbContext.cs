@@ -136,6 +136,7 @@ namespace api.Dal
                 e.Property(x => x.ServerConfigName).HasMaxLength(100);
                 e.Property(x => x.ConfigKey).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ServerConfigCol).HasColumnName("serverConfigcol").HasMaxLength(45);
+                e.Property(x => x.ScheduleTimeZone).HasMaxLength(64); // same cap as user.TimeZone (roadmap #71)
             });
 
             modelBuilder.Entity<DeviceUnitZoneRow>(e =>
