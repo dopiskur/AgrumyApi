@@ -59,8 +59,11 @@ namespace api.Controllers.API
             }
 
             // The device's OWN tenant, not the caller's - a Global admin/Device deleting a foreign
-            // tenant's device would otherwise silently match zero rows.
-            await Repo.DeviceDeleteAsync(idDevice, device!.TenantID);
+            // tenant's device would otherwise silently match zero rows. Roadmap #108: same ?? 0
+            // fallback as #96/#96-follow-ups - a null TenantID device's row was written with 0
+            // (DeviceAddAsync's own ?? 0 convention), so filtering on the bare nullable here would
+            // delete zero rows instead.
+            await Repo.DeviceDeleteAsync(idDevice, device!.TenantID ?? 0);
             return true;
         }
 

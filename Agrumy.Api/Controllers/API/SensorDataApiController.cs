@@ -52,12 +52,15 @@ namespace api.Controllers.API
             {
                 return NotFound();
             }
-            if (!CallerManagesDevices(device.TenantID))
+            // Roadmap #108: same ?? 0 fallback as #96 - a null TenantID device's rows were written
+            // with 0 (DeviceAddAsync's own ?? 0 convention), so passing the bare nullable here would
+            // wrongly deny/delete-zero-rows for it.
+            if (!CallerManagesDevices(device.TenantID ?? 0))
             {
                 return StatusCode(403, "Device belongs to a different tenant");
             }
 
-            await Repo.SensorDataDeleteAsync(device.TenantID, deviceID, timeRange, timeMDMY);
+            await Repo.SensorDataDeleteAsync(device.TenantID ?? 0, deviceID, timeRange, timeMDMY);
             return Ok();
         }
 
