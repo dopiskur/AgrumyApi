@@ -9,7 +9,7 @@ namespace api.Dal.Interface
         Task ServerConfigUpdateAsync(ServerConfig config);
 
         /// <summary>Overwrites the DB row's hysteresis fields from appsettings.json (roadmap #10) -
-        /// only called at startup when Config.serverConfigReload is true.</summary>
+        /// only called at startup when AgrumySettings.ServerConfigReload is true.</summary>
         Task ServerConfigReloadFromAppSettingsAsync(int idServerConfig);
     }
 }

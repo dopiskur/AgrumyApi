@@ -14,7 +14,6 @@ namespace api.Dal
 
         public async Task DeviceDiagnosticUpsertAsync(int deviceID, int tenantID, DeviceConfigPoll poll)
         {
-            await using var db = Db();
             var row = await db.DeviceDiagnostics.FirstOrDefaultAsync(d => d.DeviceID == deviceID);
             if (row == null)
             {
@@ -35,7 +34,6 @@ namespace api.Dal
 
         public async Task<IList<DeviceFleetStatus>> DeviceFleetGetAsync(int? tenantID)
         {
-            await using var db = Db();
             IQueryable<DeviceRow> devices = db.Devices.AsNoTracking();
             if (tenantID != null)
             {
@@ -82,12 +80,10 @@ namespace api.Dal
 
         public async Task<bool> EventDevicePushAsync(int deviceID, int tenantID, DeviceEventType eventType, string? message)
         {
-            // Read outside the write connection, same reasoning as DeviceAddAsync's ServerConfigGetAsync
-            // call - auto-generates the row (and its EventDedupeMinutes default) on a brand-new install.
-            int dedupeMinutes = (await ServerConfigGetAsync()).EventDedupeMinutes ?? Config.eventDedupeMinutes;
+            // ServerConfigGetAsync may auto-generate the row (and its EventDedupeMinutes default) on
+            // a brand-new install - same reasoning as DeviceAddAsync's own call to it.
+            int dedupeMinutes = (await ServerConfigGetAsync()).EventDedupeMinutes ?? settings.EventDedupeMinutes;
             DateTime cutoff = DateTime.UtcNow.AddMinutes(-dedupeMinutes);
-
-            await using var db = Db();
 
             bool isDuplicate = await db.EventDevices.AsNoTracking()
                 .AnyAsync(e => e.DeviceID == deviceID && e.EventID == (int)eventType && e.Date >= cutoff);
@@ -110,7 +106,6 @@ namespace api.Dal
 
         public async Task<IList<DeviceEvent>> EventDeviceGetAsync(int? deviceID, int? tenantID, int limit = 100)
         {
-            await using var db = Db();
             var rows = await db.EventDevices.AsNoTracking()
                 .Where(e => e.DeviceID == deviceID && e.TenantID == tenantID)
                 .OrderByDescending(e => e.Date)
@@ -123,7 +118,6 @@ namespace api.Dal
 
         public async Task<IList<OfflineAlertCandidate>> OfflineAlertCandidatesGetAsync()
         {
-            await using var db = Db();
             return await db.Devices.AsNoTracking()
                 .Where(d => d.Enabled == true) // a disabled device is expected to be silent
                 .Select(d => new OfflineAlertCandidate(
@@ -138,7 +132,6 @@ namespace api.Dal
 
         public async Task DeviceOfflineNotifiedSetAsync(int deviceID, DateTime? notifiedAt)
         {
-            await using var db = Db();
             // A device with no diagnostic row at all has never polled, so it cannot have just
             // transitioned to offline (OfflineAlertCandidatesGetAsync's LastSeenAt would be null,
             // which ComputeOnline already treats as offline-forever) - nothing to set.

@@ -11,7 +11,6 @@ namespace api.Dal
     {
         public async Task<IList<DeviceType>> DeviceTypeGetAsync()
         {
-            await using var db = Db();
             return await db.DeviceTypes.AsNoTracking()
                 .Select(t => new DeviceType
                 {
@@ -25,7 +24,6 @@ namespace api.Dal
 
         public async Task<IList<DeviceTypeService>> DeviceTypeServiceGetAsync()
         {
-            await using var db = Db();
             return await db.DeviceTypeServices.AsNoTracking()
                 .Select(s => new DeviceTypeService { IDDeviceTypeService = s.IDDeviceTypeService, ServiceType = s.ServiceType })
                 .ToListAsync();
@@ -33,7 +31,6 @@ namespace api.Dal
 
         public async Task<IList<DeviceTypeRelay>> DeviceTypeRelayGetAsync()
         {
-            await using var db = Db();
             return await db.DeviceTypeRelays.AsNoTracking()
                 .Select(r => new DeviceTypeRelay { IDDeviceTypeRelay = r.IDDeviceTypeRelay, RelayName = r.RelayName })
                 .ToListAsync();
@@ -41,7 +38,6 @@ namespace api.Dal
 
         public async Task<IList<DeviceTypeSensor>> DeviceTypeSensorGetAsync()
         {
-            await using var db = Db();
             return await db.DeviceTypeSensors.AsNoTracking()
                 .Select(s => new DeviceTypeSensor
                 {

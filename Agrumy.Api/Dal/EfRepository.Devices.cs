@@ -13,11 +13,12 @@ namespace api.Dal
     {
         public async Task DeviceAddAsync(Device device)
         {
-            // Outside the transaction below: read-only, and ServerConfigGetAsync opens its own
-            // connection via Db() - auto-generates the row on a brand-new install.
+            // Read (and possibly auto-generate on a brand-new install) BEFORE the transaction below
+            // starts - ServerConfigGetAsync's own SaveChangesAsync (if it seeds a row) auto-commits
+            // on the shared context (roadmap #101) before BeginTransactionAsync opens this method's
+            // own explicit transaction, so the two never nest.
             ServerConfig serverConfig = await ServerConfigGetAsync();
 
-            await using var db = Db();
             await using var tx = await db.Database.BeginTransactionAsync();
 
             var sensorCfg = new DeviceConfigSensorRow();
@@ -60,7 +61,6 @@ namespace api.Dal
 
         public async Task DeviceDeleteAsync(int? idDevice, int? tenantID)
         {
-            await using var db = Db();
             var target = await db.Devices.AsNoTracking()
                 .Where(d => d.IDDevice == idDevice && d.TenantID == tenantID)
                 .Select(d => new { d.DeviceConfigSensorID, d.DeviceConfigControllerID })
@@ -87,7 +87,6 @@ namespace api.Dal
 
         public async Task<Device?> DeviceGetAsync(int? tenantID, int? idDevice, string? apiId, string? macAddress)
         {
-            await using var db = Db();
             IQueryable<DeviceRow> q = db.Devices.AsNoTracking().Where(d => d.TenantID == tenantID);
 
             if (idDevice != null)
@@ -113,21 +112,18 @@ namespace api.Dal
 
         public async Task<Device?> DeviceGetByIdAsync(int? idDevice)
         {
-            await using var db = Db();
             var row = await db.Devices.AsNoTracking().FirstOrDefaultAsync(d => d.IDDevice == idDevice);
             return row == null ? null : ToDto(row);
         }
 
         public async Task<Device?> DeviceGetByApiIdAsync(string? apiId)
         {
-            await using var db = Db();
             var row = await db.Devices.AsNoTracking().FirstOrDefaultAsync(d => d.ApiId == apiId);
             return row == null ? null : ToDto(row);
         }
 
         public async Task<IList<Device>> DevicesGetAsync(int? tenantID)
         {
-            await using var db = Db();
             var rows = await db.Devices.AsNoTracking().Where(d => d.TenantID == tenantID).ToListAsync();
             return rows.Select(ToDto).ToList();
         }
@@ -136,14 +132,12 @@ namespace api.Dal
         // reach this after CallerReadsDevicesGlobally passed, mirroring UsersGetAllAsync.
         public async Task<IList<Device>> DevicesGetAllAsync()
         {
-            await using var db = Db();
             var rows = await db.Devices.AsNoTracking().ToListAsync();
             return rows.Select(ToDto).ToList();
         }
 
         public async Task<bool> DeviceCheckMacAddressAsync(int? tenantID, string? macAddress)
         {
-            await using var db = Db();
             return await db.Devices.AsNoTracking()
                 .AnyAsync(d => d.TenantID == tenantID && d.MacAddress == macAddress);
         }
@@ -155,7 +149,6 @@ namespace api.Dal
                 return;
             }
 
-            await using var db = Db();
             var row = await db.Devices.FirstOrDefaultAsync(d => d.IDDevice == device.IDDevice);
             if (row == null)
             {

@@ -2,6 +2,7 @@ using api.Dal.Entities;
 using api.Dal.Interface;
 using api.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using MySqlConnector;
 using Npgsql;
 
@@ -20,51 +21,27 @@ namespace api.Dal
     /// Roadmap #74: one class, split into partial files mirroring the IRepository facets
     /// (EfRepository.Users.cs, EfRepository.Devices.cs, ...) - this file holds the connection
     /// plumbing and the ISystemRepository members.
+    ///
+    /// Roadmap #101: constructor-injected <see cref="AgrumyDbContext"/>, registered scoped
+    /// (Program.cs) - one context per HTTP request/background-worker tick, not a new one per
+    /// method call. Previously every method opened its own via a private static Db() factory,
+    /// which meant EF's change tracking never spanned two repo calls in the same request, real
+    /// connection-pool churn (open/close per method), and tests had to poke process-wide static
+    /// fields (ConnectionStringOverride/ProviderOverride) instead of just constructing an instance.
     /// </summary>
-    internal partial class EfRepository : IRepository
+    internal partial class EfRepository(AgrumyDbContext db, IOptions<AgrumySettings> settingsOptions) : IRepository
     {
-        /// <summary>
-        /// Test-only seam: point the repository at an integration database before the first call.
-        /// Mirrors <c>RepoFactory.OverrideForTests</c>. Null =&gt; use appsettings.
-        /// </summary>
-        internal static string? ConnectionStringOverride { get; set; }
-
-        /// <summary>Test-only seam: force the provider. Null =&gt; use <c>Database:Provider</c>.</summary>
-        internal static DbProviderKind? ProviderOverride { get; set; }
-
-        // Built once for the normal (appsettings-driven) path. Not cached when a test seam is set,
-        // so an integration test can point successive calls at different engines.
-        private static DbContextOptions<AgrumyDbContext>? _options;
-
-        private static AgrumyDbContext Db()
-        {
-            if (ConnectionStringOverride != null || ProviderOverride != null)
-            {
-                return new AgrumyDbContext(DbOptionsFactory.Build(
-                    ProviderOverride ?? DbProviderKindParser.Parse(Config.dbProvider),
-                    ConnectionStringOverride
-                        ?? Config.defaultSqlCon
-                        ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is missing.")));
-            }
-
-            _options ??= DbOptionsFactory.Build(
-                DbProviderKindParser.Parse(Config.dbProvider),
-                Config.defaultSqlCon
-                    ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is missing."));
-            return new AgrumyDbContext(_options);
-        }
+        private readonly AgrumySettings settings = settingsOptions.Value;
 
         // ---- Startup / health -----------------------------------------------------------
 
         public async Task<bool> TestConnectionAsync()
         {
-            await using var db = Db();
             return await db.Database.CanConnectAsync();
         }
 
         public async Task EnsureSchemaAsync()
         {
-            await using var db = Db();
 
             // Pre-beta: no real data to preserve across schema changes, so we skip migration
             // history entirely and just create-if-missing from the current model. Empty DB gets

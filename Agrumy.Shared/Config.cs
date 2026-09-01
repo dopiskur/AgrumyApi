@@ -1,75 +1,33 @@
-﻿using System.Globalization;
 using Microsoft.Extensions.Configuration;
 
 namespace api
 {
-    public class Config
+    /// <summary>
+    /// Roadmap #104: thin static shim, kept only because <see cref="Security.JwtTokenProvider"/> is
+    /// static by design and shared verbatim between two independent host processes (Agrumy.Api and
+    /// Agrumy.Web each load this assembly separately) - a constructor-injected settings object can't
+    /// reach static methods. Everything else should prefer constructor-injected
+    /// <c>IOptions&lt;AgrumySettings&gt;</c> instead (see EfRepository, roadmap #101).
+    ///
+    /// <see cref="Init"/> MUST be called exactly once at startup by EACH host's Program.cs, passing
+    /// THAT host's own <c>builder.Configuration</c> - before this, Config built its own
+    /// <c>ConfigurationBuilder</c> from <c>Directory.GetCurrentDirectory()/appsettings.json</c>,
+    /// entirely outside the host pipeline: no <c>appsettings.{Environment}.json</c> override, no
+    /// standard env-var/user-secrets provider (the AGRUMY_DB_PROVIDER env var was a manual,
+    /// one-off workaround for exactly this gap), never reloadable, and fragile under systemd where
+    /// the working directory does not necessarily match the bin directory.
+    /// </summary>
+    public static class Config
     {
-        private static IConfigurationRoot configuration = new ConfigurationBuilder()
-           .SetBasePath(Directory.GetCurrentDirectory())
-           .AddJsonFile("appsettings.json")
-           .Build();
+        public static string? secureKey { get; private set; }
+        public static string? jwtIssuer { get; private set; }
+        public static string? jwtAudience { get; private set; }
 
-        // SQL settings
-        public static readonly string? defaultSqlCon = configuration.GetConnectionString("DefaultConnection");
-
-        /// <summary>Raw value of <c>Database:Provider</c> (mysql | mariadb | postgres | postgresql). Null/empty =&gt; mysql. Parsed by api.Dal.DbProviderKindParser.</summary>
-        public static readonly string? dbProvider =
-            Environment.GetEnvironmentVariable("AGRUMY_DB_PROVIDER")
-            ?? configuration.GetSection("Database:Provider").Value;
-        public static readonly string? secureKey = configuration.GetSection("JWT:SecureKey").Value;
-        public static readonly string? jwtIssuer = configuration.GetSection("JWT:Issuer").Value;
-        public static readonly string? jwtAudience = configuration.GetSection("JWT:Audience").Value;
-
-        public static readonly string? apiService = configuration.GetSection("WebView:ApiService").Value;
-
-        // ServerConfig:Reload (roadmap #10 hysteresis) - if true, overwrite the DB serverConfig
-        // row's hysteresis fields from ServerConfig:Hysteresis on every startup instead of only
-        // seeding them once when the row is first created. An operator flips this to force the
-        // DB back to the file's values; leaving it true keeps clobbering any admin-UI edit on
-        // every restart, so it defaults to false.
-        public static readonly bool serverConfigReload =
-            bool.TryParse(configuration.GetSection("ServerConfig:Reload").Value, out var reload) && reload;
-
-        // Fallback hysteresis defaults if ServerConfig:Hysteresis is missing from appsettings.json
-        // entirely (upgrade from an older config file) - same values the firmware used to hardcode.
-        public static readonly double hysteresisWaterLevel = ParseDoubleOr("ServerConfig:Hysteresis:WaterLevel", 5.0);
-        public static readonly double hysteresisTemperature = ParseDoubleOr("ServerConfig:Hysteresis:Temperature", 1.0);
-        public static readonly double hysteresisHumidity = ParseDoubleOr("ServerConfig:Hysteresis:Humidity", 5.0);
-        public static readonly double hysteresisLight = ParseDoubleOr("ServerConfig:Hysteresis:Light", 20.0);
-
-        // IConfiguration stores every value as its literal JSON text (e.g. "20.0"). Parsing that
-        // with the ambient CultureInfo.CurrentCulture is wrong on any host whose locale uses "."
-        // as a group separator (e.g. hr-HR) - "20.0" silently becomes 200. InvariantCulture makes
-        // appsettings.json's "." always mean decimal point, regardless of the OS locale.
-        private static double ParseDoubleOr(string key, double fallback) =>
-            double.TryParse(configuration.GetSection(key).Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
-                ? value
-                : fallback;
-
-        // Roadmap #28: how long a device's identical repeated event is ignored server-side.
-        public static readonly int eventDedupeMinutes = ParseIntOr("ServerConfig:EventDedupeMinutes", 10);
-
-        // Roadmap #24: how long a user must wait between "resend activation email" requests.
-        public static readonly int activationResendCooldownMinutes = ParseIntOr("ServerConfig:ActivationResendCooldownMinutes", 10);
-
-        // Roadmap #64: off by default - UserRegistration rejects an unknown tenant name instead of
-        // silently creating one until an admin opts in.
-        public static readonly bool allowSelfServiceTenantCreation = ParseBoolOr("ServerConfig:AllowSelfServiceTenantCreation", false);
-
-        // Roadmap #39: no fallback constant - unlike the numeric defaults above, there is no
-        // universally-reasonable default IANA zone to assume for a fleet's physical location.
-        // Null (unset) is a valid, common state: TimeZoneHelper.GetUtcOffsetSeconds treats it as
-        // UTC (offset 0) rather than throwing, so schedule mode is inert-but-safe until an admin
-        // sets this on the Server Settings page.
-        public static readonly string? scheduleTimeZone = configuration.GetSection("ServerConfig:ScheduleTimeZone").Value;
-
-        private static int ParseIntOr(string key, int fallback) =>
-            int.TryParse(configuration.GetSection(key).Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
-                ? value
-                : fallback;
-
-        private static bool ParseBoolOr(string key, bool fallback) =>
-            bool.TryParse(configuration.GetSection(key).Value, out var value) ? value : fallback;
+        public static void Init(IConfiguration configuration)
+        {
+            secureKey = configuration.GetSection("JWT:SecureKey").Value;
+            jwtIssuer = configuration.GetSection("JWT:Issuer").Value;
+            jwtAudience = configuration.GetSection("JWT:Audience").Value;
+        }
     }
 }

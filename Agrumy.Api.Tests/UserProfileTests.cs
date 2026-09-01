@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using api;
 using api.Controllers.API;
 using api.Dal.Interface;
 using api.Models;
@@ -7,6 +8,7 @@ using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Agrumy.Api.Tests;
@@ -157,9 +159,11 @@ public class UserProfileTests
     private readonly Mock<ICache> _cache = new();
     private readonly Mock<INotificationDispatcher> _notifications = new();
 
+    private static readonly IOptions<AgrumySettings> TestSettings = Options.Create(AgrumySettings.Bind(TestConfig.Configuration));
+
     private UserApiController NewController(string? email)
     {
-        var controller = new UserApiController(_repo.Object, _cache.Object, _notifications.Object);
+        var controller = new UserApiController(_repo.Object, _cache.Object, _notifications.Object, TestSettings);
         var claims = new List<Claim> { new("TenantID", "1") };
         if (email != null)
         {

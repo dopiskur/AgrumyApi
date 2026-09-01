@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using api;
 using api.Controllers.API;
 using api.Dal.Interface;
 using api.Models;
@@ -6,6 +7,7 @@ using api.Notifications;
 using api.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Agrumy.Api.Tests;
@@ -24,8 +26,14 @@ public class ApiControllerTests
     // dispatched - only the handful that assert on it (see the roadmap #24/#63 section) add setups.
     private readonly Mock<INotificationDispatcher> _notifications = new();
 
+    // Roadmap #104: bound from the same appsettings.json TestConfig.Init() already read Config.*
+    // from (module initializer, runs once for the whole assembly) - a token UserApiController
+    // signs with this and JwtTokenProvider.ValidateToken (Config.secureKey) validates use the same
+    // key/issuer/audience.
+    private static readonly IOptions<AgrumySettings> TestSettings = Options.Create(AgrumySettings.Bind(TestConfig.Configuration));
+
     private DeviceApiController NewDeviceController() => new(_repo.Object, _cache.Object);
-    private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _notifications.Object);
+    private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _notifications.Object, TestSettings);
 
     /// <summary>Gives a bare (non-DI-constructed) controller the JWT claims an [Authorize] action reads via HttpContext.User.</summary>
     private static void SetCaller(ControllerBase controller, string role, int? tenantId) =>

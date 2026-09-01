@@ -1,10 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using api;
 using api.Dal;
 using api.Dal.Entities;
 using api.Models;
 using api.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Agrumy.Api.Tests;
@@ -113,19 +115,20 @@ public sealed class RelationalIntegrationFixture
     public AgrumyDbContext NewContext(Target t) => new(DbOptionsFactory.Build(t.Provider, t.ConnectionString));
 }
 
-[Collection("RepoFactory")] // shares the process-wide EfRepository.ProviderOverride / ConnectionStringOverride seams
 public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegrationFixture>, IDisposable
 {
     private readonly RelationalIntegrationFixture _fx;
-    private readonly EfRepository _repo = new();
+    private AgrumyDbContext? _db;
+    private EfRepository _repo = null!;
 
     public RelationalIntegrationTests(RelationalIntegrationFixture fx) => _fx = fx;
 
-    public void Dispose()
-    {
-        EfRepository.ProviderOverride = null;
-        EfRepository.ConnectionStringOverride = null;
-    }
+    // Roadmap #101: _db is this test's own AgrumyDbContext (constructed fresh per Use() call, not
+    // shared/DI-managed), so this class owns disposing it - no more process-wide
+    // EfRepository.ProviderOverride/ConnectionStringOverride statics to reset, which also means
+    // parallel test execution across different provider targets is safe again (the old
+    // [Collection("RepoFactory")] serialization is gone with them).
+    public void Dispose() => _db?.Dispose();
 
     /// <summary>One row per configured engine, or a sentinel that makes every test skip.</summary>
     public static IEnumerable<object[]> Providers()
@@ -138,12 +141,17 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         return rows.Count > 0 ? rows : new[] { new object[] { (DbProviderKind)255 } };
     }
 
+    // Roadmap #101: callable more than once per test - e.g. to hand a test a FRESH context/repo
+    // partway through, the same way a real second HTTP request would get its own fresh scope
+    // rather than reusing a first request's tracked entities (see
+    // UserIssueActivationTokenAsync_WithinCooldown_ReturnsFalse_ButOffCooldown_ReturnsTrue).
     private RelationalIntegrationFixture.Target Use(DbProviderKind provider)
     {
         var t = _fx.Targets.FirstOrDefault(x => x.Provider == provider);
         Skip.If(t is null, $"No integration database configured for {provider}.");
-        EfRepository.ProviderOverride = t!.Provider;
-        EfRepository.ConnectionStringOverride = t.ConnectionString;
+        _db?.Dispose();
+        _db = new AgrumyDbContext(DbOptionsFactory.Build(t!.Provider, t.ConnectionString));
+        _repo = new EfRepository(_db, Options.Create(new AgrumySettings()));
         return t;
     }
 
@@ -1231,8 +1239,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         bool tooSoon = await _repo.UserIssueActivationTokenAsync(userId, "resend1-" + U(), DateTime.UtcNow.AddHours(1), cooldownMinutes: 10);
         Assert.False(tooSoon);
 
-        // Backdate ActivationLastSentAt past the cooldown window directly, same technique the
-        // EventDevicePush dedupe-expiry test uses - no need to actually wait 10 minutes.
+        // Backdate ActivationLastSentAt past the cooldown window directly - no need to actually
+        // wait 10 minutes.
         await using (var db = _fx.NewContext(t))
         {
             var row = await db.Users.FirstAsync(u => u.IDUser == userId);
@@ -1240,6 +1248,11 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             await db.SaveChangesAsync();
         }
 
+        // Roadmap #101: _repo's context already has this Users row tracked from the two calls
+        // above (change tracking spanning a "request" is the whole point of #101) - re-Use() to
+        // get a fresh context/repo, the same way the NEXT real HTTP request would, so this read
+        // actually re-queries the DB instead of returning the stale tracked instance.
+        Use(provider);
         string resend2 = "resend2-" + U();
         bool offCooldown = await _repo.UserIssueActivationTokenAsync(userId, resend2, DateTime.UtcNow.AddHours(1), cooldownMinutes: 10);
         Assert.True(offCooldown);

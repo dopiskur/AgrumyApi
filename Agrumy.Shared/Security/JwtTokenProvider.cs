@@ -9,8 +9,6 @@ namespace api.Security
 {
     public partial class JwtTokenProvider
     {
-        private static string? signKey = Config.secureKey;
-
         /// <summary>Roadmap #69: static bridge into the repo's normal ILogger pipeline for a class
         /// that has no DI reach (static methods, called from both Agrumy.Api and Agrumy.Web) -
         /// each host assigns it once at startup (see both Program.cs). Null (e.g. unit tests, an
@@ -75,11 +73,13 @@ namespace api.Security
         /// null if the token itself is invalid/expired/wrongly-signed. An empty (but non-null) list
         /// means the token validated but carried no role claims at all - callers must treat that as
         /// "no roles", not "check failed".</summary>
-        public static IReadOnlyList<string>? ValidateToken(string token) => ValidateToken(token, signKey);
+        public static IReadOnlyList<string>? ValidateToken(string token) => ValidateToken(token, Config.secureKey);
 
         /// <summary>Key-parameterized overload - exists so the roadmap #69 non-ASCII-key regression
-        /// test can drive the REAL validation path with a chosen key (the single-arg form above is
-        /// hard-bound to Config.secureKey via the static field); production callers never pass a key.</summary>
+        /// test can drive the REAL validation path with a chosen key (the single-arg form above reads
+        /// Config.secureKey live, roadmap #104 - not cached, since Config.Init() runs at host startup
+        /// and a cached field risks capturing a pre-Init() null depending on static-init ordering);
+        /// production callers never pass a key.</summary>
         public static IReadOnlyList<string>? ValidateToken(string token, string? secureKey)
         {
             if (token == null || secureKey == null)

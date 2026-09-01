@@ -9,7 +9,6 @@ namespace api.Dal
     {
         public async Task<ServerConfig> ServerConfigGetAsync(int idServerConfig = 1)
         {
-            await using var db = Db();
             var row = await db.ServerConfigs.AsNoTracking()
                 .FirstOrDefaultAsync(s => s.IDServerConfig == idServerConfig);
 
@@ -28,14 +27,14 @@ namespace api.Dal
                 ConfigKey = Guid.NewGuid().ToString(),
                 PortHTTP = 80,
                 PortHTTPS = 443,
-                WaterLevelHysteresis = Config.hysteresisWaterLevel,
-                TemperatureHysteresis = Config.hysteresisTemperature,
-                HumidityHysteresis = Config.hysteresisHumidity,
-                LightHysteresis = Config.hysteresisLight,
-                EventDedupeMinutes = Config.eventDedupeMinutes,
-                ActivationResendCooldownMinutes = Config.activationResendCooldownMinutes,
-                AllowSelfServiceTenantCreation = Config.allowSelfServiceTenantCreation,
-                ScheduleTimeZone = Config.scheduleTimeZone,
+                WaterLevelHysteresis = settings.HysteresisWaterLevel,
+                TemperatureHysteresis = settings.HysteresisTemperature,
+                HumidityHysteresis = settings.HysteresisHumidity,
+                LightHysteresis = settings.HysteresisLight,
+                EventDedupeMinutes = settings.EventDedupeMinutes,
+                ActivationResendCooldownMinutes = settings.ActivationResendCooldownMinutes,
+                AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation,
+                ScheduleTimeZone = settings.ScheduleTimeZone,
             };
             db.ServerConfigs.Add(generated);
             await db.SaveChangesAsync();
@@ -44,7 +43,6 @@ namespace api.Dal
 
         public async Task ServerConfigUpdateAsync(ServerConfig config)
         {
-            await using var db = Db();
             var row = await db.ServerConfigs.FirstOrDefaultAsync(s => s.IDServerConfig == config.IDServerConfig);
             if (row == null)
             {
@@ -64,10 +62,9 @@ namespace api.Dal
 
         /// <summary>Forces the DB serverConfig row's hysteresis fields back to appsettings.json's
         /// ServerConfig:Hysteresis values, creating the row if it does not exist yet. Only called
-        /// at startup when ServerConfig:Reload is true - see Config.serverConfigReload.</summary>
+        /// at startup when ServerConfig:Reload is true - see AgrumySettings.ServerConfigReload.</summary>
         public async Task ServerConfigReloadFromAppSettingsAsync(int idServerConfig = 1)
         {
-            await using var db = Db();
             var row = await db.ServerConfigs.FirstOrDefaultAsync(s => s.IDServerConfig == idServerConfig);
             if (row == null)
             {
@@ -82,14 +79,14 @@ namespace api.Dal
                 db.ServerConfigs.Add(row);
             }
 
-            row.WaterLevelHysteresis = Config.hysteresisWaterLevel;
-            row.TemperatureHysteresis = Config.hysteresisTemperature;
-            row.HumidityHysteresis = Config.hysteresisHumidity;
-            row.LightHysteresis = Config.hysteresisLight;
-            row.EventDedupeMinutes = Config.eventDedupeMinutes;
-            row.ActivationResendCooldownMinutes = Config.activationResendCooldownMinutes;
-            row.AllowSelfServiceTenantCreation = Config.allowSelfServiceTenantCreation;
-            row.ScheduleTimeZone = Config.scheduleTimeZone;
+            row.WaterLevelHysteresis = settings.HysteresisWaterLevel;
+            row.TemperatureHysteresis = settings.HysteresisTemperature;
+            row.HumidityHysteresis = settings.HysteresisHumidity;
+            row.LightHysteresis = settings.HysteresisLight;
+            row.EventDedupeMinutes = settings.EventDedupeMinutes;
+            row.ActivationResendCooldownMinutes = settings.ActivationResendCooldownMinutes;
+            row.AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation;
+            row.ScheduleTimeZone = settings.ScheduleTimeZone;
             await db.SaveChangesAsync();
         }
 

@@ -11,7 +11,6 @@ namespace api.Dal
     {
         public async Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID)
         {
-            await using var db = Db();
             var row = await db.DeviceConfigSensors.AsNoTracking()
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigSensor == deviceConfigSensorID);
             return row == null ? null : ToDto(row);
@@ -19,7 +18,6 @@ namespace api.Dal
 
         public async Task<DeviceConfigController?> DeviceConfigControllerGetAsync(int? deviceConfigControllerID)
         {
-            await using var db = Db();
             var row = await db.DeviceConfigControllers.AsNoTracking()
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigController == deviceConfigControllerID);
             return row == null ? null : ToDto(row);
@@ -27,7 +25,6 @@ namespace api.Dal
 
         public async Task<Device?> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID)
         {
-            await using var db = Db();
             var row = await db.Devices.AsNoTracking()
                 .FirstOrDefaultAsync(d => d.DeviceConfigSensorID == deviceConfigSensorID);
             return row == null ? null : ToDto(row);
@@ -35,7 +32,6 @@ namespace api.Dal
 
         public async Task<Device?> DeviceGetByDeviceConfigControllerIdAsync(int? deviceConfigControllerID)
         {
-            await using var db = Db();
             var row = await db.Devices.AsNoTracking()
                 .FirstOrDefaultAsync(d => d.DeviceConfigControllerID == deviceConfigControllerID);
             return row == null ? null : ToDto(row);
@@ -47,8 +43,6 @@ namespace api.Dal
             {
                 return;
             }
-
-            await using var db = Db();
 
             var row = await db.DeviceConfigControllers
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigController == cfg.IDDeviceConfigController);
@@ -125,8 +119,6 @@ namespace api.Dal
             {
                 return;
             }
-
-            await using var db = Db();
 
             var row = await db.DeviceConfigSensors
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigSensor == cfg.IDDeviceConfigSensor);

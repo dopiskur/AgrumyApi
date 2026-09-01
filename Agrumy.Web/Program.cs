@@ -1,4 +1,5 @@
 using System.Globalization;
+using api;
 using api.Dal.Interface;
 using api.Filters;
 using api.Security;
@@ -16,6 +17,13 @@ CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
 CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Roadmap #104: must run before anything touches the static JwtTokenProvider (LoginController,
+// BearerTokenHandler both call JwtTokenProvider.ValidateToken) - this host's real
+// builder.Configuration, not Config's old self-built ConfigurationBuilder from
+// Directory.GetCurrentDirectory(). Agrumy.Web's own appsettings.json JWT section (must match
+// Agrumy.Api's, see README) is what populates Config.secureKey/jwtIssuer/jwtAudience here.
+Config.Init(builder.Configuration);
 
 // Base URL of the Agrumy.Api service the views call over HTTP.
 var apiServiceUrl = builder.Configuration["WebView:ApiService"];

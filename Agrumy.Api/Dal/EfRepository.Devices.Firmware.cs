@@ -11,7 +11,6 @@ namespace api.Dal
     {
         public async Task<DeviceFirmware?> DeviceFirmwareLatestGetAsync(int? deviceTypeID)
         {
-            await using var db = Db();
             return await db.DeviceFirmwares.AsNoTracking()
                 .Where(f => f.DeviceTypeID == deviceTypeID)
                 .OrderByDescending(f => f.DateAdded)

@@ -8,11 +8,13 @@ using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace api.Controllers.API
 {
     [Route("api/User")]
-    public class UserApiController(IRepository repo, ICache cache, INotificationDispatcher notifications) : ApiControllerBase(repo, cache)
+    public class UserApiController(IRepository repo, ICache cache, INotificationDispatcher notifications, IOptions<AgrumySettings> settingsOptions)
+        : ApiControllerBase(repo, cache)
     {
         private const int DefaultRoleId = 1;   // "regular user" group on an existing tenant
         private const int AccessTokenMinutes = 120;
@@ -20,7 +22,9 @@ namespace api.Controllers.API
         private const int ActivationTokenValidHours = 24; // roadmap #24
         private const int MinTenantNameLength = 6;        // roadmap #64
 
-        private static readonly string? SecureKey = Config.secureKey;
+        // Roadmap #104: constructor-injected IOptions<AgrumySettings>, not the static Config class.
+        private readonly AgrumySettings settings = settingsOptions.Value;
+        private string? SecureKey => settings.JwtSecureKey;
 
         /// <summary>New opaque token plus the hash that's actually stored - the plaintext never
         /// touches the DB. Shared by refresh tokens and activation tokens; same shape, same
@@ -162,7 +166,7 @@ namespace api.Controllers.API
             var (user, _) = await LookupAsync(value.Login);
             if (user?.IDUser is int idUser && user.EmailVerified != true)
             {
-                int cooldownMinutes = (await Repo.ServerConfigGetAsync(1)).ActivationResendCooldownMinutes ?? Config.activationResendCooldownMinutes;
+                int cooldownMinutes = (await Repo.ServerConfigGetAsync(1)).ActivationResendCooldownMinutes ?? settings.ActivationResendCooldownMinutes;
                 var (plaintext, hash) = GenerateOpaqueToken();
                 bool issued = await Repo.UserIssueActivationTokenAsync(idUser, hash, DateTime.UtcNow.AddHours(ActivationTokenValidHours), cooldownMinutes);
                 if (issued)
@@ -177,7 +181,7 @@ namespace api.Controllers.API
         {
             if (string.IsNullOrWhiteSpace(email)) { return; }
 
-            string link = $"{Config.jwtIssuer}/api/User/Activate?token={Uri.EscapeDataString(plaintextToken)}";
+            string link = $"{settings.JwtIssuer}/api/User/Activate?token={Uri.EscapeDataString(plaintextToken)}";
             await notifications.DispatchAsync(new Notification(
                 "Confirm your Agrumy account",
                 $"Click the link below to verify your email address:\n{link}\n\nThis link expires in {ActivationTokenValidHours} hours.",

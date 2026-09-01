@@ -9,7 +9,6 @@ namespace api.Dal
     {
         public async Task UserAddAsync(User user, UserSecret userSecret)
         {
-            await using var db = Db();
             db.Users.Add(new UserRow
             {
                 TenantID = user.TenantID ?? 0,
@@ -31,7 +30,6 @@ namespace api.Dal
 
         public async Task UserUpdateAsync(User user)
         {
-            await using var db = Db();
             var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == user.IDUser);
             if (row == null)
             {
@@ -58,7 +56,6 @@ namespace api.Dal
         /// the controller mis-binds - the column list here IS the authorization boundary.</summary>
         public async Task<bool> UserProfileSetAsync(string email, string? firstName, string? lastName, string? timeZone)
         {
-            await using var db = Db();
             var row = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
             if (row == null)
             {
@@ -78,7 +75,6 @@ namespace api.Dal
         /// see the follow-up note on DeviceApiController.DeviceRegistration).</summary>
         public async Task<bool> UserSetDevicePinAsync(int idUser, string? devicePin, DateTime? expiresAtUtc)
         {
-            await using var db = Db();
             var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == idUser);
             if (row == null)
             {
@@ -100,14 +96,12 @@ namespace api.Dal
                 return false;
             }
 
-            await using var db = Db();
             int rows = await db.Users.Where(u => u.IDUser == idUser).ExecuteDeleteAsync();
             return rows > 0;
         }
 
         public async Task<User?> UserGetAsync(int? idUser, string? email, string? username)
         {
-            await using var db = Db();
 
             // Inner join to userGroup, exactly as the UserGet proc.
             var q = from u in db.Users.AsNoTracking()
@@ -137,7 +131,6 @@ namespace api.Dal
 
         public async Task<IList<User>> UsersGetAsync(int? tenantID)
         {
-            await using var db = Db();
             var rows = await (from u in db.Users.AsNoTracking()
                               join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup
                               where u.TenantID == tenantID
@@ -149,7 +142,6 @@ namespace api.Dal
         // only reach this after confirming the caller is a TenantID==0 admin.
         public async Task<IList<User>> UsersGetAllAsync()
         {
-            await using var db = Db();
             var rows = await (from u in db.Users.AsNoTracking()
                               join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup
                               select new { u, g }).ToListAsync();
@@ -158,7 +150,6 @@ namespace api.Dal
 
         public async Task<UserSecret?> UserSecretGetAsync(int? idUser, string? email, string? username)
         {
-            await using var db = Db();
             IQueryable<UserRow> q = db.Users.AsNoTracking();
 
             if (idUser != null)
@@ -184,7 +175,6 @@ namespace api.Dal
 
         public async Task<bool> UserSetPasswordAsync(string? email, UserSecret userSecret)
         {
-            await using var db = Db();
             int rows = await db.Users.Where(u => u.Email == email)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(u => u.PwdHash, userSecret.PwdHash ?? "")
@@ -194,13 +184,11 @@ namespace api.Dal
 
         public async Task<bool> BootstrapAdminPendingAsync()
         {
-            await using var db = Db();
             return await db.Users.AsNoTracking().AnyAsync(u => u.PwdHash == null);
         }
 
         public async Task<bool> BootstrapAdminSetPasswordAsync(UserSecret secret)
         {
-            await using var db = Db();
             // WHERE PwdHash IS NULL, not a Login/email match - see IUserRepository for why this is
             // deliberately the only key: it is what makes the door close permanently once used.
             int rows = await db.Users.Where(u => u.PwdHash == null)
@@ -212,7 +200,6 @@ namespace api.Dal
 
         public async Task<IList<UserRole>> UserRoleGetAsync()
         {
-            await using var db = Db();
             return await db.UserRoles.AsNoTracking()
                 .Select(r => new UserRole { IDUserRole = r.IDUserRole, RoleName = r.RoleName, RoleScopeID = r.RoleScopeID })
                 .ToListAsync();
@@ -222,7 +209,6 @@ namespace api.Dal
 
         public async Task<IReadOnlyList<string>> UserRoleNamesGetAsync(int idUser)
         {
-            await using var db = Db();
             return await (from ur in db.UserUserRoles.AsNoTracking()
                           join r in db.UserRoles.AsNoTracking() on ur.UserRoleID equals r.IDUserRole
                           where ur.UserID == idUser && r.RoleName != null
@@ -231,7 +217,6 @@ namespace api.Dal
 
         public async Task UserRolesSetAsync(int idUser, IEnumerable<string> roleNames)
         {
-            await using var db = Db();
             var wanted = roleNames.ToHashSet();
 
             var roleIds = await db.UserRoles.AsNoTracking()
@@ -252,7 +237,6 @@ namespace api.Dal
 
         public async Task UserSetActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt)
         {
-            await using var db = Db();
             var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == idUser);
             if (row is null) { return; }
 
@@ -264,7 +248,6 @@ namespace api.Dal
 
         public async Task<bool> UserIssueActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt, int cooldownMinutes)
         {
-            await using var db = Db();
             var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == idUser);
             if (row is null || row.EmailVerified)
             {
@@ -284,7 +267,6 @@ namespace api.Dal
 
         public async Task<User?> UserActivateAsync(string tokenHash)
         {
-            await using var db = Db();
             var row = await db.Users.FirstOrDefaultAsync(u => u.ActivationTokenHash == tokenHash);
             if (row is null || row.ActivationTokenExpiresAt is null || row.ActivationTokenExpiresAt < DateTime.UtcNow)
             {
@@ -304,7 +286,6 @@ namespace api.Dal
         // (see UserApiController.UserRegistration) - so this is never empty for a real tenant.
         public async Task<IList<User>> TenantAdminsGetAsync(int tenantId)
         {
-            await using var db = Db();
             var rows = await (from u in db.Users.AsNoTracking()
                               join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup
                               join r in db.UserRoles.AsNoTracking() on g.UserRoleID equals r.IDUserRole
@@ -317,13 +298,11 @@ namespace api.Dal
 
         public async Task<bool> TenantGetAsync(string tenantName)
         {
-            await using var db = Db();
             return await db.Tenants.AsNoTracking().AnyAsync(t => t.TenantName == tenantName);
         }
 
         public async Task<int?> TenantGetIdAsync(string tenantName)
         {
-            await using var db = Db();
             return await db.Tenants.AsNoTracking()
                 .Where(t => t.TenantName == tenantName)
                 .Select(t => (int?)t.IDTenant)
@@ -332,7 +311,6 @@ namespace api.Dal
 
         public async Task<int> TenantAddAsync(string tenantName)
         {
-            await using var db = Db();
             var row = new TenantRow { TenantName = tenantName };
             db.Tenants.Add(row);
             await db.SaveChangesAsync();
@@ -343,7 +321,6 @@ namespace api.Dal
 
         public async Task<IList<UserGroup>> UserGroupsGetAsync()
         {
-            await using var db = Db();
             return await (from g in db.UserGroups.AsNoTracking()
                           join r in db.UserRoles.AsNoTracking() on g.UserRoleID equals r.IDUserRole
                           select new UserGroup
@@ -357,7 +334,6 @@ namespace api.Dal
 
         public async Task<UserGroup?> UserGroupGetAsync(int? idUserGroup)
         {
-            await using var db = Db();
             return await (from g in db.UserGroups.AsNoTracking()
                           join r in db.UserRoles.AsNoTracking() on g.UserRoleID equals r.IDUserRole
                           where g.IDUserGroup == idUserGroup
@@ -376,13 +352,11 @@ namespace api.Dal
             {
                 return; // proc guard: IF (idUserGroup > 0)
             }
-            await using var db = Db();
             await db.UserGroups.Where(g => g.IDUserGroup == idUserGroup).ExecuteDeleteAsync();
         }
 
         public async Task UserGroupAddAsync(UserGroup userGroup)
         {
-            await using var db = Db();
             db.UserGroups.Add(new UserGroupRow
             {
                 GroupName = userGroup.GroupName,

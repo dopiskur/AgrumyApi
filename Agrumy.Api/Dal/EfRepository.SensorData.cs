@@ -54,7 +54,6 @@ namespace api.Dal
                 return;
             }
 
-            await using var db = Db();
             db.SensorData.AddRange(rows);
             await db.SaveChangesAsync();
         }
@@ -76,7 +75,6 @@ namespace api.Dal
                 _ => now.AddYears(-timeRange.Value),
             };
 
-            await using var db = Db();
             var rows = await db.SensorData.AsNoTracking()
                 .Where(r => r.DeviceID == deviceID
                             && r.TenantID == tenantID
@@ -104,7 +102,6 @@ namespace api.Dal
 
         public async Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? tenantID, int? getData, int? deviceID, int? reportID)
         {
-            await using var db = Db();
 
             if (getData == 0)
             {
@@ -155,7 +152,6 @@ namespace api.Dal
                 _ => now.AddYears(-timeRange.Value),
             };
 
-            await using var db = Db();
             await db.SensorData
                 .Where(r => r.DeviceID == deviceID && r.TenantID == tenantID && r.DateCreated < cutoff)
                 .ExecuteDeleteAsync();

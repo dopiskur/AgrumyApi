@@ -1,3 +1,4 @@
+using api;
 using api.BackgroundWorkers;
 using api.Dal;
 using api.Dal.Interface;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Net;
@@ -15,6 +17,27 @@ using System.Text;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Roadmap #104: must run before anything touches the static JwtTokenProvider (whose Config.
+// secureKey/jwtIssuer/jwtAudience it populates) - this host's real builder.Configuration, not
+// Config's old self-built ConfigurationBuilder from Directory.GetCurrentDirectory().
+Config.Init(builder.Configuration);
+
+// Roadmap #101/#104: one AgrumySettings snapshot per process, bound from the real host
+// IConfiguration - see AgrumySettings.Bind for exactly which keys/env vars feed it.
+builder.Services.AddSingleton(Options.Create(AgrumySettings.Bind(builder.Configuration)));
+
+// Roadmap #101: real scoped lifetime - one AgrumyDbContext per HTTP request/background-worker
+// tick (AddScoped, matching EfRepository's own scoped registration below), not a new one per
+// repository method call. Provider/connection string come from AgrumySettings, not appsettings
+// directly, so the AGRUMY_DB_PROVIDER env-var override (AgrumySettings.Bind) still applies.
+builder.Services.AddScoped(sp =>
+{
+    AgrumySettings settings = sp.GetRequiredService<IOptions<AgrumySettings>>().Value;
+    string connectionString = settings.DefaultConnection
+        ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is missing.");
+    return new AgrumyDbContext(DbOptionsFactory.Build(DbProviderKindParser.Parse(settings.DatabaseProvider), connectionString));
+});
 
 var secureKey = builder.Configuration["JWT:SecureKey"];
 if (string.IsNullOrEmpty(secureKey))
@@ -229,10 +252,10 @@ using (var scope = app.Services.CreateScope())
             startupLogger.LogInformation("Startup DB check: schema verified/provisioned.");
 
             // ServerConfig:Reload (roadmap #10) - force the DB's hysteresis defaults back to
-            // appsettings.json. Off by default; see Config.serverConfigReload for why. Nested
-            // inside the DB-is-reachable branch so a Reload=true install with the DB down still
-            // falls through to the same failFastOnDbCheck handling below instead of throwing past it.
-            if (api.Config.serverConfigReload)
+            // appsettings.json. Off by default; see AgrumySettings.ServerConfigReload for why.
+            // Nested inside the DB-is-reachable branch so a Reload=true install with the DB down
+            // still falls through to the same failFastOnDbCheck handling below instead of throwing past it.
+            if (scope.ServiceProvider.GetRequiredService<IOptions<AgrumySettings>>().Value.ServerConfigReload)
             {
                 await repository.ServerConfigReloadFromAppSettingsAsync(1);
                 startupLogger.LogInformation("ServerConfig:Reload was true - serverConfig hysteresis fields overwritten from appsettings.json.");
