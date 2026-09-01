@@ -13,8 +13,10 @@ using Moq;
 namespace Agrumy.Api.Tests;
 
 /// <summary>
-/// The global filter that replaced the per-action try/catch blocks: unique-constraint hits become
-/// a 500 business message, everything else goes through IRepository.ClassifyException -> 503.
+/// The global filter that replaced the per-action try/catch blocks: a unique-constraint hit becomes
+/// a 409 business message (roadmap #99 - this used to be a hardcoded 500, an oversight relative to
+/// the general path's own 409 for every other constraint violation), everything else goes through
+/// IRepository.ClassifyException -> 503/500/409.
 /// </summary>
 public class DbExceptionFilterTests
 {
@@ -90,26 +92,28 @@ public class DbExceptionFilterTests
     }
 
     [Fact]
-    public void UniqueEmailViolation_Becomes500BusinessMessage()
+    public void UniqueEmailViolation_Becomes409BusinessMessage()
     {
+        // Roadmap #99: was a hardcoded 500 - a client can't distinguish "you already registered
+        // this email" (409, actionable) from a real server error (500) without this fix.
         var ctx = Context(new Exception("outer",
             new Exception("Duplicate entry 'a@b.com' for key 'user.email_UNIQUE'")));
         Filter().OnException(ctx);
 
         var obj = Assert.IsType<ObjectResult>(ctx.Result);
-        Assert.Equal(500, obj.StatusCode);
+        Assert.Equal(409, obj.StatusCode);
         Assert.Equal("email already registered", obj.Value);
         Assert.True(ctx.ExceptionHandled);
     }
 
     [Fact]
-    public void UniqueUsernameViolation_Becomes500BusinessMessage()
+    public void UniqueUsernameViolation_Becomes409BusinessMessage()
     {
         var ctx = Context(new Exception("Duplicate entry 'bob' for key 'Username_UNIQUE'"));
         Filter().OnException(ctx);
 
         var obj = Assert.IsType<ObjectResult>(ctx.Result);
-        Assert.Equal(500, obj.StatusCode);
+        Assert.Equal(409, obj.StatusCode);
         Assert.Equal("username already registered", obj.Value);
     }
 
