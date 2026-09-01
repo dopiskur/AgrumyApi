@@ -3,7 +3,9 @@
   "// Security": "App-level security switches.",
   "Security": {
     "// EnforceHttps": "true (default) = redirect HTTP->HTTPS and send HSTS outside Development. false = leave the API reachable over plain HTTP.",
-    "EnforceHttps": true
+    "EnforceHttps": true,
+    "// KnownProxies": "Roadmap #84 - comma-separated IP addresses of reverse proxies trusted to set X-Forwarded-For/X-Forwarded-Proto (Program.cs ForwardedHeadersOptions). Omit/leave empty for a same-box proxy - the default already trusts loopback only. NEVER set this to trust an untrusted/public address - that lets any client spoof its own IP and bypass rate limiting.",
+    "KnownProxies": ""
   },
 
   "// Database": "Which EF Core provider to use for ConnectionStrings:DefaultConnection.",

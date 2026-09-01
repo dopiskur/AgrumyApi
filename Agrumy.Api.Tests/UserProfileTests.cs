@@ -231,4 +231,76 @@ public class UserProfileTests
         Assert.IsType<UnauthorizedResult>(result.Result);
         _repo.Verify(r => r.UserSetDevicePinAsync(It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<DateTime?>()), Times.Never);
     }
+
+    // ---- POST /api/User/ChangePassword (roadmap #83) -----------------------------------
+
+    [Fact]
+    public async Task ChangePassword_CorrectOldPassword_ChangesAndReturnsOk()
+    {
+        string salt = AuthenticationProvider.GetSalt();
+        string hash = AuthenticationProvider.GetHash("old-pw", salt);
+        var secret = new UserSecret { PwdHash = hash, PwdSalt = salt };
+
+        _repo.Setup(r => r.UserGetAsync(null, "me@x.com", null)).ReturnsAsync(new User { IDUser = 5, Email = "me@x.com" });
+        _repo.Setup(r => r.UserSecretGetAsync(null, "me@x.com", null)).ReturnsAsync(secret);
+        _repo.Setup(r => r.UserSetPasswordAsync("me@x.com", It.IsAny<UserSecret>())).ReturnsAsync(true);
+
+        var result = await NewController("me@x.com").UserSetPassword(
+            new UserSetPassword { OldPassword = "old-pw", NewPassword = "new-pw" });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        _repo.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ChangePassword_WrongOldPassword_Returns401_And_WritesNothing()
+    {
+        string salt = AuthenticationProvider.GetSalt();
+        string hash = AuthenticationProvider.GetHash("the-real-old-pw", salt);
+
+        _repo.Setup(r => r.UserGetAsync(null, "me@x.com", null)).ReturnsAsync(new User { IDUser = 5, Email = "me@x.com" });
+        _repo.Setup(r => r.UserSecretGetAsync(null, "me@x.com", null)).ReturnsAsync(new UserSecret { PwdHash = hash, PwdSalt = salt });
+
+        var result = await NewController("me@x.com").UserSetPassword(
+            new UserSetPassword { OldPassword = "wrong-pw", NewPassword = "new-pw" });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(401, obj.StatusCode);
+        // MockBehavior.Strict: an un-set-up UserSetPasswordAsync call would already have thrown.
+    }
+
+    [Fact]
+    public async Task ChangePassword_SameOldAndNewPassword_Returns403_And_NeverLooksUpUser()
+    {
+        var result = await NewController("me@x.com").UserSetPassword(
+            new UserSetPassword { OldPassword = "same-pw", NewPassword = "same-pw" });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+        _repo.Verify(r => r.UserGetAsync(It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    /// <summary>The bug this closes: previously identity came from a Login field in the body, so an
+    /// unauthenticated caller could use this endpoint as a password-guessing oracle against any
+    /// known email. Now [Authorize] rejects the call before the action even runs; this proves the
+    /// no-identity path the action itself falls back to (defense in depth) also refuses, and never
+    /// touches the repository.</summary>
+    [Fact]
+    public async Task ChangePassword_NoIdentity_Returns401_And_NeverTouchesRepo()
+    {
+        var result = await NewController(null).UserSetPassword(
+            new UserSetPassword { OldPassword = "old-pw", NewPassword = "new-pw" });
+
+        Assert.IsType<UnauthorizedResult>(result.Result);
+    }
+
+    /// <summary>Same reasoning as UserProfileUpdate_Carries_No_Authorization_Fields above: the
+    /// payload type itself is the containment - a reintroduced Login property would be the same
+    /// #83 bug again, so this fails and forces a conscious look.</summary>
+    [Fact]
+    public void UserSetPassword_Carries_No_Login_Field()
+    {
+        var names = typeof(UserSetPassword).GetProperties().Select(p => p.Name).ToList();
+        Assert.Equal(new[] { "OldPassword", "NewPassword" }.OrderBy(n => n), names.OrderBy(n => n));
+    }
 }

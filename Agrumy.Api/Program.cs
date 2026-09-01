@@ -6,9 +6,11 @@ using api.Notifications;
 using api.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Net;
 using System.Text;
 using System.Threading.RateLimiting;
 
@@ -80,6 +82,32 @@ builder.Services.AddScoped<OfflineAlertEvaluator>();
 builder.Services.AddHostedService<OfflineAlertBackgroundService>();
 
 builder.Services.AddControllers(options => options.Filters.AddService<DbExceptionFilter>());
+
+// Roadmap #84: the rate limiter below partitions by Connection.RemoteIpAddress - behind a reverse
+// proxy (roadmap #30) that's always the proxy's own IP, so every real client shares one bucket and
+// rate limiting is effectively disabled. ForwardedHeadersMiddleware rewrites RemoteIpAddress from
+// X-Forwarded-For before the limiter (or anything else) sees it, but ONLY for a request whose
+// immediate peer is in KnownProxies - left unconfigured, ForwardedHeadersOptions' own default
+// trusts loopback only, which is correct for a same-box proxy and, critically, is NOT a wildcard:
+// trusting an arbitrary peer would let any client spoof X-Forwarded-For and both bypass rate
+// limiting and forge its apparent IP everywhere else that reads it. A remote/containerized proxy
+// must list its real address(es) explicitly via Security:KnownProxies (comma-separated) in
+// appsettings.json.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    string? configuredProxies = builder.Configuration["Security:KnownProxies"];
+    if (!string.IsNullOrWhiteSpace(configuredProxies))
+    {
+        foreach (string proxy in configuredProxies.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (IPAddress.TryParse(proxy, out IPAddress? ip))
+            {
+                options.KnownProxies.Add(ip);
+            }
+        }
+    }
+});
 
 // Rate limiting - all policies are fixed-window, partitioned by client IP, reject with 429.
 builder.Services.AddRateLimiter(options =>
@@ -159,6 +187,10 @@ var app = builder.Build();
 // Roadmap #69: JwtTokenProvider is static (no DI reach) - hand it a logger once so token
 // rejections land in the normal log pipeline instead of vanishing.
 JwtTokenProvider.Logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(JwtTokenProvider));
+
+// Must run before anything that reads Connection.RemoteIpAddress or Request.Scheme - the rate
+// limiter (roadmap #84) below, but also UseHttpsRedirection/UseHsts further down.
+app.UseForwardedHeaders();
 
 app.UseSwagger();
 app.UseSwaggerUI();

@@ -326,17 +326,29 @@ namespace api.Controllers.API
             return Ok();
         }
 
+        /// <summary>Roadmap #83: identity comes ONLY from the JWT (same pattern as UserProfileSet
+        /// above), not a Login field in the body - previously this took Login from the request and
+        /// had neither [Authorize] nor rate limiting, making it an unauthenticated, unthrottled
+        /// oracle for guessing any known email's password via the 401-vs-403 response split.</summary>
         [HttpPost("ChangePassword")]
+        [Authorize]
+        [EnableRateLimiting("login")]
         public async Task<ActionResult<string>> UserSetPassword([FromBody] UserSetPassword value)
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
+
+            string? name = User.Identity?.Name;
+            if (string.IsNullOrEmpty(name))
+            {
+                return Unauthorized();
+            }
 
             if (value.OldPassword == value.NewPassword)
             {
                 return StatusCode(403, "The new password must be different from the old password");
             }
 
-            var (user, secret) = await LookupAsync(value.Login);
+            var (user, secret) = await LookupAsync(name);
             if (user is null || secret is null ||
                 !AuthenticationProvider.VerifyHash(secret.PwdHash, secret.PwdSalt, value.OldPassword))
             {

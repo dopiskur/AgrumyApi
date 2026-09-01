@@ -65,10 +65,9 @@ namespace api.Controllers.View
                 try
                 {
                     // Reuses the existing old-password-proving API flow (POST /api/User/ChangePassword);
-                    // Login comes from the caller's own identity, never from the form.
+                    // identity comes from the caller's own JWT server-side (roadmap #83), never from the form.
                     await api.ChangePassword(new UserSetPassword
                     {
-                        Login = self.Email,
                         OldPassword = value.OldPassword,
                         NewPassword = value.NewPassword,
                     });

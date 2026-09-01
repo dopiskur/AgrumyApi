@@ -20,8 +20,8 @@ namespace api.ViewModels
         public DateTime? DevicePinExpires { get; set; }
     }
 
-    /// <summary>Separate from UserSetPassword because the API model requires a Login field the page
-    /// must not bind from the form - the controller injects the caller's own identity server-side.</summary>
+    /// <summary>Separate from UserSetPassword because that API model carries no Login field at all
+    /// (roadmap #83) - the API resolves identity from the caller's JWT, never from the form.</summary>
     public class ChangePasswordViewModel
     {
         [Required(ErrorMessage = "Old password is required")]

@@ -133,10 +133,11 @@ namespace api.Models
         public string? Token { get; set; }
     }
 
+    /// <summary>Body of POST /api/User/ChangePassword - no Login field on purpose (roadmap #83):
+    /// identity comes ONLY from the caller's JWT, same pattern as UserProfileUpdate, so this can
+    /// never be used as an unauthenticated password-guessing oracle against an arbitrary account.</summary>
     public class UserSetPassword
     {
-        [Required(ErrorMessage = "Email or username is required")]
-        public string? Login { get; set; }
         [Required(ErrorMessage = "Old password is required")]
         public string? OldPassword { get; set; }
         [Required(ErrorMessage = "New password is required")]

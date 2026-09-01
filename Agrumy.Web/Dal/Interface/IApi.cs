@@ -48,8 +48,9 @@ namespace api.Dal.Interface
         [Put("/api/User/Profile")]
         Task UserProfileSet([Body] UserProfileUpdate value);
 
-        /// <summary>Existing password-change flow that proves identity with the old password -
-        /// reused by the profile page rather than a parallel mechanism.</summary>
+        /// <summary>Password-change flow: proves the caller still knows the old password, identity
+        /// otherwise comes from the attached JWT (roadmap #83) - reused by the profile page rather
+        /// than a parallel mechanism.</summary>
         [Post("/api/User/ChangePassword")]
         Task ChangePassword([Body] UserSetPassword value);
 

@@ -184,7 +184,7 @@ apiId/apiKey/apiAuth scheme described in "How it works", not JWT.
 | --- | --- | --- |
 | `POST /api/User/Register` | rate-limited, no auth | Self-service registration; new users are disabled by default |
 | `POST /api/User/Login` | rate-limited, no auth | Returns a JWT bearer token |
-| `POST /api/User/ChangePassword` | none | Change a user's password |
+| `POST /api/User/ChangePassword` | rate-limited, JWT (self) | Change the caller's own password (identity from JWT, old password required) |
 | `GET /api/User/All` | admin | List every user |
 | `GET /api/User/Self` | admin | Fetch the caller's own user record (see README note: currently admin-only, not "admin or the user themselves") |
 | `GET /api/User` | admin | Fetch a user by id |
