@@ -1122,6 +1122,24 @@ public class ApiControllerTests
     }
 
     [Fact]
+    public async Task DeviceUpdate_NullTenantDevice_CallerOwnsDefaultTenant_Succeeds()
+    {
+        // Roadmap #111: TenantID=0 is a real default tenant (#108's confirmation), so its own
+        // (non-Global) admin must be able to manage a device whose row has TenantID=null - before
+        // the fix, EnsureOwnedDeviceAsync's bare `device.TenantID != CallerTenantId` compared
+        // null != 0 (true) and wrongly 403'd a caller who legitimately owns this device.
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = null });
+        _repo.Setup(r => r.DeviceUpdateAsync(It.IsAny<Device>())).Returns(Task.CompletedTask);
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 0, "user", RoleNames.TenantReader, RoleNames.TenantDevice);
+        var result = await controller.DeviceUpdate(new Device { IDDevice = 8 });
+
+        Assert.True(result.Value);
+        _repo.Verify(r => r.DeviceUpdateAsync(It.IsAny<Device>()), Times.Once);
+    }
+
+    [Fact]
     public async Task DeviceUpdate_TenantDevice_ForeignTenant_Returns403()
     {
         _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 99 });

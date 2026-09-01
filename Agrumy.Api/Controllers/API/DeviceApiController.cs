@@ -229,8 +229,11 @@ namespace api.Controllers.API
                 return (null, NotFound());
             }
 
+            // Roadmap #111: same ?? 0 fallback as #96/#102/#108 - without it a null-TenantID device
+            // (rows written as TenantID=0 by DeviceAddAsync's own convention) never equals a
+            // tenant-0 caller's CallerTenantId, so its own admin gets a 403 on their own device.
             bool crossTenantAllowed = forWrite ? CallerManagesDevicesGlobally : CallerReadsDevicesGlobally;
-            if (device.TenantID != CallerTenantId && !crossTenantAllowed)
+            if ((device.TenantID ?? 0) != CallerTenantId && !crossTenantAllowed)
             {
                 return (device, StatusCode(403, $"{ownerLabel} belongs to a different tenant"));
             }
