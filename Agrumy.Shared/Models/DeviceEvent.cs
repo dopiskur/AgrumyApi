@@ -18,6 +18,11 @@ namespace api.Models
         // when a device crosses ComputeOnline's threshold, so the transition shows in the same
         // Events timeline as every device-reported event.
         Offline = 8,
+        // Roadmap #34: the device's post-execution confirmation for a deviceCommand (Reboot never
+        // reaches this - it has no "after" to report from - ForceOTA/ForceConfigSync do). Message
+        // carries the outcome ("success" / "failed: <reason>"); CommandId (DeviceEventPush) links
+        // it back to the specific command row so PushEvent can call MarkExecutedAsync.
+        CommandExecuted = 9,
     }
 
     /// <summary>Body of POST /api/Device/Event. Deliberately carries no device/tenant identity field -
@@ -27,6 +32,9 @@ namespace api.Models
     {
         public string? EventType { get; set; }
         public string? Message { get; set; }
+        /// <summary>Roadmap #34: present only alongside EventType=CommandExecuted - which
+        /// deviceCommand row this confirms, so PushEvent can mark it Executed.</summary>
+        public int? CommandId { get; set; }
     }
 
     /// <summary>One row from GET /api/Device/Events - server-side CreatedAt, not a device-reported

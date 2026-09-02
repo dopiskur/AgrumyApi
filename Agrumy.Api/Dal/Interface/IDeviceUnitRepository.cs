@@ -50,6 +50,17 @@ namespace api.Dal.Interface
         /// when the device being assigned is itself controller-capable.</summary>
         Task<bool> DeviceUnitZoneHasControllerAsync(int idDeviceUnitZone);
 
+        /// <summary>Roadmap #34: the zone's one controller device (#82's own "at most one" invariant
+        /// means this is 0 or 1 in practice), or null if the zone has none - CommandQueueService's
+        /// Zone-target fan-out resolves to exactly this device, erroring (not silently no-op-ing)
+        /// when it's null.</summary>
+        Task<Device?> DeviceUnitZoneGetControllerAsync(int idDeviceUnitZone);
+
+        /// <summary>Roadmap #34: every controller device across every zone under this unit (zones
+        /// with no controller are simply absent from the result, not an error - Unit-target
+        /// fan-out is "every controller that exists", not "one per zone or bust").</summary>
+        Task<IList<Device>> DeviceUnitGetControllersAsync(int idDeviceUnit);
+
         // ---- Device assignment (roadmap #82) -----------------------------------------
 
         /// <summary>Every device in the tenant with no current Unit/Zone (DeviceUnitZoneID is

@@ -184,12 +184,17 @@
         </footer>
     </div>
 
+    @* Roadmap #34: one token for every page's device-commands.js fetch() calls - cheaper than
+       each command-button host view carrying its own antiforgery form. *@
+    @Html.AntiForgeryToken()
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <!-- Loaded once here instead of per-view - every form page used to each repeat its own
          Scripts section just to pull in client-side validation. -->
     <partial name="_ValidationScriptsPartial" />
     <script src="~/lib/adminlte/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="~/lib/adminlte/dist/js/adminlte.min.js"></script>
+    <script src="~/js/device-commands.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

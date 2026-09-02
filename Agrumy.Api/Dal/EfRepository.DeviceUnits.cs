@@ -158,6 +158,21 @@ namespace api.Dal
                 .AnyAsync(d => d.DeviceUnitZoneID == idDeviceUnitZone && d.DeviceControllerEnabled == true);
         }
 
+        public async Task<Device?> DeviceUnitZoneGetControllerAsync(int idDeviceUnitZone)
+        {
+            var row = await db.Devices.AsNoTracking()
+                .FirstOrDefaultAsync(d => d.DeviceUnitZoneID == idDeviceUnitZone && d.DeviceControllerEnabled == true);
+            return row == null ? null : ToDto(row);
+        }
+
+        public async Task<IList<Device>> DeviceUnitGetControllersAsync(int idDeviceUnit)
+        {
+            var rows = await db.Devices.AsNoTracking()
+                .Where(d => d.DeviceUnitID == idDeviceUnit && d.DeviceControllerEnabled == true)
+                .ToListAsync();
+            return rows.Select(ToDto).ToList();
+        }
+
         // ---- Device assignment (roadmap #82) -----------------------------------------
 
         public async Task<IList<Device>> DeviceUnassignedGetAsync(int? tenantID, bool controllerCapable)

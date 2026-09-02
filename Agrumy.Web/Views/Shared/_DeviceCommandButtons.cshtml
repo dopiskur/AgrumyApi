@@ -1,0 +1,18 @@
+@model DeviceCommandButtonsViewModel
+@* Roadmap #34: each button POSTs to DeviceController.IssueCommand via wwwroot/js/device-commands.js
+   (listener + antiforgery token wired up once in _Layout), disabling itself until the server
+   confirms - server-side dedup in CommandQueueService is the real guard, this is just UX. *@
+<span class="btn-group" role="group">
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-device-command
+            data-target-type="@((int)Model.TargetType)" data-target-id="@Model.TargetId" data-action-type="@((int)CommandActionType.Reboot)">
+        <i class="bi bi-arrow-clockwise"></i> Reboot
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-device-command
+            data-target-type="@((int)Model.TargetType)" data-target-id="@Model.TargetId" data-action-type="@((int)CommandActionType.ForceOTA)">
+        <i class="bi bi-cloud-arrow-down"></i> Force OTA Check
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-device-command
+            data-target-type="@((int)Model.TargetType)" data-target-id="@Model.TargetId" data-action-type="@((int)CommandActionType.ForceConfigSync)">
+        <i class="bi bi-arrow-repeat"></i> Force Config Sync
+    </button>
+</span>

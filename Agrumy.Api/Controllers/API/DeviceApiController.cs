@@ -1,3 +1,4 @@
+using api.Commands;
 using api.Dal.Interface;
 using api.Models;
 using api.Security;
@@ -9,7 +10,7 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace api.Controllers.API
 {
     [Route("/api/Device")]
-    public class DeviceApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
+    public class DeviceApiController(IRepository repo, ICache cache, CommandQueueService commandQueue) : ApiControllerBase(repo, cache)
     {
         #region websvc api
 
@@ -264,12 +265,19 @@ namespace api.Controllers.API
             // different instance (#72), and this DB read already happens unconditionally for the
             // diagnostics upsert, so a second, independently-staled ConfigVersion added risk with
             // no savings.
-            if (value.ConfigVersion == device.ConfigVersion)
+            //
+            // Roadmap #34: the empty-body short-circuit now also checks for a pending command -
+            // config being unchanged is no longer enough on its own to skip the response, since a
+            // command needs to ride along on this SAME poll (no separate endpoint, no extra TLS
+            // handshake). GetPendingCommandAsync is cheap (one indexed query, no pending command in
+            // the overwhelming common case) so paying it on every poll is fine.
+            PendingCommand? pendingCommand = await commandQueue.GetPendingCommandAsync(device.IDDevice.Value);
+            if (value.ConfigVersion == device.ConfigVersion && pendingCommand == null)
             {
-                return Ok(); // device is up to date - do nothing
+                return Ok(); // device is up to date and nothing is queued for it - do nothing
             }
 
-            return Ok(await BuildDeviceConfigAsync(device));
+            return Ok(await BuildDeviceConfigAsync(device, pendingCommand));
         }
 
         /// <summary>Roadmap #28. No identity field in the body by design - see DeviceEventPush;
@@ -293,6 +301,31 @@ namespace api.Controllers.API
             }
 
             await Repo.EventDevicePushAsync(device.IDDevice!.Value, device.TenantID, eventType, value.Message);
+
+            // Roadmap #34: the device's post-execution confirmation rides on the SAME existing
+            // event-push endpoint (#28) rather than a new one - CommandId links it back to the
+            // specific command row. No ownership check needed beyond the session auth already
+            // required above (the same rule the rest of this endpoint already follows).
+            if (eventType == DeviceEventType.CommandExecuted && value.CommandId is int commandId)
+            {
+                await commandQueue.MarkExecutedAsync(commandId);
+            }
+
+            return Ok();
+        }
+
+        /// <summary>Roadmap #34: the device confirms receipt of the PendingCommand it just got in
+        /// this same session's last Config poll response, BEFORE executing it - a Reboot has
+        /// nothing to report from afterward on this connection, so ack-after-execute is not an
+        /// option (this is the "novi API poziv" mechanism the design left open, decided here: a
+        /// small dedicated endpoint, not piggybacked on the next poll's request body). No ownership
+        /// check beyond session auth - same rule as PushEvent above.</summary>
+        [HttpPost("Command/Ack")]
+        [EnableRateLimiting("device-data")]
+        [Authorize(Policy = DeviceAuth.SessionPolicy)]
+        public async Task<ActionResult> AckCommand([FromBody] CommandAckRequest value)
+        {
+            await commandQueue.AcknowledgeCommandAsync(value.CommandId);
             return Ok();
         }
 
@@ -341,10 +374,15 @@ namespace api.Controllers.API
             // device, which the user judged "suludo" (absurd). It stays valid for repeated
             // registrations until its own 24h expiry; the 32^6 keyspace is what makes leaked/
             // shoulder-surfed reuse economically unattractive to brute-force, not single-use.
-            return Ok(await BuildDeviceConfigAsync(device));
+            //
+            // Roadmap #34: a genuinely NEW device never has one, but Register also handles the
+            // "device row already exists" re-registration path (factory reset, etc.), where a
+            // command could legitimately still be queued.
+            PendingCommand? pendingCommand = await commandQueue.GetPendingCommandAsync(device.IDDevice!.Value);
+            return Ok(await BuildDeviceConfigAsync(device, pendingCommand));
         }
 
-        private async Task<DeviceConfig> BuildDeviceConfigAsync(Device device)
+        private async Task<DeviceConfig> BuildDeviceConfigAsync(Device device, PendingCommand? pendingCommand)
         {
             // Roadmap #39: computed fresh on every Config/Register response (cheap - one TimeZoneInfo
             // lookup) rather than cached, so a DST transition or an admin changing
@@ -374,6 +412,8 @@ namespace api.Controllers.API
                 Reset = device.Reset,
                 FirmwareUpdate = device.FirmwareUpdate,
                 Enabled = device.Enabled,
+                CommandVersion = device.CommandVersion,
+                PendingCommand = pendingCommand,
             };
 
             // Roadmap #3 (OTA). Only look up a build when the flag is set; the firmware does a

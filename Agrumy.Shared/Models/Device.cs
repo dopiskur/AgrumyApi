@@ -5,6 +5,8 @@ namespace api.Models
     public class Device
     {
         public int? ConfigVersion { get; set; } = 1;
+        // Roadmap #34 - see api.Models.DeviceConfig.CommandVersion for the full story.
+        public int? CommandVersion { get; set; }
 
         [HiddenInput(DisplayValue = true)]
         public int? IDDevice { get; set; }
@@ -110,6 +112,16 @@ namespace api.Models
         public DeviceConfigSensor? DeviceConfigSensor { get; set; }
         public DeviceConfigController? DeviceConfigController { get; set; }
 
+        // Roadmap #34: deliberately separate from ConfigVersion - issuing a command must not force
+        // a full config re-apply on the firmware side, and a config change must not touch the
+        // command queue. Sent on every response (Config poll AND Register) for the firmware's own
+        // bookkeeping (compare against what it last processed to skip redundant re-handling); the
+        // SERVER's decision to send a non-empty response at all is driven by whether a pending
+        // command actually exists (GetConfig), not by comparing this number.
+        public int? CommandVersion { get; set; }
+        // Null when there is nothing to do - present only when a real, unexpired Pending command
+        // is waiting (DeviceApiController.GetConfig/BuildDeviceConfigAsync).
+        public PendingCommand? PendingCommand { get; set; }
     }
 
     /// <summary>Body of POST /api/Device/Config (roadmap #7): the poll doubles as the heartbeat, so

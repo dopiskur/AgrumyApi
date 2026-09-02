@@ -2,70 +2,221 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/config.response.schema.json",
   "title": "Device Register - response  (server -> firmware)",
-  "description": "System.Text.Json serialization (ASP.NET Core Web defaults => camelCase property names, null values KEPT) of api.Models.DeviceConfig, produced by DeviceApiController.BuildDeviceConfigAsync(). Returned by BOTH POST /api/Device/Config (only when the device's ConfigVersion differs from the server's - otherwise the server returns 200 with an EMPTY body) AND POST /api/Device/Register. Firmware parses it in DeviceController::loadConfig(). This file and register.response.schema.json are identical by construction - keep them in sync.",
+  "description": "System.Text.Json serialization (ASP.NET Core Web defaults => camelCase property names, null values KEPT) of api.Models.DeviceConfig, produced by DeviceApiController.BuildDeviceConfigAsync(). Returned by BOTH POST /api/Device/Config AND POST /api/Device/Register. Roadmap #34: Config returns this body when EITHER the device's ConfigVersion differs from the server's OR a command is pending for the device (pendingCommand non-null) - the server returns 200 with an EMPTY body only when neither is true. Firmware parses it in DeviceController::loadConfig(). This file and register.response.schema.json are identical by construction - keep them in sync.",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "configVersion", "tenantID", "deviceID", "deviceUnitID", "deviceUnitZoneID", "deviceTypeServiceID",
-    "apiId", "apiKey", "servicePoint", "servicePublicKey",
-    "sleepSeconds", "sleepDeep", "utcOffsetSeconds", "deviceSensorEnabled", "deviceControllerEnabled", "batteryEnabled",
-    "debug", "reboot", "reset", "firmwareUpdate", "firmwareVersion", "firmwareUrl", "enabled",
-    "deviceConfigSensor", "deviceConfigController"
+    "configVersion",
+    "tenantID",
+    "deviceID",
+    "deviceUnitID",
+    "deviceUnitZoneID",
+    "deviceTypeServiceID",
+    "apiId",
+    "apiKey",
+    "servicePoint",
+    "servicePublicKey",
+    "sleepSeconds",
+    "sleepDeep",
+    "utcOffsetSeconds",
+    "deviceSensorEnabled",
+    "deviceControllerEnabled",
+    "batteryEnabled",
+    "debug",
+    "reboot",
+    "reset",
+    "firmwareUpdate",
+    "firmwareVersion",
+    "firmwareUrl",
+    "enabled",
+    "deviceConfigSensor",
+    "deviceConfigController",
+    "commandVersion",
+    "pendingCommand"
   ],
   "properties": {
-    "configVersion": { "type": ["integer", "null"] },
-    "tenantID": { "type": ["integer", "null"] },
+    "configVersion": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "tenantID": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
     "deviceID": {
-      "type": ["integer", "null"],
+      "type": [
+        "integer",
+        "null"
+      ],
       "description": "Lowercase 'd' - the C# property is literally 'deviceID', so camelCase serialization leaves it unchanged. Firmware reads config[\"deviceID\"]."
     },
-    "deviceUnitID": { "type": ["integer", "null"] },
-    "deviceUnitZoneID": { "type": ["integer", "null"] },
+    "deviceUnitID": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "deviceUnitZoneID": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
     "deviceTypeServiceID": {
-      "type": ["integer", "null"],
+      "type": [
+        "integer",
+        "null"
+      ],
       "description": "0 http, 1 https, 2 mqtt. Drives DeviceController::serviceType() in steady-state operation."
     },
-    "apiId": { "type": ["string", "null"] },
-    "apiKey": { "type": ["string", "null"] },
-    "servicePoint": { "type": ["string", "null"] },
+    "apiId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "apiKey": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "servicePoint": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "servicePublicKey": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Pinned CA/self-signed cert for self-hosted deployments; null => firmware validates the TLS chain against its embedded CA bundle."
     },
-    "sleepSeconds": { "type": ["integer", "null"] },
-    "sleepDeep": { "type": ["boolean", "null"] },
+    "sleepSeconds": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "sleepDeep": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "utcOffsetSeconds": {
-      "type": ["integer", "null"],
+      "type": [
+        "integer",
+        "null"
+      ],
       "description": "Roadmap #39. Current UTC offset in seconds (positive east of UTC) for ServerConfig.ScheduleTimeZone, computed fresh on every response via TimeZoneHelper.GetUtcOffsetSeconds. 0 when no schedule timezone is configured. Firmware adds this to the NTP epoch and feeds the result to gmtime() to get local calendar fields with no on-device timezone database."
     },
-    "deviceSensorEnabled": { "type": ["boolean", "null"] },
-    "deviceControllerEnabled": { "type": ["boolean", "null"] },
-    "batteryEnabled": { "type": ["boolean", "null"] },
-    "debug": { "type": ["boolean", "null"] },
-    "reboot": { "type": ["boolean", "null"] },
-    "reset": { "type": ["boolean", "null"] },
-    "firmwareUpdate": { "type": ["boolean", "null"] },
+    "deviceSensorEnabled": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "deviceControllerEnabled": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "batteryEnabled": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "debug": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "reboot": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "reset": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "firmwareUpdate": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "firmwareVersion": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Roadmap #3 (OTA). The newest published firmware version for this device's type; non-null only when firmwareUpdate is true and a deviceFirmware row exists. The firmware compares it against its compiled-in version before downloading."
     },
     "firmwareUrl": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Roadmap #3 (OTA). HTTP(S) URL of the .bin to flash; paired with firmwareVersion, same null conditions."
     },
-    "enabled": { "type": ["boolean", "null"] },
+    "enabled": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "deviceConfigSensor": {
       "description": "Populated only when deviceSensorEnabled is true; otherwise serialized as null (System.Text.Json keeps the key).",
       "oneOf": [
-        { "type": "null" },
-        { "$ref": "#/definitions/deviceConfigSensor" }
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/definitions/deviceConfigSensor"
+        }
       ]
     },
     "deviceConfigController": {
       "description": "Populated only when deviceControllerEnabled is true; otherwise serialized as null.",
       "oneOf": [
-        { "type": "null" },
-        { "$ref": "#/definitions/deviceConfigController" }
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/definitions/deviceConfigController"
+        }
+      ]
+    },
+    "commandVersion": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Roadmap #34. Separate counter from configVersion - bumped once per device whenever a new deviceCommand row is created for it. Firmware-side bookkeeping only (compare against what it last processed); the server's decision to send a non-empty response is driven by whether a pending command actually exists, not by this number."
+    },
+    "pendingCommand": {
+      "description": "Roadmap #34. Null when there is nothing to do; present only for a real, unexpired Pending command.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/definitions/pendingCommand"
+        }
       ]
     }
   },
@@ -75,28 +226,107 @@
       "additionalProperties": false,
       "description": "camelCase serialization of api.Models.DeviceConfigSensor.",
       "required": [
-        "idDeviceConfigSensor", "sensorBattery", "sensorTemp", "sensorTempSoil", "sensorHumid",
-        "sensorMoist", "sensorLight", "sensorCo2", "sensorTvoc", "sensorBarometer", "sensorPH",
-        "sensorRainLevel", "sensorWaterLevel", "sensorWind"
+        "idDeviceConfigSensor",
+        "sensorBattery",
+        "sensorTemp",
+        "sensorTempSoil",
+        "sensorHumid",
+        "sensorMoist",
+        "sensorLight",
+        "sensorCo2",
+        "sensorTvoc",
+        "sensorBarometer",
+        "sensorPH",
+        "sensorRainLevel",
+        "sensorWaterLevel",
+        "sensorWind"
       ],
       "properties": {
-        "idDeviceConfigSensor": { "type": ["integer", "null"] },
-        "sensorBattery": { "type": ["integer", "null"] },
-        "sensorTemp": { "type": ["integer", "null"] },
-        "sensorTempSoil": { "type": ["integer", "null"] },
-        "sensorHumid": { "type": ["integer", "null"] },
-        "sensorMoist": { "type": ["integer", "null"] },
-        "sensorLight": { "type": ["integer", "null"] },
-        "sensorCo2": { "type": ["integer", "null"] },
-        "sensorTvoc": { "type": ["integer", "null"] },
-        "sensorBarometer": { "type": ["integer", "null"] },
+        "idDeviceConfigSensor": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sensorBattery": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sensorTemp": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sensorTempSoil": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sensorHumid": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sensorMoist": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sensorLight": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sensorCo2": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sensorTvoc": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sensorBarometer": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "sensorPH": {
-          "type": ["integer", "null"],
+          "type": [
+            "integer",
+            "null"
+          ],
           "description": "C# property is 'SensorPH'; camelCase leaves the 'PH' suffix uppercase -> 'sensorPH'."
         },
-        "sensorRainLevel": { "type": ["integer", "null"] },
-        "sensorWaterLevel": { "type": ["integer", "null"] },
-        "sensorWind": { "type": ["integer", "null"] }
+        "sensorRainLevel": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sensorWaterLevel": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sensorWind": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
       }
     },
     "deviceConfigController": {
@@ -104,80 +334,304 @@
       "additionalProperties": false,
       "description": "camelCase serialization of api.Models.DeviceConfigController.",
       "required": [
-        "idDeviceConfigController", "tempLow", "tempHigh", "humidLow", "humidHigh", "moistLow",
-        "moistHigh", "lightLow", "lightHigh", "waterLow", "waterHigh",
-        "waterLevelHysteresis", "temperatureHysteresis", "humidityHysteresis", "lightHysteresis",
-        "ventilationIntervalEnabled", "ventilationInterval", "ventilationIntervalLength",
-        "lightIntervalEnabled", "lightInterval", "lightIntervalLength",
-        "heatingIntervalEnabled", "heatingInterval", "heatingIntervalLength",
-        "waterPumpIntervalEnabled", "waterPumpInterval", "waterPumpIntervalLength",
-        "ventilationSchedule", "lightSchedule", "heatingSchedule", "waterPumpSchedule",
-        "relayEnabled", "relay1", "relay2", "relay3", "relay4", "relay5", "relay6", "relay7", "relay8"
+        "idDeviceConfigController",
+        "tempLow",
+        "tempHigh",
+        "humidLow",
+        "humidHigh",
+        "moistLow",
+        "moistHigh",
+        "lightLow",
+        "lightHigh",
+        "waterLow",
+        "waterHigh",
+        "waterLevelHysteresis",
+        "temperatureHysteresis",
+        "humidityHysteresis",
+        "lightHysteresis",
+        "ventilationIntervalEnabled",
+        "ventilationInterval",
+        "ventilationIntervalLength",
+        "lightIntervalEnabled",
+        "lightInterval",
+        "lightIntervalLength",
+        "heatingIntervalEnabled",
+        "heatingInterval",
+        "heatingIntervalLength",
+        "waterPumpIntervalEnabled",
+        "waterPumpInterval",
+        "waterPumpIntervalLength",
+        "ventilationSchedule",
+        "lightSchedule",
+        "heatingSchedule",
+        "waterPumpSchedule",
+        "relayEnabled",
+        "relay1",
+        "relay2",
+        "relay3",
+        "relay4",
+        "relay5",
+        "relay6",
+        "relay7",
+        "relay8"
       ],
       "properties": {
-        "idDeviceConfigController": { "type": ["integer", "null"] },
-        "tempLow": { "type": ["number", "null"] },
-        "tempHigh": { "type": ["number", "null"] },
-        "humidLow": { "type": ["number", "null"] },
-        "humidHigh": { "type": ["number", "null"] },
-        "moistLow": { "type": ["number", "null"] },
-        "moistHigh": { "type": ["number", "null"] },
-        "lightLow": { "type": ["number", "null"] },
-        "lightHigh": { "type": ["number", "null"] },
-        "waterLow": { "type": ["number", "null"] },
-        "waterHigh": { "type": ["number", "null"] },
+        "idDeviceConfigController": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tempLow": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "tempHigh": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "humidLow": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "humidHigh": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "moistLow": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "moistHigh": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lightLow": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lightHigh": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "waterLow": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "waterHigh": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "waterLevelHysteresis": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "description": "Roadmap #10. Dead-zone margin above waterLow before relayWaterPump turns off."
         },
         "temperatureHysteresis": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "description": "Roadmap #10. Dead-zone margin above tempLow before relayHeating turns off."
         },
         "humidityHysteresis": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "description": "Roadmap #10. Dead-zone margin below humidHigh before relayVentilation turns off (opposite direction from the other three - ventilation triggers ON above its threshold)."
         },
         "lightHysteresis": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "description": "Roadmap #10. Dead-zone margin above lightLow before relayLight turns off."
         },
-        "ventilationIntervalEnabled": { "type": ["boolean", "null"] },
-        "ventilationInterval": { "type": ["integer", "null"] },
-        "ventilationIntervalLength": { "type": ["integer", "null"] },
-        "lightIntervalEnabled": { "type": ["boolean", "null"] },
-        "lightInterval": { "type": ["integer", "null"] },
-        "lightIntervalLength": { "type": ["integer", "null"] },
-        "heatingIntervalEnabled": { "type": ["boolean", "null"] },
-        "heatingInterval": { "type": ["integer", "null"] },
-        "heatingIntervalLength": { "type": ["integer", "null"] },
-        "waterPumpIntervalEnabled": { "type": ["boolean", "null"] },
-        "waterPumpInterval": { "type": ["integer", "null"] },
-        "waterPumpIntervalLength": { "type": ["integer", "null"] },
+        "ventilationIntervalEnabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "ventilationInterval": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "ventilationIntervalLength": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "lightIntervalEnabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "lightInterval": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "lightIntervalLength": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "heatingIntervalEnabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "heatingInterval": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "heatingIntervalLength": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "waterPumpIntervalEnabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "waterPumpInterval": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "waterPumpIntervalLength": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "ventilationSchedule": {
           "type": "array",
-          "items": { "$ref": "#/definitions/deviceScheduleSlot" },
+          "items": {
+            "$ref": "#/definitions/deviceScheduleSlot"
+          },
           "description": "Roadmap #39/#115. Third relay-control mode alongside the Interval fields above and Threshold (tempLow etc.) - zero or more wall-clock on/off windows, independent of any sensor reading. The function is on whenever local time falls in ANY window (OR'd together, AgrumyDevice's RelayLogic::computeAnyScheduleState); an empty array means it never turns on in schedule mode - no separate 'enabled' flag."
         },
-        "lightSchedule": { "type": "array", "items": { "$ref": "#/definitions/deviceScheduleSlot" } },
-        "heatingSchedule": { "type": "array", "items": { "$ref": "#/definitions/deviceScheduleSlot" } },
-        "waterPumpSchedule": { "type": "array", "items": { "$ref": "#/definitions/deviceScheduleSlot" } },
-        "relayEnabled": { "type": ["boolean", "null"] },
-        "relay1": { "type": ["integer", "null"] },
-        "relay2": { "type": ["integer", "null"] },
-        "relay3": { "type": ["integer", "null"] },
-        "relay4": { "type": ["integer", "null"] },
-        "relay5": { "type": ["integer", "null"] },
-        "relay6": { "type": ["integer", "null"] },
-        "relay7": { "type": ["integer", "null"] },
-        "relay8": { "type": ["integer", "null"] }
+        "lightSchedule": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/deviceScheduleSlot"
+          }
+        },
+        "heatingSchedule": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/deviceScheduleSlot"
+          }
+        },
+        "waterPumpSchedule": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/deviceScheduleSlot"
+          }
+        },
+        "relayEnabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "relay1": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "relay2": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "relay3": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "relay4": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "relay5": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "relay6": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "relay7": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "relay8": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
       }
     },
     "deviceScheduleSlot": {
       "type": "object",
       "additionalProperties": false,
       "description": "Roadmap #115. camelCase serialization of api.Models.DeviceScheduleSlot - one wall-clock window within one of deviceConfigController's four schedule arrays.",
-      "required": ["daysOfWeek", "start", "duration"],
+      "required": [
+        "daysOfWeek",
+        "start",
+        "duration"
+      ],
       "properties": {
         "daysOfWeek": {
           "type": "integer",
@@ -190,6 +644,30 @@
         "duration": {
           "type": "integer",
           "description": "Seconds. start+duration must not exceed 86400 (no crossing local midnight in v1) - enforced server-side, DeviceApiController.ScheduleWindowError."
+        }
+      }
+    },
+    "pendingCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Roadmap #34. camelCase serialization of api.Models.PendingCommand - the one oldest, unexpired Pending deviceCommand row for this device, if any.",
+      "required": [
+        "idDeviceCommand",
+        "actionType",
+        "expiresAt"
+      ],
+      "properties": {
+        "idDeviceCommand": {
+          "type": "integer",
+          "description": "Echo this back as CommandId in the Ack call (POST /api/Device/Command/Ack) and in the CommandExecuted event (POST /api/Device/Event)."
+        },
+        "actionType": {
+          "type": "integer",
+          "description": "1=Reboot, 2=ForceOTA, 3=ForceConfigSync (api.Models.CommandActionType) - same server->firmware raw-int convention as relay1..8/deviceTypeServiceID, not a string."
+        },
+        "expiresAt": {
+          "type": "string",
+          "description": "ISO 8601 UTC timestamp. A command not acked/executed by this time must not be acted on if somehow still received - matches the server's own lazy-expiry check."
         }
       }
     }

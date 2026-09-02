@@ -16,6 +16,7 @@ namespace api.Dal.Interface
         IRefreshTokenRepository,
         IDeviceRepository,
         IDeviceUnitRepository,
+        ICommandRepository,
         ISensorDataRepository
     {
     }

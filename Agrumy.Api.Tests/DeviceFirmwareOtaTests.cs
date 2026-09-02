@@ -1,3 +1,4 @@
+using api.Commands;
 using api.Controllers.API;
 using api.Dal.Interface;
 using api.Models;
@@ -26,8 +27,10 @@ public class DeviceFirmwareOtaTests
         // no ScheduleTimeZone configured, so the response's offset is 0/UTC (see UtcOffsetSecondsTests
         // below for the actual offset-computation behavior).
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
+        // Roadmap #34: DeviceRegistration now always checks for a pending command before returning.
+        _repo.Setup(r => r.GetPendingCommandsAsync(device.IDDevice!.Value)).ReturnsAsync(new List<DeviceCommand>());
 
-        var controller = new DeviceApiController(_repo.Object, _cache.Object);
+        var controller = new DeviceApiController(_repo.Object, _cache.Object, new CommandQueueService(_repo.Object, _repo.Object, _repo.Object));
         var result = controller.DeviceRegistration(new DeviceRegistration
         {
             Email = "owner@example.com",

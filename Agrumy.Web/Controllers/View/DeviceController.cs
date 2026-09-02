@@ -150,6 +150,26 @@ namespace api.Controllers.View
             return events;
         }
 
+        /// <summary>Roadmap #34: the single AJAX target for every _DeviceCommandButtons instance
+        /// (Device Details, Zone detail, Unit-level Zones()) - device-commands.js posts here and
+        /// reads back plain text (the ApiException body on failure) rather than a redirect, since
+        /// the caller is a fetch() call, not a form navigation.</summary>
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> IssueCommand(CommandTargetType targetType, int targetId, CommandActionType actionType)
+        {
+            try
+            {
+                await api.DeviceCommandIssue(new IssueCommandRequest { TargetType = targetType, TargetId = targetId, ActionType = actionType });
+                return Ok();
+            }
+            catch (ApiException ex)
+            {
+                return StatusCode(ex.StatusCode, ex.Body);
+            }
+        }
+
         [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> Delete(int? idDevice) =>
             View(await api.DeviceGet(idDevice));

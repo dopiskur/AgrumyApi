@@ -2,6 +2,7 @@
 
 @{
     ViewData["Title"] = "Details";
+    Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
 }
 
 <div class="card">
@@ -134,6 +135,10 @@
         </dl>
     </div>
     <div class="card-footer">
+        @if (hasAnyRole(RoleNames.DeviceManagers))
+        {
+            <partial name="_DeviceCommandButtons" model="new DeviceCommandButtonsViewModel { TargetType = CommandTargetType.Device, TargetId = Model.IDDevice!.Value }" />
+        }
         <a asp-action="Edit" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Edit</a>
         <a asp-action="EditSensor" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Sensor config</a>
         <a asp-action="EditController" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Controller config</a>

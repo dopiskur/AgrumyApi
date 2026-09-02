@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using api;
+using api.Commands;
 using api.Controllers.API;
 using api.Dal.Interface;
 using api.Models;
@@ -32,7 +33,10 @@ public class ApiControllerTests
     // key/issuer/audience.
     private static readonly IOptions<AgrumySettings> TestSettings = Options.Create(AgrumySettings.Bind(TestConfig.Configuration));
 
-    private DeviceApiController NewDeviceController() => new(_repo.Object, _cache.Object);
+    // Roadmap #34: CommandQueueService is a plain sealed class (not mocked) - IRepository already
+    // implements ICommandRepository/IDeviceRepository/IDeviceUnitRepository, so the same mock
+    // backs all three of its constructor params.
+    private DeviceApiController NewDeviceController() => new(_repo.Object, _cache.Object, new CommandQueueService(_repo.Object, _repo.Object, _repo.Object));
     private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _notifications.Object, TestSettings);
 
     /// <summary>Gives a bare (non-DI-constructed) controller the JWT claims an [Authorize] action reads via HttpContext.User.</summary>
@@ -192,6 +196,7 @@ public class ApiControllerTests
              .ReturnsAsync(new Device { IDDevice = 500, TenantID = 3, ConfigVersion = 66 });
         _repo.Setup(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.IsAny<DeviceConfigPoll>()))
              .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // roadmap #34: none pending
 
         var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 66, Rssi = -60 });
 
@@ -216,6 +221,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.IsAny<DeviceConfigPoll>()))
              .Returns(Task.CompletedTask);
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // BuildDeviceConfigAsync always reads this
+        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // roadmap #34: none pending
 
         // Version mismatch (65 sent, DB has 66) - must return the full config, sourced from the
         // DB read, not a cache lookup that no longer carries ConfigVersion at all.
@@ -300,6 +306,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF"))
              .ReturnsAsync(new Device { IDDevice = 500, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // roadmap #39: BuildDeviceConfigAsync always reads this now
+        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // roadmap #34: none pending
 
         var result = await NewDeviceController().DeviceRegistration(PinRegistration("abc234"));
 
@@ -317,6 +324,8 @@ public class ApiControllerTests
         _repo.Setup(r => r.DeviceGetAsync(1, null, null, "112233445566"))
              .ReturnsAsync(new Device { IDDevice = 501, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // roadmap #39: BuildDeviceConfigAsync always reads this now
+        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // roadmap #34: none pending
+        _repo.Setup(r => r.GetPendingCommandsAsync(501)).ReturnsAsync(new List<DeviceCommand>());
 
         var first = await NewDeviceController().DeviceRegistration(PinRegistration("ABC234"));
         var second = await NewDeviceController().DeviceRegistration(new DeviceRegistration

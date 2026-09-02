@@ -175,6 +175,11 @@ namespace api.Dal.Interface
         [Get("/api/DeviceUnit/Dashboard/Zone")]
         Task<DeviceUnitZoneDashboard> DeviceUnitZoneDashboardGet(int? idDeviceUnitZone);
 
+        // ---- Device commands (roadmap #34) ---------------------------------
+
+        [Post("/api/DeviceCommand")]
+        Task<IReadOnlyList<int>> DeviceCommandIssue([Body] IssueCommandRequest request);
+
         // ---- SensorData ---------------------------------------------------
 
         [Get("/api/SensorData")]

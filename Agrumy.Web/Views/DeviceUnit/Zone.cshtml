@@ -40,6 +40,12 @@
         @if (hasAnyRole(RoleNames.DeviceManagers))
         {
             <div class="float-end d-flex align-items-center gap-2">
+                @* Roadmap #34: same hasController gate as "Add Controller" below - a zone with
+                   nothing controller-capable assigned has no device on the other end to command. *@
+                @if (hasController)
+                {
+                    <partial name="_DeviceCommandButtons" model="new DeviceCommandButtonsViewModel { TargetType = CommandTargetType.Zone, TargetId = zone.IDDeviceUnitZone }" />
+                }
                 @* #82 rule (a)/(b): a zone has at most one controller - the button disappears once
                    one is assigned; "Add Sensor" stays open for any number of separate sensor nodes. *@
                 @if (!hasController)

@@ -1,5 +1,6 @@
 using api;
 using api.BackgroundWorkers;
+using api.Commands;
 using api.Dal;
 using api.Dal.Interface;
 using api.Filters;
@@ -84,6 +85,7 @@ builder.Services.AddScoped<ITenantRepository>(sp => sp.GetRequiredService<EfRepo
 builder.Services.AddScoped<IRefreshTokenRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IDeviceRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IDeviceUnitRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<ICommandRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ISensorDataRepository>(sp => sp.GetRequiredService<EfRepository>());
 // Roadmap #72: in-process today (same practical behaviour as the old MemoryCache - lost on
 // restart, not shared across instances), but CacheRepository talks to IDistributedCache, so a
@@ -104,6 +106,11 @@ builder.Services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
 // repositories/dispatcher itself and PeriodicBackgroundService creates a fresh DI scope per tick.
 builder.Services.AddScoped<OfflineAlertEvaluator>();
 builder.Services.AddHostedService<OfflineAlertBackgroundService>();
+
+// Roadmap #34: no background worker - expiry is lazy (CommandQueueService.GetPendingCommandAsync
+// marks a stale row Expired the moment it's next looked at), so this is a plain scoped service,
+// not an IHostedService registration like OfflineAlertEvaluator above.
+builder.Services.AddScoped<CommandQueueService>();
 
 builder.Services.AddControllers(options => options.Filters.AddService<DbExceptionFilter>());
 

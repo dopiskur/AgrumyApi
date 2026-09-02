@@ -173,8 +173,23 @@ namespace api.Dal.Entities
         public bool? Reset { get; set; }
         public bool? FirmwareUpdate { get; set; }
         public int? ConfigVersion { get; set; }
+        // Roadmap #34 - see api.Models.DeviceConfig.CommandVersion for the full story.
+        public int CommandVersion { get; set; }
         public DateTime? DateCreated { get; set; }
         public DateTime? DateModified { get; set; }
+    }
+
+    /// <summary>Roadmap #34: one discrete, one-shot device action - see api.Models.CommandStatus
+    /// for why Acknowledged is a real, persisted state and not just an implementation detail.</summary>
+    public class DeviceCommandRow
+    {
+        public int IDDeviceCommand { get; set; }
+        public int DeviceID { get; set; }
+        public int ActionType { get; set; }
+        public int Status { get; set; }
+        public DateTime IssuedAt { get; set; }
+        public DateTime ExpiresAt { get; set; }
+        public DateTime? ExecutedAt { get; set; }
     }
 
     /// <summary>One row per device, upserted on every config poll (roadmap #7) - the poll itself is

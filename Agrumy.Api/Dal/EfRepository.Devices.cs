@@ -207,6 +207,7 @@ namespace api.Dal
             FirmwareUpdate = d.FirmwareUpdate,
             Enabled = d.Enabled,
             ConfigVersion = d.ConfigVersion,
+            CommandVersion = d.CommandVersion,
             DateCreated = d.DateCreated,
             DateModified = d.DateModified,
         };

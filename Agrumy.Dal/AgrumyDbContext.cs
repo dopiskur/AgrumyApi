@@ -40,6 +40,7 @@ namespace api.Dal
         public DbSet<DeviceScheduleSlotRow> DeviceScheduleSlots => Set<DeviceScheduleSlotRow>();
         public DbSet<DeviceFirmwareRow> DeviceFirmwares => Set<DeviceFirmwareRow>();
         public DbSet<DeviceDiagnosticRow> DeviceDiagnostics => Set<DeviceDiagnosticRow>();
+        public DbSet<DeviceCommandRow> DeviceCommands => Set<DeviceCommandRow>();
 
         public DbSet<SensorDataRow> SensorData => Set<SensorDataRow>();
         public DbSet<SensorDataReportRow> SensorDataReports => Set<SensorDataReportRow>();
@@ -268,6 +269,16 @@ namespace api.Dal
                 e.HasOne<DeviceTypeServiceRow>().WithMany().HasForeignKey(x => x.DeviceTypeServiceID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<TenantRow>().WithMany().HasForeignKey(x => x.TenantID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
+            });
+
+            // Roadmap #34.
+            modelBuilder.Entity<DeviceCommandRow>(e =>
+            {
+                e.ToTable("deviceCommand");
+                e.HasKey(x => x.IDDeviceCommand);
+                e.Property(x => x.IDDeviceCommand).ValueGeneratedOnAdd();
+                e.HasIndex(x => new { x.DeviceID, x.Status }).HasDatabaseName("ix_deviceCommand_device_status");
+                e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<DeviceDiagnosticRow>(e =>
