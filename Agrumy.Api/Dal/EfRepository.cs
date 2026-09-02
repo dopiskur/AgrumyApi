@@ -2,6 +2,7 @@ using api.Dal.Entities;
 using api.Dal.Interface;
 using api.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MySqlConnector;
 using Npgsql;
@@ -29,7 +30,7 @@ namespace api.Dal
     /// connection-pool churn (open/close per method), and tests had to poke process-wide static
     /// fields (ConnectionStringOverride/ProviderOverride) instead of just constructing an instance.
     /// </summary>
-    internal partial class EfRepository(AgrumyDbContext db, IOptions<AgrumySettings> settingsOptions) : IRepository
+    internal partial class EfRepository(AgrumyDbContext db, IOptions<AgrumySettings> settingsOptions, ILogger<EfRepository> logger) : IRepository
     {
         private readonly AgrumySettings settings = settingsOptions.Value;
 
@@ -50,6 +51,12 @@ namespace api.Dal
             // Migrations come back at beta - see roadmap.
             await db.Database.EnsureCreatedAsync();
 
+            // Roadmap #14: PostgreSQL is the "large deployment" tier of the tiered-hybrid decision -
+            // MariaDB/MySQL stays a plain relational table (small-deployment tier, no code path here
+            // at all). No-op on a MySQL/Pomelo context, and no-op (after logging) on a Postgres
+            // context whose server doesn't have the TimescaleDB extension installed.
+            await EnsureTimescaleHypertableAsync();
+
             // #66: EnsureCreatedAsync makes tables, never rows - without the role catalog a fresh
             // install would have every login fall back to the legacy single-role path forever and
             // registration's UserRolesSetAsync would silently assign nothing. Insert-if-missing by
@@ -67,6 +74,63 @@ namespace api.Dal
             await SeedDeviceTypeLookupsAsync(db);
             await SeedDeviceUnitSentinelsAsync(db);
             await SeedBootstrapAdminAsync(db);
+        }
+
+        /// <summary>Roadmap #14's tiered-hybrid decision: the deployment-size choice IS the provider
+        /// choice, so this runs unconditionally on every Postgres startup rather than needing a
+        /// separate opt-in setting - a self-hosted admin who picked Postgres already picked the
+        /// "large deployment" tier. `sensorData`'s PK is `IDSensorData` alone (see AgrumyDbContext);
+        /// TimescaleDB requires the partitioning column in every unique constraint including the PK,
+        /// so converting to a hypertable means widening it to (IDSensorData, DateCreated) first -
+        /// IDSensorData keeps working as a lookup key (EfRepository.DeviceUnits.cs's "latest reading
+        /// per zone" query), it just stops being unique on its own. Idempotent: skips straight past
+        /// an already-converted table, and if the extension itself isn't installed (dev/self-hosted
+        /// Postgres without TimescaleDB) this logs a warning and leaves sensorData as an ordinary
+        /// table - same as the MariaDB tier, not a startup failure.</summary>
+        private async Task EnsureTimescaleHypertableAsync()
+        {
+            if (!db.Database.IsNpgsql())
+            {
+                return;
+            }
+
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync("CREATE EXTENSION IF NOT EXISTS timescaledb;");
+            }
+            catch (PostgresException ex)
+            {
+                logger.LogWarning(ex,
+                    "TimescaleDB extension unavailable on this PostgreSQL server; sensorData stays a plain table.");
+                return;
+            }
+
+            // DO block, not two separate ExecuteSqlRawAsync calls: the PK rename and
+            // create_hypertable() must both happen (or neither) exactly once, and the
+            // pg_constraint lookup avoids hardcoding EF's "PK_sensorData" naming-convention output.
+            const string sql = """
+                DO $$
+                DECLARE
+                  pk_name text;
+                BEGIN
+                  IF NOT EXISTS (
+                    SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'sensorData'
+                  ) THEN
+                    SELECT conname INTO pk_name FROM pg_constraint
+                      WHERE conrelid = '"sensorData"'::regclass AND contype = 'p';
+                    IF pk_name IS NOT NULL THEN
+                      EXECUTE format('ALTER TABLE %I DROP CONSTRAINT %I', 'sensorData', pk_name);
+                    END IF;
+                    ALTER TABLE "sensorData" ADD PRIMARY KEY ("IDSensorData", "DateCreated");
+                    -- create_hypertable's first parameter is REGCLASS: an unquoted-looking literal
+                    -- here gets folded to lowercase by the implicit text->regclass cast (same
+                    -- identifier-normalization rule as bare SQL), missing this mixed-case table -
+                    -- the embedded double quotes below are what make it match "sensorData" exactly.
+                    PERFORM create_hypertable('"sensorData"', 'DateCreated', migrate_data => true, if_not_exists => true);
+                  END IF;
+                END $$;
+                """;
+            await db.Database.ExecuteSqlRawAsync(sql);
         }
 
         /// <summary>Roadmap #81/#82: EnsureCreatedAsync makes the deviceUnit/deviceUnitZone tables,

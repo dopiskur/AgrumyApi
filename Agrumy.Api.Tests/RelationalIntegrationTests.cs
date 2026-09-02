@@ -6,6 +6,7 @@ using api.Dal.Entities;
 using api.Models;
 using api.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -152,7 +153,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Skip.If(t is null, $"No integration database configured for {provider}.");
         _db?.Dispose();
         _db = new AgrumyDbContext(DbOptionsFactory.Build(t!.Provider, t.ConnectionString));
-        _repo = new EfRepository(_db, Options.Create(new AgrumySettings()));
+        _repo = new EfRepository(_db, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance);
         return t;
     }
 

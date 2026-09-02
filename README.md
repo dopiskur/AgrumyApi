@@ -187,6 +187,21 @@ database and is not part of this.
   values must be cleaned before such data can be loaded into PostgreSQL; for
   MySQL itself, add `AllowZeroDateTime=True;ConvertZeroDateTime=True` to the
   connection string if the data contains any.
+- **TimescaleDB (roadmap #14, tiered-hybrid deployment).** The provider choice
+  *is* the deployment-size choice: MariaDB/MySQL is the small-deployment tier
+  and stays an ordinary table, no code path runs for it. Choosing PostgreSQL
+  is choosing the large-deployment tier - on every startup,
+  `EfRepository.EnsureTimescaleHypertableAsync` runs `CREATE EXTENSION IF NOT
+  EXISTS timescaledb` and converts `sensorData` into a hypertable partitioned
+  on `DateCreated` (widening its PK to `(IDSensorData, DateCreated)`, which
+  TimescaleDB requires). This needs no application code branching - EF Core
+  LINQ queries against `sensorData` run unchanged on both providers, Timescale
+  just partitions/prunes transparently underneath. A self-hosted Postgres
+  without the extension installed isn't a startup failure: the `CREATE
+  EXTENSION` call is caught, a warning is logged, and `sensorData` is left as
+  a plain table, same as the MariaDB tier. Verified against
+  `timescale/timescaledb:latest-pg17` - a bare `postgres:17` container (as
+  used by the dev/test fixture above) exercises the same warn-and-skip path.
 
 ## API endpoints
 

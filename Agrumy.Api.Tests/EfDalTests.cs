@@ -2,6 +2,7 @@ using System.Text.Json;
 using api;
 using api.Dal;
 using api.Dal.Entities;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace Agrumy.Api.Tests;
@@ -100,7 +101,8 @@ public class ClassifyExceptionTests
     // (throwaway connection string, roadmap #101) and default settings are enough to construct it.
     private readonly EfRepository _repo = new(
         new AgrumyDbContext(DbOptionsFactory.Build(DbProviderKind.MySql, "server=unused;database=unused;")),
-        Options.Create(new AgrumySettings()));
+        Options.Create(new AgrumySettings()),
+        NullLogger<EfRepository>.Instance);
 
     [Fact]
     public void PlainException_MentioningMissingTable_IsSchemaMissing()
