@@ -155,12 +155,15 @@ namespace api.Dal
                 return;
             }
 
-            // Columns the DeviceUpdate proc touched (note: it did NOT set DeviceUnitZoneID,
-            // MacAddress or the config-id columns).
+            // Columns the DeviceUpdate proc touched (note: it did NOT set MacAddress or the
+            // config-id columns). Roadmap #82: DeviceUnitID/DeviceUnitZoneID dropped from this list
+            // too - both are now written exclusively by DeviceAssignToZoneAsync/
+            // DeviceUnassignFromZoneAsync, which keep the pair consistent with each other (derived
+            // from the zone's own DeviceUnitID); this generic update touching just one of them could
+            // silently desync a device's Unit from its Zone.
             row.TenantID = device.TenantID;
             row.DeviceTypeID = device.DeviceTypeID;
             row.DeviceTypeServiceID = device.DeviceTypeServiceID;
-            row.DeviceUnitID = device.DeviceUnitID;
             row.DeviceName = device.DeviceName;
             row.ApiId = device.ApiId ?? "";
             row.ApiKey = device.ApiKey ?? "";

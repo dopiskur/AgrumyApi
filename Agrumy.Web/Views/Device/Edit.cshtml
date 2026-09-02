@@ -37,15 +37,28 @@
 
             <partial name="_SelectField" model="deviceTypeSelect" />
 
+            @* Roadmap #82: assignment moved to the Dashboard's Add Controller/Add Sensor/Remove
+               flow (DeviceUnitController) - it needs to validate the "one controller per zone" rule
+               and keep DeviceUnitID/DeviceUnitZoneID consistent with each other, neither of which a
+               bare numeric field here could do. DeviceUpdateAsync no longer writes either column. *@
             <div class="mb-3">
-                <label asp-for="Device.DeviceUnitID" class="form-label"></label>
-                <input asp-for="Device.DeviceUnitID" class="form-control" />
-                <span asp-validation-for="Device.DeviceUnitID" class="text-danger"></span>
-            </div>
-            <div class="mb-3">
-                <label asp-for="Device.DeviceUnitZoneID" class="form-label"></label>
-                <input asp-for="Device.DeviceUnitZoneID" class="form-control" />
-                <span asp-validation-for="Device.DeviceUnitZoneID" class="text-danger"></span>
+                <label class="form-label">Unit / Zone</label>
+                @if (device.DeviceUnitZoneID is int zoneId && zoneId != 0)
+                {
+                    <p class="form-control-plaintext">
+                        Assigned - manage from the
+                        <a asp-controller="DeviceUnit" asp-action="Zone" asp-route-idDeviceUnitZone="@zoneId">zone dashboard</a>.
+                    </p>
+                }
+                else
+                {
+                    <p class="form-control-plaintext">
+                        Not assigned - assign it from the
+                        <a asp-controller="DeviceUnit" asp-action="Index">Dashboard</a>.
+                    </p>
+                }
+                @Html.HiddenFor(m => m.Device!.DeviceUnitID)
+                @Html.HiddenFor(m => m.Device!.DeviceUnitZoneID)
             </div>
             <div class="mb-3">
                 <label asp-for="Device.DeviceConfigSensorID" class="form-label"></label>

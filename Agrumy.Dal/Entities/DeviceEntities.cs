@@ -1,17 +1,25 @@
 namespace api.Dal.Entities
 {
-    public class DeviceUnitZoneRow
-    {
-        public int IDDeviceUnitZone { get; set; }
-        public string? DeviceUnitZoneName { get; set; }
-    }
-
+    /// <summary>Roadmap #82: TenantID null means the shared global sentinel row (IDDeviceUnit=0
+    /// "Default", see EfRepository.SeedDeviceUnitSentinelsAsync), not a real per-tenant Unit.</summary>
     public class DeviceUnitRow
     {
         public int IDDeviceUnit { get; set; }
-        public int? DeviceUnitZoneID { get; set; }
+        public int? TenantID { get; set; }
         public string? DeviceUnitName { get; set; }
         public bool? ZoneEnabled { get; set; }
+    }
+
+    /// <summary>Roadmap #81/#82: DeviceUnitID is the real "Unit contains many Zones" FK (replacing
+    /// the removed, backwards deviceUnit.DeviceUnitZoneID) - see the containment migration comment
+    /// in db/migrations/2026-09-02-deviceunit-zone-containment.sql. TenantID null means the shared
+    /// global sentinel row (IDDeviceUnitZone=0 "Disabled"), same convention as DeviceUnitRow.</summary>
+    public class DeviceUnitZoneRow
+    {
+        public int IDDeviceUnitZone { get; set; }
+        public int? TenantID { get; set; }
+        public int DeviceUnitID { get; set; }
+        public string? DeviceUnitZoneName { get; set; }
     }
 
     public class DeviceTypeRow

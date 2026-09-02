@@ -83,6 +83,7 @@ builder.Services.AddScoped<IUserRepository>(sp => sp.GetRequiredService<EfReposi
 builder.Services.AddScoped<ITenantRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IRefreshTokenRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IDeviceRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<IDeviceUnitRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ISensorDataRepository>(sp => sp.GetRequiredService<EfRepository>());
 // Roadmap #72: in-process today (same practical behaviour as the old MemoryCache - lost on
 // restart, not shared across instances), but CacheRepository talks to IDistributedCache, so a

@@ -1,0 +1,51 @@
+@model api.ViewModels.UnitZonesViewModel
+@{
+    ViewData["Title"] = Model.Unit.DeviceUnitName;
+    Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-action="Index">Units</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.Unit.DeviceUnitName</li>
+    </ol>
+</nav>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">@Model.Unit.DeviceUnitName - Zones</h3>
+        @if (hasAnyRole(RoleNames.DeviceManagers))
+        {
+            <div class="float-end d-flex align-items-center gap-3">
+                <form asp-action="ZoneAdd" method="post" class="d-flex gap-2">
+                    <input type="hidden" name="idDeviceUnit" value="@Model.Unit.IDDeviceUnit" />
+                    <input type="text" name="deviceUnitZoneName" class="form-control form-control-sm" placeholder="New zone name" required maxlength="120" />
+                    <button type="submit" class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-plus-lg"></i> Add Zone</button>
+                </form>
+                <form asp-action="UnitDelete" method="post" onsubmit="return confirm('Delete this unit and every zone in it? Devices are unassigned, not deleted.');">
+                    <input type="hidden" name="idDeviceUnit" value="@Model.Unit.IDDeviceUnit" />
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete unit"><i class="bi bi-trash"></i></button>
+                </form>
+            </div>
+        }
+    </div>
+    <div class="card-body">
+        <div class="row" id="zoneCubes">
+            <partial name="_ZoneCubes" model="Model.Zones" />
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/live-refresh.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            startLiveRefresh({
+                url: '@Url.Action("ZonesCubes", new { idDeviceUnit = Model.Unit.IDDeviceUnit })',
+                applyHtml: function (html) {
+                    document.getElementById('zoneCubes').innerHTML = html;
+                }
+            });
+        });
+    </script>
+}

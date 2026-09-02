@@ -77,12 +77,13 @@ public sealed class RelationalIntegrationFixture
 
         // deviceUnit(0)/deviceUnitZone(0) are the "Default"/"Disabled" sentinel rows the production
         // DB ships (db/agrumyDB-withData.sql); sensorData's non-null DeviceUnitID/DeviceUnitZoneID
-        // default to 0, so with the legacy FKs in place these must exist. Zone before unit.
-        if (!db.DeviceUnitZones.Any())
-            db.DeviceUnitZones.Add(new DeviceUnitZoneRow { IDDeviceUnitZone = 0, DeviceUnitZoneName = "Disabled" });
-        db.SaveChanges();
+        // default to 0, so with the FK in place these must exist. Unit before zone (roadmap #81/#82:
+        // deviceUnitZone.DeviceUnitID is now the real containment FK, opposite of the old direction).
         if (!db.DeviceUnits.Any())
-            db.DeviceUnits.Add(new DeviceUnitRow { IDDeviceUnit = 0, DeviceUnitZoneID = null, DeviceUnitName = "Default" });
+            db.DeviceUnits.Add(new DeviceUnitRow { IDDeviceUnit = 0, TenantID = null, DeviceUnitName = "Default" });
+        db.SaveChanges();
+        if (!db.DeviceUnitZones.Any())
+            db.DeviceUnitZones.Add(new DeviceUnitZoneRow { IDDeviceUnitZone = 0, TenantID = null, DeviceUnitID = 0, DeviceUnitZoneName = "Disabled" });
 
         if (!db.DeviceTypeServices.Any())
             db.DeviceTypeServices.Add(new DeviceTypeServiceRow { IDDeviceTypeService = 1, ServiceType = "HTTPS" });
@@ -950,6 +951,179 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(21.5, row.Temperature);
         Assert.False(await db.SensorData.AnyAsync(r => r.DeviceID == d.IDDevice!.Value + 999_999));
         Assert.False(await db.SensorData.AnyAsync(r => r.TenantID == tenantId + 999_999));
+    }
+
+    // ---- device unit / zone (roadmap #81 + #82) --------------------------
+
+    private async Task<(DeviceUnit Unit, DeviceUnitZone Zone)> MakeUnitAndZone(int? tenantId)
+    {
+        var unit = await _repo.DeviceUnitAddAsync(new DeviceUnit { TenantID = tenantId, DeviceUnitName = "Unit_" + U() });
+        var zone = await _repo.DeviceUnitZoneAddAsync(new DeviceUnitZone
+        {
+            TenantID = tenantId,
+            DeviceUnitID = unit.IDDeviceUnit!.Value,
+            DeviceUnitZoneName = "Zone_" + U(),
+        });
+        return (unit, zone);
+    }
+
+    // Roadmap #81/#82: the containment migration flipped the FK (Zone -> Unit, not the old
+    // Unit -> Zone) so one Unit can genuinely hold several Zones - the whole point of the
+    // hierarchical dashboard.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnit_Contains_MultipleZones(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone1) = await MakeUnitAndZone(tenantId);
+        var zone2 = await _repo.DeviceUnitZoneAddAsync(new DeviceUnitZone
+        {
+            TenantID = tenantId,
+            DeviceUnitID = unit.IDDeviceUnit!.Value,
+            DeviceUnitZoneName = "Zone_" + U(),
+        });
+
+        var zones = await _repo.DeviceUnitZonesGetAsync(unit.IDDeviceUnit!.Value);
+        Assert.Equal(2, zones.Count);
+        Assert.Contains(zones, z => z.IDDeviceUnitZone == zone1.IDDeviceUnitZone);
+        Assert.Contains(zones, z => z.IDDeviceUnitZone == zone2.IDDeviceUnitZone);
+        Assert.All(zones, z => Assert.Equal(unit.IDDeviceUnit, z.DeviceUnitID));
+    }
+
+    // Roadmap #82: admin-created Units/Zones must not leak across tenants (same standard as every
+    // other #47/#66/#102/#111 tenant-isolation fix) - only the shared IDDeviceUnit=0 sentinel is global.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitsGet_IsTenantScoped(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenant1, _, _) = await MakeUser(t);
+        var (tenant2, _, _) = await MakeUser(t);
+        var (unit1, _) = await MakeUnitAndZone(tenant1);
+        var (unit2, _) = await MakeUnitAndZone(tenant2);
+
+        var seenByTenant1 = await _repo.DeviceUnitsGetAsync(tenant1);
+        Assert.Contains(seenByTenant1, u => u.IDDeviceUnit == unit1.IDDeviceUnit);
+        Assert.DoesNotContain(seenByTenant1, u => u.IDDeviceUnit == unit2.IDDeviceUnit);
+        Assert.DoesNotContain(seenByTenant1, u => u.IDDeviceUnit == 0); // sentinel never listed as a real unit
+    }
+
+    // Roadmap #82: assigning writes BOTH DeviceUnitID and DeviceUnitZoneID from the zone's own
+    // record (never trusts a caller-supplied unit id) and bumps ConfigVersion; unassigning resets
+    // both to the 0 sentinel WITHOUT bumping ConfigVersion (rule (e): pure bookkeeping).
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceAssignToZone_SetsUnitAndZone_AndBumpsConfigVersion_UnassignDoesNot(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d = await MakeDevice(t, tenantId);
+        int originalConfigVersion = d.ConfigVersion!.Value;
+
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+
+        var assigned = await _repo.DeviceGetByIdAsync(d.IDDevice);
+        Assert.Equal(unit.IDDeviceUnit, assigned!.DeviceUnitID);
+        Assert.Equal(zone.IDDeviceUnitZone, assigned.DeviceUnitZoneID);
+        Assert.Equal(originalConfigVersion + 1, assigned.ConfigVersion);
+
+        await _repo.DeviceUnassignFromZoneAsync(d.IDDevice.Value);
+
+        var unassigned = await _repo.DeviceGetByIdAsync(d.IDDevice);
+        Assert.Equal(0, unassigned!.DeviceUnitID);
+        Assert.Equal(0, unassigned.DeviceUnitZoneID);
+        Assert.Equal(originalConfigVersion + 1, unassigned.ConfigVersion); // unchanged by the unassign
+    }
+
+    // Roadmap #82 rule (d): the "Add Controller"/"Add Sensor" picker only offers devices with no
+    // current zone, filtered by the capability the caller is filling.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnassignedGet_ExcludesAlreadyAssigned_FiltersByCapability(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (_, zone) = await MakeUnitAndZone(tenantId);
+        var assigned = await MakeDevice(t, tenantId); // sensor+controller capable, per MakeDevice
+        var unassigned = await MakeDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(assigned.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+
+        var controllerCandidates = await _repo.DeviceUnassignedGetAsync(tenantId, controllerCapable: true);
+        Assert.Contains(controllerCandidates, x => x.IDDevice == unassigned.IDDevice);
+        Assert.DoesNotContain(controllerCandidates, x => x.IDDevice == assigned.IDDevice);
+
+        var sensorCandidates = await _repo.DeviceUnassignedGetAsync(tenantId, controllerCapable: false);
+        Assert.Contains(sensorCandidates, x => x.IDDevice == unassigned.IDDevice);
+    }
+
+    // Roadmap #82 rule (a): a zone has at most one controller - the API checks this primitive
+    // before calling DeviceAssignToZoneAsync for a second controller-capable device.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitZoneHasController_TrueOnlyAfterAControllerCapableDeviceIsAssigned(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (_, zone) = await MakeUnitAndZone(tenantId);
+        var controller = await MakeDevice(t, tenantId);
+
+        Assert.False(await _repo.DeviceUnitZoneHasControllerAsync(zone.IDDeviceUnitZone!.Value));
+        await _repo.DeviceAssignToZoneAsync(controller.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        Assert.True(await _repo.DeviceUnitZoneHasControllerAsync(zone.IDDeviceUnitZone!.Value));
+    }
+
+    // Roadmap #81: the dashboard averages the LATEST reading per device, one number per sensor
+    // type, ignoring types nobody in scope has ever reported (null, not zero).
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitDashboard_AveragesLatestReadingPerDevice_PerSensorType(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d1 = await MakeDevice(t, tenantId);
+        var d2 = await MakeDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(d1.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d2.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+
+        // d1: an older then a newer reading - only the newer one (20.0) must count.
+        await _repo.SensorDataPushAsync(new JsonArray(
+            new JsonObject { ["temperature"] = "10.0", ["dateCreated"] = "2026-08-01 00:00:00" }),
+            d1.IDDevice!.Value, tenantId, unit.IDDeviceUnit, zone.IDDeviceUnitZone);
+        await _repo.SensorDataPushAsync(new JsonArray(
+            new JsonObject { ["temperature"] = "20.0", ["dateCreated"] = "2026-08-02 00:00:00" }),
+            d1.IDDevice!.Value, tenantId, unit.IDDeviceUnit, zone.IDDeviceUnitZone);
+        // d2: reports humidity only - never sent a temperature, must not drag the temperature average down.
+        await _repo.SensorDataPushAsync(new JsonArray(
+            new JsonObject { ["humidity"] = "50.0", ["dateCreated"] = "2026-08-02 00:00:00" }),
+            d2.IDDevice!.Value, tenantId, unit.IDDeviceUnit, zone.IDDeviceUnitZone);
+
+        var unitDashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        Assert.Equal(2, unitDashboard.DeviceCount);
+        Assert.Equal(1, unitDashboard.ZoneCount);
+        Assert.Equal(20.0, unitDashboard.Averages.Temperature); // only d1's latest reading, d2 never reported temperature
+        Assert.Equal(50.0, unitDashboard.Averages.Humidity);    // only d2 reported humidity
+
+        var zoneDetail = await _repo.DeviceUnitZoneDashboardGetAsync(zone.IDDeviceUnitZone!.Value);
+        Assert.NotNull(zoneDetail);
+        Assert.Equal(2, zoneDetail!.Devices.Count);
+        Assert.Equal(20.0, zoneDetail.Averages.Temperature);
+    }
+
+    // Roadmap #82: deleting a Unit cascades its Zones and unassigns (not deletes) their devices.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitDelete_CascadesZones_AndUnassignsDevices_WithoutDeletingThem(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d = await MakeDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+
+        await _repo.DeviceUnitDeleteAsync(unit.IDDeviceUnit!.Value);
+
+        Assert.Null(await _repo.DeviceUnitGetByIdAsync(unit.IDDeviceUnit));
+        Assert.Null(await _repo.DeviceUnitZoneGetByIdAsync(zone.IDDeviceUnitZone));
+        var stillThere = await _repo.DeviceGetByIdAsync(d.IDDevice);
+        Assert.NotNull(stillThere); // device itself is untouched
+        Assert.Equal(0, stillThere!.DeviceUnitID);
+        Assert.Equal(0, stillThere.DeviceUnitZoneID);
     }
 
     // ---- device events (roadmap #28) ----------------------------------

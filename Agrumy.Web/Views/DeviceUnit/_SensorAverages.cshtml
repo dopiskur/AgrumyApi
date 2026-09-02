@@ -1,0 +1,38 @@
+@model api.Models.SensorAverages
+@{
+    // Roadmap #81: one badge per sensor type actually present in scope - types are never mixed or
+    // averaged together, and a type nobody in this unit/zone reports simply doesn't get a badge
+    // (the underlying average is null, not zero - LINQ's nullable Average() already tells the
+    // difference between "no data" and "data averaging to zero").
+    (string Label, string Icon, double? Value, string Unit)[] rows =
+    [
+        ("Temp", "bi-thermometer-half", Model.Temperature, "°C"),
+        ("Soil temp", "bi-thermometer", Model.SoilTemperature, "°C"),
+        ("Humidity", "bi-droplet-half", Model.Humidity, "%"),
+        ("Moisture", "bi-moisture", Model.Moisture, "%"),
+        ("Light", "bi-brightness-high", Model.Light, "lx"),
+        ("CO2", "bi-cloud", Model.Co2, "ppm"),
+        ("TVOC", "bi-wind", Model.Tvoc, "ppb"),
+        ("Pressure", "bi-speedometer2", Model.Barometer, "hPa"),
+        ("pH", "bi-eyedropper", Model.LiquidPH, ""),
+        ("Rain", "bi-cloud-rain", Model.RainLevel, ""),
+        ("Water level", "bi-water", Model.WaterLevel, ""),
+        ("Wind", "bi-wind", Model.Wind, "m/s"),
+    ];
+    var present = rows.Where(r => r.Value != null).ToList();
+}
+@if (present.Count == 0)
+{
+    <span class="text-secondary small fst-italic">No sensor data yet</span>
+}
+else
+{
+    <div class="d-flex flex-wrap gap-1">
+        @foreach (var (label, icon, value, unit) in present)
+        {
+            <span class="badge text-bg-light border text-dark fw-normal">
+                <i class="bi @icon me-1"></i>@label: @(((double)value!).ToString("0.#"))@unit
+            </span>
+        }
+    </div>
+}

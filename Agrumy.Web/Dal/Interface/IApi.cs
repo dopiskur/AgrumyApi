@@ -128,6 +128,53 @@ namespace api.Dal.Interface
         [Get("/api/Device/Fleet")]
         Task<IList<DeviceFleetStatus>> DeviceFleetGet();
 
+        // ---- Unit/Zone (roadmap #81/#82) -----------------------------------
+
+        [Get("/api/DeviceUnit/All")]
+        Task<IList<DeviceUnit>> DeviceUnitsGet();
+
+        [Get("/api/DeviceUnit")]
+        Task<DeviceUnit> DeviceUnitGet(int? idDeviceUnit);
+
+        [Post("/api/DeviceUnit")]
+        Task<DeviceUnit> DeviceUnitAdd([Body] DeviceUnit unit);
+
+        [Put("/api/DeviceUnit")]
+        Task DeviceUnitUpdate([Body] DeviceUnit unit);
+
+        [Delete("/api/DeviceUnit")]
+        Task DeviceUnitDelete(int? idDeviceUnit);
+
+        [Get("/api/DeviceUnit/Zone")]
+        Task<IList<DeviceUnitZone>> DeviceUnitZonesGet(int? idDeviceUnit);
+
+        [Post("/api/DeviceUnit/Zone")]
+        Task<DeviceUnitZone> DeviceUnitZoneAdd([Body] DeviceUnitZone zone);
+
+        [Put("/api/DeviceUnit/Zone")]
+        Task DeviceUnitZoneUpdate([Body] DeviceUnitZone zone);
+
+        [Delete("/api/DeviceUnit/Zone")]
+        Task DeviceUnitZoneDelete(int? idDeviceUnitZone);
+
+        [Get("/api/DeviceUnit/Unassigned")]
+        Task<IList<Device>> DeviceUnassignedGet(bool controllerCapable);
+
+        [Post("/api/DeviceUnit/Assign")]
+        Task DeviceAssign([Body] DeviceZoneAssignment body);
+
+        [Post("/api/DeviceUnit/Unassign")]
+        Task DeviceUnassign(int? idDevice);
+
+        [Get("/api/DeviceUnit/Dashboard")]
+        Task<IList<DeviceUnitDashboard>> DeviceUnitDashboardGet();
+
+        [Get("/api/DeviceUnit/Dashboard/Zones")]
+        Task<IList<DeviceUnitZoneDashboard>> DeviceUnitZoneDashboardListGet(int? idDeviceUnit);
+
+        [Get("/api/DeviceUnit/Dashboard/Zone")]
+        Task<DeviceUnitZoneDashboard> DeviceUnitZoneDashboardGet(int? idDeviceUnitZone);
+
         // ---- SensorData ---------------------------------------------------
 
         [Get("/api/SensorData")]

@@ -139,21 +139,23 @@ namespace api.Dal
                 e.Property(x => x.ScheduleTimeZone).HasMaxLength(64); // same cap as user.TimeZone (roadmap #71)
             });
 
-            modelBuilder.Entity<DeviceUnitZoneRow>(e =>
-            {
-                e.ToTable("deviceUnitZone");
-                e.HasKey(x => x.IDDeviceUnitZone);
-                e.Property(x => x.IDDeviceUnitZone).ValueGeneratedNever();
-                e.Property(x => x.DeviceUnitZoneName).HasMaxLength(120);
-            });
-
             modelBuilder.Entity<DeviceUnitRow>(e =>
             {
                 e.ToTable("deviceUnit");
                 e.HasKey(x => x.IDDeviceUnit);
                 e.Property(x => x.IDDeviceUnit).ValueGeneratedNever();
                 e.Property(x => x.DeviceUnitName).HasMaxLength(100);
-                e.HasOne<DeviceUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceUnitZoneID).OnDelete(DeleteBehavior.NoAction);
+            });
+
+            // Roadmap #81/#82: real containment FK (Zone -> Unit), replacing the removed backwards
+            // deviceUnit.DeviceUnitZoneID pointer - see db/migrations/2026-09-02-deviceunit-zone-containment.sql.
+            modelBuilder.Entity<DeviceUnitZoneRow>(e =>
+            {
+                e.ToTable("deviceUnitZone");
+                e.HasKey(x => x.IDDeviceUnitZone);
+                e.Property(x => x.IDDeviceUnitZone).ValueGeneratedNever();
+                e.Property(x => x.DeviceUnitZoneName).HasMaxLength(120);
+                e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<DeviceTypeRow>(e =>

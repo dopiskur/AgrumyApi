@@ -1,0 +1,89 @@
+using api.Models;
+
+namespace api.Dal.Interface
+{
+    /// <summary>Unit/Zone facet of the data layer (roadmap #74 pattern): #82's CRUD + device
+    /// assignment, and #81's hierarchical dashboard aggregation. Split out from IDeviceRepository
+    /// (roadmap #95 style) since this is a sizeable new domain, not a couple of extra members on an
+    /// already-large facet.</summary>
+    public interface IDeviceUnitRepository
+    {
+        // ---- Unit CRUD (roadmap #82) -------------------------------------------------
+
+        /// <summary>Every real Unit in the tenant (or every tenant when tenantID is null - callers
+        /// must check CallerReadsDevicesGlobally themselves, same rule as DevicesGetAllAsync). Never
+        /// includes the IDDeviceUnit=0 "Default" sentinel - that is not a real, admin-manageable Unit.</summary>
+        Task<IList<DeviceUnit>> DeviceUnitsGetAsync(int? tenantID);
+
+        /// <summary>The Unit with this id (no tenant filter) - for ownership checks before an
+        /// authorized write, same pattern as IDeviceRepository.DeviceGetByIdAsync - or null if none.</summary>
+        Task<DeviceUnit?> DeviceUnitGetByIdAsync(int? idDeviceUnit);
+
+        Task<DeviceUnit> DeviceUnitAddAsync(DeviceUnit unit);
+
+        Task DeviceUnitUpdateAsync(DeviceUnit unit);
+
+        /// <summary>Cascade-deletes every Zone under this Unit first (each zone's own devices are
+        /// unassigned exactly like DeviceUnassignFromZoneAsync - pure bookkeeping, no config-sync),
+        /// then the Unit row itself. A no-op if the id does not exist.</summary>
+        Task DeviceUnitDeleteAsync(int idDeviceUnit);
+
+        // ---- Zone CRUD (roadmap #82) ------------------------------------------------
+
+        /// <summary>Every Zone belonging to this Unit. Never includes the IDDeviceUnitZone=0
+        /// "Disabled" sentinel.</summary>
+        Task<IList<DeviceUnitZone>> DeviceUnitZonesGetAsync(int idDeviceUnit);
+
+        /// <summary>The Zone with this id (no tenant filter) - for ownership checks - or null if none.</summary>
+        Task<DeviceUnitZone?> DeviceUnitZoneGetByIdAsync(int? idDeviceUnitZone);
+
+        Task<DeviceUnitZone> DeviceUnitZoneAddAsync(DeviceUnitZone zone);
+
+        Task DeviceUnitZoneUpdateAsync(DeviceUnitZone zone);
+
+        /// <summary>Unassigns every device currently in this Zone (pure bookkeeping, same as
+        /// DeviceUnassignFromZoneAsync), then deletes the Zone row. A no-op if the id does not exist.</summary>
+        Task DeviceUnitZoneDeleteAsync(int idDeviceUnitZone);
+
+        /// <summary>Whether this Zone already has a controller-capable device assigned - #82 rule
+        /// (a): a Zone has at most one controller. Checked by the API before DeviceAssignToZoneAsync
+        /// when the device being assigned is itself controller-capable.</summary>
+        Task<bool> DeviceUnitZoneHasControllerAsync(int idDeviceUnitZone);
+
+        // ---- Device assignment (roadmap #82) -----------------------------------------
+
+        /// <summary>Every device in the tenant with no current Unit/Zone (DeviceUnitZoneID is
+        /// null/0, the sentinel) - the "Add Controller"/"Add Sensor" picker list (#82 rule (d),
+        /// tenant-scoped). controllerCapable selects DeviceControllerEnabled devices for "Add
+        /// Controller", DeviceSensorEnabled devices otherwise - a device with both flags set (e.g.
+        /// KC868-A6) appears in both lists but assigning it via either action moves the whole
+        /// device/row (#82 rule (c): its embedded sensors come along automatically).</summary>
+        Task<IList<Device>> DeviceUnassignedGetAsync(int? tenantID, bool controllerCapable);
+
+        /// <summary>Assigns one device to one zone - sets both DeviceUnitID (resolved from the
+        /// zone's own DeviceUnitID) and DeviceUnitZoneID, and bumps ConfigVersion so the device
+        /// picks up its new assignment on its next config poll.</summary>
+        Task DeviceAssignToZoneAsync(int idDevice, int idDeviceUnitZone);
+
+        /// <summary>#82 rule (e): resets DeviceUnitID/DeviceUnitZoneID to the 0 "unassigned"
+        /// sentinel - pure server-side bookkeeping, deliberately does NOT bump ConfigVersion or
+        /// otherwise notify the device (it keeps polling/reporting telemetry normally; the only
+        /// effect is that future telemetry no longer counts toward any zone's aggregation).</summary>
+        Task DeviceUnassignFromZoneAsync(int idDevice);
+
+        // ---- Dashboard aggregation (roadmap #81) -------------------------------------
+
+        /// <summary>One cube per real Unit in scope (tenantID null = every tenant, same
+        /// CallerReadsDevicesGlobally rule as DeviceFleetGetAsync) - name, zone/device counts, and
+        /// the per-sensor-type average across every device in every zone of that unit.</summary>
+        Task<IList<DeviceUnitDashboard>> DeviceUnitDashboardGetAsync(int? tenantID);
+
+        /// <summary>One cube per Zone within one Unit - same shape, narrowed scope. Devices list is
+        /// left empty (populated only by the single-zone detail below).</summary>
+        Task<IList<DeviceUnitZoneDashboard>> DeviceUnitZoneDashboardListGetAsync(int idDeviceUnit);
+
+        /// <summary>Single-zone detail: roll-up plus the actual device list (#82: "Zona prikazuje i
+        /// detalje - kontroler + senzori"). Null if the zone id does not exist.</summary>
+        Task<DeviceUnitZoneDashboard?> DeviceUnitZoneDashboardGetAsync(int idDeviceUnitZone);
+    }
+}

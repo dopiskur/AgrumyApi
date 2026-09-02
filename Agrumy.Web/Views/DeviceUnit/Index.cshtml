@@ -1,0 +1,43 @@
+@model IList<api.Models.DeviceUnitDashboard>
+@{
+    ViewData["Title"] = "Dashboard";
+    Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Units</h3>
+        @if (hasAnyRole(RoleNames.DeviceManagers))
+        {
+            <div class="float-end">
+                <form asp-action="UnitAdd" method="post" class="d-flex gap-2">
+                    <input type="text" name="deviceUnitName" class="form-control form-control-sm" placeholder="New unit name" required maxlength="100" />
+                    <button type="submit" class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-plus-lg"></i> Add Unit</button>
+                </form>
+            </div>
+        }
+    </div>
+    <div class="card-body">
+        <p class="text-secondary small">
+            Hierarchical view by physical/logical space - click a unit to see its zones.
+            For a flat, fast-triage list of every device instead, see <a asp-controller="Device" asp-action="Fleet">Fleet</a>.
+        </p>
+        <div class="row" id="unitCubes">
+            <partial name="_UnitCubes" model="Model" />
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/live-refresh.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            startLiveRefresh({
+                url: '@Url.Action("IndexCubes")',
+                applyHtml: function (html) {
+                    document.getElementById('unitCubes').innerHTML = html;
+                }
+            });
+        });
+    </script>
+}

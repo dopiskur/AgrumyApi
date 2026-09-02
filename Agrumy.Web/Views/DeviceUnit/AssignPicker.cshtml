@@ -1,0 +1,55 @@
+@model api.ViewModels.AssignPickerViewModel
+@{
+    ViewData["Title"] = Model.ControllerCapable ? "Add Controller" : "Add Sensor";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">@ViewData["Title"]</h3>
+    </div>
+    <div class="card-body">
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger" asp-validation-summary="ModelOnly"></div>
+        }
+
+        @if (Model.Devices.Count == 0)
+        {
+            <p class="text-secondary">
+                No unassigned @(Model.ControllerCapable ? "controller-capable" : "sensor-capable") devices found.
+                Register a new device from <a asp-controller="Device" asp-action="AddDevice">Add New Device</a>, or free one up by removing it from another zone first.
+            </p>
+        }
+        else
+        {
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Device</th>
+                        <th class="d-none d-md-table-cell">MAC address</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in Model.Devices)
+                    {
+                        <tr>
+                            <td>@d.DeviceName</td>
+                            <td class="d-none d-md-table-cell text-secondary">@d.MacAddress</td>
+                            <td class="text-end">
+                                <form asp-action="Assign" method="post" class="d-inline">
+                                    <input type="hidden" name="idDevice" value="@d.IDDevice" />
+                                    <input type="hidden" name="idDeviceUnitZone" value="@Model.IDDeviceUnitZone" />
+                                    <input type="hidden" name="controllerCapable" value="@Model.ControllerCapable" />
+                                    <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <a asp-action="Zone" asp-route-idDeviceUnitZone="@Model.IDDeviceUnitZone" class="btn btn-outline-secondary">Back</a>
+    </div>
+</div>

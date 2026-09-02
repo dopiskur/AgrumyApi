@@ -1,0 +1,63 @@
+@model api.Models.DeviceUnitZoneDashboard
+@{
+    ViewData["Title"] = Model.DeviceUnitZoneName;
+    Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
+    bool hasController = Model.Devices.Any(d => d.DeviceControllerEnabled == true);
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-action="Index">Units</a></li>
+        <li class="breadcrumb-item"><a asp-action="Zones" asp-route-idDeviceUnit="@Model.IDDeviceUnit">Zones</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.DeviceUnitZoneName</li>
+    </ol>
+</nav>
+
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger" asp-validation-summary="ModelOnly"></div>
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">@Model.DeviceUnitZoneName</h3>
+        @if (hasAnyRole(RoleNames.DeviceManagers))
+        {
+            <div class="float-end d-flex align-items-center gap-2">
+                @* #82 rule (a)/(b): a zone has at most one controller - the button disappears once
+                   one is assigned; "Add Sensor" stays open for any number of separate sensor nodes. *@
+                @if (!hasController)
+                {
+                    <a asp-action="AssignPicker" asp-route-idDeviceUnitZone="@Model.IDDeviceUnitZone" asp-route-controllerCapable="true" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-cpu"></i> Add Controller
+                    </a>
+                }
+                <a asp-action="AssignPicker" asp-route-idDeviceUnitZone="@Model.IDDeviceUnitZone" asp-route-controllerCapable="false" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-broadcast"></i> Add Sensor
+                </a>
+                <form asp-action="ZoneDelete" method="post" onsubmit="return confirm('Delete this zone? Its devices are unassigned, not deleted.');">
+                    <input type="hidden" name="idDeviceUnitZone" value="@Model.IDDeviceUnitZone" />
+                    <input type="hidden" name="idDeviceUnit" value="@Model.IDDeviceUnit" />
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete zone"><i class="bi bi-trash"></i></button>
+                </form>
+            </div>
+        }
+    </div>
+    <div class="card-body" id="zoneDetails">
+        <partial name="_ZoneDetails" model="Model" />
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/live-refresh.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            startLiveRefresh({
+                url: '@Url.Action("ZoneDetails", new { idDeviceUnitZone = Model.IDDeviceUnitZone })',
+                applyHtml: function (html) {
+                    document.getElementById('zoneDetails').innerHTML = html;
+                }
+            });
+        });
+    </script>
+}

@@ -1,0 +1,24 @@
+@model IList<api.Models.DeviceUnitZoneDashboard>
+@* Same live-refresh convention as _UnitCubes - shared by Zones.cshtml's initial render and
+   DeviceUnitController.ZonesCubes' polling refresh. *@
+@if (Model.Count == 0)
+{
+    <div class="col-12">
+        <p class="text-secondary">No zones yet.</p>
+    </div>
+}
+@foreach (var z in Model)
+{
+    <div class="col-md-4 col-sm-6 mb-3">
+        <a asp-action="Zone" asp-route-idDeviceUnitZone="@z.IDDeviceUnitZone" class="text-decoration-none text-reset">
+            <div class="small-box text-bg-info h-100">
+                <div class="inner">
+                    <h3 class="fs-4">@z.DeviceUnitZoneName</h3>
+                    <p class="mb-2">@z.DeviceCount device@(z.DeviceCount == 1 ? "" : "s")</p>
+                    <partial name="_SensorAverages" model="z.Averages" />
+                </div>
+                <div class="small-box-icon"><i class="bi bi-grid-3x3-gap"></i></div>
+            </div>
+        </a>
+    </div>
+}

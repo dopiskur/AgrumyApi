@@ -65,7 +65,30 @@ namespace api.Dal
             }
 
             await SeedDeviceTypeLookupsAsync(db);
+            await SeedDeviceUnitSentinelsAsync(db);
             await SeedBootstrapAdminAsync(db);
+        }
+
+        /// <summary>Roadmap #81/#82: EnsureCreatedAsync makes the deviceUnit/deviceUnitZone tables,
+        /// never rows - without the IDDeviceUnit=0/IDDeviceUnitZone=0 sentinel pair, a brand-new
+        /// install's very first device registration would violate device.DeviceUnitID's FK (the
+        /// Shared Device model defaults DeviceUnitID/DeviceUnitZoneID to 0, not null). Global
+        /// (TenantID=null) by design - this is the shared "unassigned" bucket every tenant's
+        /// not-yet-zoned devices point at, not one tenant's real data. Zone before... no, Unit
+        /// before Zone (Zone's DeviceUnitID FK now points at Unit, opposite of the pre-migration
+        /// order - see db/migrations/2026-09-02-deviceunit-zone-containment.sql).</summary>
+        private static async Task SeedDeviceUnitSentinelsAsync(AgrumyDbContext db)
+        {
+            if (!await db.DeviceUnits.AnyAsync())
+            {
+                db.DeviceUnits.Add(new DeviceUnitRow { IDDeviceUnit = 0, TenantID = null, DeviceUnitName = "Default" });
+                await db.SaveChangesAsync();
+            }
+            if (!await db.DeviceUnitZones.AnyAsync())
+            {
+                db.DeviceUnitZones.Add(new DeviceUnitZoneRow { IDDeviceUnitZone = 0, TenantID = null, DeviceUnitID = 0, DeviceUnitZoneName = "Disabled" });
+                await db.SaveChangesAsync();
+            }
         }
 
         /// <summary>Roadmap #91: EnsureCreatedAsync makes the four deviceType* tables, never rows -

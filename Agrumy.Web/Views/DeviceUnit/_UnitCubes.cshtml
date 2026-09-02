@@ -1,0 +1,24 @@
+@model IList<api.Models.DeviceUnitDashboard>
+@* Roadmap #90: this partial IS #unitCubes' content, shared by Index.cshtml's initial render and
+   DeviceUnitController.IndexCubes' polling refresh - same convention as Device/_FleetRows. *@
+@if (Model.Count == 0)
+{
+    <div class="col-12">
+        <p class="text-secondary">No units yet. @(User.Identity!.IsAuthenticated ? "Add one above to start organizing devices by physical space." : "")</p>
+    </div>
+}
+@foreach (var u in Model)
+{
+    <div class="col-md-4 col-sm-6 mb-3">
+        <a asp-action="Zones" asp-route-idDeviceUnit="@u.IDDeviceUnit" class="text-decoration-none text-reset">
+            <div class="small-box text-bg-primary h-100">
+                <div class="inner">
+                    <h3 class="fs-4">@u.DeviceUnitName</h3>
+                    <p class="mb-2">@u.ZoneCount zone@(u.ZoneCount == 1 ? "" : "s") &middot; @u.DeviceCount device@(u.DeviceCount == 1 ? "" : "s")</p>
+                    <partial name="_SensorAverages" model="u.Averages" />
+                </div>
+                <div class="small-box-icon"><i class="bi bi-house-door"></i></div>
+            </div>
+        </a>
+    </div>
+}
