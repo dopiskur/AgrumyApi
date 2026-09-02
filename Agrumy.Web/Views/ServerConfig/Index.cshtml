@@ -13,133 +13,167 @@
         {
             <div class="alert alert-success">@message</div>
         }
-        <p class="text-secondary">
-            Hysteresis (dead-zone) defaults a newly-added device's Controller config is seeded
-            with. Changing these has no effect on devices that already exist - edit those
-            individually under Device &rarr; Controller.
-        </p>
         <form asp-action="Index">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             <input type="hidden" asp-for="IDServerConfig" />
 
-            <div class="mb-3">
-                <label asp-for="WaterLevelHysteresis" class="form-label"></label>
-                <input asp-for="WaterLevelHysteresis" class="form-control" />
-                <span asp-validation-for="WaterLevelHysteresis" class="text-danger"></span>
-            </div>
-            <div class="mb-3">
-                <label asp-for="TemperatureHysteresis" class="form-label"></label>
-                <input asp-for="TemperatureHysteresis" class="form-control" />
-                <span asp-validation-for="TemperatureHysteresis" class="text-danger"></span>
-            </div>
-            <div class="mb-3">
-                <label asp-for="HumidityHysteresis" class="form-label"></label>
-                <input asp-for="HumidityHysteresis" class="form-control" />
-                <span asp-validation-for="HumidityHysteresis" class="text-danger"></span>
-            </div>
-            <div class="mb-3">
-                <label asp-for="LightHysteresis" class="form-label"></label>
-                <input asp-for="LightHysteresis" class="form-control" />
-                <span asp-validation-for="LightHysteresis" class="text-danger"></span>
-            </div>
+            <ul class="nav nav-tabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-hysteresis" type="button" role="tab">Relay Hysteresis</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-safety-limits" type="button" role="tab">Water Pump Safety</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-alerts" type="button" role="tab">Alerts</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-accounts" type="button" role="tab">Accounts</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-scheduling" type="button" role="tab">Scheduling</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-firmware" type="button" role="tab">Firmware</button>
+                </li>
+            </ul>
+            <div class="tab-content border border-top-0 rounded-bottom p-3 mb-3">
+                <div class="tab-pane fade show active" id="tab-hysteresis" role="tabpanel">
+                    <p class="text-secondary">
+                        Dead-zone defaults a newly-added device's Controller config is seeded with
+                        (roadmap #10). Changing these has no effect on devices that already exist -
+                        edit those individually under Device &rarr; Controller.
+                    </p>
+                    <div class="mb-3">
+                        <label asp-for="WaterLevelHysteresis" class="form-label"></label>
+                        <input asp-for="WaterLevelHysteresis" class="form-control" />
+                        <span asp-validation-for="WaterLevelHysteresis" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="TemperatureHysteresis" class="form-label"></label>
+                        <input asp-for="TemperatureHysteresis" class="form-control" />
+                        <span asp-validation-for="TemperatureHysteresis" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="HumidityHysteresis" class="form-label"></label>
+                        <input asp-for="HumidityHysteresis" class="form-control" />
+                        <span asp-validation-for="HumidityHysteresis" class="text-danger"></span>
+                    </div>
+                    <div class="mb-0">
+                        <label asp-for="LightHysteresis" class="form-label"></label>
+                        <input asp-for="LightHysteresis" class="form-control" />
+                        <span asp-validation-for="LightHysteresis" class="text-danger"></span>
+                    </div>
+                </div>
 
-            <p class="text-secondary">
-                Low-battery alert (roadmap #12): a device's latest battery reading at or below
-                this percentage triggers one email per low-battery streak; it only clears (and can
-                re-alert) once the reading climbs back above threshold + hysteresis, same dead-zone
-                idea as the margins above, applied to the alert instead of a relay.
-            </p>
-            <div class="mb-3">
-                <label asp-for="BatteryLowThreshold" class="form-label"></label>
-                <input asp-for="BatteryLowThreshold" class="form-control" />
-                <span asp-validation-for="BatteryLowThreshold" class="text-danger"></span>
-            </div>
-            <div class="mb-3">
-                <label asp-for="BatteryLowHysteresis" class="form-label"></label>
-                <input asp-for="BatteryLowHysteresis" class="form-control" />
-                <span asp-validation-for="BatteryLowHysteresis" class="text-danger"></span>
-            </div>
+                <div class="tab-pane fade" id="tab-safety-limits" role="tabpanel">
+                    <p class="text-secondary">
+                        Water pump safety limits (roadmap #36): a hard ceiling the device enforces
+                        AFTER whichever mode (threshold/interval/schedule) decides the pump should
+                        run, independent of it. 0 disables either one. These are only the defaults
+                        seeded onto a newly-added device - edit an existing device's own values
+                        under Device &rarr; Controller &rarr; Safety Limits.
+                    </p>
+                    <div class="mb-3">
+                        <label asp-for="WaterPumpMaxRunSeconds" class="form-label"></label>
+                        <input asp-for="WaterPumpMaxRunSeconds" class="form-control" />
+                        <span asp-validation-for="WaterPumpMaxRunSeconds" class="text-danger"></span>
+                    </div>
+                    <div class="mb-0">
+                        <label asp-for="WaterPumpCooldownSeconds" class="form-label"></label>
+                        <input asp-for="WaterPumpCooldownSeconds" class="form-control" />
+                        <span asp-validation-for="WaterPumpCooldownSeconds" class="text-danger"></span>
+                    </div>
+                </div>
 
-            <p class="text-secondary">
-                Water pump safety limits (roadmap #36): a hard ceiling the device enforces AFTER
-                whichever mode (threshold/interval/schedule) decides the pump should run,
-                independent of it. 0 disables either one. These are only the defaults seeded onto
-                a newly-added device - edit an existing device's own values under Device &rarr;
-                Controller &rarr; Safety Limits.
-            </p>
-            <div class="mb-3">
-                <label asp-for="WaterPumpMaxRunSeconds" class="form-label"></label>
-                <input asp-for="WaterPumpMaxRunSeconds" class="form-control" />
-                <span asp-validation-for="WaterPumpMaxRunSeconds" class="text-danger"></span>
-            </div>
-            <div class="mb-3">
-                <label asp-for="WaterPumpCooldownSeconds" class="form-label"></label>
-                <input asp-for="WaterPumpCooldownSeconds" class="form-control" />
-                <span asp-validation-for="WaterPumpCooldownSeconds" class="text-danger"></span>
-            </div>
+                <div class="tab-pane fade" id="tab-alerts" role="tabpanel">
+                    <p class="text-secondary">
+                        Low-battery alert (roadmap #12): a device's latest battery reading at or
+                        below this percentage triggers one email per low-battery streak; it only
+                        clears (and can re-alert) once the reading climbs back above threshold +
+                        hysteresis, same dead-zone idea as the relay margins, applied to the alert
+                        instead of a relay.
+                    </p>
+                    <div class="mb-3">
+                        <label asp-for="BatteryLowThreshold" class="form-label"></label>
+                        <input asp-for="BatteryLowThreshold" class="form-control" />
+                        <span asp-validation-for="BatteryLowThreshold" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="BatteryLowHysteresis" class="form-label"></label>
+                        <input asp-for="BatteryLowHysteresis" class="form-control" />
+                        <span asp-validation-for="BatteryLowHysteresis" class="text-danger"></span>
+                    </div>
+                    <p class="text-secondary">
+                        A device repeating the identical event (e.g. "NoInternet") within this many
+                        minutes of its last one is ignored, not stored (roadmap #28).
+                    </p>
+                    <div class="mb-0">
+                        <label asp-for="EventDedupeMinutes" class="form-label"></label>
+                        <input asp-for="EventDedupeMinutes" class="form-control" />
+                        <span asp-validation-for="EventDedupeMinutes" class="text-danger"></span>
+                    </div>
+                </div>
 
-            <p class="text-secondary">
-                A device repeating the identical event (e.g. "NoInternet") within this many
-                minutes of its last one is ignored, not stored.
-            </p>
-            <div class="mb-3">
-                <label asp-for="EventDedupeMinutes" class="form-label"></label>
-                <input asp-for="EventDedupeMinutes" class="form-control" />
-                <span asp-validation-for="EventDedupeMinutes" class="text-danger"></span>
-            </div>
+                <div class="tab-pane fade" id="tab-accounts" role="tabpanel">
+                    <p class="text-secondary">
+                        Minimum minutes a user must wait between "resend activation email" requests
+                        (roadmap #24).
+                    </p>
+                    <div class="mb-3">
+                        <label asp-for="ActivationResendCooldownMinutes" class="form-label"></label>
+                        <input asp-for="ActivationResendCooldownMinutes" class="form-control" />
+                        <span asp-validation-for="ActivationResendCooldownMinutes" class="text-danger"></span>
+                    </div>
+                    <p class="text-secondary">
+                        When enabled, the public Register page lets a visitor create a brand new
+                        tenant (min. 6-character name) by simply typing a name that doesn't exist
+                        yet - they become that tenant's admin. Off by default (roadmap #64).
+                    </p>
+                    <div class="mb-0 form-check">
+                        <input asp-for="AllowSelfServiceTenantCreation" class="form-check-input" />
+                        <label asp-for="AllowSelfServiceTenantCreation" class="form-check-label"></label>
+                    </div>
+                </div>
 
-            <p class="text-secondary">
-                Minimum minutes a user must wait between "resend activation email" requests
-                (roadmap #24).
-            </p>
-            <div class="mb-3">
-                <label asp-for="ActivationResendCooldownMinutes" class="form-label"></label>
-                <input asp-for="ActivationResendCooldownMinutes" class="form-control" />
-                <span asp-validation-for="ActivationResendCooldownMinutes" class="text-danger"></span>
-            </div>
+                <div class="tab-pane fade" id="tab-scheduling" role="tabpanel">
+                    <p class="text-secondary">
+                        Local wall-clock zone schedule-mode relay windows (Device &rarr; Controller
+                        &rarr; Schedules) are evaluated against (roadmap #39). Not set = windows
+                        evaluate as UTC.
+                    </p>
+                    <div class="mb-0">
+                        <label asp-for="ScheduleTimeZone" class="form-label"></label>
+                        <select asp-for="ScheduleTimeZone" asp-items="(IEnumerable<SelectListItem>)ViewBag.TimeZones" class="form-select"></select>
+                        <span asp-validation-for="ScheduleTimeZone" class="text-danger"></span>
+                    </div>
+                </div>
 
-            <p class="text-secondary">
-                When enabled, the public Register page lets a visitor create a brand new tenant
-                (min. 6-character name) by simply typing a name that doesn't exist yet - they
-                become that tenant's admin. Off by default (roadmap #64).
-            </p>
-            <div class="mb-3 form-check">
-                <input asp-for="AllowSelfServiceTenantCreation" class="form-check-input" />
-                <label asp-for="AllowSelfServiceTenantCreation" class="form-check-label"></label>
-            </div>
-
-            <p class="text-secondary">
-                Local wall-clock zone schedule-mode relay windows (Device &rarr; Controller &rarr;
-                Schedules) are evaluated against (roadmap #39). Not set = windows evaluate as UTC.
-            </p>
-            <div class="mb-3">
-                <label asp-for="ScheduleTimeZone" class="form-label"></label>
-                <select asp-for="ScheduleTimeZone" asp-items="(IEnumerable<SelectListItem>)ViewBag.TimeZones" class="form-select"></select>
-                <span asp-validation-for="ScheduleTimeZone" class="text-danger"></span>
-            </div>
-
-            <p class="text-secondary">
-                Where device firmware comes from (roadmap #94). <strong>GitHub</strong> (default) reads the
-                public releases of the repository below. <strong>Local repository</strong> serves files this
-                server stores itself - fill it on the <a asp-controller="Firmware" asp-action="Index">Firmware</a>
-                page (pull from GitHub, import a USB directory, or upload); the only mode that works
-                air-gapped or with a pinned self-signed certificate. <strong>Custom</strong> reads a
-                <code>manifest.json</code> from your own URL.
-            </p>
-            <div class="mb-3">
-                <label asp-for="FirmwareSource" class="form-label"></label>
-                <select asp-for="FirmwareSource" asp-items="Html.GetEnumSelectList<FirmwareSource>()" class="form-select"></select>
-                <span asp-validation-for="FirmwareSource" class="text-danger"></span>
-            </div>
-            <div class="mb-3">
-                <label asp-for="FirmwareGitHubRepository" class="form-label"></label>
-                <input asp-for="FirmwareGitHubRepository" class="form-control" placeholder="dopiskur/AgrumyFirmware" />
-                <span asp-validation-for="FirmwareGitHubRepository" class="text-danger"></span>
-            </div>
-            <div class="mb-3">
-                <label asp-for="FirmwareCustomRepositoryUrl" class="form-label"></label>
-                <input asp-for="FirmwareCustomRepositoryUrl" class="form-control" placeholder="https://firmware.example.com/agrumy/manifest.json" />
-                <span asp-validation-for="FirmwareCustomRepositoryUrl" class="text-danger"></span>
+                <div class="tab-pane fade" id="tab-firmware" role="tabpanel">
+                    <p class="text-secondary">
+                        Where device firmware comes from (roadmap #94). <strong>GitHub</strong> (default) reads the
+                        public releases of the repository below. <strong>Local repository</strong> serves files this
+                        server stores itself - fill it on the <a asp-controller="Firmware" asp-action="Index">Firmware</a>
+                        page (pull from GitHub, import a USB directory, or upload); the only mode that works
+                        air-gapped or with a pinned self-signed certificate. <strong>Custom</strong> reads a
+                        <code>manifest.json</code> from your own URL.
+                    </p>
+                    <div class="mb-3">
+                        <label asp-for="FirmwareSource" class="form-label"></label>
+                        <select asp-for="FirmwareSource" asp-items="Html.GetEnumSelectList<FirmwareSource>()" class="form-select"></select>
+                        <span asp-validation-for="FirmwareSource" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="FirmwareGitHubRepository" class="form-label"></label>
+                        <input asp-for="FirmwareGitHubRepository" class="form-control" placeholder="dopiskur/AgrumyFirmware" />
+                        <span asp-validation-for="FirmwareGitHubRepository" class="text-danger"></span>
+                    </div>
+                    <div class="mb-0">
+                        <label asp-for="FirmwareCustomRepositoryUrl" class="form-label"></label>
+                        <input asp-for="FirmwareCustomRepositoryUrl" class="form-control" placeholder="https://firmware.example.com/agrumy/manifest.json" />
+                        <span asp-validation-for="FirmwareCustomRepositoryUrl" class="text-danger"></span>
+                    </div>
+                </div>
             </div>
 
             <div class="mb-0">
