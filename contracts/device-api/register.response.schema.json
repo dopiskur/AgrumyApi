@@ -28,6 +28,7 @@
     "firmwareUpdate",
     "firmwareVersion",
     "firmwareUrl",
+    "firmwareSha256",
     "enabled",
     "deviceConfigSensor",
     "deviceConfigController",
@@ -172,6 +173,13 @@
         "null"
       ],
       "description": "Roadmap #3 (OTA). HTTP(S) URL of the .bin to flash; paired with firmwareVersion, same null conditions."
+    },
+    "firmwareSha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Roadmap #131. Lowercase hex SHA-256 of the .bin at firmwareUrl (DeviceFirmware.Sha256), when the catalog has one - OtaController hashes the download while streaming it to flash and aborts before Update.end() on a mismatch. Null whenever the source has no manifest hash to offer (e.g. a Custom repository without one); the firmware then skips verification rather than failing closed."
     },
     "enabled": {
       "type": [

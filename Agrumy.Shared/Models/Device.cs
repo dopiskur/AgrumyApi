@@ -112,6 +112,12 @@ namespace api.Models
         // row for the device's type, but only when FirmwareUpdate == true. Null otherwise.
         public string? FirmwareVersion { get; set; }
         public string? FirmwareUrl { get; set; }
+        // Roadmap #131: DeviceFirmware.Sha256 for the offered build, when the catalog has one -
+        // firmware verifies it against the streamed .bin before Update.end(), Update.abort() on
+        // mismatch. Null whenever the source had no manifest hash (a Custom repository without one,
+        // or a GitHub release missing manifest.json) - OtaController skips the check rather than
+        // failing closed, it is not proof the .bin is bad.
+        public string? FirmwareSha256 { get; set; }
         public bool? Enabled { get; set; }
         public DeviceConfigSensor? DeviceConfigSensor { get; set; }
         public DeviceConfigController? DeviceConfigController { get; set; }

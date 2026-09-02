@@ -497,6 +497,7 @@ namespace api.Controllers.API
             {
                 deviceConfig.FirmwareVersion = firmware.Version;
                 deviceConfig.FirmwareUrl = firmware.Url;
+                deviceConfig.FirmwareSha256 = firmware.Sha256; // roadmap #131
             }
 
             if (deviceConfig.DeviceSensorEnabled == true)
