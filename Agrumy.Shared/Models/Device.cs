@@ -237,35 +237,24 @@ namespace api.Models
         public int? WaterPumpInterval { get; set; }
         public int? WaterPumpIntervalLength { get; set; }
 
-        // Roadmap #39: a third relay-control mode alongside threshold (dead-zone) and interval
-        // (duty-cycle) above - "be on during this wall-clock window on these days", independent of
-        // any sensor reading. DaysOfWeek is a 7-bit mask matching C's tm_wday convention (bit 0 =
-        // Sunday .. bit 6 = Saturday - see AgrumyDevice's ControllerController::scheduleRelayFunction),
-        // so the firmware needs zero day-numbering translation. Start/Duration are seconds since
-        // LOCAL midnight (not UTC) - "local" resolved via ServerConfig.ScheduleTimeZone and delivered
-        // to the device as a plain UTC offset (DeviceConfig.UtcOffsetSeconds) rather than an IANA id,
-        // so the firmware needs no timezone database, just integer math refreshed every config poll.
-        // v1 deliberately does not support a window crossing local midnight (Start + Duration must
-        // stay within the same calendar day) - see DeviceApiController's validation.
-        public bool? VentilationScheduleEnabled { get; set; }
-        public int? VentilationScheduleDaysOfWeek { get; set; }
-        public int? VentilationScheduleStart { get; set; }
-        public int? VentilationScheduleDuration { get; set; }
-
-        public bool? LightScheduleEnabled { get; set; }
-        public int? LightScheduleDaysOfWeek { get; set; }
-        public int? LightScheduleStart { get; set; }
-        public int? LightScheduleDuration { get; set; }
-
-        public bool? HeatingScheduleEnabled { get; set; }
-        public int? HeatingScheduleDaysOfWeek { get; set; }
-        public int? HeatingScheduleStart { get; set; }
-        public int? HeatingScheduleDuration { get; set; }
-
-        public bool? WaterPumpScheduleEnabled { get; set; }
-        public int? WaterPumpScheduleDaysOfWeek { get; set; }
-        public int? WaterPumpScheduleStart { get; set; }
-        public int? WaterPumpScheduleDuration { get; set; }
+        // Roadmap #39/#115: a third relay-control mode alongside threshold (dead-zone) and
+        // interval (duty-cycle) above - "be on during any of these wall-clock windows on these
+        // days", independent of any sensor reading. Each function gets zero or more windows,
+        // OR'd together by the firmware (AgrumyDevice's RelayLogic::computeAnyScheduleState) -
+        // zero windows means that function never turns on in schedule mode, no separate "enabled"
+        // flag needed (confirmed design, #115). DaysOfWeek is a 7-bit mask matching C's tm_wday
+        // convention (bit 0 = Sunday .. bit 6 = Saturday - see AgrumyDevice's
+        // ActuatorController::scheduleRelayFunction), so the firmware needs zero day-numbering
+        // translation. Start/Duration are seconds since LOCAL midnight (not UTC) - "local"
+        // resolved via ServerConfig.ScheduleTimeZone and delivered to the device as a plain UTC
+        // offset (DeviceConfig.UtcOffsetSeconds) rather than an IANA id, so the firmware needs no
+        // timezone database, just integer math refreshed every config poll. v1 deliberately does
+        // not support a window crossing local midnight (Start + Duration must stay within the
+        // same calendar day) - see DeviceApiController's validation.
+        public List<DeviceScheduleSlot> VentilationSchedule { get; set; } = [];
+        public List<DeviceScheduleSlot> LightSchedule { get; set; } = [];
+        public List<DeviceScheduleSlot> HeatingSchedule { get; set; } = [];
+        public List<DeviceScheduleSlot> WaterPumpSchedule { get; set; } = [];
 
         // Relay
         public bool? RelayEnabled { get; set; }
@@ -278,6 +267,19 @@ namespace api.Models
         public int? Relay7 { get; set; }
         public int? Relay8 { get; set; }
 
+    }
+
+    /// <summary>Roadmap #115: one wall-clock window within one of DeviceConfigController's four
+    /// per-function schedule lists. No RelayFunction/Enabled fields here - which function it
+    /// belongs to is which list it's in, and its presence in the list IS "enabled".</summary>
+    public class DeviceScheduleSlot
+    {
+        /// <summary>7-bit mask, bit 0 = Sunday .. bit 6 = Saturday (C's tm_wday convention).</summary>
+        public int DaysOfWeek { get; set; }
+        /// <summary>Seconds since local midnight, 0-86399.</summary>
+        public int Start { get; set; }
+        /// <summary>Seconds; Start + Duration must not exceed 86400 (no crossing local midnight).</summary>
+        public int Duration { get; set; }
     }
 
     public class DeviceType()

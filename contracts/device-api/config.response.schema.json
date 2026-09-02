@@ -111,10 +111,7 @@
         "lightIntervalEnabled", "lightInterval", "lightIntervalLength",
         "heatingIntervalEnabled", "heatingInterval", "heatingIntervalLength",
         "waterPumpIntervalEnabled", "waterPumpInterval", "waterPumpIntervalLength",
-        "ventilationScheduleEnabled", "ventilationScheduleDaysOfWeek", "ventilationScheduleStart", "ventilationScheduleDuration",
-        "lightScheduleEnabled", "lightScheduleDaysOfWeek", "lightScheduleStart", "lightScheduleDuration",
-        "heatingScheduleEnabled", "heatingScheduleDaysOfWeek", "heatingScheduleStart", "heatingScheduleDuration",
-        "waterPumpScheduleEnabled", "waterPumpScheduleDaysOfWeek", "waterPumpScheduleStart", "waterPumpScheduleDuration",
+        "ventilationSchedule", "lightSchedule", "heatingSchedule", "waterPumpSchedule",
         "relayEnabled", "relay1", "relay2", "relay3", "relay4", "relay5", "relay6", "relay7", "relay8"
       ],
       "properties": {
@@ -157,34 +154,14 @@
         "waterPumpIntervalEnabled": { "type": ["boolean", "null"] },
         "waterPumpInterval": { "type": ["integer", "null"] },
         "waterPumpIntervalLength": { "type": ["integer", "null"] },
-        "ventilationScheduleEnabled": {
-          "type": ["boolean", "null"],
-          "description": "Roadmap #39. Third relay-control mode alongside the Interval fields above and Threshold (tempLow etc.) - a wall-clock on/off window, independent of any sensor reading."
+        "ventilationSchedule": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/deviceScheduleSlot" },
+          "description": "Roadmap #39/#115. Third relay-control mode alongside the Interval fields above and Threshold (tempLow etc.) - zero or more wall-clock on/off windows, independent of any sensor reading. The function is on whenever local time falls in ANY window (OR'd together, AgrumyDevice's RelayLogic::computeAnyScheduleState); an empty array means it never turns on in schedule mode - no separate 'enabled' flag."
         },
-        "ventilationScheduleDaysOfWeek": {
-          "type": ["integer", "null"],
-          "description": "7-bit mask, bit 0 = Sunday .. bit 6 = Saturday (matches C's tm_wday - see ControllerController::scheduleRelayFunction)."
-        },
-        "ventilationScheduleStart": {
-          "type": ["integer", "null"],
-          "description": "Seconds since LOCAL midnight (DeviceConfig.utcOffsetSeconds resolves 'local'), 0-86399."
-        },
-        "ventilationScheduleDuration": {
-          "type": ["integer", "null"],
-          "description": "Seconds. start+duration must not exceed 86400 (no crossing local midnight in v1) - enforced server-side, DeviceApiController.ScheduleWindowError."
-        },
-        "lightScheduleEnabled": { "type": ["boolean", "null"] },
-        "lightScheduleDaysOfWeek": { "type": ["integer", "null"] },
-        "lightScheduleStart": { "type": ["integer", "null"] },
-        "lightScheduleDuration": { "type": ["integer", "null"] },
-        "heatingScheduleEnabled": { "type": ["boolean", "null"] },
-        "heatingScheduleDaysOfWeek": { "type": ["integer", "null"] },
-        "heatingScheduleStart": { "type": ["integer", "null"] },
-        "heatingScheduleDuration": { "type": ["integer", "null"] },
-        "waterPumpScheduleEnabled": { "type": ["boolean", "null"] },
-        "waterPumpScheduleDaysOfWeek": { "type": ["integer", "null"] },
-        "waterPumpScheduleStart": { "type": ["integer", "null"] },
-        "waterPumpScheduleDuration": { "type": ["integer", "null"] },
+        "lightSchedule": { "type": "array", "items": { "$ref": "#/definitions/deviceScheduleSlot" } },
+        "heatingSchedule": { "type": "array", "items": { "$ref": "#/definitions/deviceScheduleSlot" } },
+        "waterPumpSchedule": { "type": "array", "items": { "$ref": "#/definitions/deviceScheduleSlot" } },
         "relayEnabled": { "type": ["boolean", "null"] },
         "relay1": { "type": ["integer", "null"] },
         "relay2": { "type": ["integer", "null"] },
@@ -194,6 +171,26 @@
         "relay6": { "type": ["integer", "null"] },
         "relay7": { "type": ["integer", "null"] },
         "relay8": { "type": ["integer", "null"] }
+      }
+    },
+    "deviceScheduleSlot": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Roadmap #115. camelCase serialization of api.Models.DeviceScheduleSlot - one wall-clock window within one of deviceConfigController's four schedule arrays.",
+      "required": ["daysOfWeek", "start", "duration"],
+      "properties": {
+        "daysOfWeek": {
+          "type": "integer",
+          "description": "7-bit mask, bit 0 = Sunday .. bit 6 = Saturday (matches C's tm_wday - see AgrumyDevice's ActuatorController::scheduleRelayFunction)."
+        },
+        "start": {
+          "type": "integer",
+          "description": "Seconds since LOCAL midnight (DeviceConfig.utcOffsetSeconds resolves 'local'), 0-86399."
+        },
+        "duration": {
+          "type": "integer",
+          "description": "Seconds. start+duration must not exceed 86400 (no crossing local midnight in v1) - enforced server-side, DeviceApiController.ScheduleWindowError."
+        }
       }
     }
   }

@@ -11,58 +11,15 @@
     var waterPumpIntervalToggle = new EnabledToggleFieldViewModel { Name = ControllerField(nameof(cfg.WaterPumpIntervalEnabled)), Label = "Water pump interval", Value = cfg.WaterPumpIntervalEnabled };
     var relayEnabledToggle = new EnabledToggleFieldViewModel { Name = ControllerField(nameof(cfg.RelayEnabled)), Label = "Relay", Value = cfg.RelayEnabled };
 
-    // Roadmap #39: same (field name, current value) pairing idea as relaySlots below, one entry
-    // per relay function - EditController.cshtml only wires the loop, _ScheduleField.cshtml renders it.
+    // Roadmap #39/#115: one entry per relay function, each holding that function's current list
+    // of windows - EditController.cshtml only wires the loop, _ScheduleField.cshtml renders it
+    // (rows) and wwwroot/js/schedule-fields.js wires the client-side Add/Remove.
     var scheduleGroups = new ScheduleFieldViewModel[]
     {
-        new()
-        {
-            EnabledFieldName = ControllerField(nameof(cfg.VentilationScheduleEnabled)),
-            DaysOfWeekFieldName = ControllerField(nameof(cfg.VentilationScheduleDaysOfWeek)),
-            StartFieldName = ControllerField(nameof(cfg.VentilationScheduleStart)),
-            DurationFieldName = ControllerField(nameof(cfg.VentilationScheduleDuration)),
-            Label = "Ventilation",
-            EnabledValue = cfg.VentilationScheduleEnabled,
-            DaysOfWeekValue = cfg.VentilationScheduleDaysOfWeek,
-            StartValue = cfg.VentilationScheduleStart,
-            DurationValue = cfg.VentilationScheduleDuration,
-        },
-        new()
-        {
-            EnabledFieldName = ControllerField(nameof(cfg.LightScheduleEnabled)),
-            DaysOfWeekFieldName = ControllerField(nameof(cfg.LightScheduleDaysOfWeek)),
-            StartFieldName = ControllerField(nameof(cfg.LightScheduleStart)),
-            DurationFieldName = ControllerField(nameof(cfg.LightScheduleDuration)),
-            Label = "Light",
-            EnabledValue = cfg.LightScheduleEnabled,
-            DaysOfWeekValue = cfg.LightScheduleDaysOfWeek,
-            StartValue = cfg.LightScheduleStart,
-            DurationValue = cfg.LightScheduleDuration,
-        },
-        new()
-        {
-            EnabledFieldName = ControllerField(nameof(cfg.HeatingScheduleEnabled)),
-            DaysOfWeekFieldName = ControllerField(nameof(cfg.HeatingScheduleDaysOfWeek)),
-            StartFieldName = ControllerField(nameof(cfg.HeatingScheduleStart)),
-            DurationFieldName = ControllerField(nameof(cfg.HeatingScheduleDuration)),
-            Label = "Heating",
-            EnabledValue = cfg.HeatingScheduleEnabled,
-            DaysOfWeekValue = cfg.HeatingScheduleDaysOfWeek,
-            StartValue = cfg.HeatingScheduleStart,
-            DurationValue = cfg.HeatingScheduleDuration,
-        },
-        new()
-        {
-            EnabledFieldName = ControllerField(nameof(cfg.WaterPumpScheduleEnabled)),
-            DaysOfWeekFieldName = ControllerField(nameof(cfg.WaterPumpScheduleDaysOfWeek)),
-            StartFieldName = ControllerField(nameof(cfg.WaterPumpScheduleStart)),
-            DurationFieldName = ControllerField(nameof(cfg.WaterPumpScheduleDuration)),
-            Label = "Water pump",
-            EnabledValue = cfg.WaterPumpScheduleEnabled,
-            DaysOfWeekValue = cfg.WaterPumpScheduleDaysOfWeek,
-            StartValue = cfg.WaterPumpScheduleStart,
-            DurationValue = cfg.WaterPumpScheduleDuration,
-        },
+        new() { ListFieldName = ControllerField(nameof(cfg.VentilationSchedule)), Label = "Ventilation", Slots = cfg.VentilationSchedule },
+        new() { ListFieldName = ControllerField(nameof(cfg.LightSchedule)), Label = "Light", Slots = cfg.LightSchedule },
+        new() { ListFieldName = ControllerField(nameof(cfg.HeatingSchedule)), Label = "Heating", Slots = cfg.HeatingSchedule },
+        new() { ListFieldName = ControllerField(nameof(cfg.WaterPumpSchedule)), Label = "Water pump", Slots = cfg.WaterPumpSchedule },
     };
 
     // Same SelectList source for all 8 relay slots - only the bound property and its current

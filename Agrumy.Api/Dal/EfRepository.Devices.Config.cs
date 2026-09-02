@@ -20,7 +20,14 @@ namespace api.Dal
         {
             var row = await db.DeviceConfigControllers.AsNoTracking()
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigController == deviceConfigControllerID);
-            return row == null ? null : ToDto(row);
+            if (row == null)
+            {
+                return null;
+            }
+            var slots = await db.DeviceScheduleSlots.AsNoTracking()
+                .Where(s => s.DeviceConfigControllerID == deviceConfigControllerID)
+                .ToListAsync();
+            return ToDto(row, slots);
         }
 
         public async Task<Device?> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID)
@@ -77,22 +84,6 @@ namespace api.Dal
                 row.WaterPumpIntervalEnabled = cfg.WaterPumpIntervalEnabled;
                 row.WaterPumpInterval = cfg.WaterPumpInterval;
                 row.WaterPumpIntervalLength = cfg.WaterPumpIntervalLength;
-                row.VentilationScheduleEnabled = cfg.VentilationScheduleEnabled;
-                row.VentilationScheduleDaysOfWeek = cfg.VentilationScheduleDaysOfWeek;
-                row.VentilationScheduleStart = cfg.VentilationScheduleStart;
-                row.VentilationScheduleDuration = cfg.VentilationScheduleDuration;
-                row.LightScheduleEnabled = cfg.LightScheduleEnabled;
-                row.LightScheduleDaysOfWeek = cfg.LightScheduleDaysOfWeek;
-                row.LightScheduleStart = cfg.LightScheduleStart;
-                row.LightScheduleDuration = cfg.LightScheduleDuration;
-                row.HeatingScheduleEnabled = cfg.HeatingScheduleEnabled;
-                row.HeatingScheduleDaysOfWeek = cfg.HeatingScheduleDaysOfWeek;
-                row.HeatingScheduleStart = cfg.HeatingScheduleStart;
-                row.HeatingScheduleDuration = cfg.HeatingScheduleDuration;
-                row.WaterPumpScheduleEnabled = cfg.WaterPumpScheduleEnabled;
-                row.WaterPumpScheduleDaysOfWeek = cfg.WaterPumpScheduleDaysOfWeek;
-                row.WaterPumpScheduleStart = cfg.WaterPumpScheduleStart;
-                row.WaterPumpScheduleDuration = cfg.WaterPumpScheduleDuration;
                 row.RelayEnabled = cfg.RelayEnabled;
                 row.Relay1 = cfg.Relay1;
                 row.Relay2 = cfg.Relay2;
@@ -102,6 +93,19 @@ namespace api.Dal
                 row.Relay6 = cfg.Relay6;
                 row.Relay7 = cfg.Relay7;
                 row.Relay8 = cfg.Relay8;
+
+                // Roadmap #115: delete-all-then-reinsert - AgrumyDbContext does not configure EF
+                // relationships for LINQ joins (see its class comment), so this is the simplest
+                // correct way to replace a controller's full slot set on every save. Immediate
+                // (not queued on the change tracker), so it runs before the AddRange below.
+                await db.DeviceScheduleSlots
+                    .Where(s => s.DeviceConfigControllerID == row.IDDeviceConfigController)
+                    .ExecuteDeleteAsync();
+                db.DeviceScheduleSlots.AddRange(
+                    BuildScheduleSlotRows(row.IDDeviceConfigController, 1, cfg.VentilationSchedule)
+                    .Concat(BuildScheduleSlotRows(row.IDDeviceConfigController, 2, cfg.LightSchedule))
+                    .Concat(BuildScheduleSlotRows(row.IDDeviceConfigController, 3, cfg.HeatingSchedule))
+                    .Concat(BuildScheduleSlotRows(row.IDDeviceConfigController, 4, cfg.WaterPumpSchedule)));
             }
 
             var deviceRow = await db.Devices.FirstOrDefaultAsync(d => d.IDDevice == idDevice);
@@ -112,6 +116,17 @@ namespace api.Dal
 
             await db.SaveChangesAsync(); // one transaction: config row + ConfigVersion bump
         }
+
+        private static IEnumerable<DeviceScheduleSlotRow> BuildScheduleSlotRows(
+            int deviceConfigControllerId, int relayFunction, IEnumerable<DeviceScheduleSlot>? slots) =>
+            (slots ?? []).Select(s => new DeviceScheduleSlotRow
+            {
+                DeviceConfigControllerID = deviceConfigControllerId,
+                RelayFunction = relayFunction,
+                DaysOfWeek = s.DaysOfWeek,
+                Start = s.Start,
+                Duration = s.Duration,
+            });
 
         public async Task DeviceConfigSensorUpdateAsync(int? idDevice, DeviceConfigSensor? cfg)
         {
@@ -166,7 +181,7 @@ namespace api.Dal
             SensorWind = c.SensorWind,
         };
 
-        private static DeviceConfigController ToDto(DeviceConfigControllerRow c) => new()
+        private static DeviceConfigController ToDto(DeviceConfigControllerRow c, IList<DeviceScheduleSlotRow> slots) => new()
         {
             IDDeviceConfigController = c.IDDeviceConfigController,
             TempLow = c.TempLow,
@@ -195,22 +210,10 @@ namespace api.Dal
             WaterPumpIntervalEnabled = c.WaterPumpIntervalEnabled,
             WaterPumpInterval = c.WaterPumpInterval,
             WaterPumpIntervalLength = c.WaterPumpIntervalLength,
-            VentilationScheduleEnabled = c.VentilationScheduleEnabled,
-            VentilationScheduleDaysOfWeek = c.VentilationScheduleDaysOfWeek,
-            VentilationScheduleStart = c.VentilationScheduleStart,
-            VentilationScheduleDuration = c.VentilationScheduleDuration,
-            LightScheduleEnabled = c.LightScheduleEnabled,
-            LightScheduleDaysOfWeek = c.LightScheduleDaysOfWeek,
-            LightScheduleStart = c.LightScheduleStart,
-            LightScheduleDuration = c.LightScheduleDuration,
-            HeatingScheduleEnabled = c.HeatingScheduleEnabled,
-            HeatingScheduleDaysOfWeek = c.HeatingScheduleDaysOfWeek,
-            HeatingScheduleStart = c.HeatingScheduleStart,
-            HeatingScheduleDuration = c.HeatingScheduleDuration,
-            WaterPumpScheduleEnabled = c.WaterPumpScheduleEnabled,
-            WaterPumpScheduleDaysOfWeek = c.WaterPumpScheduleDaysOfWeek,
-            WaterPumpScheduleStart = c.WaterPumpScheduleStart,
-            WaterPumpScheduleDuration = c.WaterPumpScheduleDuration,
+            VentilationSchedule = ScheduleSlotsFor(slots, 1),
+            LightSchedule = ScheduleSlotsFor(slots, 2),
+            HeatingSchedule = ScheduleSlotsFor(slots, 3),
+            WaterPumpSchedule = ScheduleSlotsFor(slots, 4),
             RelayEnabled = c.RelayEnabled,
             Relay1 = c.Relay1,
             Relay2 = c.Relay2,
@@ -221,5 +224,10 @@ namespace api.Dal
             Relay7 = c.Relay7,
             Relay8 = c.Relay8,
         };
+
+        private static List<DeviceScheduleSlot> ScheduleSlotsFor(IList<DeviceScheduleSlotRow> slots, int relayFunction) =>
+            slots.Where(s => s.RelayFunction == relayFunction)
+                 .Select(s => new DeviceScheduleSlot { DaysOfWeek = s.DaysOfWeek, Start = s.Start, Duration = s.Duration })
+                 .ToList();
     }
 }

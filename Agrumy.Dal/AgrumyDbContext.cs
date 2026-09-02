@@ -37,6 +37,7 @@ namespace api.Dal
         public DbSet<DeviceTypeSensorRow> DeviceTypeSensors => Set<DeviceTypeSensorRow>();
         public DbSet<DeviceConfigSensorRow> DeviceConfigSensors => Set<DeviceConfigSensorRow>();
         public DbSet<DeviceConfigControllerRow> DeviceConfigControllers => Set<DeviceConfigControllerRow>();
+        public DbSet<DeviceScheduleSlotRow> DeviceScheduleSlots => Set<DeviceScheduleSlotRow>();
         public DbSet<DeviceFirmwareRow> DeviceFirmwares => Set<DeviceFirmwareRow>();
         public DbSet<DeviceDiagnosticRow> DeviceDiagnostics => Set<DeviceDiagnosticRow>();
 
@@ -229,6 +230,15 @@ namespace api.Dal
                 e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorRainLevel).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorWaterLevel).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorWind).OnDelete(DeleteBehavior.NoAction);
+            });
+
+            // Roadmap #115: real one-to-many (replaces the old flat Schedule* columns).
+            modelBuilder.Entity<DeviceScheduleSlotRow>(e =>
+            {
+                e.ToTable("deviceScheduleSlot");
+                e.HasKey(x => x.IDDeviceScheduleSlot);
+                e.Property(x => x.IDDeviceScheduleSlot).ValueGeneratedOnAdd();
+                e.HasOne<DeviceConfigControllerRow>().WithMany().HasForeignKey(x => x.DeviceConfigControllerID).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<DeviceRow>(e =>

@@ -1213,7 +1213,7 @@ public class ApiControllerTests
         Assert.Equal(403, obj.StatusCode);
     }
 
-    // ---- DeviceApiController.DeviceConfigControllerUpdate - roadmap #39 schedule validation ----
+    // ---- DeviceApiController.DeviceConfigControllerUpdate - roadmap #39/#115 schedule validation ----
 
     [Fact]
     public async Task DeviceConfigControllerUpdate_ScheduleCrossesMidnight_Returns400_AndNeverTouchesRepo()
@@ -1226,10 +1226,10 @@ public class ApiControllerTests
             Device = new Device { IDDevice = 8 },
             Controller = new DeviceConfigController
             {
-                VentilationScheduleEnabled = true,
-                VentilationScheduleDaysOfWeek = 0b1111111,
-                VentilationScheduleStart = 86000,
-                VentilationScheduleDuration = 1000, // 86000 + 1000 > 86400 - crosses local midnight
+                VentilationSchedule =
+                [
+                    new DeviceScheduleSlot { DaysOfWeek = 0b1111111, Start = 86000, Duration = 1000 }, // 86000 + 1000 > 86400 - crosses local midnight
+                ],
             },
         });
 
@@ -1239,10 +1239,10 @@ public class ApiControllerTests
     }
 
     [Fact]
-    public async Task DeviceConfigControllerUpdate_ScheduleDisabled_SkipsValidation_EvenWithOutOfRangeFields()
+    public async Task DeviceConfigControllerUpdate_EmptyScheduleList_SkipsValidation()
     {
-        // A disabled schedule's stale/garbage fields must not block saving something else on the
-        // same form - only an ENABLED schedule's window is validated.
+        // Roadmap #115: no separate "enabled" flag any more - an empty list is simply nothing to
+        // validate (equivalent to the old "disabled" case), not a call that must fail.
         _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 0 });
         _repo.Setup(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>())).Returns(Task.CompletedTask);
 
@@ -1252,14 +1252,14 @@ public class ApiControllerTests
         var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
         {
             Device = new Device { IDDevice = 8 },
-            Controller = new DeviceConfigController { VentilationScheduleEnabled = false, VentilationScheduleStart = 99999, VentilationScheduleDuration = 99999 },
+            Controller = new DeviceConfigController { VentilationSchedule = [] },
         });
 
         Assert.True(result.Value);
     }
 
     [Fact]
-    public async Task DeviceConfigControllerUpdate_ValidSchedule_Persists()
+    public async Task DeviceConfigControllerUpdate_ValidMultiSlotSchedule_Persists()
     {
         _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 0 });
         _repo.Setup(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>())).Returns(Task.CompletedTask);
@@ -1272,15 +1272,37 @@ public class ApiControllerTests
             Device = new Device { IDDevice = 8 },
             Controller = new DeviceConfigController
             {
-                LightScheduleEnabled = true,
-                LightScheduleDaysOfWeek = 0b0111110, // Mon-Fri
-                LightScheduleStart = 21600,           // 06:00
-                LightScheduleDuration = 43200,        // 12h -> ends 18:00, same calendar day
+                LightSchedule =
+                [
+                    new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 21600, Duration = 1800 },  // Mon-Fri 06:00-06:30
+                    new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 50400, Duration = 900 },    // Mon-Fri 14:00-14:15
+                ],
             },
         });
 
         Assert.True(result.Value);
         _repo.Verify(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeviceConfigControllerUpdate_OneBadSlotAmongManyGood_Returns400()
+    {
+        // A single out-of-range slot must reject the whole save, even with other valid slots
+        // present in the same or a different function's list.
+        var controller = NewDeviceController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
+        {
+            Device = new Device { IDDevice = 8 },
+            Controller = new DeviceConfigController
+            {
+                VentilationSchedule = [new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 21600, Duration = 1800 }],
+                WaterPumpSchedule = [new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 0, Duration = 0 }], // duration < 1
+            },
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
     // ---- ServerConfigApiController.Update - roadmap #39 ScheduleTimeZone validation -------------

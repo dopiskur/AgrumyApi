@@ -146,6 +146,23 @@ public class ContractTests
         AssertValid("config.response.schema.json", JsonSerializer.Serialize(new DeviceConfig(), Mvc));
     }
 
+    [Theory]
+    [InlineData("config.response.schema.json")]
+    [InlineData("register.response.schema.json")]
+    public void DeviceConfig_WithScheduleSlots_MatchesResponseSchema(string schema)
+    {
+        // Roadmap #115: exercises the deviceScheduleSlot definition itself, not just the "always
+        // empty array" default every other test here happens to send.
+        var cfg = FullConfig();
+        cfg.DeviceConfigController!.VentilationSchedule =
+        [
+            new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 21600, Duration = 1800 },  // Mon-Fri 06:00-06:30
+            new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 50400, Duration = 900 },    // Mon-Fri 14:00-14:15
+        ];
+
+        AssertValid(schema, JsonSerializer.Serialize(cfg, Mvc));
+    }
+
     [Fact]
     public void DeviceAuthentication_MatchesResponseSchema()
     {

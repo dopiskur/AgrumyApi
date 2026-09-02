@@ -744,8 +744,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await _repo.DeviceConfigControllerUpdateAsync(d.IDDevice, new DeviceConfigController
         {
             IDDeviceConfigController = d.DeviceConfigControllerID, TempLow = 5.5, TempHigh = 30.25, RelayEnabled = true, Relay1 = 2,
-            // Roadmap #39.
-            LightScheduleEnabled = true, LightScheduleDaysOfWeek = 0b0111110, LightScheduleStart = 21600, LightScheduleDuration = 43200,
+            // Roadmap #39/#115.
+            LightSchedule = [new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 21600, Duration = 43200 }],
         });
         var back = await _repo.DeviceGetByIdAsync(d.IDDevice);
         Assert.NotNull(back);
@@ -755,11 +755,42 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(5.5, ctrl!.TempLow);   // real double (proc truncated via int params)
         Assert.Equal(30.25, ctrl.TempHigh);
         Assert.True(ctrl.RelayEnabled);
-        Assert.True(ctrl.LightScheduleEnabled);
-        Assert.Equal(0b0111110, ctrl.LightScheduleDaysOfWeek);
-        Assert.Equal(21600, ctrl.LightScheduleStart);
-        Assert.Equal(43200, ctrl.LightScheduleDuration);
+        var slot = Assert.Single(ctrl.LightSchedule);
+        Assert.Equal(0b0111110, slot.DaysOfWeek);
+        Assert.Equal(21600, slot.Start);
+        Assert.Equal(43200, slot.Duration);
+        Assert.Empty(ctrl.VentilationSchedule); // untouched groups stay empty, not null
         Assert.Equal(1, (await _repo.DeviceConfigSensorGetAsync(d.DeviceConfigSensorID))!.SensorTemp);
+    }
+
+    // Roadmap #115: a second save with a DIFFERENT slot set must fully replace the first, not
+    // append to it - the delete-all-then-reinsert pattern in DeviceConfigControllerUpdateAsync is
+    // the one place this could silently accumulate stale rows instead.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceConfigController_ScheduleUpdate_ReplacesPriorSlots_DoesNotAccumulate(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+
+        await _repo.DeviceConfigControllerUpdateAsync(d.IDDevice, new DeviceConfigController
+        {
+            IDDeviceConfigController = d.DeviceConfigControllerID,
+            VentilationSchedule =
+            [
+                new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 21600, Duration = 1800 },
+                new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 50400, Duration = 900 },
+            ],
+        });
+        Assert.Equal(2, (await _repo.DeviceConfigControllerGetAsync(d.DeviceConfigControllerID))!.VentilationSchedule.Count);
+
+        await _repo.DeviceConfigControllerUpdateAsync(d.IDDevice, new DeviceConfigController
+        {
+            IDDeviceConfigController = d.DeviceConfigControllerID,
+            VentilationSchedule = [new DeviceScheduleSlot { DaysOfWeek = 0b1000001, Start = 0, Duration = 60 }],
+        });
+        var slot = Assert.Single((await _repo.DeviceConfigControllerGetAsync(d.DeviceConfigControllerID))!.VentilationSchedule);
+        Assert.Equal(0b1000001, slot.DaysOfWeek);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]

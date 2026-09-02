@@ -167,11 +167,16 @@ namespace api.Controllers.API
             return true;
         }
 
-        /// <summary>Roadmap #39: v1 deliberately does not support a schedule window crossing local
-        /// midnight (see api.Models.DeviceConfigController's comment) - Start+Duration must fit in
-        /// one calendar day, and DaysOfWeek must fit the 7-bit mask AgrumyDevice's
-        /// ControllerController::scheduleRelayFunction expects (bit 0 = Sunday .. bit 6 = Saturday).
-        /// Returns the first validation failure found, or null if every enabled schedule is sound.</summary>
+        /// <summary>Roadmap #39/#115: v1 deliberately does not support a schedule window crossing
+        /// local midnight (see api.Models.DeviceConfigController's comment) - Start+Duration must
+        /// fit in one calendar day, and DaysOfWeek must fit the 7-bit mask AgrumyDevice's
+        /// ActuatorController::scheduleRelayFunction expects (bit 0 = Sunday .. bit 6 = Saturday).
+        /// Every slot in every function's list is checked (no more per-function Enabled gate - a
+        /// slot's presence in the list already means it is active); returns the first failure
+        /// found, or null if every slot is sound. A device-side cap on how many slots actually get
+        /// used (MAX_SCHEDULE_SLOTS_PER_FUNCTION, AgrumyDevice's RelayLogic.h) is NOT enforced here
+        /// deliberately - a caller sending more than the firmware can hold just gets extras it
+        /// silently ignores, not a hard save-time rejection tied to one particular firmware build.</summary>
         private static string? ScheduleWindowError(DeviceConfigController? cfg)
         {
             if (cfg == null)
@@ -179,31 +184,30 @@ namespace api.Controllers.API
                 return null;
             }
 
-            (bool? Enabled, int? Days, int? Start, int? Duration, string Label)[] schedules =
+            (IEnumerable<DeviceScheduleSlot>? Slots, string Label)[] groups =
             [
-                (cfg.VentilationScheduleEnabled, cfg.VentilationScheduleDaysOfWeek, cfg.VentilationScheduleStart, cfg.VentilationScheduleDuration, "Ventilation"),
-                (cfg.LightScheduleEnabled, cfg.LightScheduleDaysOfWeek, cfg.LightScheduleStart, cfg.LightScheduleDuration, "Light"),
-                (cfg.HeatingScheduleEnabled, cfg.HeatingScheduleDaysOfWeek, cfg.HeatingScheduleStart, cfg.HeatingScheduleDuration, "Heating"),
-                (cfg.WaterPumpScheduleEnabled, cfg.WaterPumpScheduleDaysOfWeek, cfg.WaterPumpScheduleStart, cfg.WaterPumpScheduleDuration, "Water pump"),
+                (cfg.VentilationSchedule, "Ventilation"),
+                (cfg.LightSchedule, "Light"),
+                (cfg.HeatingSchedule, "Heating"),
+                (cfg.WaterPumpSchedule, "Water pump"),
             ];
 
-            foreach (var (enabled, days, start, duration, label) in schedules)
+            foreach (var (slots, label) in groups)
             {
-                if (enabled != true)
+                foreach (var slot in slots ?? [])
                 {
-                    continue;
-                }
-                if (days is not int d || d < 0 || d > 0b1111111)
-                {
-                    return $"{label} schedule: days of week must be a value from 0 to 127.";
-                }
-                if (start is not int s || s < 0 || s > 86399)
-                {
-                    return $"{label} schedule: start must be between 0 and 86399 seconds since local midnight.";
-                }
-                if (duration is not int len || len < 1 || start + len > 86400)
-                {
-                    return $"{label} schedule: duration must be at least 1 second and not cross local midnight (start + duration <= 86400).";
+                    if (slot.DaysOfWeek < 0 || slot.DaysOfWeek > 0b1111111)
+                    {
+                        return $"{label} schedule: days of week must be a value from 0 to 127.";
+                    }
+                    if (slot.Start < 0 || slot.Start > 86399)
+                    {
+                        return $"{label} schedule: start must be between 0 and 86399 seconds since local midnight.";
+                    }
+                    if (slot.Duration < 1 || slot.Start + slot.Duration > 86400)
+                    {
+                        return $"{label} schedule: duration must be at least 1 second and not cross local midnight (start + duration <= 86400).";
+                    }
                 }
             }
             return null;

@@ -99,24 +99,6 @@ namespace api.Dal.Entities
         public int? WaterPumpInterval { get; set; } = 0;
         public int? WaterPumpIntervalLength { get; set; } = 0;
 
-        // Roadmap #39 - see api.Models.DeviceConfigController for the full field-shape story.
-        public bool? VentilationScheduleEnabled { get; set; } = false;
-        public int? VentilationScheduleDaysOfWeek { get; set; } = 0;
-        public int? VentilationScheduleStart { get; set; } = 0;
-        public int? VentilationScheduleDuration { get; set; } = 0;
-        public bool? LightScheduleEnabled { get; set; } = false;
-        public int? LightScheduleDaysOfWeek { get; set; } = 0;
-        public int? LightScheduleStart { get; set; } = 0;
-        public int? LightScheduleDuration { get; set; } = 0;
-        public bool? HeatingScheduleEnabled { get; set; } = false;
-        public int? HeatingScheduleDaysOfWeek { get; set; } = 0;
-        public int? HeatingScheduleStart { get; set; } = 0;
-        public int? HeatingScheduleDuration { get; set; } = 0;
-        public bool? WaterPumpScheduleEnabled { get; set; } = false;
-        public int? WaterPumpScheduleDaysOfWeek { get; set; } = 0;
-        public int? WaterPumpScheduleStart { get; set; } = 0;
-        public int? WaterPumpScheduleDuration { get; set; } = 0;
-
         public bool? RelayEnabled { get; set; }
         public int? Relay1 { get; set; }
         public int? Relay2 { get; set; }
@@ -126,6 +108,23 @@ namespace api.Dal.Entities
         public int? Relay6 { get; set; }
         public int? Relay7 { get; set; }
         public int? Relay8 { get; set; }
+    }
+
+    /// <summary>Roadmap #115: one wall-clock window for one relay function on one
+    /// deviceConfigController - replaces the old flat Schedule{Enabled,DaysOfWeek,Start,Duration}
+    /// columns (see api.Models.DeviceConfigController for the wire-shape story). RelayFunction
+    /// matches deviceTypeRelay's seed IDs (1=Ventilation, 2=Light, 3=Heating, 4=Water pump), same
+    /// convention as ActuatorController::RelayFunctionType on the device side. A row's mere
+    /// presence means it is active - there is no separate Enabled column (confirmed design: zero
+    /// rows for a function already means "never on in schedule mode").</summary>
+    public class DeviceScheduleSlotRow
+    {
+        public int IDDeviceScheduleSlot { get; set; }
+        public int DeviceConfigControllerID { get; set; }
+        public int RelayFunction { get; set; }
+        public int DaysOfWeek { get; set; }
+        public int Start { get; set; }
+        public int Duration { get; set; }
     }
 
     public class DeviceConfigSensorRow
