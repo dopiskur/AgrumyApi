@@ -20,7 +20,7 @@ public class OfflineAlertEvaluatorTests
     private OfflineAlertEvaluator NewEvaluator() => new(_devices.Object, _users.Object, _dispatcher.Object);
 
     private static OfflineAlertCandidate Candidate(
-        int id = 1, int? tenantId = 1, string? name = "Greenhouse Sensor",
+        int id = 1, int tenantId = 1, string? name = "Greenhouse Sensor",
         int? sleepSeconds = 60, DateTime? lastSeenAt = null, DateTime? offlineNotifiedAt = null) =>
         new(id, tenantId, name, sleepSeconds, lastSeenAt, offlineNotifiedAt);
 
@@ -101,13 +101,5 @@ public class OfflineAlertEvaluatorTests
 
         // Strict mocks: EventDevicePushAsync/TenantAdminsGetAsync/DispatchAsync would throw if
         // called - dedup means none of them should be.
-    }
-
-    [Fact]
-    public async Task Candidate_With_No_TenantID_Is_Skipped_Defensively()
-    {
-        SetupCandidates(Candidate(tenantId: null, lastSeenAt: DateTime.UtcNow.AddHours(-1), offlineNotifiedAt: null));
-
-        await NewEvaluator().RunOnceAsync();
     }
 }

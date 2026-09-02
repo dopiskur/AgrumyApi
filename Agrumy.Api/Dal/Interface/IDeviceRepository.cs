@@ -5,11 +5,10 @@ namespace api.Dal.Interface
     /// <summary>Roadmap #40: the minimal shape OfflineAlertBackgroundService needs to decide
     /// whether a notification is due - not the full Fleet dashboard DTO (DeviceFleetStatus),
     /// since OfflineNotifiedAt is alert-bookkeeping state the Web UI has no business displaying.
-    /// TenantID is nullable to mirror DeviceRow.TenantID as stored - a null one is skipped by the
-    /// worker rather than crashing it.</summary>
+    /// TenantID mirrors DeviceRow.TenantID, non-nullable since roadmap #112.</summary>
     public sealed record OfflineAlertCandidate(
         int IDDevice,
-        int? TenantID,
+        int TenantID,
         string? DeviceName,
         int? SleepSeconds,
         DateTime? LastSeenAt,

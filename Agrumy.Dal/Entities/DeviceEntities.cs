@@ -141,7 +141,8 @@ namespace api.Dal.Entities
     public class DeviceRow
     {
         public int IDDevice { get; set; }
-        public int? TenantID { get; set; }
+        // Roadmap #112: non-nullable, matching the DB column now that it is NOT NULL DEFAULT 0.
+        public int TenantID { get; set; }
         public int? DeviceTypeID { get; set; }
         public int? DeviceUnitID { get; set; }
         public int? DeviceUnitZoneID { get; set; }

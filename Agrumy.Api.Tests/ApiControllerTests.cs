@@ -1158,13 +1158,11 @@ public class ApiControllerTests
     }
 
     [Fact]
-    public async Task DeviceUpdate_NullTenantDevice_CallerOwnsDefaultTenant_Succeeds()
+    public async Task DeviceUpdate_DefaultTenantDevice_CallerOwnsDefaultTenant_Succeeds()
     {
-        // Roadmap #111: TenantID=0 is a real default tenant (#108's confirmation), so its own
-        // (non-Global) admin must be able to manage a device whose row has TenantID=null - before
-        // the fix, EnsureOwnedDeviceAsync's bare `device.TenantID != CallerTenantId` compared
-        // null != 0 (true) and wrongly 403'd a caller who legitimately owns this device.
-        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = null });
+        // Roadmap #111: TenantID=0 is a real default tenant, not a "no tenant" sentinel - its own
+        // (non-Global) admin must be able to manage a device whose row has TenantID=0.
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 0 });
         _repo.Setup(r => r.DeviceUpdateAsync(It.IsAny<Device>())).Returns(Task.CompletedTask);
 
         var controller = NewDeviceController();
@@ -1396,24 +1394,6 @@ public class ApiControllerTests
     }
 
     [Fact]
-    public async Task DeviceDelete_NullTenantDevice_UsesSameZeroFallbackAsAdd()
-    {
-        // Roadmap #108: a null-TenantID device's rows were all written with TenantID=0 by
-        // DeviceAddAsync's own ?? 0 convention - the delete call must use the same fallback or it
-        // filters on TenantID IS NULL and silently deletes zero rows (strict mock proves this: an
-        // un-stubbed DeviceDeleteAsync(7, null) call would throw instead of matching).
-        _repo.Setup(r => r.DeviceGetByIdAsync(7)).ReturnsAsync(new Device { IDDevice = 7, TenantID = null });
-        _repo.Setup(r => r.DeviceDeleteAsync(7, 0)).Returns(Task.CompletedTask);
-
-        var controller = NewDeviceController();
-        SetCallerRoles(controller, 0, "admin", RoleNames.GlobalAdmin);
-        var result = await controller.DeviceDelete(7);
-
-        Assert.True(result.Value);
-        _repo.Verify(r => r.DeviceDeleteAsync(7, 0), Times.Once);
-    }
-
-    [Fact]
     public async Task DeviceEventsGet_TenantReader_OwnTenant_Ok()
     {
         _repo.Setup(r => r.DeviceGetByIdAsync(5)).ReturnsAsync(new Device { IDDevice = 5, TenantID = 2 });
@@ -1424,23 +1404,6 @@ public class ApiControllerTests
         var result = await controller.DeviceEventsGet(5);
 
         Assert.IsType<OkObjectResult>(result.Result);
-    }
-
-    [Fact]
-    public async Task DeviceEventsGet_NullTenantDevice_UsesSameZeroFallbackAsPush()
-    {
-        // Roadmap #96: a device row with TenantID=null was written as TenantID=0 by
-        // EventDevicePushAsync's own ?? 0 fallback - the get side must apply the identical
-        // fallback or it queries TenantID==null and never matches the row that was actually written.
-        _repo.Setup(r => r.DeviceGetByIdAsync(5)).ReturnsAsync(new Device { IDDevice = 5, TenantID = null });
-        _repo.Setup(r => r.EventDeviceGetAsync(5, 0, 100)).ReturnsAsync(new List<DeviceEvent>());
-
-        var controller = NewDeviceController();
-        SetCallerRoles(controller, 0, "admin", RoleNames.GlobalAdmin);
-        var result = await controller.DeviceEventsGet(5);
-
-        Assert.IsType<OkObjectResult>(result.Result);
-        _repo.Verify(r => r.EventDeviceGetAsync(5, 0, 100), Times.Once);
     }
 
     [Fact]
@@ -1550,24 +1513,6 @@ public class ApiControllerTests
 
         Assert.IsType<OkResult>(result);
         _repo.Verify(r => r.SensorDataDeleteAsync(4, 7, 0, 0), Times.Once);
-    }
-
-    [Fact]
-    public async Task SensorDataDelete_NullTenantDevice_UsesSameZeroFallbackAsAdd()
-    {
-        // Roadmap #108: TenantID=0 is a real default tenant, not a "no tenant" sentinel (user
-        // confirmed) - a caller who legitimately manages tenant 0 must be able to both pass the
-        // authorization check AND delete a null-TenantID device's rows (written as 0 by
-        // DeviceAddAsync), which requires the same ?? 0 fallback on both call sites.
-        _repo.Setup(r => r.DeviceGetByIdAsync(7)).ReturnsAsync(new Device { IDDevice = 7, TenantID = null });
-        _repo.Setup(r => r.SensorDataDeleteAsync(0, 7, 0, 0)).Returns(Task.CompletedTask);
-
-        var controller = NewSensorDataController();
-        SetCallerRoles(controller, 0, "user", RoleNames.TenantReader, RoleNames.TenantDevice);
-        var result = await controller.Delete(7);
-
-        Assert.IsType<OkResult>(result);
-        _repo.Verify(r => r.SensorDataDeleteAsync(0, 7, 0, 0), Times.Once);
     }
 
     [Fact]

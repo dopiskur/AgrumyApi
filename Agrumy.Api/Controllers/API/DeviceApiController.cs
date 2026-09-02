@@ -59,11 +59,8 @@ namespace api.Controllers.API
             }
 
             // The device's OWN tenant, not the caller's - a Global admin/Device deleting a foreign
-            // tenant's device would otherwise silently match zero rows. Roadmap #108: same ?? 0
-            // fallback as #96/#96-follow-ups - a null TenantID device's row was written with 0
-            // (DeviceAddAsync's own ?? 0 convention), so filtering on the bare nullable here would
-            // delete zero rows instead.
-            await Repo.DeviceDeleteAsync(idDevice, device!.TenantID ?? 0);
+            // tenant's device would otherwise silently match zero rows.
+            await Repo.DeviceDeleteAsync(idDevice, device!.TenantID);
             return true;
         }
 
@@ -118,10 +115,8 @@ namespace api.Controllers.API
             }
 
             // The device's own tenant (== the caller's for a tenant-scoped caller; the ensure call
-            // above already authorized a cross-tenant global reader). Same ?? 0 fallback as
-            // EventDevicePushAsync's caller - roadmap #96, a null TenantID otherwise never matches
-            // the TenantID=0 row the push side actually wrote.
-            return Ok(await Repo.EventDeviceGetAsync(device!.IDDevice, device.TenantID ?? 0));
+            // above already authorized a cross-tenant global reader).
+            return Ok(await Repo.EventDeviceGetAsync(device!.IDDevice, device.TenantID));
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -229,11 +224,8 @@ namespace api.Controllers.API
                 return (null, NotFound());
             }
 
-            // Roadmap #111: same ?? 0 fallback as #96/#102/#108 - without it a null-TenantID device
-            // (rows written as TenantID=0 by DeviceAddAsync's own convention) never equals a
-            // tenant-0 caller's CallerTenantId, so its own admin gets a 403 on their own device.
             bool crossTenantAllowed = forWrite ? CallerManagesDevicesGlobally : CallerReadsDevicesGlobally;
-            if ((device.TenantID ?? 0) != CallerTenantId && !crossTenantAllowed)
+            if (device.TenantID != CallerTenantId && !crossTenantAllowed)
             {
                 return (device, StatusCode(403, $"{ownerLabel} belongs to a different tenant"));
             }
@@ -261,7 +253,7 @@ namespace api.Controllers.API
                 return NotFound();
             }
 
-            await Repo.DeviceDiagnosticUpsertAsync(device.IDDevice!.Value, device.TenantID ?? 0, value);
+            await Repo.DeviceDiagnosticUpsertAsync(device.IDDevice!.Value, device.TenantID, value);
 
             // Roadmap #106: compare against the device row just read above, not a session-cache
             // copy - the cache entry can be stale/absent (5-min sliding TTL, #109) or written by a
@@ -296,7 +288,7 @@ namespace api.Controllers.API
                 return Unauthorized();
             }
 
-            await Repo.EventDevicePushAsync(device.IDDevice!.Value, device.TenantID ?? 0, eventType, value.Message);
+            await Repo.EventDevicePushAsync(device.IDDevice!.Value, device.TenantID, eventType, value.Message);
             return Ok();
         }
 
@@ -323,7 +315,7 @@ namespace api.Controllers.API
                 await Repo.DeviceAddAsync(new Device
                 {
                     ConfigVersion = 1,
-                    TenantID = user.TenantID,
+                    TenantID = user.TenantID ?? 0, // User.TenantID stays nullable (out of #112's scope)
                     DeviceName = "Agrumy_" + value.MacAddress.ToUpper(),
                     MacAddress = value.MacAddress,
                     ApiId = Guid.NewGuid().ToString(), // identifier, not a secret - Guid is fine

@@ -8,8 +8,11 @@ namespace api.Models
 
         [HiddenInput(DisplayValue = true)]
         public int? IDDevice { get; set; }
+        // Roadmap #112: non-nullable - TenantID=0 is a real, meaningful default tenant (user
+        // confirmed), not a "no tenant" sentinel, so a nullable int let an impossible third state
+        // leak into every consumer as a `?? 0` fallback (see #96/#100/#106/#102/#108/#111).
         [HiddenInput(DisplayValue = true)]
-        public int? TenantID { get; set; } = 0;
+        public int TenantID { get; set; } = 0;
 
         public int? DeviceTypeID { get; set; } = 0;
         [HiddenInput(DisplayValue = true)]

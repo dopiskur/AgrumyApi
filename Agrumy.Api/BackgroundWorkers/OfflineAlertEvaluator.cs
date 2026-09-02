@@ -25,7 +25,7 @@ namespace api.BackgroundWorkers
                 // as offline for the Fleet dashboard badge, which is fine for a passive badge, but
                 // would mean every brand-new device fires an "offline" email before it ever had a
                 // chance to connect. Alerting is opt-in to "was reachable, now is not."
-                if (d.LastSeenAt is null || d.TenantID is null)
+                if (d.LastSeenAt is null)
                 {
                     continue;
                 }
@@ -54,10 +54,10 @@ namespace api.BackgroundWorkers
                 // is server-detected, not device-pushed, but an admin reading a device's Events
                 // page should see "went offline" alongside NoInternet/ConfigApplied/etc., not a
                 // second, separate log they'd never think to check.
-                await deviceRepo.EventDevicePushAsync(d.IDDevice, d.TenantID.Value, DeviceEventType.Offline,
+                await deviceRepo.EventDevicePushAsync(d.IDDevice, d.TenantID, DeviceEventType.Offline,
                     $"No contact since {d.LastSeenAt:u}");
 
-                var admins = await userRepo.TenantAdminsGetAsync(d.TenantID.Value);
+                var admins = await userRepo.TenantAdminsGetAsync(d.TenantID);
                 foreach (var admin in admins)
                 {
                     if (string.IsNullOrWhiteSpace(admin.Email))
