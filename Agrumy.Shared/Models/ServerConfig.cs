@@ -20,6 +20,16 @@ namespace api.Models
         public double? HumidityHysteresis { get; set; }
         public double? LightHysteresis { get; set; }
 
+        // Roadmap #12: low-battery alert threshold/hysteresis (percent, from the latest
+        // sensorData.Battery reading) - same dead-zone principle as the four fields above, but
+        // for LowBatteryAlertEvaluator's periodic sweep (roadmap #40 pattern), not on-device
+        // relay logic, so there is no per-device DeviceConfigController override: an alert
+        // threshold has no reason to differ device-to-device the way a physical relay setpoint
+        // does. Fires when Battery <= BatteryLowThreshold, clears (rearms) once Battery >=
+        // BatteryLowThreshold + BatteryLowHysteresis - avoids alert-spam flapping right at the edge.
+        public double? BatteryLowThreshold { get; set; }
+        public double? BatteryLowHysteresis { get; set; }
+
         // Roadmap #28: a device repeating the identical DeviceEventType within this many minutes
         // of its last one is ignored server-side rather than stored - same seed/reload/admin-edit
         // pattern as the hysteresis fields above.

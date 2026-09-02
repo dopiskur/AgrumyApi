@@ -56,6 +56,9 @@
       "Humidity": 5.0,
       "Light": 20.0
     },
+    "// BatteryLowThreshold / BatteryLowHysteresis": "Roadmap #12 - percent. LowBatteryAlertEvaluator alerts once a device's latest sensorData.Battery reading drops to/below BatteryLowThreshold, and only clears (rearms) once it climbs back to/above BatteryLowThreshold + BatteryLowHysteresis - same dead-zone principle as Hysteresis above, applied to the alert instead of a relay.",
+    "BatteryLowThreshold": 20.0,
+    "BatteryLowHysteresis": 5.0,
     "// EventDedupeMinutes": "Roadmap #28 - a device repeating the identical event type within this many minutes of its last one is ignored server-side, not stored.",
     "EventDedupeMinutes": 10,
     "// ActivationResendCooldownMinutes": "Roadmap #24 - minimum minutes between 'resend activation email' requests for the same user.",
@@ -95,7 +98,9 @@
       "FcmCredentialsPath": ""
     },
     "// OfflineCheckIntervalMinutes": "Roadmap #40 - how often OfflineAlertBackgroundService sweeps every device for a newly-offline one. Independent of any device's own poll interval (SleepSeconds) - there is no single right value across a fleet with mixed intervals.",
-    "OfflineCheckIntervalMinutes": 5
+    "OfflineCheckIntervalMinutes": 5,
+    "// BatteryCheckIntervalMinutes": "Roadmap #12 - how often LowBatteryAlertEvaluator sweeps every device's latest telemetry battery reading. Longer than OfflineCheckIntervalMinutes by default - a battery drains over hours/days, not seconds.",
+    "BatteryCheckIntervalMinutes": 30
   },
 
   "// Logging": "Standard ASP.NET Core logging configuration.",

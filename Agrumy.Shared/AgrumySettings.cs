@@ -40,6 +40,11 @@ namespace api
         public double HysteresisHumidity { get; set; } = 5.0;
         public double HysteresisLight { get; set; } = 20.0;
 
+        // Roadmap #12: low-battery alert defaults - see api.Models.ServerConfig.BatteryLowThreshold/
+        // BatteryLowHysteresis for the dead-zone rule they feed into.
+        public double BatteryLowThreshold { get; set; } = 20.0;
+        public double BatteryLowHysteresis { get; set; } = 5.0;
+
         // Roadmap #28: how long a device's identical repeated event is ignored server-side.
         public int EventDedupeMinutes { get; set; } = 10;
 
@@ -78,6 +83,8 @@ namespace api
             HysteresisTemperature = ParseDoubleOr(configuration, "ServerConfig:Hysteresis:Temperature", 1.0),
             HysteresisHumidity = ParseDoubleOr(configuration, "ServerConfig:Hysteresis:Humidity", 5.0),
             HysteresisLight = ParseDoubleOr(configuration, "ServerConfig:Hysteresis:Light", 20.0),
+            BatteryLowThreshold = ParseDoubleOr(configuration, "ServerConfig:BatteryLowThreshold", 20.0),
+            BatteryLowHysteresis = ParseDoubleOr(configuration, "ServerConfig:BatteryLowHysteresis", 5.0),
             EventDedupeMinutes = ParseIntOr(configuration, "ServerConfig:EventDedupeMinutes", 10),
             ActivationResendCooldownMinutes = ParseIntOr(configuration, "ServerConfig:ActivationResendCooldownMinutes", 10),
             AllowSelfServiceTenantCreation = ParseBoolOr(configuration, "ServerConfig:AllowSelfServiceTenantCreation", false),

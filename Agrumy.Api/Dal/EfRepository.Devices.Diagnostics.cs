@@ -166,6 +166,37 @@ namespace api.Dal
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.OfflineNotifiedAt, notifiedAt));
         }
 
+        // ---- Low-battery alert background worker (roadmap #12, #40 pattern) --------------
+
+        public async Task<IList<LowBatteryAlertCandidate>> LowBatteryAlertCandidatesGetAsync()
+        {
+            // Same correlated-scalar-subquery shape as DeviceFleetGetAsync's Battery column above -
+            // translates to one plain ORDER BY ... LIMIT 1 subselect per device on both providers.
+            return await db.Devices.AsNoTracking()
+                .Where(d => d.Enabled == true) // a disabled device is expected to be silent
+                .Select(d => new LowBatteryAlertCandidate(
+                    d.IDDevice,
+                    d.TenantID,
+                    d.DeviceName,
+                    db.SensorData.AsNoTracking()
+                        .Where(s => s.DeviceID == d.IDDevice)
+                        .OrderByDescending(s => s.DateCreated)
+                        .Select(s => s.Battery)
+                        .FirstOrDefault(),
+                    db.DeviceDiagnostics.AsNoTracking().Where(x => x.DeviceID == d.IDDevice).Select(x => x.LowBatteryNotifiedAt).FirstOrDefault()))
+                .ToListAsync();
+        }
+
+        public async Task DeviceLowBatteryNotifiedSetAsync(int deviceID, DateTime? notifiedAt)
+        {
+            // Same "nothing to set for a device that has never polled" rule as
+            // DeviceOfflineNotifiedSetAsync - a device with no diagnostic row has no battery
+            // telemetry to have been alerted about.
+            await db.DeviceDiagnostics
+                .Where(x => x.DeviceID == deviceID)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.LowBatteryNotifiedAt, notifiedAt));
+        }
+
         private static DeviceEvent ToDto(EventDeviceRow e) => new()
         {
             IDEventDevice = e.IDEventDevice,

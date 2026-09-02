@@ -86,13 +86,25 @@
       "additionalProperties": false,
       "description": "camelCase serialization of api.Models.DeviceConfigSensor.",
       "required": [
-        "idDeviceConfigSensor", "sensorBattery", "sensorTemp", "sensorTempSoil", "sensorHumid",
+        "idDeviceConfigSensor", "sensorBattery", "batteryDividerR1", "batteryDividerR2",
+        "sensorTemp", "sensorTempSoil", "sensorHumid",
         "sensorMoist", "sensorLight", "sensorCo2", "sensorTvoc", "sensorBarometer", "sensorPH",
         "sensorRainLevel", "sensorWaterLevel", "sensorWind"
       ],
       "properties": {
         "idDeviceConfigSensor": { "type": ["integer", "null"] },
-        "sensorBattery": { "type": ["integer", "null"] },
+        "sensorBattery": {
+          "type": ["integer", "null"],
+          "description": "Roadmap #12. FK into deviceTypeSensor: 0/null=Disabled(None), 1009=MAX17048 (I2C fuel gauge, recommended), 2001=Analog voltage (VoltageDivider, fallback/necessity)."
+        },
+        "batteryDividerR1": {
+          "type": ["number", "null"],
+          "description": "Roadmap #12. VoltageDivider only (sensorBattery=2001): the actual R1 resistor wired, in ohms. V_battery = V_measured * (R1+R2)/R2. Ignored by MAX17048."
+        },
+        "batteryDividerR2": {
+          "type": ["number", "null"],
+          "description": "Roadmap #12. VoltageDivider only (sensorBattery=2001): the actual R2 resistor wired, in ohms."
+        },
         "sensorTemp": { "type": ["integer", "null"] },
         "sensorTempSoil": { "type": ["integer", "null"] },
         "sensorHumid": { "type": ["integer", "null"] },

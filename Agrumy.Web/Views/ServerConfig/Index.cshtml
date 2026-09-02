@@ -44,6 +44,23 @@
             </div>
 
             <p class="text-secondary">
+                Low-battery alert (roadmap #12): a device's latest battery reading at or below
+                this percentage triggers one email per low-battery streak; it only clears (and can
+                re-alert) once the reading climbs back above threshold + hysteresis, same dead-zone
+                idea as the margins above, applied to the alert instead of a relay.
+            </p>
+            <div class="mb-3">
+                <label asp-for="BatteryLowThreshold" class="form-label"></label>
+                <input asp-for="BatteryLowThreshold" class="form-control" />
+                <span asp-validation-for="BatteryLowThreshold" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="BatteryLowHysteresis" class="form-label"></label>
+                <input asp-for="BatteryLowHysteresis" class="form-control" />
+                <span asp-validation-for="BatteryLowHysteresis" class="text-danger"></span>
+            </div>
+
+            <p class="text-secondary">
                 A device repeating the identical event (e.g. "NoInternet") within this many
                 minutes of its last one is ignored, not stored.
             </p>

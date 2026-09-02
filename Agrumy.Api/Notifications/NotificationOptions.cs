@@ -13,6 +13,11 @@ namespace api.Notifications
         // mixed poll intervals) - 5 minutes comfortably beats ComputeOnline's minimum ~90s grace
         // window without hammering the DB on every tick.
         public int OfflineCheckIntervalMinutes { get; set; } = 5;
+
+        // Roadmap #12: how often LowBatteryAlertEvaluator sweeps every device's latest telemetry
+        // battery reading. Longer than OfflineCheckIntervalMinutes by default - a battery drains
+        // over hours/days, not seconds, so there is no need to poll it as tightly as reachability.
+        public int BatteryCheckIntervalMinutes { get; set; } = 30;
     }
 
     public sealed class EmailChannelOptions

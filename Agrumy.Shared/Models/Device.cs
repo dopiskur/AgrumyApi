@@ -212,7 +212,15 @@ namespace api.Models
     {
         [HiddenInput(DisplayValue = true)]
         public int? IDDeviceConfigSensor { get; set; }
+        // Roadmap #12: 0/null=Disabled(None), 1009=MAX17048 (I2C fuel gauge, recommended,
+        // coulomb counting), 2001=Analog voltage (VoltageDivider, fallback/necessity) - same
+        // deviceTypeSensor-backed dropdown mechanism as every other Sensor* field here (#91).
         public int? SensorBattery { get; set; }
+        // VoltageDivider calibration (sensorBattery=2001 only) - the ACTUAL resistors the user
+        // wired, in ohms, not an abstract preset ratio: V_battery = V_measured * (R1+R2)/R2.
+        // Ignored by MAX17048, which reports state-of-charge directly.
+        public double? BatteryDividerR1 { get; set; }
+        public double? BatteryDividerR2 { get; set; }
         public int? SensorTemp { get; set; }//
         public int? SensorTempSoil { get; set; }
         public int? SensorHumid { get; set; }

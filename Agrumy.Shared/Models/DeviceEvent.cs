@@ -27,6 +27,10 @@ namespace api.Models
         // when a heartbeat first reports the version an admin asked for (Device.FirmwareUpdate /
         // FirmwareTargetVersion), which is also when those two flags are cleared.
         FirmwareUpdated = 10,
+        // Roadmap #12: server-detected, not device-pushed - written by LowBatteryAlertEvaluator
+        // when the latest sensorData.Battery reading crosses ServerConfig.BatteryLowThreshold,
+        // same dedup-by-streak pattern as Offline above (deviceDiagnostic.LowBatteryNotifiedAt).
+        LowBattery = 11,
     }
 
     /// <summary>Body of POST /api/Device/Event. Deliberately carries no device/tenant identity field -

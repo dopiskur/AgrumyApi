@@ -109,6 +109,11 @@ builder.Services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
 builder.Services.AddScoped<OfflineAlertEvaluator>();
 builder.Services.AddHostedService<OfflineAlertBackgroundService>();
 
+// Roadmap #12 (feature) + #40 (pattern): low-battery alert, same scoped/hosted-service shape as
+// OfflineAlertEvaluator/OfflineAlertBackgroundService above.
+builder.Services.AddScoped<LowBatteryAlertEvaluator>();
+builder.Services.AddHostedService<LowBatteryAlertBackgroundService>();
+
 // Roadmap #34: no background worker - expiry is lazy (CommandQueueService.GetPendingCommandAsync
 // marks a stale row Expired the moment it's next looked at), so this is a plain scoped service,
 // not an IHostedService registration like OfflineAlertEvaluator above.

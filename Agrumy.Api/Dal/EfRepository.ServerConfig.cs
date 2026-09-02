@@ -31,6 +31,8 @@ namespace api.Dal
                 TemperatureHysteresis = settings.HysteresisTemperature,
                 HumidityHysteresis = settings.HysteresisHumidity,
                 LightHysteresis = settings.HysteresisLight,
+                BatteryLowThreshold = settings.BatteryLowThreshold,
+                BatteryLowHysteresis = settings.BatteryLowHysteresis,
                 EventDedupeMinutes = settings.EventDedupeMinutes,
                 ActivationResendCooldownMinutes = settings.ActivationResendCooldownMinutes,
                 AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation,
@@ -55,6 +57,8 @@ namespace api.Dal
             row.TemperatureHysteresis = config.TemperatureHysteresis;
             row.HumidityHysteresis = config.HumidityHysteresis;
             row.LightHysteresis = config.LightHysteresis;
+            row.BatteryLowThreshold = config.BatteryLowThreshold;
+            row.BatteryLowHysteresis = config.BatteryLowHysteresis;
             row.EventDedupeMinutes = config.EventDedupeMinutes;
             row.ActivationResendCooldownMinutes = config.ActivationResendCooldownMinutes;
             row.AllowSelfServiceTenantCreation = config.AllowSelfServiceTenantCreation;
@@ -88,6 +92,8 @@ namespace api.Dal
             row.TemperatureHysteresis = settings.HysteresisTemperature;
             row.HumidityHysteresis = settings.HysteresisHumidity;
             row.LightHysteresis = settings.HysteresisLight;
+            row.BatteryLowThreshold = settings.BatteryLowThreshold;
+            row.BatteryLowHysteresis = settings.BatteryLowHysteresis;
             row.EventDedupeMinutes = settings.EventDedupeMinutes;
             row.ActivationResendCooldownMinutes = settings.ActivationResendCooldownMinutes;
             row.AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation;
@@ -107,6 +113,8 @@ namespace api.Dal
             TemperatureHysteresis = r.TemperatureHysteresis,
             HumidityHysteresis = r.HumidityHysteresis,
             LightHysteresis = r.LightHysteresis,
+            BatteryLowThreshold = r.BatteryLowThreshold,
+            BatteryLowHysteresis = r.BatteryLowHysteresis,
             EventDedupeMinutes = r.EventDedupeMinutes,
             ActivationResendCooldownMinutes = r.ActivationResendCooldownMinutes,
             AllowSelfServiceTenantCreation = r.AllowSelfServiceTenantCreation,

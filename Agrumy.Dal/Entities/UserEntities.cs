@@ -113,6 +113,10 @@ namespace api.Dal.Entities
         public double? HumidityHysteresis { get; set; }
         public double? LightHysteresis { get; set; }
 
+        // Roadmap #12 - see api.Models.ServerConfig.BatteryLowThreshold/BatteryLowHysteresis.
+        public double? BatteryLowThreshold { get; set; }
+        public double? BatteryLowHysteresis { get; set; }
+
         // Roadmap #28 - see api.Models.ServerConfig.EventDedupeMinutes.
         public int? EventDedupeMinutes { get; set; }
 

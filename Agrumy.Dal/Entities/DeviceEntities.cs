@@ -131,6 +131,9 @@ namespace api.Dal.Entities
     {
         public int IDDeviceConfigSensor { get; set; }
         public int? SensorBattery { get; set; }
+        // Roadmap #12 - see api.Models.DeviceConfigSensor.BatteryDividerR1/R2.
+        public double? BatteryDividerR1 { get; set; }
+        public double? BatteryDividerR2 { get; set; }
         public int? SensorTemp { get; set; }
         public int? SensorTempSoil { get; set; }
         public int? SensorHumid { get; set; }
@@ -210,6 +213,10 @@ namespace api.Dal.Entities
         // alert (cleared on the tick that observes it's reachable again). One notification per
         // streak, not one per tick, without a separate dedup table.
         public DateTime? OfflineNotifiedAt { get; set; }
+        // Roadmap #12: same dedup-by-streak rule as OfflineNotifiedAt above, but for
+        // LowBatteryAlertEvaluator - null means either never low, or recovered above
+        // ServerConfig.BatteryLowThreshold + BatteryLowHysteresis since the last alert.
+        public DateTime? LowBatteryNotifiedAt { get; set; }
         public string? FirmwareVersion { get; set; }
         // Roadmap #94 - see api.Models.DeviceConfigPoll.Board.
         public string? Board { get; set; }

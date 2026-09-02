@@ -14,6 +14,16 @@ namespace api.Dal.Interface
         DateTime? LastSeenAt,
         DateTime? OfflineNotifiedAt);
 
+    /// <summary>Roadmap #12: the minimal shape LowBatteryAlertEvaluator needs - Battery is the
+    /// latest sensorData row's reading (telemetry, not the #7 heartbeat - see
+    /// DeviceFleetStatus's class comment for why), null when the device has never reported one.</summary>
+    public sealed record LowBatteryAlertCandidate(
+        int IDDevice,
+        int TenantID,
+        string? DeviceName,
+        int? Battery,
+        DateTime? LowBatteryNotifiedAt);
+
     /// <summary>Device facet of the data layer (roadmap #74): device CRUD, sensor/controller
     /// configs, firmware (OTA, roadmap #3), the fixed type lists, and device events (roadmap #28).</summary>
     public interface IDeviceRepository
@@ -96,5 +106,15 @@ namespace api.Dal.Interface
         /// <summary>Sets (or clears, notifiedAt: null) OfflineNotifiedAt on one device's diagnostic
         /// row - see OfflineAlertCandidate for what that field means.</summary>
         Task DeviceOfflineNotifiedSetAsync(int deviceID, DateTime? notifiedAt);
+
+        // Low-battery alert background worker (roadmap #12, #40 pattern)
+
+        /// <summary>Every enabled device, across every tenant, with its latest telemetry battery
+        /// reading - the worker is not tenant-scoped, it runs once for the whole install.</summary>
+        Task<IList<LowBatteryAlertCandidate>> LowBatteryAlertCandidatesGetAsync();
+
+        /// <summary>Sets (or clears, notifiedAt: null) LowBatteryNotifiedAt on one device's
+        /// diagnostic row - see LowBatteryAlertCandidate for what that field means.</summary>
+        Task DeviceLowBatteryNotifiedSetAsync(int deviceID, DateTime? notifiedAt);
     }
 }

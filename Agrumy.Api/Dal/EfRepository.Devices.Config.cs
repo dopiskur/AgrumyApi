@@ -140,6 +140,8 @@ namespace api.Dal
             if (row != null)
             {
                 row.SensorBattery = cfg.SensorBattery;
+                row.BatteryDividerR1 = cfg.BatteryDividerR1;
+                row.BatteryDividerR2 = cfg.BatteryDividerR2;
                 row.SensorTemp = cfg.SensorTemp;
                 row.SensorTempSoil = cfg.SensorTempSoil;
                 row.SensorHumid = cfg.SensorHumid;
@@ -167,6 +169,8 @@ namespace api.Dal
         {
             IDDeviceConfigSensor = c.IDDeviceConfigSensor,
             SensorBattery = c.SensorBattery,
+            BatteryDividerR1 = c.BatteryDividerR1,
+            BatteryDividerR2 = c.BatteryDividerR2,
             SensorTemp = c.SensorTemp,
             SensorTempSoil = c.SensorTempSoil,
             SensorHumid = c.SensorHumid,
