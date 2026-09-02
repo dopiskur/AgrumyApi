@@ -368,16 +368,21 @@ namespace api.Dal
             }).ToList();
         }
 
-        /// <summary>Roadmap #116 rule (4): Red beats Orange beats Green. Only ENABLED devices'
-        /// online state counts toward Red (see GetDeviceSnapshotsAsync); a disabled device is
-        /// always considered "online" for this purpose so it can never redden its zone.</summary>
+        /// <summary>Roadmap #116 rule (4), amended (user report on invent.hr's SecondUnit/Default
+        /// zone): Red beats Orange beats Green. Only ENABLED devices' online state counts toward
+        /// Red (see GetDeviceSnapshotsAsync); a disabled device is always considered "online" for
+        /// that purpose so it can never redden its zone. But a disabled device is not invisible
+        /// either - it visibly shows a red "Offline" badge on its own Fleet/zone row (that badge
+        /// has no Enabled check, roadmap #7/#8), so a zone/unit cube that stayed plain Green while
+        /// containing one read as a silent contradiction. Orange now also covers "at least one
+        /// disabled device in scope", independent of the problem-event check below.</summary>
         private static ZoneStatus ComputeStatus(IReadOnlyCollection<UnitZoneDeviceSnapshot> snapshots)
         {
             if (snapshots.Any(s => s.Enabled && !s.Online))
             {
                 return ZoneStatus.Red;
             }
-            if (snapshots.Any(s => s.HasRecentProblemEvent))
+            if (snapshots.Any(s => s.HasRecentProblemEvent) || snapshots.Any(s => !s.Enabled))
             {
                 return ZoneStatus.Orange;
             }

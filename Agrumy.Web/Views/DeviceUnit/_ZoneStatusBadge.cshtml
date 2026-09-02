@@ -5,7 +5,7 @@
     var (css, icon, title) = Model switch
     {
         api.Models.ZoneStatus.Red => ("text-bg-danger", "bi-exclamation-octagon-fill", "A device in scope is offline"),
-        api.Models.ZoneStatus.Orange => ("text-bg-warning", "bi-exclamation-triangle-fill", "A device in scope had a problem in the last 24h"),
+        api.Models.ZoneStatus.Orange => ("text-bg-warning", "bi-exclamation-triangle-fill", "A device in scope had a problem in the last 24h, or is disabled"),
         _ => ("text-bg-success", "bi-check-circle-fill", "No known issues"),
     };
 }

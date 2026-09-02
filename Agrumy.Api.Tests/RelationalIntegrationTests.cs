@@ -1294,9 +1294,12 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     // A disabled device is expected to be silent (same rule as OfflineAlertCandidatesGetAsync,
-    // roadmap #40) - it must never redden a zone/unit nobody expects it to report into.
+    // roadmap #40) - it must never redden a zone/unit nobody expects it to report into. But it is
+    // not invisible either (amended after a user report on invent.hr's SecondUnit/Default zone: a
+    // disabled+offline device still shows a red "Offline" badge on its own Fleet/zone row, which
+    // read as a contradiction next to a plain-Green cube) - it now takes the zone/unit to Orange.
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitDashboard_Status_DisabledOfflineDevice_DoesNotRedden(DbProviderKind provider)
+    public async Task DeviceUnitDashboard_Status_DisabledOfflineDevice_TurnsOrange_NotRed(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
@@ -1305,7 +1308,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
 
         var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
-        Assert.Equal(ZoneStatus.Green, dashboard.Status);
+        Assert.Equal(ZoneStatus.Orange, dashboard.Status);
     }
 
     // Roadmap #122 diagnosis: the existing #116 rule-(4) tests only cover a device that has NEVER
