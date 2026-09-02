@@ -4,7 +4,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IUserRepository + ITenantRepository members (roadmap #74 split).</summary>
+    /// <summary>IUserRepository core members (roadmap #74 split, further split by roadmap #113):
+    /// user CRUD/lookup/password reset and TenantAdminsGetAsync here; bootstrap admin (roadmap #91)
+    /// in EfRepository.Users.Bootstrap.cs, composable roles (roadmap #66) in
+    /// EfRepository.Users.Roles.cs, email activation (roadmap #24) in
+    /// EfRepository.Users.Activation.cs, tenant CRUD (ITenantRepository) in
+    /// EfRepository.Tenants.cs, and user groups in EfRepository.Users.Groups.cs.</summary>
     internal partial class EfRepository
     {
         public async Task UserAddAsync(User user, UserSecret userSecret)
@@ -182,106 +187,6 @@ namespace api.Dal
             return rows > 0;
         }
 
-        public async Task<bool> BootstrapAdminPendingAsync()
-        {
-            return await db.Users.AsNoTracking().AnyAsync(u => u.PwdHash == null);
-        }
-
-        public async Task<bool> BootstrapAdminSetPasswordAsync(UserSecret secret)
-        {
-            // WHERE PwdHash IS NULL, not a Login/email match - see IUserRepository for why this is
-            // deliberately the only key: it is what makes the door close permanently once used.
-            int rows = await db.Users.Where(u => u.PwdHash == null)
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(u => u.PwdHash, secret.PwdHash)
-                    .SetProperty(u => u.PwdSalt, secret.PwdSalt));
-            return rows > 0;
-        }
-
-        public async Task<IList<UserRole>> UserRoleGetAsync()
-        {
-            return await db.UserRoles.AsNoTracking()
-                .Select(r => new UserRole { IDUserRole = r.IDUserRole, RoleName = r.RoleName, RoleScopeID = r.RoleScopeID })
-                .ToListAsync();
-        }
-
-        // ---- Composable roles (roadmap #66) ------------------------------------------
-
-        public async Task<IReadOnlyList<string>> UserRoleNamesGetAsync(int idUser)
-        {
-            return await (from ur in db.UserUserRoles.AsNoTracking()
-                          join r in db.UserRoles.AsNoTracking() on ur.UserRoleID equals r.IDUserRole
-                          where ur.UserID == idUser && r.RoleName != null
-                          select r.RoleName!).ToListAsync();
-        }
-
-        public async Task UserRolesSetAsync(int idUser, IEnumerable<string> roleNames)
-        {
-            var wanted = roleNames.ToHashSet();
-
-            var roleIds = await db.UserRoles.AsNoTracking()
-                .Where(r => r.RoleName != null && wanted.Contains(r.RoleName))
-                .Select(r => r.IDUserRole)
-                .ToListAsync();
-
-            var existing = await db.UserUserRoles.Where(x => x.UserID == idUser).ToListAsync();
-            db.UserUserRoles.RemoveRange(existing.Where(x => !roleIds.Contains(x.UserRoleID)));
-            db.UserUserRoles.AddRange(roleIds
-                .Where(id => existing.All(x => x.UserRoleID != id))
-                .Select(id => new UserUserRoleRow { UserID = idUser, UserRoleID = id }));
-
-            await db.SaveChangesAsync();
-        }
-
-        // ---- Email activation (roadmap #24) -----------------------------------------
-
-        public async Task UserSetActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt)
-        {
-            var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == idUser);
-            if (row is null) { return; }
-
-            row.ActivationTokenHash = tokenHash;
-            row.ActivationTokenExpiresAt = expiresAt;
-            row.ActivationLastSentAt = DateTime.UtcNow;
-            await db.SaveChangesAsync();
-        }
-
-        public async Task<bool> UserIssueActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt, int cooldownMinutes)
-        {
-            var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == idUser);
-            if (row is null || row.EmailVerified)
-            {
-                return false;
-            }
-            if (row.ActivationLastSentAt is DateTime lastSent && lastSent > DateTime.UtcNow.AddMinutes(-cooldownMinutes))
-            {
-                return false; // still in cooldown
-            }
-
-            row.ActivationTokenHash = tokenHash;
-            row.ActivationTokenExpiresAt = expiresAt;
-            row.ActivationLastSentAt = DateTime.UtcNow;
-            await db.SaveChangesAsync();
-            return true;
-        }
-
-        public async Task<User?> UserActivateAsync(string tokenHash)
-        {
-            var row = await db.Users.FirstOrDefaultAsync(u => u.ActivationTokenHash == tokenHash);
-            if (row is null || row.ActivationTokenExpiresAt is null || row.ActivationTokenExpiresAt < DateTime.UtcNow)
-            {
-                return null;
-            }
-
-            row.EmailVerified = true;
-            row.ActivationTokenHash = null;
-            row.ActivationTokenExpiresAt = null;
-            await db.SaveChangesAsync();
-
-            UserGroupRow? group = await db.UserGroups.AsNoTracking().FirstOrDefaultAsync(g => g.IDUserGroup == row.UserGroupID);
-            return group is null ? null : ToDto(row, group);
-        }
-
         // Roadmap #63: a tenant can never have zero admins - its creator becomes one at registration
         // (see UserApiController.UserRegistration) - so this is never empty for a real tenant.
         public async Task<IList<User>> TenantAdminsGetAsync(int tenantId)
@@ -292,77 +197,6 @@ namespace api.Dal
                               where u.TenantID == tenantId && r.RoleName == "admin"
                               select new { u, g }).ToListAsync();
             return rows.Select(x => ToDto(x.u, x.g)).ToList();
-        }
-
-        // ---- Tenant ---------------------------------------------------------
-
-        public async Task<bool> TenantGetAsync(string tenantName)
-        {
-            return await db.Tenants.AsNoTracking().AnyAsync(t => t.TenantName == tenantName);
-        }
-
-        public async Task<int?> TenantGetIdAsync(string tenantName)
-        {
-            return await db.Tenants.AsNoTracking()
-                .Where(t => t.TenantName == tenantName)
-                .Select(t => (int?)t.IDTenant)
-                .FirstOrDefaultAsync();
-        }
-
-        public async Task<int> TenantAddAsync(string tenantName)
-        {
-            var row = new TenantRow { TenantName = tenantName };
-            db.Tenants.Add(row);
-            await db.SaveChangesAsync();
-            return row.IDTenant;
-        }
-
-        // ---- Group ---------------------------------------------------------
-
-        public async Task<IList<UserGroup>> UserGroupsGetAsync()
-        {
-            return await (from g in db.UserGroups.AsNoTracking()
-                          join r in db.UserRoles.AsNoTracking() on g.UserRoleID equals r.IDUserRole
-                          select new UserGroup
-                          {
-                              IDUserGroup = g.IDUserGroup,
-                              GroupName = g.GroupName,
-                              UserRoleID = g.UserRoleID,
-                              RoleName = r.RoleName,
-                          }).ToListAsync();
-        }
-
-        public async Task<UserGroup?> UserGroupGetAsync(int? idUserGroup)
-        {
-            return await (from g in db.UserGroups.AsNoTracking()
-                          join r in db.UserRoles.AsNoTracking() on g.UserRoleID equals r.IDUserRole
-                          where g.IDUserGroup == idUserGroup
-                          select new UserGroup
-                          {
-                              IDUserGroup = g.IDUserGroup,
-                              GroupName = g.GroupName,
-                              UserRoleID = g.UserRoleID,
-                              RoleName = r.RoleName,
-                          }).FirstOrDefaultAsync();
-        }
-
-        public async Task UserGroupDeleteAsync(int? idUserGroup)
-        {
-            if (idUserGroup is null or <= 0)
-            {
-                return; // proc guard: IF (idUserGroup > 0)
-            }
-            await db.UserGroups.Where(g => g.IDUserGroup == idUserGroup).ExecuteDeleteAsync();
-        }
-
-        public async Task UserGroupAddAsync(UserGroup userGroup)
-        {
-            db.UserGroups.Add(new UserGroupRow
-            {
-                GroupName = userGroup.GroupName,
-                UserRoleID = userGroup.UserRoleID,
-            });
-            await db.SaveChangesAsync();
         }
 
         // UserGet / UsersGet joined only userGroup (not userRole), so RoleName stays null and
