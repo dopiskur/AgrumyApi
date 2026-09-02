@@ -114,6 +114,11 @@ builder.Services.AddHostedService<OfflineAlertBackgroundService>();
 // not an IHostedService registration like OfflineAlertEvaluator above.
 builder.Services.AddScoped<CommandQueueService>();
 
+// Roadmap #126: on-demand background jobs (Optimize/Purge Old Data) - singleton queue so it
+// outlives any one request's DI scope, consumed one at a time by BackgroundJobRunner.
+builder.Services.AddSingleton<BackgroundJobQueue>();
+builder.Services.AddHostedService<BackgroundJobRunner>();
+
 // Roadmap #94: firmware catalog. One named HttpClient for GitHub/Custom-repository reads and
 // .bin downloads - the default handler follows the 302 a GitHub release asset answers with.
 builder.Services.AddHttpClient(HttpFirmwareFetcher.ClientName, client =>

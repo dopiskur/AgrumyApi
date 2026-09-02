@@ -246,5 +246,18 @@ namespace api.Dal.Interface
         /// to read - whether to show the "create a new tenant" option at all.</summary>
         [Get("/api/ServerConfig/Public")]
         Task<PublicServerConfig> ServerConfigGetPublic();
+
+        // ---- Data maintenance (roadmap #126) -----------------------------
+
+        /// <summary>Whether the current DB provider is MariaDB/MySQL - decides whether the Purge
+        /// confirmation flow needs the extra "shrink files on disk?" dialog at all.</summary>
+        [Get("/api/DataMaintenance/Provider")]
+        Task<DataMaintenanceProviderInfo> DataMaintenanceProviderGet();
+
+        [Post("/api/DataMaintenance/Optimize")]
+        Task DataMaintenanceOptimize([Body] DataMaintenanceRequest request);
+
+        [Post("/api/DataMaintenance/Purge")]
+        Task DataMaintenancePurge([Body] DataPurgeRequest request);
     }
 }

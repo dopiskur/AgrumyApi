@@ -51,6 +51,52 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Index));
         }
 
+        /// <summary>Roadmap #126: whether to show the MariaDB-only "shrink files on disk?" dialog
+        /// before a Purge confirmation - fetched once by the page's own JS, same AJAX-target
+        /// convention as DeviceController.IssueCommand (device-commands.js).</summary>
+        [HttpGet]
+        public async Task<ActionResult<DataMaintenanceProviderInfo>> DataMaintenanceProvider()
+        {
+            try
+            {
+                return Ok(await api.DataMaintenanceProviderGet());
+            }
+            catch (ApiException ex)
+            {
+                return StatusCode(ex.StatusCode, ex.Body);
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> DataMaintenanceOptimize([FromBody] DataMaintenanceRequest request)
+        {
+            try
+            {
+                await api.DataMaintenanceOptimize(request);
+                return Ok();
+            }
+            catch (ApiException ex)
+            {
+                return StatusCode(ex.StatusCode, ex.Body);
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> DataMaintenancePurge([FromBody] DataPurgeRequest request)
+        {
+            try
+            {
+                await api.DataMaintenancePurge(request);
+                return Ok();
+            }
+            catch (ApiException ex)
+            {
+                return StatusCode(ex.StatusCode, ex.Body);
+            }
+        }
+
         /// <summary>Roadmap #39: same source/shape as ProfileController's per-user dropdown - one
         /// extra "not set" option up top, since a blank ScheduleTimeZone (unlike a user's display
         /// TimeZone) is a real, intentional state (see api.Models.ServerConfig's comment).</summary>

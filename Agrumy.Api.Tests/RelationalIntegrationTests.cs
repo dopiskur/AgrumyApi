@@ -1572,6 +1572,74 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(left[0].DateCreated > now.AddDays(-2));
     }
 
+    // ---- data maintenance (roadmap #126) -----------------------------------
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task OptimizeOldSensorData_Downsamples_5Minute_Bucket_ExcludingOutliers(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+
+        DateTime cutoffUtc = DateTime.UtcNow.AddDays(-30);
+        DateTime rawTimestamp = cutoffUtc.AddDays(-1);
+        DateTime bucketStart = new(rawTimestamp.Ticks - (rawTimestamp.Ticks % TimeSpan.FromMinutes(5).Ticks), DateTimeKind.Utc);
+        DateTime recentTimestamp = DateTime.UtcNow.AddDays(-1); // newer than cutoff - must survive untouched
+
+        await using (var db = _fx.NewContext(t))
+        {
+            db.SensorData.AddRange(
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 20, DateCreated = bucketStart.AddSeconds(10) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 21, DateCreated = bucketStart.AddSeconds(70) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 19, DateCreated = bucketStart.AddSeconds(130) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 20, DateCreated = bucketStart.AddSeconds(190) },
+                // a broken-sensor spike - must be excluded from the bucket's average, not drag it up
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 500, DateCreated = bucketStart.AddSeconds(250) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 99, DateCreated = recentTimestamp });
+            await db.SaveChangesAsync();
+        }
+
+        await _repo.OptimizeOldSensorDataAsync(cutoffUtc, CancellationToken.None);
+
+        await using var back = _fx.NewContext(t);
+        var rows = await back.SensorData.Where(r => r.DeviceID == d.IDDevice).OrderBy(r => r.DateCreated).ToListAsync();
+
+        var optimized = Assert.Single(rows, r => r.DateCreated == bucketStart);
+        Assert.Equal(tenantId, optimized.TenantID);
+        Assert.Equal(20.0, optimized.Temperature); // (19+20+20+21)/4 - the 500 outlier excluded by IQR
+
+        // Untouched by microsecond precision differences across MySQL/Postgres round-tripping a
+        // DateTime carrying 100ns ticks (same reasoning as RefreshToken_AddAndGet_RoundTrips'
+        // tolerance above) - identified by its distinct Temperature value instead of exact DateCreated.
+        var untouched = Assert.Single(rows, r => r.Temperature == 99);
+        Assert.True(Math.Abs((untouched.DateCreated!.Value - recentTimestamp).TotalSeconds) < 1);
+        Assert.Equal(2, rows.Count); // one optimized bucket + the untouched recent row
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task PurgeOldSensorData_DeletesRows_Older_Than_Cutoff(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+        var now = DateTime.UtcNow;
+
+        await using (var db = _fx.NewContext(t))
+        {
+            db.SensorData.AddRange(
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DateCreated = now.AddDays(-10) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DateCreated = now.AddDays(-1) });
+            await db.SaveChangesAsync();
+        }
+
+        await _repo.PurgeOldSensorDataAsync(now.AddDays(-5), shrinkAfterPurge: false, CancellationToken.None);
+
+        await using var back = _fx.NewContext(t);
+        var left = await back.SensorData.Where(r => r.DeviceID == d.IDDevice).ToListAsync();
+        Assert.Single(left);
+        Assert.True(left[0].DateCreated > now.AddDays(-2));
+    }
+
     // ---- error classification --------------------------------------
 
     [SkippableTheory, MemberData(nameof(Providers))]

@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using api.Dal.Entities;
 using api.Models;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace api.Dal
 {
@@ -155,6 +156,175 @@ namespace api.Dal
             await db.SensorData
                 .Where(r => r.DeviceID == deviceID && r.TenantID == tenantID && r.DateCreated < cutoff)
                 .ExecuteDeleteAsync();
+        }
+
+        private static readonly TimeSpan OptimizeBucketSize = TimeSpan.FromMinutes(5);
+
+        public async Task OptimizeOldSensorDataAsync(DateTime cutoffUtc, CancellationToken ct)
+        {
+            // Per-device, not one giant query across the whole table - keeps each transaction's
+            // row count (and the in-memory row list below) bounded to one device's history, and a
+            // failure partway through leaves every device processed so far genuinely optimized
+            // rather than rolling back the entire run.
+            List<int> deviceIds = await db.SensorData.AsNoTracking()
+                .Where(r => r.DateCreated < cutoffUtc)
+                .Select(r => r.DeviceID)
+                .Distinct()
+                .ToListAsync(ct);
+
+            foreach (int deviceId in deviceIds)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                List<SensorDataRow> rows = await db.SensorData.AsNoTracking()
+                    .Where(r => r.DeviceID == deviceId && r.DateCreated < cutoffUtc && r.DateCreated != null)
+                    .OrderBy(r => r.DateCreated)
+                    .ToListAsync(ct);
+
+                if (rows.Count == 0)
+                {
+                    continue;
+                }
+
+                List<SensorDataRow> replacements = rows
+                    .GroupBy(r => BucketStart(r.DateCreated!.Value))
+                    .Select(bucket => BuildOptimizedRow(deviceId, bucket.Key, bucket.ToList()))
+                    .ToList();
+
+                // Delete-then-insert in one transaction: a crash between the two would otherwise
+                // either duplicate data (insert without delete) or silently lose the bucket
+                // (delete without insert).
+                await using var transaction = await db.Database.BeginTransactionAsync(ct);
+                await db.SensorData
+                    .Where(r => r.DeviceID == deviceId && r.DateCreated < cutoffUtc)
+                    .ExecuteDeleteAsync(ct);
+                db.SensorData.AddRange(replacements);
+                await db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+        }
+
+        public async Task PurgeOldSensorDataAsync(DateTime cutoffUtc, bool shrinkAfterPurge, CancellationToken ct)
+        {
+            if (db.Database.IsNpgsql())
+            {
+                bool isHypertable;
+                try
+                {
+                    isHypertable = await db.Database.SqlQueryRaw<int>(
+                        "SELECT COUNT(*)::int FROM timescaledb_information.hypertables WHERE hypertable_name = 'sensorData'")
+                        .FirstAsync(ct) > 0;
+                }
+                catch (PostgresException)
+                {
+                    // TimescaleDB extension not installed - #14's graceful-fallback tier, sensorData
+                    // is a plain table here (same as MariaDB, minus the OPTIMIZE-TABLE shrink step).
+                    isHypertable = false;
+                }
+
+                if (isHypertable)
+                {
+                    // drop_chunks deletes whole chunk files, not row-by-row - space is returned to
+                    // the OS immediately, unlike a plain DELETE (see the MariaDB branch below for
+                    // why that path needs an extra shrink step and this one never does). Embedded
+                    // double-quotes in the regclass literal, same reasoning as EnsureTimescaleHypertableAsync:
+                    // an unquoted cast lowercases the mixed-case table name and misses it.
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"""SELECT drop_chunks('"sensorData"'::regclass, older_than => {cutoffUtc});""", ct);
+                    return;
+                }
+
+                await db.SensorData.Where(r => r.DateCreated < cutoffUtc).ExecuteDeleteAsync(ct);
+                return;
+            }
+
+            await db.SensorData.Where(r => r.DateCreated < cutoffUtc).ExecuteDeleteAsync(ct);
+            if (shrinkAfterPurge)
+            {
+                // InnoDB never shrinks its .ibd file on a plain DELETE (the freed space is only
+                // reused internally) - OPTIMIZE TABLE is the full, locking rebuild that actually
+                // returns it to the OS. Caller (DataMaintenanceApiController) only sets this true
+                // after the admin explicitly opted in on a dedicated dialog, since this can take a
+                // long time on a large table.
+                await db.Database.ExecuteSqlRawAsync("OPTIMIZE TABLE `sensorData`;", ct);
+            }
+        }
+
+        private static DateTime BucketStart(DateTime timestamp) =>
+            new(timestamp.Ticks - (timestamp.Ticks % OptimizeBucketSize.Ticks), DateTimeKind.Utc);
+
+        /// <summary>One replacement row for a 5-minute bucket: TenantID/DeviceUnitID/DeviceUnitZoneID
+        /// come from the bucket's most recent raw row (a mid-bucket unit/zone reassignment is rare
+        /// and the newer value is the more useful one to keep), every sensor column is the
+        /// average-without-outliers of whatever raw values that bucket has (nulls excluded).</summary>
+        private static SensorDataRow BuildOptimizedRow(int deviceId, DateTime bucketStart, List<SensorDataRow> rows)
+        {
+            SensorDataRow mostRecent = rows[^1]; // rows arrive pre-sorted by DateCreated ascending
+            return new SensorDataRow
+            {
+                TenantID = mostRecent.TenantID,
+                DeviceID = deviceId,
+                DeviceUnitID = mostRecent.DeviceUnitID,
+                DeviceUnitZoneID = mostRecent.DeviceUnitZoneID,
+                Battery = TrimmedMeanInt(rows.Select(r => r.Battery)),
+                Temperature = TrimmedMean(rows.Select(r => r.Temperature)),
+                SoilTemperature = TrimmedMean(rows.Select(r => r.SoilTemperature)),
+                Humidity = TrimmedMean(rows.Select(r => r.Humidity)),
+                Moisture = TrimmedMeanInt(rows.Select(r => r.Moisture)),
+                Light = TrimmedMeanInt(rows.Select(r => r.Light)),
+                Co2 = TrimmedMeanInt(rows.Select(r => r.Co2)),
+                Tvoc = TrimmedMeanInt(rows.Select(r => r.Tvoc)),
+                Barometer = TrimmedMean(rows.Select(r => r.Barometer)),
+                LiquidPH = TrimmedMean(rows.Select(r => r.LiquidPH)),
+                RainLevel = TrimmedMeanInt(rows.Select(r => r.RainLevel)),
+                WaterLevel = TrimmedMeanInt(rows.Select(r => r.WaterLevel)),
+                Wind = TrimmedMeanInt(rows.Select(r => r.Wind)),
+                DateCreated = bucketStart,
+            };
+        }
+
+        /// <summary>Classic IQR outlier rule (exclude anything outside 1.5x the interquartile range),
+        /// falling back to a plain average when there are too few points (under 4) to identify
+        /// outliers meaningfully, or when every value gets flagged (a degenerate all-equal-but-one
+        /// bucket would otherwise average zero points).</summary>
+        private static double? TrimmedMean(IEnumerable<double?> source)
+        {
+            List<double> values = source.Where(v => v.HasValue).Select(v => v!.Value).OrderBy(v => v).ToList();
+            if (values.Count == 0)
+            {
+                return null;
+            }
+            if (values.Count < 4)
+            {
+                return values.Average();
+            }
+
+            double q1 = Percentile(values, 0.25);
+            double q3 = Percentile(values, 0.75);
+            double iqr = q3 - q1;
+            double lower = q1 - 1.5 * iqr;
+            double upper = q3 + 1.5 * iqr;
+            List<double> kept = values.Where(v => v >= lower && v <= upper).ToList();
+            return kept.Count > 0 ? kept.Average() : values.Average();
+        }
+
+        private static int? TrimmedMeanInt(IEnumerable<int?> source)
+        {
+            double? mean = TrimmedMean(source.Select(v => (double?)v));
+            return mean.HasValue ? (int)Math.Round(mean.Value, MidpointRounding.AwayFromZero) : null;
+        }
+
+        private static double Percentile(List<double> sortedValues, double p)
+        {
+            double index = p * (sortedValues.Count - 1);
+            int lower = (int)Math.Floor(index);
+            int upper = (int)Math.Ceiling(index);
+            if (lower == upper)
+            {
+                return sortedValues[lower];
+            }
+            double fraction = index - lower;
+            return sortedValues[lower] + (sortedValues[upper] - sortedValues[lower]) * fraction;
         }
 
         // ---- JSON value coercion (firmware sends measurements as strings or null) --------

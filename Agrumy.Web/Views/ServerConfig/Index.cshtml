@@ -113,3 +113,82 @@
         </form>
     </div>
 </div>
+
+<div class="card mt-3">
+    <div class="card-header">
+        <h3 class="card-title">Data Maintenance</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-secondary">
+            Applies to sensor telemetry older than the selected threshold, across every device.
+            <strong>Optimize</strong> downsamples it to 5-minute averages (outliers excluded) in
+            place - the data stays, just less precise. <strong>Purge</strong> deletes it
+            completely, with no way to recover it. Both run in the background - this page does
+            not wait for them to finish (roadmap #126).
+        </p>
+        <div class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label" for="dataMaintenanceThreshold">Older than</label>
+                <select id="dataMaintenanceThreshold" class="form-select">
+                    <option value="90">90 days</option>
+                    <option value="180">180 days</option>
+                    <option value="365" selected>365 days</option>
+                    <option value="730">730 days</option>
+                    <option value="1825">5 years</option>
+                    <option value="3650">10 years</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="button" id="dataMaintenanceOptimize" class="btn btn-outline-primary">Optimize Old Data</button>
+            </div>
+            <div class="col-auto">
+                <button type="button" id="dataMaintenancePurge" class="btn btn-outline-danger">Purge Old Data</button>
+            </div>
+        </div>
+        <div id="dataMaintenanceStatus" class="mt-2"></div>
+    </div>
+</div>
+
+<div class="modal fade" id="purgeConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Purge</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>
+                    This permanently deletes sensor data older than the selected threshold -
+                    nothing is kept, not even a downsampled aggregate. This cannot be undone.
+                </p>
+                <label class="form-label" for="purgeConfirmPhrase">Type <code>PURGE</code> to confirm</label>
+                <input type="text" id="purgeConfirmPhrase" class="form-control" autocomplete="off" />
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="purgeConfirmSubmit" class="btn btn-danger" disabled>Purge</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="purgeShrinkModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Also shrink files on disk?</h5>
+            </div>
+            <div class="modal-body">
+                <p>This locks the table and may take a long time on large databases.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="purgeShrinkNo" class="btn btn-secondary">No, skip</button>
+                <button type="button" id="purgeShrinkYes" class="btn btn-primary">Yes, shrink now</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/data-maintenance.js"></script>
+}
