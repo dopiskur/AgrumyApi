@@ -71,4 +71,48 @@ public class CacheRepositoryTests
 
         Assert.Equal("new", result.apiAuth);
     }
+
+    // ---- Generic GetAsync<T>/SetAsync<T> (roadmap #118) ------------------------------
+
+    private sealed record FleetSnapshot(int IDDevice, bool Online);
+
+    [Fact]
+    public async Task GetAsync_Miss_ReturnsNull()
+    {
+        var repo = new CacheRepository(NewBackingStore());
+
+        List<FleetSnapshot>? result = await repo.GetAsync<List<FleetSnapshot>>("fleet:no-such-key");
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task SetAsync_Then_GetAsync_RoundTrips()
+    {
+        var repo = new CacheRepository(NewBackingStore());
+        var snapshot = new List<FleetSnapshot> { new(1, true), new(2, false) };
+
+        await repo.SetAsync("fleet:1", snapshot, TimeSpan.FromSeconds(6));
+        List<FleetSnapshot>? result = await repo.GetAsync<List<FleetSnapshot>>("fleet:1");
+
+        Assert.Equal(snapshot, result);
+    }
+
+    /// <summary>Same distributed-visibility guarantee as
+    /// <see cref="TwoRepositoryInstances_OverSharedBackingStore_SeeEachOthersWrites"/> above, for the
+    /// generic path - this is what lets several concurrently open admin tabs (roadmap #90's 10s poll,
+    /// each its own HTTP request/scope) share one real DB query instead of one each.</summary>
+    [Fact]
+    public async Task GetAsync_OverSharedBackingStore_SeesAnotherInstancesSetAsync()
+    {
+        IDistributedCache sharedStore = NewBackingStore();
+        var writer = new CacheRepository(sharedStore);
+        var reader = new CacheRepository(sharedStore);
+        var snapshot = new List<FleetSnapshot> { new(7, true) };
+
+        await writer.SetAsync("fleet:shared", snapshot, TimeSpan.FromSeconds(6));
+        List<FleetSnapshot>? result = await reader.GetAsync<List<FleetSnapshot>>("fleet:shared");
+
+        Assert.Equal(snapshot, result);
+    }
 }
