@@ -23,6 +23,7 @@ UI operators use to manage devices, users and tenants.
 | `Agrumy.Dal` | class library | Data-access model: `AgrumyDbContext`, EF entities (`api.Dal.Entities`), provider selection (`DbProviderKind`, `DbOptionsFactory`). No stored procedures - every query is LINQ. |
 | `Agrumy.Api` | Web API | Device/sensor communication + admin API (`Controllers/API`), the `IRepository` implementation (`Dal/EfRepository`, EF Core over `Agrumy.Dal`), MySQL/MariaDB **or** PostgreSQL, JWT bearer auth, Swagger, startup DB health-check + schema creation on an empty database. |
 | `Agrumy.Web` | MVC app | Admin UI (`Controllers/View`, `Views/`, `wwwroot/`). Talks to `Agrumy.Api` **only over HTTP** (`Dal/ApiRepository` + `HttpClient` with a JWT bearer token). No direct database access. |
+| `Agrumy.Api.Tests` | test project | Integration tests that run the real EF Core stack against both providers in parallel (`AGRUMY_TEST_MYSQL`/`AGRUMY_TEST_POSTGRES` connection strings), plus unit tests for the alert/schedule/hysteresis evaluators. |
 
 `db/` holds a historical schema dump (`agrumyDB-final.sql`, `agrumyDB-withData.sql`)
 and old deployment notes (`README.txt`), kept for reference only - the schema is now
@@ -54,6 +55,12 @@ patches applied to the pre-existing legacy database, unrelated to EF.
    and carries on with the previous config instead of halting, so irrigation/
    climate control keeps running on stale-but-known-good settings through an
    outage; it just won't pick up config *changes* until connectivity comes back.
+5. **Heartbeat and commands.** Every config-poll doubles as a heartbeat -
+   `Uptime`/`Rssi`/`FreeHeap`/`FirmwareVersion`/`Board` land in `deviceDiagnostic`
+   and drive the Fleet page's online/offline status. The same poll response
+   carries any command an operator queued for that device (`POST
+   /api/DeviceCommand` - Reboot / ForceOTA / ForceConfigSync); the device acts on
+   it and reports back via `POST /api/Device/Command/Ack`.
 
 ## Why not just use Home Assistant / ESPHome / ThingsBoard?
 
@@ -120,13 +127,21 @@ listens on (5000 by default, set in `Agrumy.Api/Properties/launchSettings.json`)
 | `JWT:Issuer` | yes | e.g. `https://api.agrumy.com` |
 | `JWT:Audience` | yes | e.g. `agrumy-api` |
 | `Security:EnforceHttps` | no (default `true`) | `false` = serve plain HTTP, no redirect/HSTS - needed while `AgrumyFirmware` firmware still calls `http://` |
+| `Security:KnownProxies` | no (default empty = loopback only) | roadmap #84 - comma-separated IPs of reverse proxies trusted to set `X-Forwarded-For`/`X-Forwarded-Proto` for the rate limiter. Never point this at an untrusted/public address - that lets a client spoof its own IP and dodge rate limiting. |
 | `Startup:FailFastOnDbCheck` | no (default `false`) | `true` = stop the app if the DB check / provisioning fails |
+| `ServerConfig:Reload` | no (default `false`) | `true` = overwrite the DB `serverConfig` row's hysteresis fields from `ServerConfig:Hysteresis` below on every startup, discarding admin-UI edits. Seed-once is the normal mode; flip to `true` only to force a reset, then back to `false`. |
+| `ServerConfig:Hysteresis:*` | no | roadmap #10 - dead-zone margins (`WaterLevel`/`Temperature`/`Humidity`/`Light`) new devices are seeded with |
+| `ServerConfig:BatteryLowThreshold`, `BatteryLowHysteresis` | no (default `20.0`/`5.0`) | roadmap #12 - percent. `LowBatteryAlertEvaluator` alerts at/below the threshold, rearms only once the reading climbs back to threshold+hysteresis |
+| `ServerConfig:EventDedupeMinutes` | no (default `10`) | roadmap #28 - a device repeating the same event type within this window is dropped, not stored |
+| `ServerConfig:ActivationResendCooldownMinutes` | no (default `10`) | roadmap #24 - minimum minutes between "resend activation email" requests |
+| `ServerConfig:AllowSelfServiceTenantCreation` | no (default `false`) | roadmap #64 - `true` lets a registration for an unknown tenant name create that tenant (min. 6 chars) with the registrant as its admin |
 | `Notifications:Email:*` | no (default off) | SMTP alert email (roadmap #6). `Enabled` + `Host` + `FromAddress` are the minimum; `Port`/`UseStartTls`/`Username`/`Password`/`FromName` optional. Disabled or incomplete = channel skipped, not an error. |
 | `Notifications:Push:*` | no (default off) | FCM push channel - **prepared but inert**. Stays skipped until the Android app registers device tokens and the OAuth step in `FcmPushNotificationChannel` is wired. Leave `Enabled=false`. |
+| `Notifications:OfflineCheckIntervalMinutes` | no (default `5`) | roadmap #40 - how often `OfflineAlertBackgroundService` sweeps every device for a newly-offline one and notifies its tenant's admins via whatever `Notifications:*` channels are configured above |
+| `Notifications:BatteryCheckIntervalMinutes` | no (default `30`) | roadmap #12 - how often `LowBatteryAlertEvaluator` sweeps every device's latest battery telemetry; longer than the offline interval by default since a battery drains over hours/days, not seconds |
 | `Firmware:LocalPath` | no (default `firmware-store`) | roadmap #94 - directory the **Local** firmware repository stores/serves `.bin` files from (`GET /api/Firmware/Download/{file}`). Relative = under the content root; must be writable by the service user. |
 | `Firmware:GitHubRepository` | no (default `dopiskur/AgrumyFirmware`) | `owner/name` whose GitHub Releases feed the catalog - only seeds the `serverConfig` row, the live value is edited on the Server Settings page |
 | `Firmware:GitHubToken` | no | optional GitHub API token; public repositories need none |
-| `Notifications:OfflineCheckIntervalMinutes` | no (default `5`) | roadmap #40 - how often `OfflineAlertBackgroundService` sweeps every device for a newly-offline one and notifies its tenant's admins via whatever `Notifications:*` channels are configured above. |
 | `WebView:Enabled`, `WebView:ApiService` | no | present in `appsettings.json.example` as a documented switch for a possible combined API+UI deployment, but **not currently read by any code** - `Agrumy.Web` is what actually serves the admin UI today |
 
 **`Agrumy.Web/appsettings.json`**
@@ -134,7 +149,8 @@ listens on (5000 by default, set in `Agrumy.Api/Properties/launchSettings.json`)
 | Key | Required | Notes |
 | --- | --- | --- |
 | `WebView:ApiService` | yes | base URL of `Agrumy.Api` (default `http://localhost:5000`) |
-| `JWT:SecureKey` | yes | **must be identical** to `Agrumy.Api`'s `JWT:SecureKey`, otherwise cookie tokens fail validation and every page redirects to login |
+| `JWT:SecureKey`, `JWT:Issuer`, `JWT:Audience` | yes | **must be identical** to `Agrumy.Api`'s values (roadmap #48), otherwise cookie tokens fail validation and every page redirects to login |
+| `DataProtection:KeyPath` | no (default: a `dataprotection-keys` dir next to, not inside, the app folder) | roadmap #79 - where cookie-auth/antiforgery encryption keys persist. Must sit outside anything a redeploy wipes (not `bin/`), and be read/write for the account the service actually runs as. |
 
 ## Database & schema provisioning
 
@@ -206,36 +222,106 @@ database and is not part of this.
 ## API endpoints
 
 All routes below are under `Agrumy.Api`. `[Authorize]` requires a JWT bearer
-token from `POST /api/User/Login`; `[Authorize(Roles = "admin")]` requires the
-`admin` role claim in that token. Device endpoints use the separate
-apiId/apiKey/apiAuth scheme described in "How it works", not JWT.
+token from `POST /api/User/Login`. Most write/admin endpoints require one of
+the **composable roles** in `api.Security.RoleNames` (roadmap #66/#91) rather
+than a single `admin` flag - `UserManagers`/`DeviceManagers` match any of
+`LegacyAdmin`, `GlobalAdmin`, `GlobalUser`/`GlobalDevice`, `TenantAdmin`,
+`TenantUser`/`TenantDevice`; `Admins` matches `LegacyAdmin`/`GlobalAdmin`/
+`TenantAdmin`; a handful of server-wide actions (below) require the literal
+`admin` role, i.e. Global admin only, because they cross every tenant at once.
+Device endpoints use the separate apiId/apiKey/apiAuth scheme described in
+"How it works", not JWT.
+
+**User** (`UserApiController`, `api/User`)
 
 | Endpoint | Auth | Purpose |
 | --- | --- | --- |
-| `POST /api/User/Register` | rate-limited, no auth | Self-service registration; new users are disabled by default |
-| `POST /api/User/Login` | rate-limited, no auth | Returns a JWT bearer token |
+| `POST /api/User/Register` | rate-limited, no auth | Self-service registration; account is inactive until `Activate` |
+| `GET /api/User/Activate` | rate-limited, no auth | Confirms the emailed activation token |
+| `POST /api/User/ResendActivation` | rate-limited, no auth | Re-sends the activation email |
+| `POST /api/User/Login` | rate-limited, no auth | Returns a JWT access token + refresh token |
+| `POST /api/User/RefreshToken` | rate-limited, no auth | Silent renewal - rotates the refresh token, detects reuse of an already-rotated one |
+| `POST /api/User/RevokeRefreshToken` | rate-limited, no auth | Logout - invalidates one refresh token |
 | `GET /api/User/BootstrapPending` | no auth | Roadmap #91: true while the fresh-install bootstrap Global Admin still has no password |
 | `POST /api/User/BootstrapSetPassword` | rate-limited, no auth | Roadmap #91: one-shot - sets the bootstrap Global Admin's password, then this always returns 403 |
-| `POST /api/User/ChangePassword` | rate-limited, JWT (self) | Change the caller's own password (identity from JWT, old password required) |
-| `GET /api/User/All` | admin | List every user |
-| `GET /api/User/Self` | admin | Fetch the caller's own user record (see README note: currently admin-only, not "admin or the user themselves") |
-| `GET /api/User` | admin | Fetch a user by id |
-| `POST /api/User` | admin | Create a user |
-| `PUT /api/User` | admin | Update a user |
-| `DELETE /api/User` | admin | Delete a user (ids 0 and 1 are protected) |
-| `GET /api/User/Roles` | admin | List available roles |
-| `GET/POST/DELETE /api/User/Group[/All]` | admin | List/create/delete user groups (tenant roles) |
+| `POST /api/User/ChangePassword` | rate-limited, JWT (self) | Change the caller's own password (old password required) |
+| `PUT /api/User/Profile` | JWT (self) | Roadmap #71: update the caller's own display name / IANA time zone |
+| `POST /api/User/DevicePin` | JWT (self) | Roadmap #70/#76: issue/reuse the caller's still-valid 6-char device-registration PIN (24h expiry, multi-use within that window) |
+| `GET /api/User/All`, `GET /api/User/Self`, `GET /api/User` | JWT | List users / fetch own record / fetch a user by id |
+| `POST /api/User`, `PUT /api/User` | UserManagers | Create / update a user |
+| `DELETE /api/User` | UserManagers | Delete a user (ids 0 and 1 are protected) |
+| `GET /api/User/Roles`, `GET /api/User/UserRoles` | UserManagers | List available roles / a user's assigned roles |
+| `PUT /api/User/UserRoles` | Admins | Set a user's roles |
+| `GET /api/User/Group/All`, `GET /api/User/Group` | UserManagers | List / fetch tenant user groups |
+| `POST /api/User/Group`, `DELETE /api/User/Group` | Admins | Create / delete a user group |
+
+**Device** (`DeviceApiController`, `api/Device`)
+
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
 | `POST /api/Device/Register` | device pin | Device self-registration (see "How it works") |
 | `POST /api/Device/Authenticate` | apiId/apiKey | Issues the short-lived `apiAuth` token |
-| `POST /api/Device/Config` | apiId/apiAuth | Config-version-checked config sync |
+| `POST /api/Device/Config` | apiId/apiAuth | Config-version-checked config sync; also carries any queued `DeviceCommand` and diagnostic heartbeat fields |
+| `POST /api/Device/Event`, `POST /api/Device/Command/Ack` | apiId/apiAuth | Device pushes an event / acknowledges a command |
 | `GET /api/Device/All`, `GET /api/Device` | JWT | List devices / fetch one |
-| `PUT /api/Device`, `DELETE /api/Device` | JWT admin | Update / delete a device |
-| `GET/PUT /api/Device/Sensor`, `GET/PUT /api/Device/Controller` | JWT (PUT admin) | Read/update a device's sensor or controller config |
+| `GET /api/Device/Fleet` | JWT | Roadmap #7/#8: every device's latest diagnostic + online/offline status |
+| `GET /api/Device/Events` | JWT | A device's event log |
+| `PUT /api/Device`, `DELETE /api/Device` | DeviceManagers | Update / delete a device |
+| `GET/PUT /api/Device/Sensor`, `GET/PUT /api/Device/Controller` | JWT (PUT DeviceManagers) | Read/update a device's sensor or controller config |
+| `POST /api/Device/FirmwareUpdate`, `DELETE /api/Device/FirmwareUpdate` | DeviceManagers | Queue / cancel an OTA update for one device |
 | `GET /api/Device/Type`, `TypeService`, `TypeRelay`, `TypeSensor` | JWT | Fixed lookup lists used to build device config forms |
+
+**DeviceCommand** (`DeviceCommandApiController`, roadmap #34)
+
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
+| `POST /api/DeviceCommand` | DeviceManagers | Queue Reboot / ForceOTA / ForceConfigSync for one or more devices; delivered on the device's next config poll |
+
+**DeviceUnit** (`DeviceUnitApiController`, roadmap #81/#82, `api/DeviceUnit`)
+
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
+| `GET /api/DeviceUnit/All`, `GET /api/DeviceUnit` | JWT | List units / fetch one |
+| `POST /api/DeviceUnit`, `PUT /api/DeviceUnit`, `DELETE /api/DeviceUnit` | DeviceManagers | Create / update / delete a unit |
+| `GET /api/DeviceUnit/Zone` | JWT | Zones under a unit |
+| `POST/PUT/DELETE /api/DeviceUnit/Zone` | DeviceManagers | Create / update / delete a zone |
+| `GET /api/DeviceUnit/Unassigned` | DeviceManagers | Devices not yet placed in any zone |
+| `POST /api/DeviceUnit/Assign`, `POST /api/DeviceUnit/Unassign` | DeviceManagers | Place / remove a device from a zone |
+| `GET /api/DeviceUnit/Dashboard`, `Dashboard/Zones`, `Dashboard/Zone` | JWT | Roadmap #116: hierarchical dashboard rollups (per-unit, per-zone-list, per-zone) |
+
+**Firmware** (`FirmwareApiController`, roadmap #94/#93, `api/Firmware`)
+
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
+| `GET /api/Firmware` | DeviceManagers | List catalog entries, optionally filtered by board |
+| `POST /api/Firmware/Sync` | admin | Refresh the catalog from the configured source (GitHub / Custom repository) |
+| `POST /api/Firmware/Import` | admin | Pull one release's files into the **Local** repository |
+| `POST /api/Firmware/Upload` | admin | Manually add a `.bin` to the Local repository |
+| `DELETE /api/Firmware` | admin | Remove a catalog entry |
+| `GET /api/Firmware/Manifest`, `GET /api/Firmware/Fetch` | DeviceManagers | Offline-USB-repository preparation (`tools/offline-repo/*`) |
+| `GET /api/Firmware/Download/{fileName}` | no auth | Serves a `.bin` from the Local store (device OTA download) |
+
+**ServerConfig** (`ServerConfigApiController`, `api/ServerConfig`)
+
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
+| `GET /api/ServerConfig`, `PUT /api/ServerConfig` | admin | Global defaults (hysteresis, alert thresholds, firmware source, etc.) - Global admin only, applies across every tenant |
+| `GET /api/ServerConfig/Public` | no auth | The subset of server config safe to expose pre-login (e.g. registration open/closed) |
+
+**DataMaintenance** (`DataMaintenanceApiController`, roadmap #126, `api/DataMaintenance`)
+
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
+| `GET /api/DataMaintenance/Provider` | admin | Whether the DB is MySQL/MariaDB (affects whether "shrink files on disk" is offered) |
+| `POST /api/DataMaintenance/Optimize`, `POST /api/DataMaintenance/Purge` | admin | Queue an old-data optimize/purge job on `BackgroundJobQueue`; returns 202 immediately, runs async |
+
+**SensorData** (`SensorDataApiController`, `api/SensorData`)
+
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
 | `GET /api/SensorData` | JWT | Sensor readings for a device over a time range |
-| `POST /api/SensorData` | rate-limited | Device telemetry push |
+| `POST /api/SensorData` | rate-limited | Device telemetry push (includes `Battery` since roadmap #12) |
 | `DELETE /api/SensorData` | JWT admin | Bulk-delete sensor data for a device/time range |
-| `GET /api/SensorData/Report` | JWT | Saved sensor data reports |
 
 ## Deployment
 
