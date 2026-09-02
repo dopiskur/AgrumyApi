@@ -272,10 +272,10 @@ namespace api.Models
         // Roadmap #39/#115: a third relay-control mode alongside threshold (dead-zone) and
         // interval (duty-cycle) above - "be on during any of these wall-clock windows on these
         // days", independent of any sensor reading. Each function gets zero or more windows,
-        // OR'd together by the firmware (AgrumyDevice's RelayLogic::computeAnyScheduleState) -
+        // OR'd together by the firmware (AgrumyFirmware's RelayLogic::computeAnyScheduleState) -
         // zero windows means that function never turns on in schedule mode, no separate "enabled"
         // flag needed (confirmed design, #115). DaysOfWeek is a 7-bit mask matching C's tm_wday
-        // convention (bit 0 = Sunday .. bit 6 = Saturday - see AgrumyDevice's
+        // convention (bit 0 = Sunday .. bit 6 = Saturday - see AgrumyFirmware's
         // ActuatorController::scheduleRelayFunction), so the firmware needs zero day-numbering
         // translation. Start/Duration are seconds since LOCAL midnight (not UTC) - "local"
         // resolved via ServerConfig.ScheduleTimeZone and delivered to the device as a plain UTC

@@ -1,6 +1,6 @@
 # Device <-> API contract (`contracts/device-api/`)
 
-Narrow, machine-checkable JSON Schemas for the **four** HTTP endpoints the AgrumyDevice
+Narrow, machine-checkable JSON Schemas for the **four** HTTP endpoints the AgrumyFirmware
 firmware actually calls. This is deliberately **not** a full OpenAPI document - Swashbuckle
 already generates general API docs from the C# models. The point here is a tight contract
 that a test can enforce, so that renaming/removing a JSON field on one side breaks a build
@@ -23,7 +23,7 @@ by construction** (both are the serialized `api.Models.DeviceConfig`, produced b
 
 From the **actual current behaviour of both code bases**, not from docs:
 
-* Request shapes: read out of `AgrumyDevice/src/Controller/*.cpp` (`registerDevice()`,
+* Request shapes: read out of `AgrumyFirmware/src/Controller/*.cpp` (`registerDevice()`,
   `apiAuthenticate()`, `apiConfig()`, `buildSensorDataPayload()`).
 * Response shapes: the API was run locally and each endpoint called; the live JSON
   confirmed **camelCase** property names, that **null values are kept** (not omitted),
@@ -40,7 +40,7 @@ the SensorData `rainLevel` key does **not** match the stored proc's `$.rainlevel
 * **API side** - `Agrumy.Api.Tests/ContractTests.cs` serializes the C# models with the
   same `System.Text.Json` Web defaults MVC uses and validates the output against these
   schemas. Runs in the normal `dotnet test` CI step (`.github/workflows/build.yml`).
-* **Firmware side** - `AgrumyDevice/tools/contract-check/` keeps a hand-maintained list
+* **Firmware side** - `AgrumyFirmware/tools/contract-check/` keeps a hand-maintained list
   of the JSON keys the firmware sends/expects and checks it against a **copy** of these
   schemas (copied, not submoduled - see that repo's `contracts/device-api/README.md` for
   the source commit hash). Runs in `.github/workflows/contract-check.yml` there.
@@ -59,7 +59,7 @@ then, in the same change:
 
 1. Update the affected schema file(s) here.
 2. Run `dotnet test` - `ContractTests` must stay green.
-3. Copy the changed schema file(s) into `AgrumyDevice/contracts/device-api/` and update
+3. Copy the changed schema file(s) into `AgrumyFirmware/contracts/device-api/` and update
    the source-commit line in that repo's README, plus the field list in
-   `AgrumyDevice/tools/contract-check/firmware_fields.py`.
-4. If the firmware's actual payload/parsing changed, update `AgrumyDevice/src/...` too.
+   `AgrumyFirmware/tools/contract-check/firmware_fields.py`.
+4. If the firmware's actual payload/parsing changed, update `AgrumyFirmware/src/...` too.

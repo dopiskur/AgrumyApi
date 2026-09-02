@@ -9,7 +9,7 @@ Agrumy is a small multi-tenant backend + admin UI for managing IoT devices that
 monitor and control greenhouse/citrus micro-climate - temperature, humidity, soil
 moisture, light, CO2, water level - and drive relays (ventilation, heating,
 irrigation, lighting) off configurable thresholds and time intervals. It is the
-server side of a system whose device firmware lives in the separate `AgrumyDevice`
+server side of a system whose device firmware lives in the separate `AgrumyFirmware`
 repository; this repository is the API those devices talk to, plus the MVC admin
 UI operators use to manage devices, users and tenants.
 
@@ -48,7 +48,7 @@ patches applied to the pre-existing legacy database, unrelated to EF.
    device does nothing. Sensor telemetry goes up the other way via
    `POST /api/SensorData`.
 4. **Control is local to the device.** Relay decisions (ventilation, heating,
-   water pump, lighting) run in the device firmware (`AgrumyDevice` repo) against
+   water pump, lighting) run in the device firmware (`AgrumyFirmware` repo) against
    whatever config it last saved to its own flash storage. If the config-sync
    request fails - no network, API unreachable - the firmware logs the failure
    and carries on with the previous config instead of halting, so irrigation/
@@ -119,12 +119,12 @@ listens on (5000 by default, set in `Agrumy.Api/Properties/launchSettings.json`)
 | `JWT:SecureKey` | yes | long random secret (>= 32 chars); app throws on startup without it |
 | `JWT:Issuer` | yes | e.g. `https://api.agrumy.com` |
 | `JWT:Audience` | yes | e.g. `agrumy-api` |
-| `Security:EnforceHttps` | no (default `true`) | `false` = serve plain HTTP, no redirect/HSTS - needed while `AgrumyDevice` firmware still calls `http://` |
+| `Security:EnforceHttps` | no (default `true`) | `false` = serve plain HTTP, no redirect/HSTS - needed while `AgrumyFirmware` firmware still calls `http://` |
 | `Startup:FailFastOnDbCheck` | no (default `false`) | `true` = stop the app if the DB check / provisioning fails |
 | `Notifications:Email:*` | no (default off) | SMTP alert email (roadmap #6). `Enabled` + `Host` + `FromAddress` are the minimum; `Port`/`UseStartTls`/`Username`/`Password`/`FromName` optional. Disabled or incomplete = channel skipped, not an error. |
 | `Notifications:Push:*` | no (default off) | FCM push channel - **prepared but inert**. Stays skipped until the Android app registers device tokens and the OAuth step in `FcmPushNotificationChannel` is wired. Leave `Enabled=false`. |
 | `Firmware:LocalPath` | no (default `firmware-store`) | roadmap #94 - directory the **Local** firmware repository stores/serves `.bin` files from (`GET /api/Firmware/Download/{file}`). Relative = under the content root; must be writable by the service user. |
-| `Firmware:GitHubRepository` | no (default `dopiskur/AgrumyDevice`) | `owner/name` whose GitHub Releases feed the catalog - only seeds the `serverConfig` row, the live value is edited on the Server Settings page |
+| `Firmware:GitHubRepository` | no (default `dopiskur/AgrumyFirmware`) | `owner/name` whose GitHub Releases feed the catalog - only seeds the `serverConfig` row, the live value is edited on the Server Settings page |
 | `Firmware:GitHubToken` | no | optional GitHub API token; public repositories need none |
 | `Notifications:OfflineCheckIntervalMinutes` | no (default `5`) | roadmap #40 - how often `OfflineAlertBackgroundService` sweeps every device for a newly-offline one and notifies its tenant's admins via whatever `Notifications:*` channels are configured above. |
 | `WebView:Enabled`, `WebView:ApiService` | no | present in `appsettings.json.example` as a documented switch for a possible combined API+UI deployment, but **not currently read by any code** - `Agrumy.Web` is what actually serves the admin UI today |

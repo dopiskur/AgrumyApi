@@ -61,7 +61,7 @@ namespace api
         // content root unless absolute; null = FirmwareStorage.DefaultRelativePath). GitHubRepository: only the SEED for the DB serverConfig
         // row - the admin page edits the live value. GitHubToken: optional, see HttpFirmwareFetcher.
         public string? FirmwareLocalPath { get; set; }
-        public string FirmwareGitHubRepository { get; set; } = "dopiskur/AgrumyDevice";
+        public string FirmwareGitHubRepository { get; set; } = "dopiskur/AgrumyFirmware";
         public string? FirmwareGitHubToken { get; set; }
 
         public static AgrumySettings Bind(IConfiguration configuration) => new()
@@ -83,7 +83,7 @@ namespace api
             AllowSelfServiceTenantCreation = ParseBoolOr(configuration, "ServerConfig:AllowSelfServiceTenantCreation", false),
             ScheduleTimeZone = configuration.GetSection("ServerConfig:ScheduleTimeZone").Value,
             FirmwareLocalPath = configuration.GetSection("Firmware:LocalPath").Value,
-            FirmwareGitHubRepository = configuration.GetSection("Firmware:GitHubRepository").Value is { Length: > 0 } repo ? repo : "dopiskur/AgrumyDevice",
+            FirmwareGitHubRepository = configuration.GetSection("Firmware:GitHubRepository").Value is { Length: > 0 } repo ? repo : "dopiskur/AgrumyFirmware",
             FirmwareGitHubToken = configuration.GetSection("Firmware:GitHubToken").Value,
         };
 

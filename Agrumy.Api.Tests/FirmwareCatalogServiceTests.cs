@@ -44,17 +44,17 @@ public class FirmwareCatalogServiceTests
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig
         {
             FirmwareSource = source,
-            FirmwareGitHubRepository = "dopiskur/AgrumyDevice",
+            FirmwareGitHubRepository = "dopiskur/AgrumyFirmware",
             FirmwareCustomRepositoryUrl = customUrl,
         });
 
-    private const string GitHubReleasesUrl = "https://api.github.com/repos/dopiskur/AgrumyDevice/releases?per_page=100";
+    private const string GitHubReleasesUrl = "https://api.github.com/repos/dopiskur/AgrumyFirmware/releases?per_page=100";
 
     /// <summary>Two releases (v1.1.0, v1.0.0), each with both boards + a manifest asset, plus a draft
     /// that must be ignored and a stray asset name that must be skipped.</summary>
     private void SetupGitHubReleases()
     {
-        static string Asset(string tag, string name) => $"https://github.com/dopiskur/AgrumyDevice/releases/download/{tag}/{name}";
+        static string Asset(string tag, string name) => $"https://github.com/dopiskur/AgrumyFirmware/releases/download/{tag}/{name}";
         string manifest110 = JsonSerializer.Serialize(new FirmwareManifest
         {
             Releases = [new FirmwareManifestRelease { Version = "1.1.0", Files = [
@@ -150,7 +150,7 @@ public class FirmwareCatalogServiceTests
     {
         SetSource(FirmwareSource.Local);
         SetupGitHubReleases();
-        _fetcher.Binaries["https://github.com/dopiskur/AgrumyDevice/releases/download/v1.1.0/agrumy-esp32dev-v1.1.0.bin"] = FakeFirmwareFetcher.Bytes("CORRUPTED");
+        _fetcher.Binaries["https://github.com/dopiskur/AgrumyFirmware/releases/download/v1.1.0/agrumy-esp32dev-v1.1.0.bin"] = FakeFirmwareFetcher.Bytes("CORRUPTED");
 
         FirmwareSyncResult result = await NewService().SyncAsync(FirmwareSyncMode.PullIncremental, "https://api.agrumy.com");
 

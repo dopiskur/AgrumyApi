@@ -158,7 +158,7 @@ namespace api.Dal
         /// <summary>Roadmap #91: EnsureCreatedAsync makes the four deviceType* tables, never rows -
         /// left empty, every device Add/Edit dropdown in Agrumy.Web is blank and the admin can't
         /// assign a type/service/relay/sensor to anything. Values are the original product's fixed
-        /// catalog (db/agrumyDB-final.sql) verbatim, not invented: AgrumyDevice's firmware hardcodes
+        /// catalog (db/agrumyDB-final.sql) verbatim, not invented: AgrumyFirmware's firmware hardcodes
         /// these same IDs (ControllerController.h's RelayFunctionType enum for deviceTypeRelay,
         /// DeviceController.cpp's serviceType() switch for deviceTypeService), and Agrumy.Web's
         /// DeviceController.Edit switches on the literal deviceType IDs 0/1/2/3 - drifting from this

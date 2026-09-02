@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/config.request.schema.json",
+  "$id": "https://github.com/dopiskur/AgrumyService/contracts/device-api/config.request.schema.json",
   "title": "Device Config - request  (firmware -> POST /api/Device/Config)",
   "description": "Body built by ServiceController::apiConfig(). 'ConfigVersion' - PascalCase, unlike every other firmware payload - is the device's current config version sent as a STRING (String(deviceConfig.configVersion)). Since roadmap #7 the poll doubles as the heartbeat and also carries live diagnostics: 'Uptime' (seconds since boot, from esp_timer_get_time), 'Rssi' (WiFi.RSSI() dBm, negative), 'FreeHeap' (ESP.getFreeHeap() bytes) and 'FirmwareVersion' (the RUNNING image's version string, not the offered OTA one). The server binds the body to api.Models.DeviceConfigPoll via System.Text.Json case-insensitive matching plus NumberHandling.AllowReadingFromString, and upserts the diagnostics into deviceDiagnostic with LastSeenAt = server clock. Credentials travel as HTTP HEADERS: 'apiId' (device GUID) and 'Authorization' (the apiAuth token from /Authenticate).",
   "type": "object",

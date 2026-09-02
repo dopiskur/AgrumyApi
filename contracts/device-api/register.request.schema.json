@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/register.request.schema.json",
+  "$id": "https://github.com/dopiskur/AgrumyService/contracts/device-api/register.request.schema.json",
   "title": "Device Register - request  (firmware -> POST /api/Device/Register)",
-  "description": "Body built by AgrumyDevice DeviceController::registerDevice() (payload[...] lines). This is the unauthenticated bootstrap call - identity is proven by email + devicePin in the body, NOT by headers. Server model: api.Models.DeviceRegistration.",
+  "description": "Body built by AgrumyFirmware DeviceController::registerDevice() (payload[...] lines). This is the unauthenticated bootstrap call - identity is proven by email + devicePin in the body, NOT by headers. Server model: api.Models.DeviceRegistration.",
   "type": "object",
   "additionalProperties": false,
   "required": ["macAddress", "email", "devicePin", "serviceType"],

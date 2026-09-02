@@ -4,7 +4,7 @@ namespace api.Models
 {
     /// <summary>Roadmap #94: where the firmware catalog (table deviceFirmware) is populated from
     /// and, for a device doing OTA (#3), where the .bin actually gets downloaded from. GitHub is the
-    /// zero-config default (public AgrumyDevice releases); Local means this API hosts the files
+    /// zero-config default (public AgrumyFirmware releases); Local means this API hosts the files
     /// itself (the only path that works air-gapped, and the escape hatch for a self-hosted install
     /// whose pinned servicePublicKey cert would never validate GitHub's TLS); Custom is an
     /// operator-run repository serving the same manifest.json format the offline-USB tools write.</summary>
@@ -67,14 +67,14 @@ namespace api.Models
 
     // ---- manifest.json: the one contract shared by Custom repositories, the offline-USB import
     // scanner (#94-2b) and both offline-USB preparation tools (#94-C1 browser button, #94-C2
-    // script), and produced by the AgrumyDevice release.yml workflow as a release asset. Kept flat
+    // script), and produced by the AgrumyFirmware release.yml workflow as a release asset. Kept flat
     // and versioned so a future field never breaks an older importer.
 
     public class FirmwareManifest
     {
         public int SchemaVersion { get; set; } = 1;
         public DateTime? GeneratedAt { get; set; }
-        /// <summary>Free-text provenance, e.g. "github:dopiskur/AgrumyDevice" or "local:api.agrumy.com".</summary>
+        /// <summary>Free-text provenance, e.g. "github:dopiskur/AgrumyFirmware" or "local:api.agrumy.com".</summary>
         public string? Source { get; set; }
         public List<FirmwareManifestRelease> Releases { get; set; } = [];
     }

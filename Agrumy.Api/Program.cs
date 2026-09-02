@@ -119,7 +119,7 @@ builder.Services.AddScoped<CommandQueueService>();
 builder.Services.AddHttpClient(HttpFirmwareFetcher.ClientName, client =>
 {
     client.Timeout = TimeSpan.FromMinutes(5); // a full "pull from GitHub" streams several MB per file
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("Agrumy.Api/1.0 (+https://github.com/dopiskur/AgrumyApi)");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Agrumy.Api/1.0 (+https://github.com/dopiskur/AgrumyService)");
 });
 builder.Services.AddSingleton<IFirmwareFetcher, HttpFirmwareFetcher>();
 builder.Services.AddSingleton<FirmwareStorage>();

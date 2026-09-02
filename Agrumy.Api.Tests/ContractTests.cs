@@ -171,7 +171,7 @@ public class ContractTests
     }
 
     // ---- requests (firmware -> server) ----------------------------------------------
-    // Payloads are shaped exactly as the firmware sends them (see AgrumyDevice/src/Controller).
+    // Payloads are shaped exactly as the firmware sends them (see AgrumyFirmware/src/Controller).
 
     [Fact]
     public void RegisterRequest_FirmwareShapedPayload_MatchesSchemaAndBinds()

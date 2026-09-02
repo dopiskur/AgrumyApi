@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/authenticate.request.schema.json",
+  "$id": "https://github.com/dopiskur/AgrumyService/contracts/device-api/authenticate.request.schema.json",
   "title": "Device Authenticate - request  (firmware -> POST /api/Device/Authenticate)",
   "description": "The BODY carries nothing: ServiceController::apiAuthenticate() sends an empty ArduinoJson document, which serializes as JSON null. Credentials travel as HTTP HEADERS - 'apiId' and 'apiKey', both the device GUIDs from a prior Register/Config response. The server (DeviceApiController.ReqAuth) reads only those two headers and ignores the body.",
   "type": ["null", "object"],

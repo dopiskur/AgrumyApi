@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/sensordata.request.schema.json",
+  "$id": "https://github.com/dopiskur/AgrumyService/contracts/device-api/sensordata.request.schema.json",
   "title": "SensorData - request  (firmware -> POST /api/SensorData)",
   "description": "Body built by SensorController::buildSensorDataPayload(): a JSON ARRAY of readings. The firmware buffers unsent readings and flushes them together, so the array has one or more items. Each measurement field is sent either as a STRING (ArduinoJson stores the Arduino String value, e.g. \"26.13\") or as null when that sensor produced no value this cycle. The API forwards the array unchanged to the SensorDataPush stored procedure (JSON_TABLE). There is no response schema - the endpoint returns the caller's cached ConfigVersion as a bare value. Credentials travel as HTTP HEADERS: 'apiId' and 'Authorization' (apiAuth token).",
   "type": "array",

@@ -11,7 +11,7 @@
 -- same "leave the pins alone" semantics the old disabled flag had.
 --
 -- RelayFunction matches deviceTypeRelay's seed IDs (1=Ventilation, 2=Light, 3=Heating,
--- 4=Water pump) and AgrumyDevice's RelayFunctionType enum - never renumber independently.
+-- 4=Water pump) and AgrumyFirmware's RelayFunctionType enum - never renumber independently.
 --
 -- WHY THIS IS MANUAL: see 2026-08-31-deviceDiagnostic-table.sql.
 -- NOT SAFE TO RE-RUN: the DROP COLUMN block at the end fails loudly on a second run (columns

@@ -171,12 +171,12 @@ namespace api.Controllers.API
 
         /// <summary>Roadmap #39/#115: v1 deliberately does not support a schedule window crossing
         /// local midnight (see api.Models.DeviceConfigController's comment) - Start+Duration must
-        /// fit in one calendar day, and DaysOfWeek must fit the 7-bit mask AgrumyDevice's
+        /// fit in one calendar day, and DaysOfWeek must fit the 7-bit mask AgrumyFirmware's
         /// ActuatorController::scheduleRelayFunction expects (bit 0 = Sunday .. bit 6 = Saturday).
         /// Every slot in every function's list is checked (no more per-function Enabled gate - a
         /// slot's presence in the list already means it is active); returns the first failure
         /// found, or null if every slot is sound. A device-side cap on how many slots actually get
-        /// used (MAX_SCHEDULE_SLOTS_PER_FUNCTION, AgrumyDevice's RelayLogic.h) is NOT enforced here
+        /// used (MAX_SCHEDULE_SLOTS_PER_FUNCTION, AgrumyFirmware's RelayLogic.h) is NOT enforced here
         /// deliberately - a caller sending more than the firmware can hold just gets extras it
         /// silently ignores, not a hard save-time rejection tied to one particular firmware build.</summary>
         private static string? ScheduleWindowError(DeviceConfigController? cfg)

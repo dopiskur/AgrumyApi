@@ -149,7 +149,7 @@ namespace api.Firmware
         public async Task<FirmwareSyncResult> SyncAsync(FirmwareSyncMode mode, string publicBaseUrl, CancellationToken cancellationToken = default)
         {
             ServerConfig config = await configRepo.ServerConfigGetAsync(1);
-            string repository = config.FirmwareGitHubRepository ?? "dopiskur/AgrumyDevice";
+            string repository = config.FirmwareGitHubRepository ?? "dopiskur/AgrumyFirmware";
 
             if (mode == FirmwareSyncMode.Refresh)
             {

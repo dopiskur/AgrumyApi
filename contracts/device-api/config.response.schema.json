@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/dopiskur/AgrumyApi/contracts/device-api/config.response.schema.json",
+  "$id": "https://github.com/dopiskur/AgrumyService/contracts/device-api/config.response.schema.json",
   "title": "Device config - response  (server -> firmware)",
   "description": "System.Text.Json serialization (ASP.NET Core Web defaults => camelCase property names, null values KEPT) of api.Models.DeviceConfig, produced by DeviceApiController.BuildDeviceConfigAsync(). Returned by BOTH POST /api/Device/Config AND POST /api/Device/Register. Roadmap #34: Config returns this body when EITHER the device's ConfigVersion differs from the server's OR a command is pending for the device (pendingCommand non-null) - the server returns 200 with an EMPTY body only when neither is true. Firmware parses it in DeviceController::loadConfig(). This file and register.response.schema.json are identical by construction - keep them in sync.",
   "type": "object",
@@ -168,7 +168,7 @@
         "ventilationSchedule": {
           "type": "array",
           "items": { "$ref": "#/definitions/deviceScheduleSlot" },
-          "description": "Roadmap #39/#115. Third relay-control mode alongside the Interval fields above and Threshold (tempLow etc.) - zero or more wall-clock on/off windows, independent of any sensor reading. The function is on whenever local time falls in ANY window (OR'd together, AgrumyDevice's RelayLogic::computeAnyScheduleState); an empty array means it never turns on in schedule mode - no separate 'enabled' flag."
+          "description": "Roadmap #39/#115. Third relay-control mode alongside the Interval fields above and Threshold (tempLow etc.) - zero or more wall-clock on/off windows, independent of any sensor reading. The function is on whenever local time falls in ANY window (OR'd together, AgrumyFirmware's RelayLogic::computeAnyScheduleState); an empty array means it never turns on in schedule mode - no separate 'enabled' flag."
         },
         "lightSchedule": { "type": "array", "items": { "$ref": "#/definitions/deviceScheduleSlot" } },
         "heatingSchedule": { "type": "array", "items": { "$ref": "#/definitions/deviceScheduleSlot" } },
@@ -192,7 +192,7 @@
       "properties": {
         "daysOfWeek": {
           "type": "integer",
-          "description": "7-bit mask, bit 0 = Sunday .. bit 6 = Saturday (matches C's tm_wday - see AgrumyDevice's ActuatorController::scheduleRelayFunction)."
+          "description": "7-bit mask, bit 0 = Sunday .. bit 6 = Saturday (matches C's tm_wday - see AgrumyFirmware's ActuatorController::scheduleRelayFunction)."
         },
         "start": {
           "type": "integer",

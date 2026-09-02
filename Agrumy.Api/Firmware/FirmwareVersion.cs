@@ -8,7 +8,7 @@ namespace api.Firmware
     /// the API lists them. Pure, no I/O, so it is unit-tested directly.</summary>
     public readonly partial record struct FirmwareVersion(int Major, int Minor, int Patch, string? PreRelease) : IComparable<FirmwareVersion>
     {
-        /// <summary>agrumy-{board}-v{version}.bin - what AgrumyDevice's release.yml produces, what the
+        /// <summary>agrumy-{board}-v{version}.bin - what AgrumyFirmware's release.yml produces, what the
         /// GitHub/Custom syncs accept, and what the import scanner/upload validate BEFORE a file
         /// enters the catalog (roadmap #94-2: a stray/renamed file must not pollute the store).</summary>
         [GeneratedRegex(@"^agrumy-(?<board>[a-z0-9]+)-v(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?)\.bin$")]

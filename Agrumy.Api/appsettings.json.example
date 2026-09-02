@@ -1,5 +1,5 @@
 {
-  "// TLS / HTTPS": "With Security:EnforceHttps=true (default) the app calls UseHttpsRedirection, plus UseHsts outside Development - production MUST then terminate TLS (a certificate on Kestrel via Kestrel:Certificates:Default, or TLS at the reverse proxy in front of it). Set Security:EnforceHttps=false to run over plain HTTP with no redirect/HSTS, e.g. while the AgrumyDevice firmware still uses 'http://' in DeviceController.cpp (that firmware change is a separate task).",
+  "// TLS / HTTPS": "With Security:EnforceHttps=true (default) the app calls UseHttpsRedirection, plus UseHsts outside Development - production MUST then terminate TLS (a certificate on Kestrel via Kestrel:Certificates:Default, or TLS at the reverse proxy in front of it). Set Security:EnforceHttps=false to run over plain HTTP with no redirect/HSTS, e.g. while the AgrumyFirmware firmware still uses 'http://' in DeviceController.cpp (that firmware change is a separate task).",
   "// Security": "App-level security switches.",
   "Security": {
     "// EnforceHttps": "true (default) = redirect HTTP->HTTPS and send HSTS outside Development. false = leave the API reachable over plain HTTP.",
@@ -69,7 +69,7 @@
     "// LocalPath": "Directory the Local repository stores .bin files in and serves them from (GET /api/Firmware/Download/{file}). Relative paths are under the content root. Must be writable by the service user.",
     "LocalPath": "firmware-store",
     "// GitHubRepository": "owner/name whose GitHub Releases are the default source - only SEEDS the serverConfig row on first creation; edit the live value on the Server Settings page.",
-    "GitHubRepository": "dopiskur/AgrumyDevice",
+    "GitHubRepository": "dopiskur/AgrumyFirmware",
     "// GitHubToken": "Optional fine-grained token for the GitHub API (public repos need none - 60 unauthenticated requests/hour per IP is plenty for an admin clicking Refresh).",
     "GitHubToken": ""
   },

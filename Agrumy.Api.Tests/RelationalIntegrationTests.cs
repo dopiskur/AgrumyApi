@@ -976,7 +976,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         int id = new Random().Next(200_000, 900_000);
         ServerConfig fresh = await _repo.ServerConfigGetAsync(id);
         Assert.Equal(FirmwareSource.GitHub, fresh.FirmwareSource);
-        Assert.Equal("dopiskur/AgrumyDevice", fresh.FirmwareGitHubRepository);
+        Assert.Equal("dopiskur/AgrumyFirmware", fresh.FirmwareGitHubRepository);
 
         fresh.FirmwareSource = FirmwareSource.Custom;
         fresh.FirmwareGitHubRepository = "someone/fork";
