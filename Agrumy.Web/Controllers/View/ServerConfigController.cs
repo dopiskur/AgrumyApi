@@ -37,7 +37,12 @@ namespace api.Controllers.View
             }
             catch (ApiException ex)
             {
-                ModelState.AddModelError(nameof(ServerConfig.ScheduleTimeZone), ex.Body);
+                // Roadmap #94: the API now also rejects a bad firmware source/repository/URL - route
+                // its message to the field it is about, else it lands under the time zone by default.
+                string field = ex.Body.Contains("firmware", StringComparison.OrdinalIgnoreCase) || ex.Body.Contains("GitHub", StringComparison.OrdinalIgnoreCase)
+                    ? nameof(ServerConfig.FirmwareSource)
+                    : nameof(ServerConfig.ScheduleTimeZone);
+                ModelState.AddModelError(field, ex.Body);
                 ViewBag.TimeZones = TimeZoneOptions(serverConfig.ScheduleTimeZone);
                 return View(serverConfig);
             }

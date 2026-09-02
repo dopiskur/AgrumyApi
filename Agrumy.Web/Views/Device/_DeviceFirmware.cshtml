@@ -1,0 +1,81 @@
+@model DeviceFirmwareViewModel
+@* Roadmap #93: the per-device firmware card - (a) what's running, (b) whether the catalog has a
+   newer build for this board, (c) the three ways to update: one click to latest, a specific
+   catalog version (rollback/downgrade), and - by linking to the Firmware page - a manual upload
+   which then shows up in this same version list. *@
+<div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">Firmware</h3></div>
+    <div class="card-body">
+        @if (TempData["Message"] is string message)
+        {
+            <div class="alert alert-success">@message</div>
+        }
+        @if (TempData["Error"] is string error)
+        {
+            <div class="alert alert-warning">@error</div>
+        }
+        <dl class="row mb-2">
+            <dt class="col-sm-3">Running version</dt>
+            <dd class="col-sm-9">
+                @(Model.RunningVersion ?? "-")
+                @if (Model.UpdateAvailable)
+                {
+                    <span class="badge text-bg-warning ms-1">update available: @Model.LatestVersion</span>
+                }
+                else if (Model.LatestVersion != null)
+                {
+                    <span class="badge text-bg-success ms-1">up to date</span>
+                }
+            </dd>
+            <dt class="col-sm-3">Board</dt>
+            <dd class="col-sm-9">@(Model.Board ?? "(not reported yet - firmware predates roadmap #94)")</dd>
+            <dt class="col-sm-3">Latest in catalog</dt>
+            <dd class="col-sm-9">@(Model.LatestVersion ?? "-")</dd>
+            @if (Model.UpdatePending)
+            {
+                <dt class="col-sm-3">Pending request</dt>
+                <dd class="col-sm-9">
+                    <span class="badge text-bg-info">@(Model.TargetVersion ?? "latest")</span>
+                    <span class="text-secondary small">- installs on the device's next config poll; cleared once it reports that version.</span>
+                </dd>
+            }
+        </dl>
+
+        @if (User.IsInRole(RoleNames.GlobalAdmin) || User.IsInRole(RoleNames.GlobalDevice) || User.IsInRole(RoleNames.TenantAdmin) || User.IsInRole(RoleNames.TenantDevice))
+        {
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                @if (Model.UpdatePending)
+                {
+                    <form asp-action="FirmwareUpdateCancel" method="post">
+                        <input type="hidden" name="idDevice" value="@Model.IdDevice" />
+                        <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-lg"></i> Cancel pending update</button>
+                    </form>
+                }
+                else
+                {
+                    <form asp-action="FirmwareUpdate" method="post">
+                        <input type="hidden" name="idDevice" value="@Model.IdDevice" />
+                        <button type="submit" class="btn btn-sm btn-primary" @(Model.LatestVersion == null && Model.Board != null ? "disabled" : "")><i class="bi bi-cloud-arrow-down"></i> Update to latest</button>
+                    </form>
+                    @if (Model.Versions.Count > 0)
+                    {
+                        <form asp-action="FirmwareUpdate" method="post" class="d-flex gap-2 align-items-center">
+                            <input type="hidden" name="idDevice" value="@Model.IdDevice" />
+                            <select name="version" class="form-select form-select-sm w-auto">
+                                @foreach (var v in Model.Versions)
+                                {
+                                    <option value="@v.Version" selected="@(v.Version == Model.RunningVersion)">@v.Version (@v.Source)</option>
+                                }
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap" title="Install exactly this version - rollback/downgrade included"><i class="bi bi-arrow-counterclockwise"></i> Install selected</button>
+                        </form>
+                    }
+                }
+                @if (User.IsInRole(RoleNames.GlobalAdmin))
+                {
+                    <a asp-controller="Firmware" asp-action="Index" class="btn btn-sm btn-outline-secondary"><i class="bi bi-upload"></i> Upload a build…</a>
+                }
+            </div>
+        }
+    </div>
+</div>

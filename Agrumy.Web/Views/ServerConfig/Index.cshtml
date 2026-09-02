@@ -83,6 +83,30 @@
                 <span asp-validation-for="ScheduleTimeZone" class="text-danger"></span>
             </div>
 
+            <p class="text-secondary">
+                Where device firmware comes from (roadmap #94). <strong>GitHub</strong> (default) reads the
+                public releases of the repository below. <strong>Local repository</strong> serves files this
+                server stores itself - fill it on the <a asp-controller="Firmware" asp-action="Index">Firmware</a>
+                page (pull from GitHub, import a USB directory, or upload); the only mode that works
+                air-gapped or with a pinned self-signed certificate. <strong>Custom</strong> reads a
+                <code>manifest.json</code> from your own URL.
+            </p>
+            <div class="mb-3">
+                <label asp-for="FirmwareSource" class="form-label"></label>
+                <select asp-for="FirmwareSource" asp-items="Html.GetEnumSelectList<FirmwareSource>()" class="form-select"></select>
+                <span asp-validation-for="FirmwareSource" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="FirmwareGitHubRepository" class="form-label"></label>
+                <input asp-for="FirmwareGitHubRepository" class="form-control" placeholder="dopiskur/AgrumyDevice" />
+                <span asp-validation-for="FirmwareGitHubRepository" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="FirmwareCustomRepositoryUrl" class="form-label"></label>
+                <input asp-for="FirmwareCustomRepositoryUrl" class="form-control" placeholder="https://firmware.example.com/agrumy/manifest.json" />
+                <span asp-validation-for="FirmwareCustomRepositoryUrl" class="text-danger"></span>
+            </div>
+
             <div class="mb-0">
                 <input type="submit" value="Save" class="btn btn-primary" />
             </div>

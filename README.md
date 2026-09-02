@@ -123,6 +123,9 @@ listens on (5000 by default, set in `Agrumy.Api/Properties/launchSettings.json`)
 | `Startup:FailFastOnDbCheck` | no (default `false`) | `true` = stop the app if the DB check / provisioning fails |
 | `Notifications:Email:*` | no (default off) | SMTP alert email (roadmap #6). `Enabled` + `Host` + `FromAddress` are the minimum; `Port`/`UseStartTls`/`Username`/`Password`/`FromName` optional. Disabled or incomplete = channel skipped, not an error. |
 | `Notifications:Push:*` | no (default off) | FCM push channel - **prepared but inert**. Stays skipped until the Android app registers device tokens and the OAuth step in `FcmPushNotificationChannel` is wired. Leave `Enabled=false`. |
+| `Firmware:LocalPath` | no (default `firmware-store`) | roadmap #94 - directory the **Local** firmware repository stores/serves `.bin` files from (`GET /api/Firmware/Download/{file}`). Relative = under the content root; must be writable by the service user. |
+| `Firmware:GitHubRepository` | no (default `dopiskur/AgrumyDevice`) | `owner/name` whose GitHub Releases feed the catalog - only seeds the `serverConfig` row, the live value is edited on the Server Settings page |
+| `Firmware:GitHubToken` | no | optional GitHub API token; public repositories need none |
 | `Notifications:OfflineCheckIntervalMinutes` | no (default `5`) | roadmap #40 - how often `OfflineAlertBackgroundService` sweeps every device for a newly-offline one and notifies its tenant's admins via whatever `Notifications:*` channels are configured above. |
 | `WebView:Enabled`, `WebView:ApiService` | no | present in `appsettings.json.example` as a documented switch for a possible combined API+UI deployment, but **not currently read by any code** - `Agrumy.Web` is what actually serves the admin UI today |
 

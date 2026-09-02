@@ -17,6 +17,7 @@ namespace api.Dal.Interface
         IDeviceRepository,
         IDeviceUnitRepository,
         ICommandRepository,
+        IFirmwareRepository,
         ISensorDataRepository
     {
     }

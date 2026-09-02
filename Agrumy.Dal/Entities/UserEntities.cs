@@ -122,5 +122,10 @@ namespace api.Dal.Entities
 
         // Roadmap #39 - see api.Models.ServerConfig.ScheduleTimeZone.
         public string? ScheduleTimeZone { get; set; }
+
+        // Roadmap #94 - see api.Models.ServerConfig.FirmwareSource and friends.
+        public int FirmwareSource { get; set; }
+        public string? FirmwareGitHubRepository { get; set; }
+        public string? FirmwareCustomRepositoryUrl { get; set; }
     }
 }

@@ -1,6 +1,7 @@
 using api;
 using api.BackgroundWorkers;
 using api.Commands;
+using api.Firmware;
 using api.Dal;
 using api.Dal.Interface;
 using api.Filters;
@@ -86,6 +87,7 @@ builder.Services.AddScoped<IRefreshTokenRepository>(sp => sp.GetRequiredService<
 builder.Services.AddScoped<IDeviceRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IDeviceUnitRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ICommandRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<IFirmwareRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ISensorDataRepository>(sp => sp.GetRequiredService<EfRepository>());
 // Roadmap #72: in-process today (same practical behaviour as the old MemoryCache - lost on
 // restart, not shared across instances), but CacheRepository talks to IDistributedCache, so a
@@ -111,6 +113,17 @@ builder.Services.AddHostedService<OfflineAlertBackgroundService>();
 // marks a stale row Expired the moment it's next looked at), so this is a plain scoped service,
 // not an IHostedService registration like OfflineAlertEvaluator above.
 builder.Services.AddScoped<CommandQueueService>();
+
+// Roadmap #94: firmware catalog. One named HttpClient for GitHub/Custom-repository reads and
+// .bin downloads - the default handler follows the 302 a GitHub release asset answers with.
+builder.Services.AddHttpClient(HttpFirmwareFetcher.ClientName, client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(5); // a full "pull from GitHub" streams several MB per file
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Agrumy.Api/1.0 (+https://github.com/dopiskur/AgrumyApi)");
+});
+builder.Services.AddSingleton<IFirmwareFetcher, HttpFirmwareFetcher>();
+builder.Services.AddSingleton<FirmwareStorage>();
+builder.Services.AddScoped<FirmwareCatalogService>();
 
 builder.Services.AddControllers(options => options.Filters.AddService<DbExceptionFilter>());
 

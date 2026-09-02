@@ -195,7 +195,7 @@ public class ContractTests
         // apiConfig(): PascalCase keys, ConfigVersion sent as a STRING; the diagnostics fields
         // (roadmap #7) ride along as JSON numbers/string.
         const string payload =
-            """{"ConfigVersion":"66","Uptime":3661,"Rssi":-67,"FreeHeap":153212,"FirmwareVersion":"0.1.2"}""";
+            """{"ConfigVersion":"66","Uptime":3661,"Rssi":-67,"FreeHeap":153212,"FirmwareVersion":"0.1.2","Board":"esp32dev"}""";
 
         AssertValid("config.request.schema.json", payload);
 
@@ -205,6 +205,7 @@ public class ContractTests
         Assert.Equal(-67, bound.Rssi);
         Assert.Equal(153212, bound.FreeHeap);
         Assert.Equal("0.1.2", bound.FirmwareVersion);
+        Assert.Equal("esp32dev", bound.Board); // roadmap #94
     }
 
     [Fact]

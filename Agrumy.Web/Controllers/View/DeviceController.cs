@@ -78,9 +78,53 @@ namespace api.Controllers.View
             // belongs here, not as a Fleet column. Fleet's own endpoint already computes it; find
             // this one device in the same caller-scoped list rather than adding a single-device API.
             IList<DeviceFleetStatus> fleet = await api.DeviceFleetGet();
-            ViewBag.FreeHeapBytes = fleet.FirstOrDefault(f => f.IDDevice == idDevice)?.FreeHeapBytes;
+            DeviceFleetStatus? status = fleet.FirstOrDefault(f => f.IDDevice == idDevice);
+            ViewBag.FreeHeapBytes = status?.FreeHeapBytes;
+
+            // Roadmap #93: the firmware card - catalog versions only make sense once the device has
+            // reported its board (pre-#94 firmware never does; "latest" still works for it).
+            ViewBag.Firmware = new DeviceFirmwareViewModel
+            {
+                IdDevice = idDevice!.Value,
+                Board = status?.Board,
+                RunningVersion = status?.FirmwareVersion,
+                LatestVersion = status?.LatestFirmwareVersion,
+                UpdateAvailable = status?.FirmwareUpdateAvailable == true,
+                UpdatePending = status?.FirmwareUpdatePending == true,
+                TargetVersion = status?.FirmwareTargetVersion,
+                Versions = status?.Board is { Length: > 0 } board ? await api.FirmwareList(board) : [],
+            };
 
             return View(device);
+        }
+
+        /// <summary>Roadmap #93: one-click "latest" (version empty) or a specific version (rollback/
+        /// downgrade). Shared by Fleet's Update button and Device Details' card - returnUrl decides
+        /// where the PRG redirect lands.</summary>
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> FirmwareUpdate(int idDevice, string? version, string? returnUrl)
+        {
+            try
+            {
+                await api.DeviceFirmwareUpdate(new DeviceFirmwareUpdateRequest { IdDevice = idDevice, Version = string.IsNullOrWhiteSpace(version) ? null : version });
+                TempData["Message"] = string.IsNullOrWhiteSpace(version) ? "Update to the latest firmware requested." : $"Install of firmware {version} requested.";
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return Url.IsLocalUrl(returnUrl) ? Redirect(returnUrl) : RedirectToAction(nameof(Details), new { idDevice });
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> FirmwareUpdateCancel(int idDevice)
+        {
+            await api.DeviceFirmwareUpdateCancel(idDevice);
+            return RedirectToAction(nameof(Details), new { idDevice });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]

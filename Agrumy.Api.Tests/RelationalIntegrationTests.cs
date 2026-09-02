@@ -910,6 +910,82 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Null(await _repo.DeviceFirmwareLatestGetAsync(-1));
     }
 
+    // ---- firmware catalog (roadmap #94) + per-device update flags (roadmap #93) -------------
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task FirmwareCatalog_Add_ListForBoard_FiltersBySource_And_DeleteBySource_KeepsLegacyRows(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        string board = "board" + U().ToLowerInvariant();
+
+        int gh = await _repo.FirmwareAddAsync(new DeviceFirmware { Board = board, Version = "1.0.0", Source = FirmwareSource.GitHub, Url = "gh", FileName = $"agrumy-{board}-v1.0.0.bin", Sha256 = new string('a', 64), SizeBytes = 123 });
+        await _repo.FirmwareAddAsync(new DeviceFirmware { Board = board, Version = "1.1.0", Source = FirmwareSource.Local, Url = "local" });
+        await _repo.FirmwareAddAsync(new DeviceFirmware { Board = board, Version = "2.0.0", Source = FirmwareSource.Custom, Url = "custom" });
+        await using (var db = _fx.NewContext(t))
+        {
+            db.DeviceFirmwares.Add(new DeviceFirmwareRow { DeviceTypeID = 424242, Version = "0.0.1", Url = "legacy", Source = (int)FirmwareSource.GitHub }); // pre-#94 row: no Board
+            await db.SaveChangesAsync();
+        }
+
+        var visible = await _repo.FirmwareListForBoardAsync(board, [FirmwareSource.GitHub, FirmwareSource.Local]);
+        Assert.Equal(["1.0.0", "1.1.0"], visible.Select(v => v.Version).OrderBy(v => v));
+
+        DeviceFirmware? saved = await _repo.FirmwareGetAsync(gh);
+        Assert.Equal((board, new string('a', 64), 123L, FirmwareSource.GitHub), (saved!.Board, saved.Sha256, saved.SizeBytes, saved.Source));
+
+        Assert.True(await _repo.FirmwareDeleteBySourceAsync(FirmwareSource.GitHub) >= 1);
+        Assert.DoesNotContain(await _repo.FirmwareListForBoardAsync(board, [FirmwareSource.GitHub]), f => f.Board == board);
+        Assert.NotNull(await _repo.DeviceFirmwareLatestGetAsync(424242)); // legacy row survived the sweep
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task Fleet_Reports_Board_LatestVersion_And_UpdateAvailable_By_Semver(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        (int tenantId, _, _) = await MakeUser(t);
+        Device d = await MakeDevice(t, tenantId);
+        string board = "board" + U().ToLowerInvariant();
+        await _repo.FirmwareAddAsync(new DeviceFirmware { Board = board, Version = "1.9.0", Source = FirmwareSource.GitHub, Url = "a" });
+        await _repo.FirmwareAddAsync(new DeviceFirmware { Board = board, Version = "1.10.0", Source = FirmwareSource.Local, Url = "b" }); // Local always visible; semver-newest
+
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice!.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1, FirmwareVersion = "1.9.0", Board = board });
+        Assert.Equal(board, await _repo.DeviceBoardGetAsync(d.IDDevice.Value));
+
+        var row = Assert.Single(await _repo.DeviceFleetGetAsync(tenantId), f => f.IDDevice == d.IDDevice);
+        Assert.Equal((board, "1.10.0", true, false), (row.Board, row.LatestFirmwareVersion, row.FirmwareUpdateAvailable, row.FirmwareUpdatePending));
+
+        await _repo.DeviceFirmwareUpdateSetAsync(d.IDDevice.Value, true, "1.9.0");
+        row = Assert.Single(await _repo.DeviceFleetGetAsync(tenantId), f => f.IDDevice == d.IDDevice);
+        Assert.Equal((true, "1.9.0"), (row.FirmwareUpdatePending, row.FirmwareTargetVersion));
+        Assert.Equal("1.9.0", (await _repo.DeviceGetByIdAsync(d.IDDevice))!.FirmwareTargetVersion);
+
+        await _repo.DeviceFirmwareUpdateSetAsync(d.IDDevice.Value, false, null);
+        Device back = (await _repo.DeviceGetByIdAsync(d.IDDevice))!;
+        Assert.Equal((false, (string?)null), (back.FirmwareUpdate, back.FirmwareTargetVersion));
+
+        // A heartbeat without Board (pre-#94 firmware) must not erase the one already recorded.
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
+        Assert.Equal(board, await _repo.DeviceBoardGetAsync(d.IDDevice.Value));
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task ServerConfig_FirmwareSource_RoundTrips_And_Defaults_To_GitHub_Repository(DbProviderKind provider)
+    {
+        Use(provider);
+        int id = new Random().Next(200_000, 900_000);
+        ServerConfig fresh = await _repo.ServerConfigGetAsync(id);
+        Assert.Equal(FirmwareSource.GitHub, fresh.FirmwareSource);
+        Assert.Equal("dopiskur/AgrumyDevice", fresh.FirmwareGitHubRepository);
+
+        fresh.FirmwareSource = FirmwareSource.Custom;
+        fresh.FirmwareGitHubRepository = "someone/fork";
+        fresh.FirmwareCustomRepositoryUrl = "https://fw.example.com/manifest.json";
+        await _repo.ServerConfigUpdateAsync(fresh);
+
+        ServerConfig back = await _repo.ServerConfigGetAsync(id);
+        Assert.Equal((FirmwareSource.Custom, "someone/fork", "https://fw.example.com/manifest.json"), (back.FirmwareSource, back.FirmwareGitHubRepository, back.FirmwareCustomRepositoryUrl));
+    }
+
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceType_Lists_Return_Seeded_Rows(DbProviderKind provider)
     {

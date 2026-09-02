@@ -62,7 +62,23 @@
             }
         </td>
         <td class="d-none d-md-table-cell">@Uptime(item.UptimeSeconds)</td>
-        <td class="d-none d-md-table-cell">@(item.FirmwareVersion ?? "-")</td>
+        <td class="d-none d-md-table-cell">
+            @(item.FirmwareVersion ?? "-")
+            @* Roadmap #93(b): the Update button appears ONLY when the catalog has something newer
+               for this device's board, and is replaced by a pending marker once requested. *@
+            @if (item.FirmwareUpdatePending)
+            {
+                <span class="badge text-bg-info ms-1" title="Update requested - installs on the next config poll">&rarr; @(item.FirmwareTargetVersion ?? "latest")</span>
+            }
+            else if (item.FirmwareUpdateAvailable && hasAnyRole(RoleNames.DeviceManagers))
+            {
+                <form asp-controller="Device" asp-action="FirmwareUpdate" method="post" class="d-inline ms-1">
+                    <input type="hidden" name="idDevice" value="@item.IDDevice" />
+                    <input type="hidden" name="returnUrl" value="@Context.Request.Path" />
+                    <button type="submit" class="btn btn-warning btn-sm py-0" title="Update to @item.LatestFirmwareVersion"><i class="bi bi-cloud-arrow-down"></i> @item.LatestFirmwareVersion</button>
+                </form>
+            }
+        </td>
         <td class="d-none d-md-table-cell">@(item.Battery?.ToString() ?? "-")</td>
         <td>
             @* Icon-only + btn-group on purpose: four full-text buttons made this the widest

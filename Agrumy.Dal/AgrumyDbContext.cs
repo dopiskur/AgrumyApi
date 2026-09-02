@@ -139,6 +139,8 @@ namespace api.Dal
                 e.Property(x => x.ConfigKey).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ServerConfigCol).HasColumnName("serverConfigcol").HasMaxLength(45);
                 e.Property(x => x.ScheduleTimeZone).HasMaxLength(64); // same cap as user.TimeZone (roadmap #71)
+                e.Property(x => x.FirmwareGitHubRepository).HasMaxLength(200); // roadmap #94
+                e.Property(x => x.FirmwareCustomRepositoryUrl).HasMaxLength(500);
             });
 
             modelBuilder.Entity<DeviceUnitRow>(e =>
@@ -249,6 +251,7 @@ namespace api.Dal
                 e.Property(x => x.IDDevice).ValueGeneratedOnAdd();
                 e.Property(x => x.DeviceName).HasMaxLength(128);
                 e.Property(x => x.MacAddress).HasMaxLength(12);
+                e.Property(x => x.FirmwareTargetVersion).HasMaxLength(20); // roadmap #93, same cap as deviceFirmware.Version
                 e.Property(x => x.ApiId).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ApiKey).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ServicePoint).HasMaxLength(200);
@@ -288,6 +291,7 @@ namespace api.Dal
                 e.HasKey(x => x.DeviceID);
                 e.Property(x => x.DeviceID).ValueGeneratedNever();
                 e.Property(x => x.FirmwareVersion).HasMaxLength(20); // same cap as deviceFirmware.Version
+                e.Property(x => x.Board).HasMaxLength(40);
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 
@@ -297,7 +301,12 @@ namespace api.Dal
                 e.HasKey(x => x.IDDeviceFirmware);
                 e.Property(x => x.IDDeviceFirmware).ValueGeneratedOnAdd();
                 e.Property(x => x.Version).HasMaxLength(20);
+                e.Property(x => x.Board).HasMaxLength(40);
+                e.Property(x => x.FileName).HasMaxLength(120);
+                e.Property(x => x.Sha256).HasMaxLength(64);
                 e.Property(x => x.DateAdded).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                // Roadmap #94: the "which .bin for this board" lookups all filter on (Board, Source).
+                e.HasIndex(x => new { x.Board, x.Source }).HasDatabaseName("ix_deviceFirmware_board_source");
             });
 
             modelBuilder.Entity<SensorDataRow>(e =>

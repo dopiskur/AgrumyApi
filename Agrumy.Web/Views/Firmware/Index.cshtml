@@ -1,0 +1,145 @@
+@model FirmwareViewModel
+@{
+    ViewData["Title"] = "Firmware";
+    var source = Model.Config.FirmwareSource;
+    string sourceLabel = source switch
+    {
+        FirmwareSource.Local => "Local repository (this server hosts the .bin files)",
+        FirmwareSource.Custom => "Custom repository: " + Model.Config.FirmwareCustomRepositoryUrl,
+        _ => "GitHub Releases: " + Model.Config.FirmwareGitHubRepository,
+    };
+}
+
+@if (TempData["Message"] is string message)
+{
+    <div class="alert alert-success">@message</div>
+}
+@if (TempData["Error"] is string error)
+{
+    <div class="alert alert-warning">@error</div>
+}
+
+<div class="card mb-3">
+    <div class="card-header">
+        <h3 class="card-title">Firmware source</h3>
+        <a asp-controller="ServerConfig" asp-action="Index" class="btn btn-sm btn-outline-secondary float-end"><i class="bi bi-sliders"></i> Change in Server Settings</a>
+    </div>
+    <div class="card-body">
+        <p class="mb-3"><strong>@sourceLabel</strong></p>
+
+        <div class="d-flex flex-wrap gap-2 align-items-start">
+            @if (source != FirmwareSource.Local)
+            {
+                @* Refresh re-reads the active remote source; nothing is downloaded here. *@
+                <form asp-action="Sync" method="post">
+                    <input type="hidden" name="mode" value="@FirmwareSyncMode.Refresh" />
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-repeat"></i> Refresh catalog from @(source == FirmwareSource.GitHub ? "GitHub" : "custom repository")</button>
+                </form>
+            }
+            @* Pulling into the local store is offered in every mode - an admin fills the Local
+               repository BEFORE switching the source to it (roadmap #94-2a). *@
+            <form asp-action="Sync" method="post">
+                <input type="hidden" name="mode" value="@FirmwareSyncMode.PullIncremental" />
+                <button type="submit" class="btn btn-outline-primary" title="Download only releases the local store does not have yet"><i class="bi bi-cloud-download"></i> Pull from GitHub (incremental)</button>
+            </form>
+            <form asp-action="Sync" method="post" onsubmit="return confirm('Delete every locally stored firmware file and download all releases again?');">
+                <input type="hidden" name="mode" value="@FirmwareSyncMode.PullFull" />
+                <button type="submit" class="btn btn-outline-primary" title="Wipe the local store first, then download every release"><i class="bi bi-cloud-download-fill"></i> Pull from GitHub (full rebuild)</button>
+            </form>
+        </div>
+
+        <hr />
+        <div class="row g-3">
+            <div class="col-lg-6">
+                @* Roadmap #94-2b: the only fully air-gapped path - a USB stick mounted on the server. *@
+                <h6 class="text-uppercase text-secondary small">Import from a directory on the server</h6>
+                <form asp-action="Import" method="post" class="d-flex gap-2">
+                    <input type="text" name="path" class="form-control" placeholder="/media/usb/agrumy-firmware" required />
+                    <button type="submit" class="btn btn-outline-primary text-nowrap"><i class="bi bi-usb-drive"></i> Import</button>
+                </form>
+                <div class="form-text">Files must be named <code>agrumy-&lt;board&gt;-v&lt;version&gt;.bin</code>; a <code>manifest.json</code> next to them (written by the offline-repo tools) is used to verify SHA-256 checksums.</div>
+            </div>
+            <div class="col-lg-6">
+                @* Roadmap #94-2c / #93-c-2: one mechanism for "upload a .bin", not two. *@
+                <h6 class="text-uppercase text-secondary small">Upload a .bin</h6>
+                <form asp-action="Upload" method="post" enctype="multipart/form-data" class="d-flex gap-2">
+                    <input type="file" name="file" class="form-control" accept=".bin" required />
+                    <button type="submit" class="btn btn-outline-primary text-nowrap"><i class="bi bi-upload"></i> Upload</button>
+                </form>
+                <div class="form-text">Stored in the local repository and offered to devices of that board regardless of the active source.</div>
+            </div>
+        </div>
+
+        <hr />
+        @* Roadmap #94-C1: File System Access API - Chromium only (Chrome/Edge/Opera), needs HTTPS. *@
+        <h6 class="text-uppercase text-secondary small">Prepare an offline USB repository</h6>
+        <p class="text-secondary small mb-2">
+            Copies every catalog file plus a <code>manifest.json</code> with SHA-256 checksums into a folder you pick (e.g. a USB stick).
+            Take it to the offline greenhouse server and use "Import from a directory" there. Chrome/Edge/Opera only -
+            on other browsers use the <code>tools/offline-repo/</code> script from the AgrumyDevice repository instead.
+        </p>
+        <button type="button" id="buildOfflineRepo" class="btn btn-outline-secondary" data-manifest-url="@Url.Action("OfflineManifest")" data-file-url="@Url.Action("OfflineFile")">
+            <i class="bi bi-folder-symlink"></i> Build offline repo…
+        </button>
+        <div id="offlineRepoProgress" class="mt-2" hidden>
+            <div class="progress" role="progressbar"><div class="progress-bar" style="width:0%"></div></div>
+            <div class="small text-secondary mt-1" id="offlineRepoStatus"></div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3 class="card-title">Catalog</h3></div>
+    <div class="card-body table-responsive p-0">
+        @if (Model.Catalog.Count == 0)
+        {
+            <p class="text-secondary p-3">Catalog is empty - refresh from the source, pull, import or upload a build above.</p>
+        }
+        else
+        {
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Board</th>
+                        <th>Version</th>
+                        <th>Source</th>
+                        <th class="d-none d-md-table-cell">Size</th>
+                        <th class="d-none d-md-table-cell">Published</th>
+                        <th class="d-none d-lg-table-cell">SHA-256</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var f in Model.Catalog)
+                    {
+                        bool visible = f.Source == source || f.Source == FirmwareSource.Local;
+                        <tr class="@(visible ? "" : "text-secondary")">
+                            <td>@(f.Board ?? $"(legacy type {f.DeviceTypeID})")</td>
+                            <td><a href="@f.Url" title="@f.Url">@f.Version</a></td>
+                            <td>
+                                <span class="badge @(f.Source == FirmwareSource.Local ? "text-bg-success" : "text-bg-secondary")">@f.Source</span>
+                                @if (!visible)
+                                {
+                                    <span class="badge text-bg-light border" title="Not offered to devices while another source is active">hidden</span>
+                                }
+                            </td>
+                            <td class="d-none d-md-table-cell">@(f.SizeBytes is long s ? $"{s / 1024} KB" : "-")</td>
+                            <td class="d-none d-md-table-cell">@(f.PublishedAt?.ToString("yyyy-MM-dd") ?? "-")</td>
+                            <td class="d-none d-lg-table-cell"><code class="small">@(f.Sha256 is { Length: > 12 } sha ? sha[..12] + "…" : "-")</code></td>
+                            <td>
+                                <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Remove this build from the catalog@(f.Source == FirmwareSource.Local ? " and delete the stored file" : "")?');">
+                                    <input type="hidden" name="idDeviceFirmware" value="@f.IDDeviceFirmware" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/offline-repo.js"></script>
+}

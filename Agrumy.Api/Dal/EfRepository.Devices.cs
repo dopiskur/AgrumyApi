@@ -205,6 +205,7 @@ namespace api.Dal
             Reboot = d.Reboot,
             Reset = d.Reset,
             FirmwareUpdate = d.FirmwareUpdate,
+            FirmwareTargetVersion = d.FirmwareTargetVersion,
             Enabled = d.Enabled,
             ConfigVersion = d.ConfigVersion,
             CommandVersion = d.CommandVersion,

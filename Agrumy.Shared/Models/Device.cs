@@ -52,6 +52,10 @@ namespace api.Models
         public bool? Reboot { get; set; }
         public bool? Reset { get; set; } = false;
         public bool? FirmwareUpdate { get; set; }
+        // Roadmap #93: null = "latest for the board" when FirmwareUpdate is set; a specific catalog
+        // version pins a rollback/downgrade. Both are cleared by DeviceApiController.GetConfig once
+        // the heartbeat reports that exact version running.
+        public string? FirmwareTargetVersion { get; set; }
         public bool? Enabled { get; set; } = false;
 
 
@@ -134,6 +138,9 @@ namespace api.Models
         public int? Rssi { get; set; }
         public long? FreeHeap { get; set; }
         public string? FirmwareVersion { get; set; }
+        // Roadmap #94: PlatformIO environment the running image was built for (AGRUMY_BOARD build
+        // flag) - what selects the right catalog .bin for OTA. Null from a pre-#94 firmware.
+        public string? Board { get; set; }
     }
 
     /// <summary>One device's row on the fleet dashboard (roadmap #8). Battery comes from the latest
@@ -151,6 +158,15 @@ namespace api.Models
         public int? RssiDbm { get; set; }
         public long? FreeHeapBytes { get; set; }
         public string? FirmwareVersion { get; set; }
+        // Roadmap #93/#94: catalog state for the "Update" button - LatestFirmwareVersion is the
+        // newest catalog entry for this device's Board (null if the board is unknown or the catalog
+        // has nothing for it), FirmwareUpdateAvailable is "that is newer than what's running", and
+        // the Pending/Target pair mirrors Device.FirmwareUpdate/FirmwareTargetVersion.
+        public string? Board { get; set; }
+        public string? LatestFirmwareVersion { get; set; }
+        public bool FirmwareUpdateAvailable { get; set; }
+        public bool FirmwareUpdatePending { get; set; }
+        public string? FirmwareTargetVersion { get; set; }
         public int? Battery { get; set; }
         public bool Online { get; set; }
         // Roadmap #116: lets the Web layer filter one shared DeviceFleetGet() response down to a

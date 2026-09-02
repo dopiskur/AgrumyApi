@@ -180,6 +180,38 @@ namespace api.Dal.Interface
         [Post("/api/DeviceCommand")]
         Task<IReadOnlyList<int>> DeviceCommandIssue([Body] IssueCommandRequest request);
 
+        // ---- Firmware catalog (roadmap #94) + per-device update (roadmap #93) ----
+
+        [Get("/api/Firmware")]
+        Task<IList<DeviceFirmware>> FirmwareList(string? board);
+
+        [Post("/api/Firmware/Sync")]
+        Task<FirmwareSyncResult> FirmwareSync([Body] FirmwareSyncRequest request);
+
+        [Post("/api/Firmware/Import")]
+        Task<FirmwareSyncResult> FirmwareImport([Body] FirmwareImportRequest request);
+
+        [Multipart]
+        [Post("/api/Firmware/Upload")]
+        Task<DeviceFirmware> FirmwareUpload([AliasAs("file")] StreamPart file);
+
+        [Delete("/api/Firmware")]
+        Task FirmwareDelete(int idDeviceFirmware);
+
+        [Get("/api/Firmware/Manifest")]
+        Task<FirmwareManifest> FirmwareManifest();
+
+        /// <summary>Raw .bin bytes of one catalog entry, streamed through the API whatever its source
+        /// - the browser "Build offline repo" tool's same-origin path to a GitHub asset.</summary>
+        [Get("/api/Firmware/Fetch")]
+        Task<HttpResponseMessage> FirmwareFetch(string fileName);
+
+        [Post("/api/Device/FirmwareUpdate")]
+        Task DeviceFirmwareUpdate([Body] DeviceFirmwareUpdateRequest request);
+
+        [Delete("/api/Device/FirmwareUpdate")]
+        Task DeviceFirmwareUpdateCancel(int idDevice);
+
         // ---- SensorData ---------------------------------------------------
 
         [Get("/api/SensorData")]

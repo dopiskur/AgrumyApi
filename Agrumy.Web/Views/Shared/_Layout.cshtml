@@ -136,6 +136,12 @@
                         @if (User.IsInRole(RoleNames.GlobalAdmin))
                         {
                             <li class="nav-item">
+                                <a asp-area="" asp-controller="Firmware" asp-action="Index" class="nav-link @navActive("Firmware")">
+                                    <i class="nav-icon bi bi-cpu"></i>
+                                    <p>Firmware</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a asp-area="" asp-controller="ServerConfig" asp-action="Index" class="nav-link @navActive("ServerConfig")">
                                     <i class="nav-icon bi bi-sliders"></i>
                                     <p>Server Settings</p>

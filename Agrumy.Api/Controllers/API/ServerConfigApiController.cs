@@ -54,6 +54,25 @@ namespace api.Controllers.API
                 config.ScheduleTimeZone = null;
             }
 
+            // Roadmap #94: a Custom source with no manifest URL (or a non-http one) would leave every
+            // sync failing with a vague error; a GitHub repository must be owner/name for the API path.
+            if (!Enum.IsDefined(config.FirmwareSource))
+            {
+                return BadRequest("Unknown firmware source: " + config.FirmwareSource);
+            }
+            if (config.FirmwareSource == FirmwareSource.Custom &&
+                (!Uri.TryCreate(config.FirmwareCustomRepositoryUrl, UriKind.Absolute, out Uri? customUri) || customUri.Scheme is not ("http" or "https")))
+            {
+                return BadRequest("Custom firmware source needs an absolute http(s) manifest URL.");
+            }
+            // Blank = back to the appsettings seed (EfRepository.ServerConfig's ToDto fallback), so a
+            // form that omits the field never wipes the repository; a value must be owner/name.
+            config.FirmwareGitHubRepository = string.IsNullOrWhiteSpace(config.FirmwareGitHubRepository) ? null : config.FirmwareGitHubRepository.Trim().Trim('/');
+            if (config.FirmwareGitHubRepository != null && config.FirmwareGitHubRepository.Count(c => c == '/') != 1)
+            {
+                return BadRequest("GitHub repository must be in owner/name form.");
+            }
+
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await Repo.ServerConfigUpdateAsync(config);
             return Ok();

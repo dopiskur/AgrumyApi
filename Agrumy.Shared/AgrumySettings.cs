@@ -57,6 +57,13 @@ namespace api
         // this on the Server Settings page.
         public string? ScheduleTimeZone { get; set; }
 
+        // Roadmap #94. LocalPath: where the Local repository keeps its .bin files (relative to the
+        // content root unless absolute; null = FirmwareStorage.DefaultRelativePath). GitHubRepository: only the SEED for the DB serverConfig
+        // row - the admin page edits the live value. GitHubToken: optional, see HttpFirmwareFetcher.
+        public string? FirmwareLocalPath { get; set; }
+        public string FirmwareGitHubRepository { get; set; } = "dopiskur/AgrumyDevice";
+        public string? FirmwareGitHubToken { get; set; }
+
         public static AgrumySettings Bind(IConfiguration configuration) => new()
         {
             DefaultConnection = configuration.GetConnectionString("DefaultConnection"),
@@ -75,6 +82,9 @@ namespace api
             ActivationResendCooldownMinutes = ParseIntOr(configuration, "ServerConfig:ActivationResendCooldownMinutes", 10),
             AllowSelfServiceTenantCreation = ParseBoolOr(configuration, "ServerConfig:AllowSelfServiceTenantCreation", false),
             ScheduleTimeZone = configuration.GetSection("ServerConfig:ScheduleTimeZone").Value,
+            FirmwareLocalPath = configuration.GetSection("Firmware:LocalPath").Value,
+            FirmwareGitHubRepository = configuration.GetSection("Firmware:GitHubRepository").Value is { Length: > 0 } repo ? repo : "dopiskur/AgrumyDevice",
+            FirmwareGitHubToken = configuration.GetSection("Firmware:GitHubToken").Value,
         };
 
         // IConfiguration stores every value as its literal JSON text (e.g. "20.0"). Parsing that

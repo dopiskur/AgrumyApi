@@ -64,6 +64,16 @@
     "AllowSelfServiceTenantCreation": false
   },
 
+  "// Firmware": "Roadmap #94 - firmware catalog. The active source (GitHub / Local / Custom) itself is a runtime setting on the admin Server Settings page (serverConfig row), not here.",
+  "Firmware": {
+    "// LocalPath": "Directory the Local repository stores .bin files in and serves them from (GET /api/Firmware/Download/{file}). Relative paths are under the content root. Must be writable by the service user.",
+    "LocalPath": "firmware-store",
+    "// GitHubRepository": "owner/name whose GitHub Releases are the default source - only SEEDS the serverConfig row on first creation; edit the live value on the Server Settings page.",
+    "GitHubRepository": "dopiskur/AgrumyDevice",
+    "// GitHubToken": "Optional fine-grained token for the GitHub API (public repos need none - 60 unauthenticated requests/hour per IP is plenty for an admin clicking Refresh).",
+    "GitHubToken": ""
+  },
+
   "// Notifications": "Alert delivery channels (roadmap #6). A channel with Enabled=false or missing settings is skipped, never an error.",
   "Notifications": {
     "// Email": "SMTP email via MailKit. Enabled + Host + FromAddress are the minimum to send.",

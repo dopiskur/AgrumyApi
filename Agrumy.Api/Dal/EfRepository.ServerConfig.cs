@@ -35,6 +35,8 @@ namespace api.Dal
                 ActivationResendCooldownMinutes = settings.ActivationResendCooldownMinutes,
                 AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation,
                 ScheduleTimeZone = settings.ScheduleTimeZone,
+                FirmwareSource = (int)FirmwareSource.GitHub,
+                FirmwareGitHubRepository = settings.FirmwareGitHubRepository,
             };
             db.ServerConfigs.Add(generated);
             await db.SaveChangesAsync();
@@ -57,6 +59,9 @@ namespace api.Dal
             row.ActivationResendCooldownMinutes = config.ActivationResendCooldownMinutes;
             row.AllowSelfServiceTenantCreation = config.AllowSelfServiceTenantCreation;
             row.ScheduleTimeZone = config.ScheduleTimeZone;
+            row.FirmwareSource = (int)config.FirmwareSource;
+            row.FirmwareGitHubRepository = config.FirmwareGitHubRepository;
+            row.FirmwareCustomRepositoryUrl = config.FirmwareCustomRepositoryUrl;
             await db.SaveChangesAsync();
         }
 
@@ -90,7 +95,8 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
-        private static ServerConfig ToDto(ServerConfigRow r) => new()
+        // Instance, not static: the #94 GitHub-repository fallback below reads the injected settings.
+        private ServerConfig ToDto(ServerConfigRow r) => new()
         {
             IDServerConfig = r.IDServerConfig,
             ServerConfigName = r.ServerConfigName,
@@ -105,6 +111,11 @@ namespace api.Dal
             ActivationResendCooldownMinutes = r.ActivationResendCooldownMinutes,
             AllowSelfServiceTenantCreation = r.AllowSelfServiceTenantCreation,
             ScheduleTimeZone = r.ScheduleTimeZone,
+            FirmwareSource = (FirmwareSource)r.FirmwareSource,
+            // A row created before #94 has NULL here; the setting's seed is the right fallback
+            // rather than an empty repository nobody can sync from.
+            FirmwareGitHubRepository = string.IsNullOrWhiteSpace(r.FirmwareGitHubRepository) ? settings.FirmwareGitHubRepository : r.FirmwareGitHubRepository,
+            FirmwareCustomRepositoryUrl = r.FirmwareCustomRepositoryUrl,
         };
     }
 }

@@ -172,6 +172,8 @@ namespace api.Dal.Entities
         public bool? Reboot { get; set; }
         public bool? Reset { get; set; }
         public bool? FirmwareUpdate { get; set; }
+        // Roadmap #93 - see api.Models.Device.FirmwareTargetVersion.
+        public string? FirmwareTargetVersion { get; set; }
         public int? ConfigVersion { get; set; }
         // Roadmap #34 - see api.Models.DeviceConfig.CommandVersion for the full story.
         public int CommandVersion { get; set; }
@@ -209,14 +211,24 @@ namespace api.Dal.Entities
         // streak, not one per tick, without a separate dedup table.
         public DateTime? OfflineNotifiedAt { get; set; }
         public string? FirmwareVersion { get; set; }
+        // Roadmap #94 - see api.Models.DeviceConfigPoll.Board.
+        public string? Board { get; set; }
     }
 
+    // Roadmap #94 columns (Board/Source/FileName/SizeBytes/Sha256/PublishedAt) - see
+    // api.Models.DeviceFirmware for what each means; DeviceTypeID is the pre-#94 legacy key.
     public class DeviceFirmwareRow
     {
         public int IDDeviceFirmware { get; set; }
         public int? DeviceTypeID { get; set; }
+        public string? Board { get; set; }
         public string? Version { get; set; }
         public string? Url { get; set; }
+        public int Source { get; set; }
+        public string? FileName { get; set; }
+        public long? SizeBytes { get; set; }
+        public string? Sha256 { get; set; }
+        public DateTime? PublishedAt { get; set; }
         public DateTime? DateAdded { get; set; }
     }
 }

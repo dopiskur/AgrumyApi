@@ -47,6 +47,25 @@ namespace api.Models
         // and every fleet observed so far lives in one geographic timezone.
         [Display(Name = "Schedule time zone")]
         public string? ScheduleTimeZone { get; set; }
+
+        // Roadmap #94: where firmware comes from - see api.Models.FirmwareSource for what each mode
+        // means. GitHub is the default so a fresh install needs no setup; the repository is
+        // editable so a fork can point at its own releases.
+        // String on the wire: Refit's default serializer writes enums as their names, and the API
+        // must read that back (it still accepts the integer form too). Admin-only DTO, not part of
+        // the firmware contract, so this does not touch the raw-int convention devices rely on.
+        [Display(Name = "Firmware source")]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
+        public FirmwareSource FirmwareSource { get; set; }
+
+        [Display(Name = "GitHub repository (owner/name)")]
+        public string? FirmwareGitHubRepository { get; set; }
+
+        /// <summary>Custom mode only: absolute URL of a manifest.json in the format
+        /// api.Models.FirmwareManifest describes - the .bin URLs inside it may be absolute or
+        /// relative to the manifest's own location.</summary>
+        [Display(Name = "Custom repository manifest URL")]
+        public string? FirmwareCustomRepositoryUrl { get; set; }
     }
 
     /// <summary>The only two fields of <see cref="ServerConfig"/> a pre-login, unauthenticated page

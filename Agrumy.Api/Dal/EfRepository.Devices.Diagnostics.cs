@@ -1,5 +1,6 @@
 using api.Dal.Entities;
 using api.Dal.Interface;
+using api.Firmware;
 using api.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,6 +30,7 @@ namespace api.Dal
             row.RssiDbm = poll.Rssi ?? row.RssiDbm;
             row.FreeHeapBytes = poll.FreeHeap ?? row.FreeHeapBytes;
             row.FirmwareVersion = poll.FirmwareVersion ?? row.FirmwareVersion;
+            row.Board = poll.Board ?? row.Board; // roadmap #94
             await db.SaveChangesAsync();
         }
 
@@ -58,23 +60,45 @@ namespace api.Dal
                 })
                 .ToListAsync();
 
+            // Roadmap #93: one catalog read for the whole fleet, newest version per board picked in
+            // memory (semver, not DateAdded) across the visible sources - see
+            // FirmwareCatalogService.VisibleSources for why Local always counts.
+            FirmwareSource activeSource = (await ServerConfigGetAsync()).FirmwareSource;
+            var visible = new HashSet<int> { (int)activeSource, (int)FirmwareSource.Local };
+            var catalog = await db.DeviceFirmwares.AsNoTracking()
+                .Where(f => f.Board != null && visible.Contains(f.Source))
+                .Select(f => new { f.Board, f.Version })
+                .ToListAsync();
+            var latestPerBoard = catalog
+                .GroupBy(f => f.Board!)
+                .ToDictionary(g => g.Key, g => g.Select(f => f.Version).Where(FirmwareVersion.IsValid).OrderByDescending(v => FirmwareVersion.Parse(v!)).FirstOrDefault());
+
             DateTime utcNow = DateTime.UtcNow;
-            return rows.Select(r => new DeviceFleetStatus
+            return rows.Select(r =>
             {
-                IDDevice = r.Device.IDDevice,
-                TenantID = r.Device.TenantID,
-                DeviceName = r.Device.DeviceName,
-                Enabled = r.Device.Enabled,
-                SleepSeconds = r.Device.SleepSeconds,
-                LastSeenAt = r.Diag?.LastSeenAt,
-                UptimeSeconds = r.Diag?.UptimeSeconds,
-                RssiDbm = r.Diag?.RssiDbm,
-                FreeHeapBytes = r.Diag?.FreeHeapBytes,
-                FirmwareVersion = r.Diag?.FirmwareVersion,
-                Battery = r.Battery,
-                Online = DeviceFleetStatus.ComputeOnline(r.Diag?.LastSeenAt, r.Device.SleepSeconds, utcNow),
-                DeviceUnitID = r.Device.DeviceUnitID,
-                DeviceUnitZoneID = r.Device.DeviceUnitZoneID,
+                string? latest = r.Diag?.Board != null && latestPerBoard.TryGetValue(r.Diag.Board, out var v) ? v : null;
+                return new DeviceFleetStatus
+                {
+                    IDDevice = r.Device.IDDevice,
+                    TenantID = r.Device.TenantID,
+                    DeviceName = r.Device.DeviceName,
+                    Enabled = r.Device.Enabled,
+                    SleepSeconds = r.Device.SleepSeconds,
+                    LastSeenAt = r.Diag?.LastSeenAt,
+                    UptimeSeconds = r.Diag?.UptimeSeconds,
+                    RssiDbm = r.Diag?.RssiDbm,
+                    FreeHeapBytes = r.Diag?.FreeHeapBytes,
+                    FirmwareVersion = r.Diag?.FirmwareVersion,
+                    Board = r.Diag?.Board,
+                    LatestFirmwareVersion = latest,
+                    FirmwareUpdateAvailable = FirmwareVersion.IsNewer(latest, r.Diag?.FirmwareVersion),
+                    FirmwareUpdatePending = r.Device.FirmwareUpdate == true,
+                    FirmwareTargetVersion = r.Device.FirmwareTargetVersion,
+                    Battery = r.Battery,
+                    Online = DeviceFleetStatus.ComputeOnline(r.Diag?.LastSeenAt, r.Device.SleepSeconds, utcNow),
+                    DeviceUnitID = r.Device.DeviceUnitID,
+                    DeviceUnitZoneID = r.Device.DeviceUnitZoneID,
+                };
             }).ToList();
         }
 

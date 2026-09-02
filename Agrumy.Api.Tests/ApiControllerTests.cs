@@ -36,7 +36,8 @@ public class ApiControllerTests
     // Roadmap #34: CommandQueueService is a plain sealed class (not mocked) - IRepository already
     // implements ICommandRepository/IDeviceRepository/IDeviceUnitRepository, so the same mock
     // backs all three of its constructor params.
-    private DeviceApiController NewDeviceController() => new(_repo.Object, _cache.Object, new CommandQueueService(_repo.Object, _repo.Object, _repo.Object));
+    private DeviceApiController NewDeviceController() => new(_repo.Object, _cache.Object,
+        new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), FirmwareTestSupport.NewCatalog(_repo.Object));
     private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _notifications.Object, TestSettings);
 
     /// <summary>Gives a bare (non-DI-constructed) controller the JWT claims an [Authorize] action reads via HttpContext.User.</summary>

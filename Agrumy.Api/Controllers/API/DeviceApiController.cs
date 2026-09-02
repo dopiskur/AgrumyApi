@@ -1,5 +1,6 @@
 using api.Commands;
 using api.Dal.Interface;
+using api.Firmware;
 using api.Models;
 using api.Security;
 using api.Utils;
@@ -10,7 +11,7 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace api.Controllers.API
 {
     [Route("/api/Device")]
-    public class DeviceApiController(IRepository repo, ICache cache, CommandQueueService commandQueue) : ApiControllerBase(repo, cache)
+    public class DeviceApiController(IRepository repo, ICache cache, CommandQueueService commandQueue, FirmwareCatalogService firmwareCatalog) : ApiControllerBase(repo, cache)
     {
         #region websvc api
 
@@ -260,6 +261,16 @@ namespace api.Controllers.API
 
             await Repo.DeviceDiagnosticUpsertAsync(device.IDDevice!.Value, device.TenantID, value);
 
+            // Roadmap #93: the heartbeat is also how the server learns an OTA actually took - the
+            // first poll reporting the requested version fulfils the request (flags cleared, event
+            // logged) so the UI's "pending" state and the poll's OTA offer both stop.
+            if (await firmwareCatalog.NoteHeartbeatAsync(device, value.FirmwareVersion, value.Board))
+            {
+                device.FirmwareUpdate = false;
+                device.FirmwareTargetVersion = null;
+                await Repo.EventDevicePushAsync(device.IDDevice.Value, device.TenantID, DeviceEventType.FirmwareUpdated, "version=" + value.FirmwareVersion);
+            }
+
             // Roadmap #106: compare against the device row just read above, not a session-cache
             // copy - the cache entry can be stale/absent (5-min sliding TTL, #109) or written by a
             // different instance (#72), and this DB read already happens unconditionally for the
@@ -277,7 +288,39 @@ namespace api.Controllers.API
                 return Ok(); // device is up to date and nothing is queued for it - do nothing
             }
 
-            return Ok(await BuildDeviceConfigAsync(device, pendingCommand));
+            return Ok(await BuildDeviceConfigAsync(device, pendingCommand, value.Board));
+        }
+
+        /// <summary>Roadmap #93: arms an OTA for one device - Version null = latest catalog build
+        /// for its board (one-click), a specific version = install exactly that (rollback/downgrade).
+        /// The firmware's own "offered version != running" gate (ServiceController::apiConfig) means
+        /// a redundant request is harmless; GetConfig clears it once the heartbeat confirms.</summary>
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("FirmwareUpdate")]
+        public async Task<ActionResult> FirmwareUpdateRequest([FromBody] DeviceFirmwareUpdateRequest request)
+        {
+            var (device, error) = await EnsureOwnedDeviceAsync(
+                () => Repo.DeviceGetByIdAsync(request.IdDevice), "Device", forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            string? problem = await firmwareCatalog.RequestUpdateAsync(device!, request.Version);
+            return problem == null ? Ok() : BadRequest(problem);
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpDelete("FirmwareUpdate")]
+        public async Task<ActionResult> FirmwareUpdateCancel(int idDevice)
+        {
+            var (_, error) = await EnsureOwnedDeviceAsync(
+                () => Repo.DeviceGetByIdAsync(idDevice), "Device", forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            await firmwareCatalog.CancelUpdateAsync(idDevice);
+            return Ok();
         }
 
         /// <summary>Roadmap #28. No identity field in the body by design - see DeviceEventPush;
@@ -379,10 +422,11 @@ namespace api.Controllers.API
             // "device row already exists" re-registration path (factory reset, etc.), where a
             // command could legitimately still be queued.
             PendingCommand? pendingCommand = await commandQueue.GetPendingCommandAsync(device.IDDevice!.Value);
-            return Ok(await BuildDeviceConfigAsync(device, pendingCommand));
+            // Register carries no Board (roadmap #94) - null falls back to the legacy per-type lookup.
+            return Ok(await BuildDeviceConfigAsync(device, pendingCommand, board: null));
         }
 
-        private async Task<DeviceConfig> BuildDeviceConfigAsync(Device device, PendingCommand? pendingCommand)
+        private async Task<DeviceConfig> BuildDeviceConfigAsync(Device device, PendingCommand? pendingCommand, string? board)
         {
             // Roadmap #39: computed fresh on every Config/Register response (cheap - one TimeZoneInfo
             // lookup) rather than cached, so a DST transition or an admin changing
@@ -416,17 +460,14 @@ namespace api.Controllers.API
                 PendingCommand = pendingCommand,
             };
 
-            // Roadmap #3 (OTA). Only look up a build when the flag is set; the firmware does a
-            // version comparison of its own so this being present on every Config sync is fine.
-            // Harmless on Register: a freshly-created device has FirmwareUpdate == null.
-            if (device.FirmwareUpdate == true && device.DeviceTypeID != null)
+            // Roadmap #3 (OTA) / #94: the firmware does a version comparison of its own so an offer
+            // being present on every Config sync is fine. Harmless on Register: a freshly-created
+            // device has FirmwareUpdate == null, and ResolveOfferAsync returns null for that first.
+            DeviceFirmware? firmware = await firmwareCatalog.ResolveOfferAsync(device, board);
+            if (firmware != null)
             {
-                DeviceFirmware? firmware = await Repo.DeviceFirmwareLatestGetAsync(device.DeviceTypeID);
-                if (firmware != null)
-                {
-                    deviceConfig.FirmwareVersion = firmware.Version;
-                    deviceConfig.FirmwareUrl = firmware.Url;
-                }
+                deviceConfig.FirmwareVersion = firmware.Version;
+                deviceConfig.FirmwareUrl = firmware.Url;
             }
 
             if (deviceConfig.DeviceSensorEnabled == true)

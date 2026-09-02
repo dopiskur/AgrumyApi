@@ -23,6 +23,10 @@ namespace api.Models
         // carries the outcome ("success" / "failed: <reason>"); CommandId (DeviceEventPush) links
         // it back to the specific command row so PushEvent can call MarkExecutedAsync.
         CommandExecuted = 9,
+        // Roadmap #93: server-detected, not device-pushed - written by DeviceApiController.GetConfig
+        // when a heartbeat first reports the version an admin asked for (Device.FirmwareUpdate /
+        // FirmwareTargetVersion), which is also when those two flags are cleared.
+        FirmwareUpdated = 10,
     }
 
     /// <summary>Body of POST /api/Device/Event. Deliberately carries no device/tenant identity field -
