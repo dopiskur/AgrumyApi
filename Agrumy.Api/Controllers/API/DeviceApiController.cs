@@ -158,6 +158,15 @@ namespace api.Controllers.API
                 return BadRequest(scheduleError);
             }
 
+            // Roadmap #36 (A): same "catch human error server-side" layer as the schedule check
+            // above - the device-side hard ceiling (B) is the real safety net and would just clamp
+            // a nonsense value's practical effect anyway, but a typo like a negative number should
+            // fail loudly at save time rather than silently disable the limit on-device.
+            if (SafetyLimitError(deviceUpdate.Controller) is string safetyLimitError)
+            {
+                return BadRequest(safetyLimitError);
+            }
+
             var (_, error) = await EnsureOwnedDeviceAsync(
                 () => Repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice), "Device", forWrite: true);
             if (error != null)
@@ -211,6 +220,26 @@ namespace api.Controllers.API
                         return $"{label} schedule: duration must be at least 1 second and not cross local midnight (start + duration <= 86400).";
                     }
                 }
+            }
+            return null;
+        }
+
+        /// <summary>Roadmap #36 (A): per-device override version of the same bound
+        /// ServerConfigApiController.Update enforces on the server-wide defaults - see
+        /// api.Utils.SafetyLimitValidation for why the range itself lives there, shared.</summary>
+        private static string? SafetyLimitError(DeviceConfigController? cfg)
+        {
+            if (cfg == null)
+            {
+                return null;
+            }
+            if (!SafetyLimitValidation.IsValid(cfg.WaterPumpMaxRunSeconds))
+            {
+                return $"WaterPump max run time must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.";
+            }
+            if (!SafetyLimitValidation.IsValid(cfg.WaterPumpCooldownSeconds))
+            {
+                return $"WaterPump cooldown must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.";
             }
             return null;
         }

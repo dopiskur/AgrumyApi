@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using api;
 using api.Dal;
 using api.Dal.Entities;
+using api.Dal.Interface;
 using api.Models;
 using api.Security;
 using Microsoft.EntityFrameworkCore;
@@ -153,8 +154,20 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Skip.If(t is null, $"No integration database configured for {provider}.");
         _db?.Dispose();
         _db = new AgrumyDbContext(DbOptionsFactory.Build(t!.Provider, t.ConnectionString));
-        _repo = new EfRepository(_db, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance);
+        // Roadmap #118: a real cache would make DeviceFleetGetAsync's assertions timing-dependent
+        // (a read right after a write could still see the pre-write cached snapshot) - these tests
+        // are about query/translation correctness against the real engine, not cache behaviour, so
+        // every call here always misses and always executes the real query.
+        _repo = new EfRepository(_db, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance, new NullCache());
         return t;
+    }
+
+    private sealed class NullCache : ICache
+    {
+        public Task<DeviceCache> GetDeviceCacheAsync(string key) => Task.FromResult(new DeviceCache { apiAuth = null });
+        public Task SetItemAsync(string key, DeviceCache deviceCache, TimeSpan? ttl = null) => Task.CompletedTask;
+        public Task<T?> GetAsync<T>(string key) where T : class => Task.FromResult<T?>(null);
+        public Task SetAsync<T>(string key, T value, TimeSpan ttl) where T : class => Task.CompletedTask;
     }
 
     private static string U() => Guid.NewGuid().ToString("N")[..12];
@@ -762,6 +775,35 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(43200, slot.Duration);
         Assert.Empty(ctrl.VentilationSchedule); // untouched groups stay empty, not null
         Assert.Equal(1, (await _repo.DeviceConfigSensorGetAsync(d.DeviceConfigSensorID))!.SensorTemp);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceConfigController_WaterPumpSafetyLimits_SeededFromServerConfig_ThenPerDeviceOverride(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+
+        // A brand new device is seeded from ServerConfig(1)'s current defaults - same rule as the
+        // hysteresis fields (roadmap #10), applied to roadmap #36's WaterPump safety limits.
+        ServerConfig serverDefaults = await _repo.ServerConfigGetAsync(1);
+        var d = await MakeDevice(t, tenantId);
+
+        var seeded = await _repo.DeviceConfigControllerGetAsync(d.DeviceConfigControllerID);
+        Assert.Equal(serverDefaults.WaterPumpMaxRunSeconds, seeded!.WaterPumpMaxRunSeconds);
+        Assert.Equal(serverDefaults.WaterPumpCooldownSeconds, seeded.WaterPumpCooldownSeconds);
+
+        // Per-device override from here on - editing it must not disturb the server-wide default.
+        await _repo.DeviceConfigControllerUpdateAsync(d.IDDevice, new DeviceConfigController
+        {
+            IDDeviceConfigController = d.DeviceConfigControllerID,
+            WaterPumpMaxRunSeconds = 900,
+            WaterPumpCooldownSeconds = 120,
+        });
+
+        var overridden = await _repo.DeviceConfigControllerGetAsync(d.DeviceConfigControllerID);
+        Assert.Equal(900, overridden!.WaterPumpMaxRunSeconds);
+        Assert.Equal(120, overridden.WaterPumpCooldownSeconds);
+        Assert.Equal(serverDefaults.WaterPumpMaxRunSeconds, (await _repo.ServerConfigGetAsync(1)).WaterPumpMaxRunSeconds);
     }
 
     // Roadmap #115: a second save with a DIFFERENT slot set must fully replace the first, not

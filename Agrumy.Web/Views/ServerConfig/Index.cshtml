@@ -61,6 +61,24 @@
             </div>
 
             <p class="text-secondary">
+                Water pump safety limits (roadmap #36): a hard ceiling the device enforces AFTER
+                whichever mode (threshold/interval/schedule) decides the pump should run,
+                independent of it. 0 disables either one. These are only the defaults seeded onto
+                a newly-added device - edit an existing device's own values under Device &rarr;
+                Controller &rarr; Safety Limits.
+            </p>
+            <div class="mb-3">
+                <label asp-for="WaterPumpMaxRunSeconds" class="form-label"></label>
+                <input asp-for="WaterPumpMaxRunSeconds" class="form-control" />
+                <span asp-validation-for="WaterPumpMaxRunSeconds" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="WaterPumpCooldownSeconds" class="form-label"></label>
+                <input asp-for="WaterPumpCooldownSeconds" class="form-control" />
+                <span asp-validation-for="WaterPumpCooldownSeconds" class="text-danger"></span>
+            </div>
+
+            <p class="text-secondary">
                 A device repeating the identical event (e.g. "NoInternet") within this many
                 minutes of its last one is ignored, not stored.
             </p>

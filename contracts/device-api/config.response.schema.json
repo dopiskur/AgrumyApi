@@ -135,6 +135,7 @@
         "heatingIntervalEnabled", "heatingInterval", "heatingIntervalLength",
         "waterPumpIntervalEnabled", "waterPumpInterval", "waterPumpIntervalLength",
         "ventilationSchedule", "lightSchedule", "heatingSchedule", "waterPumpSchedule",
+        "waterPumpMaxRunSeconds", "waterPumpCooldownSeconds",
         "relayEnabled", "relay1", "relay2", "relay3", "relay4", "relay5", "relay6", "relay7", "relay8"
       ],
       "properties": {
@@ -185,6 +186,14 @@
         "lightSchedule": { "type": "array", "items": { "$ref": "#/definitions/deviceScheduleSlot" } },
         "heatingSchedule": { "type": "array", "items": { "$ref": "#/definitions/deviceScheduleSlot" } },
         "waterPumpSchedule": { "type": "array", "items": { "$ref": "#/definitions/deviceScheduleSlot" } },
+        "waterPumpMaxRunSeconds": {
+          "type": ["integer", "null"],
+          "description": "Roadmap #36. Hard ceiling (seconds) on continuous WaterPump run time, enforced device-side AFTER threshold/interval/schedule decides the pump should run - AgrumyFirmware's ActuatorController::applyWaterPumpSafetyLimits. 0/null disables it."
+        },
+        "waterPumpCooldownSeconds": {
+          "type": ["integer", "null"],
+          "description": "Roadmap #36. Minimum OFF time (seconds) before the next WaterPump attempt is allowed, same enforcement point as waterPumpMaxRunSeconds. 0/null disables it."
+        },
         "relayEnabled": { "type": ["boolean", "null"] },
         "relay1": { "type": ["integer", "null"] },
         "relay2": { "type": ["integer", "null"] },

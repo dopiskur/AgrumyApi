@@ -73,6 +73,18 @@ namespace api.Controllers.API
                 return BadRequest("GitHub repository must be in owner/name form.");
             }
 
+            // Roadmap #36 (A): the server-wide default pair new devices are seeded with - same
+            // bound DeviceApiController.DeviceConfigControllerUpdate enforces on a per-device
+            // override (api.Utils.SafetyLimitValidation).
+            if (!SafetyLimitValidation.IsValid(config.WaterPumpMaxRunSeconds))
+            {
+                return BadRequest($"WaterPump max run time must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.");
+            }
+            if (!SafetyLimitValidation.IsValid(config.WaterPumpCooldownSeconds))
+            {
+                return BadRequest($"WaterPump cooldown must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.");
+            }
+
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await Repo.ServerConfigUpdateAsync(config);
             return Ok();

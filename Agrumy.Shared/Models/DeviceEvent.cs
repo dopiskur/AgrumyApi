@@ -31,6 +31,12 @@ namespace api.Models
         // when the latest sensorData.Battery reading crosses ServerConfig.BatteryLowThreshold,
         // same dedup-by-streak pattern as Offline above (deviceDiagnostic.LowBatteryNotifiedAt).
         LowBattery = 11,
+        // Roadmap #36: device-pushed (AgrumyFirmware's ActuatorController::applyWaterPumpSafetyLimits
+        // via SensorController::pushSensorData) whenever the WaterPump max-run-time ceiling or
+        // cooldown forces the pump off - Message says which one and the configured limit. Relies
+        // on the SAME EventDedupeMinutes collapsing every other device-pushed event type already
+        // gets (a mode that keeps requesting ON during cooldown would otherwise push this every tick).
+        SafetyLimitTripped = 12,
     }
 
     /// <summary>Body of POST /api/Device/Event. Deliberately carries no device/tenant identity field -

@@ -30,6 +30,10 @@ namespace api.Dal
                 TemperatureHysteresis = serverConfig.TemperatureHysteresis,
                 HumidityHysteresis = serverConfig.HumidityHysteresis,
                 LightHysteresis = serverConfig.LightHysteresis,
+                // Roadmap #36: same server-wide-default-then-per-device-override rule as the
+                // hysteresis fields above.
+                WaterPumpMaxRunSeconds = serverConfig.WaterPumpMaxRunSeconds,
+                WaterPumpCooldownSeconds = serverConfig.WaterPumpCooldownSeconds,
             };
             db.DeviceConfigSensors.Add(sensorCfg);
             db.DeviceConfigControllers.Add(controllerCfg);

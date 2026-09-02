@@ -37,11 +37,16 @@ namespace api.Controllers.View
             }
             catch (ApiException ex)
             {
-                // Roadmap #94: the API now also rejects a bad firmware source/repository/URL - route
-                // its message to the field it is about, else it lands under the time zone by default.
+                // Roadmap #94/#36: the API also rejects a bad firmware source/repository/URL or an
+                // out-of-range WaterPump safety limit - route each to the field it is actually
+                // about, else it lands under the time zone by default.
                 string field = ex.Body.Contains("firmware", StringComparison.OrdinalIgnoreCase) || ex.Body.Contains("GitHub", StringComparison.OrdinalIgnoreCase)
                     ? nameof(ServerConfig.FirmwareSource)
-                    : nameof(ServerConfig.ScheduleTimeZone);
+                    : ex.Body.Contains("cooldown", StringComparison.OrdinalIgnoreCase)
+                        ? nameof(ServerConfig.WaterPumpCooldownSeconds)
+                        : ex.Body.Contains("WaterPump", StringComparison.OrdinalIgnoreCase)
+                            ? nameof(ServerConfig.WaterPumpMaxRunSeconds)
+                            : nameof(ServerConfig.ScheduleTimeZone);
                 ModelState.AddModelError(field, ex.Body);
                 ViewBag.TimeZones = TimeZoneOptions(serverConfig.ScheduleTimeZone);
                 return View(serverConfig);

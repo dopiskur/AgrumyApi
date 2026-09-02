@@ -45,6 +45,15 @@ namespace api
         public double BatteryLowThreshold { get; set; } = 20.0;
         public double BatteryLowHysteresis { get; set; } = 5.0;
 
+        // Roadmap #36: WaterPump-only device-side safety limit defaults - 30 min max continuous
+        // run (generous over any reasonable single watering cycle, but bounds a stuck sensor/logic
+        // error's worst case) and a 5 min cooldown (time for water to drain into the ground before
+        // the next attempt trusts a fresh reading). Only seeds NEW devices at creation (same rule
+        // as the hysteresis defaults above) - an existing device's DeviceConfigController row is
+        // never retroactively changed by editing these.
+        public int WaterPumpMaxRunSeconds { get; set; } = 1800;
+        public int WaterPumpCooldownSeconds { get; set; } = 300;
+
         // Roadmap #28: how long a device's identical repeated event is ignored server-side.
         public int EventDedupeMinutes { get; set; } = 10;
 
@@ -85,6 +94,8 @@ namespace api
             HysteresisLight = ParseDoubleOr(configuration, "ServerConfig:Hysteresis:Light", 20.0),
             BatteryLowThreshold = ParseDoubleOr(configuration, "ServerConfig:BatteryLowThreshold", 20.0),
             BatteryLowHysteresis = ParseDoubleOr(configuration, "ServerConfig:BatteryLowHysteresis", 5.0),
+            WaterPumpMaxRunSeconds = ParseIntOr(configuration, "ServerConfig:WaterPumpMaxRunSeconds", 1800),
+            WaterPumpCooldownSeconds = ParseIntOr(configuration, "ServerConfig:WaterPumpCooldownSeconds", 300),
             EventDedupeMinutes = ParseIntOr(configuration, "ServerConfig:EventDedupeMinutes", 10),
             ActivationResendCooldownMinutes = ParseIntOr(configuration, "ServerConfig:ActivationResendCooldownMinutes", 10),
             AllowSelfServiceTenantCreation = ParseBoolOr(configuration, "ServerConfig:AllowSelfServiceTenantCreation", false),

@@ -29,5 +29,15 @@ namespace api.Dal
         public Task SetItemAsync(string key, DeviceCache deviceCache, TimeSpan? ttl = null) =>
             cache.SetAsync(key, JsonSerializer.SerializeToUtf8Bytes(deviceCache),
                 new DistributedCacheEntryOptions { SlidingExpiration = ttl ?? DefaultTtl });
+
+        public async Task<T?> GetAsync<T>(string key) where T : class
+        {
+            byte[]? bytes = await cache.GetAsync(key);
+            return bytes is null ? null : JsonSerializer.Deserialize<T>(bytes);
+        }
+
+        public Task SetAsync<T>(string key, T value, TimeSpan ttl) where T : class =>
+            cache.SetAsync(key, JsonSerializer.SerializeToUtf8Bytes(value),
+                new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = ttl });
     }
 }

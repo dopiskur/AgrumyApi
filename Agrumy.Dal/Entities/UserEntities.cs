@@ -117,6 +117,10 @@ namespace api.Dal.Entities
         public double? BatteryLowThreshold { get; set; }
         public double? BatteryLowHysteresis { get; set; }
 
+        // Roadmap #36 - see api.Models.ServerConfig.WaterPumpMaxRunSeconds/WaterPumpCooldownSeconds.
+        public int? WaterPumpMaxRunSeconds { get; set; }
+        public int? WaterPumpCooldownSeconds { get; set; }
+
         // Roadmap #28 - see api.Models.ServerConfig.EventDedupeMinutes.
         public int? EventDedupeMinutes { get; set; }
 

@@ -34,8 +34,22 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
+        // Roadmap #118: the Web #90 live-refresh poll (10s, one per open admin tab) was re-running
+        // this whole correlated-subquery-per-device fleet scan on every tick regardless of how many
+        // tabs were open. A short absolute-TTL cache (see ICache.SetAsync) lets any number of
+        // concurrently open tabs share one real DB query per window - does not fix #14's underlying
+        // per-row cost as sensorData grows, only defers when that growth becomes visible.
+        private static readonly TimeSpan FleetCacheTtl = TimeSpan.FromSeconds(6);
+
         public async Task<IList<DeviceFleetStatus>> DeviceFleetGetAsync(int? tenantID)
         {
+            string cacheKey = $"fleet:{tenantID?.ToString() ?? "global"}";
+            List<DeviceFleetStatus>? cached = await cache.GetAsync<List<DeviceFleetStatus>>(cacheKey);
+            if (cached != null)
+            {
+                return cached;
+            }
+
             IQueryable<DeviceRow> devices = db.Devices.AsNoTracking();
             if (tenantID != null)
             {
@@ -74,7 +88,7 @@ namespace api.Dal
                 .ToDictionary(g => g.Key, g => g.Select(f => f.Version).Where(FirmwareVersion.IsValid).OrderByDescending(v => FirmwareVersion.Parse(v!)).FirstOrDefault());
 
             DateTime utcNow = DateTime.UtcNow;
-            return rows.Select(r =>
+            List<DeviceFleetStatus> result = rows.Select(r =>
             {
                 string? latest = r.Diag?.Board != null && latestPerBoard.TryGetValue(r.Diag.Board, out var v) ? v : null;
                 return new DeviceFleetStatus
@@ -100,6 +114,9 @@ namespace api.Dal
                     DeviceUnitZoneID = r.Device.DeviceUnitZoneID,
                 };
             }).ToList();
+
+            await cache.SetAsync(cacheKey, result, FleetCacheTtl);
+            return result;
         }
 
         // ---- Device events (roadmap #28) -------------------------------------------

@@ -84,6 +84,8 @@ namespace api.Dal
                 row.WaterPumpIntervalEnabled = cfg.WaterPumpIntervalEnabled;
                 row.WaterPumpInterval = cfg.WaterPumpInterval;
                 row.WaterPumpIntervalLength = cfg.WaterPumpIntervalLength;
+                row.WaterPumpMaxRunSeconds = cfg.WaterPumpMaxRunSeconds;
+                row.WaterPumpCooldownSeconds = cfg.WaterPumpCooldownSeconds;
                 row.RelayEnabled = cfg.RelayEnabled;
                 row.Relay1 = cfg.Relay1;
                 row.Relay2 = cfg.Relay2;
@@ -214,6 +216,8 @@ namespace api.Dal
             WaterPumpIntervalEnabled = c.WaterPumpIntervalEnabled,
             WaterPumpInterval = c.WaterPumpInterval,
             WaterPumpIntervalLength = c.WaterPumpIntervalLength,
+            WaterPumpMaxRunSeconds = c.WaterPumpMaxRunSeconds,
+            WaterPumpCooldownSeconds = c.WaterPumpCooldownSeconds,
             VentilationSchedule = ScheduleSlotsFor(slots, 1),
             LightSchedule = ScheduleSlotsFor(slots, 2),
             HeatingSchedule = ScheduleSlotsFor(slots, 3),

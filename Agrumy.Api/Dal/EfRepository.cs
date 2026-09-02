@@ -30,7 +30,7 @@ namespace api.Dal
     /// connection-pool churn (open/close per method), and tests had to poke process-wide static
     /// fields (ConnectionStringOverride/ProviderOverride) instead of just constructing an instance.
     /// </summary>
-    internal partial class EfRepository(AgrumyDbContext db, IOptions<AgrumySettings> settingsOptions, ILogger<EfRepository> logger) : IRepository
+    internal partial class EfRepository(AgrumyDbContext db, IOptions<AgrumySettings> settingsOptions, ILogger<EfRepository> logger, ICache cache) : IRepository
     {
         private readonly AgrumySettings settings = settingsOptions.Value;
 

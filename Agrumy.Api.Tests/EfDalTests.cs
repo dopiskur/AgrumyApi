@@ -2,8 +2,10 @@ using System.Text.Json;
 using api;
 using api.Dal;
 using api.Dal.Entities;
+using api.Dal.Interface;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Moq;
 
 namespace Agrumy.Api.Tests;
 
@@ -102,7 +104,8 @@ public class ClassifyExceptionTests
     private readonly EfRepository _repo = new(
         new AgrumyDbContext(DbOptionsFactory.Build(DbProviderKind.MySql, "server=unused;database=unused;")),
         Options.Create(new AgrumySettings()),
-        NullLogger<EfRepository>.Instance);
+        NullLogger<EfRepository>.Instance,
+        new Mock<ICache>().Object); // ClassifyException never touches the cache - unused here
 
     [Fact]
     public void PlainException_MentioningMissingTable_IsSchemaMissing()

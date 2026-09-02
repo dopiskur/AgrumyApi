@@ -33,6 +33,8 @@ namespace api.Dal
                 LightHysteresis = settings.HysteresisLight,
                 BatteryLowThreshold = settings.BatteryLowThreshold,
                 BatteryLowHysteresis = settings.BatteryLowHysteresis,
+                WaterPumpMaxRunSeconds = settings.WaterPumpMaxRunSeconds,
+                WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds,
                 EventDedupeMinutes = settings.EventDedupeMinutes,
                 ActivationResendCooldownMinutes = settings.ActivationResendCooldownMinutes,
                 AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation,
@@ -59,6 +61,8 @@ namespace api.Dal
             row.LightHysteresis = config.LightHysteresis;
             row.BatteryLowThreshold = config.BatteryLowThreshold;
             row.BatteryLowHysteresis = config.BatteryLowHysteresis;
+            row.WaterPumpMaxRunSeconds = config.WaterPumpMaxRunSeconds;
+            row.WaterPumpCooldownSeconds = config.WaterPumpCooldownSeconds;
             row.EventDedupeMinutes = config.EventDedupeMinutes;
             row.ActivationResendCooldownMinutes = config.ActivationResendCooldownMinutes;
             row.AllowSelfServiceTenantCreation = config.AllowSelfServiceTenantCreation;
@@ -94,6 +98,8 @@ namespace api.Dal
             row.LightHysteresis = settings.HysteresisLight;
             row.BatteryLowThreshold = settings.BatteryLowThreshold;
             row.BatteryLowHysteresis = settings.BatteryLowHysteresis;
+            row.WaterPumpMaxRunSeconds = settings.WaterPumpMaxRunSeconds;
+            row.WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds;
             row.EventDedupeMinutes = settings.EventDedupeMinutes;
             row.ActivationResendCooldownMinutes = settings.ActivationResendCooldownMinutes;
             row.AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation;
@@ -115,6 +121,8 @@ namespace api.Dal
             LightHysteresis = r.LightHysteresis,
             BatteryLowThreshold = r.BatteryLowThreshold,
             BatteryLowHysteresis = r.BatteryLowHysteresis,
+            WaterPumpMaxRunSeconds = r.WaterPumpMaxRunSeconds,
+            WaterPumpCooldownSeconds = r.WaterPumpCooldownSeconds,
             EventDedupeMinutes = r.EventDedupeMinutes,
             ActivationResendCooldownMinutes = r.ActivationResendCooldownMinutes,
             AllowSelfServiceTenantCreation = r.AllowSelfServiceTenantCreation,

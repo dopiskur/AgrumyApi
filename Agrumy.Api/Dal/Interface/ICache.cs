@@ -15,5 +15,17 @@ namespace api.Dal.Interface
         /// short for a device with a multi-hour sleepSeconds, #26/#89) - omit it for the old fixed
         /// behaviour.</summary>
         Task SetItemAsync(string key, DeviceCache deviceCache, TimeSpan? ttl = null);
+
+        /// <summary>Roadmap #118: generic JSON cache for a read-mostly aggregate (e.g. the Fleet
+        /// dashboard query) that doesn't fit the device-apiAuth <see cref="DeviceCache"/> shape.
+        /// Null means a miss - the caller re-computes and calls <see cref="SetAsync{T}"/>.</summary>
+        Task<T?> GetAsync<T>(string key) where T : class;
+
+        /// <summary>Roadmap #118: fixed absolute expiration, not sliding like <see
+        /// cref="SetItemAsync"/> - a live dashboard's cached result must go stale on its own after
+        /// <paramref name="ttl"/> regardless of how many tabs keep polling it within that window,
+        /// otherwise concurrent viewers would keep resetting a sliding timer and the aggregate could
+        /// stay stale indefinitely.</summary>
+        Task SetAsync<T>(string key, T value, TimeSpan ttl) where T : class;
     }
 }

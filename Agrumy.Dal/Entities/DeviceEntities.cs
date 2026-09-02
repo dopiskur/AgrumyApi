@@ -99,6 +99,11 @@ namespace api.Dal.Entities
         public int? WaterPumpInterval { get; set; } = 0;
         public int? WaterPumpIntervalLength { get; set; } = 0;
 
+        // Roadmap #36 - see api.Models.DeviceConfigController.WaterPumpMaxRunSeconds/
+        // WaterPumpCooldownSeconds.
+        public int? WaterPumpMaxRunSeconds { get; set; }
+        public int? WaterPumpCooldownSeconds { get; set; }
+
         public bool? RelayEnabled { get; set; }
         public int? Relay1 { get; set; }
         public int? Relay2 { get; set; }

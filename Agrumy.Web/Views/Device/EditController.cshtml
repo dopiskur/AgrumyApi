@@ -98,6 +98,9 @@
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-hysteresis" type="button" role="tab">Hysteresis</button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-safety-limits" type="button" role="tab">Safety Limits</button>
+                </li>
             </ul>
             <div class="tab-content border border-top-0 rounded-bottom p-3 mb-3">
                 <div class="tab-pane fade show active" id="tab-relays" role="tabpanel">
@@ -244,6 +247,26 @@
                         <label asp-for="DeviceConfigController.LightHysteresis" class="form-label"></label>
                         <input asp-for="DeviceConfigController.LightHysteresis" class="form-control" />
                         <span asp-validation-for="DeviceConfigController.LightHysteresis" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="tab-safety-limits" role="tabpanel">
+                    <p class="text-secondary">
+                        Water pump only (roadmap #36) - a hard ceiling the device enforces AFTER
+                        whichever mode above (Thresholds/Intervals/Schedules) decides the pump
+                        should run, independent of it. 0 disables either one. Seeded from the
+                        <a asp-controller="ServerConfig" asp-action="Index">Server Settings</a>
+                        defaults when this device was created; editable per device from here on.
+                    </p>
+                    <div class="mb-3">
+                        <label asp-for="DeviceConfigController.WaterPumpMaxRunSeconds" class="form-label"></label>
+                        <input asp-for="DeviceConfigController.WaterPumpMaxRunSeconds" class="form-control" />
+                        <span asp-validation-for="DeviceConfigController.WaterPumpMaxRunSeconds" class="text-danger"></span>
+                    </div>
+                    <div class="mb-0">
+                        <label asp-for="DeviceConfigController.WaterPumpCooldownSeconds" class="form-label"></label>
+                        <input asp-for="DeviceConfigController.WaterPumpCooldownSeconds" class="form-control" />
+                        <span asp-validation-for="DeviceConfigController.WaterPumpCooldownSeconds" class="text-danger"></span>
                     </div>
                 </div>
             </div>

@@ -1315,6 +1315,60 @@ public class ApiControllerTests
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
+    // ---- DeviceApiController.DeviceConfigControllerUpdate - roadmap #36 safety-limit validation --
+
+    [Fact]
+    public async Task DeviceConfigControllerUpdate_WaterPumpMaxRunSecondsNegative_Returns400_AndNeverTouchesRepo()
+    {
+        var controller = NewDeviceController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
+        {
+            Device = new Device { IDDevice = 8 },
+            Controller = new DeviceConfigController { WaterPumpMaxRunSeconds = -1 },
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        // MockBehavior.Strict: DeviceGetByIdAsync has no setup, so reaching this point already
+        // proves validation ran before the ownership lookup/DB write, same as the schedule checks above.
+    }
+
+    [Fact]
+    public async Task DeviceConfigControllerUpdate_WaterPumpCooldownSecondsTooLarge_Returns400()
+    {
+        var controller = NewDeviceController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
+        {
+            Device = new Device { IDDevice = 8 },
+            Controller = new DeviceConfigController { WaterPumpCooldownSeconds = 86401 }, // > 24h
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task DeviceConfigControllerUpdate_WaterPumpLimitsNullOrZero_SkipsValidation()
+    {
+        // Null/0 is "disabled", a real intentional state (api.Models.DeviceConfigController's
+        // comment) - must not be rejected the way an actually-out-of-range value is.
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 0 });
+        _repo.Setup(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>())).Returns(Task.CompletedTask);
+
+        var controller = NewDeviceController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
+        {
+            Device = new Device { IDDevice = 8 },
+            Controller = new DeviceConfigController { WaterPumpMaxRunSeconds = 0, WaterPumpCooldownSeconds = null },
+        });
+
+        Assert.True(result.Value);
+    }
+
     // ---- ServerConfigApiController.Update - roadmap #39 ScheduleTimeZone validation -------------
 
     [Fact]
@@ -1364,6 +1418,32 @@ public class ApiControllerTests
 
         Assert.IsType<OkResult>(result);
         Assert.Null(saved!.ScheduleTimeZone);
+    }
+
+    // ---- ServerConfigApiController.Update - roadmap #36 safety-limit validation -----------------
+
+    [Fact]
+    public async Task ServerConfigUpdate_WaterPumpMaxRunSecondsNegative_Returns400_AndNeverWrites()
+    {
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.Update(new ServerConfig { WaterPumpMaxRunSeconds = -1 });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        // MockBehavior.Strict: ServerConfigUpdateAsync has no setup, so reaching this point already
+        // proves the bad value was rejected before any write.
+    }
+
+    [Fact]
+    public async Task ServerConfigUpdate_WaterPumpCooldownSecondsTooLarge_Returns400()
+    {
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.Update(new ServerConfig { WaterPumpCooldownSeconds = 86401 });
+
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]

@@ -30,6 +30,15 @@ namespace api.Models
         public double? BatteryLowThreshold { get; set; }
         public double? BatteryLowHysteresis { get; set; }
 
+        // Roadmap #36: WaterPump-only device-side hard safety limits (seconds) - same seed/reload/
+        // per-device-override pattern as the hysteresis fields above, not the battery pair (those
+        // have no per-device override; these do, via DeviceConfigController.WaterPumpMaxRunSeconds/
+        // WaterPumpCooldownSeconds). Null/0 disables either one. Enforced device-side
+        // (AgrumyFirmware's ActuatorController::applyWaterPumpSafetyLimits), independent of
+        // whichever control mode (threshold/interval/schedule) decided the pump should run.
+        public int? WaterPumpMaxRunSeconds { get; set; }
+        public int? WaterPumpCooldownSeconds { get; set; }
+
         // Roadmap #28: a device repeating the identical DeviceEventType within this many minutes
         // of its last one is ignored server-side rather than stored - same seed/reload/admin-edit
         // pattern as the hysteresis fields above.

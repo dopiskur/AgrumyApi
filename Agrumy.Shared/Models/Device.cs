@@ -296,6 +296,15 @@ namespace api.Models
         public List<DeviceScheduleSlot> HeatingSchedule { get; set; } = [];
         public List<DeviceScheduleSlot> WaterPumpSchedule { get; set; } = [];
 
+        // Roadmap #36: WaterPump-only device-side hard safety limits - independent of whichever
+        // mode (threshold/interval/schedule above) decided the pump should run, applied by the
+        // firmware AFTER that decision (AgrumyFirmware's ActuatorController::
+        // applyWaterPumpSafetyLimits), not instead of it. Null/0 disables either one. Seeded from
+        // ServerConfig's matching defaults when the device is created, same pattern as the
+        // hysteresis fields above - editable per device from here on.
+        public int? WaterPumpMaxRunSeconds { get; set; }
+        public int? WaterPumpCooldownSeconds { get; set; }
+
         // Relay
         public bool? RelayEnabled { get; set; }
         public int? Relay1 { get; set; }
