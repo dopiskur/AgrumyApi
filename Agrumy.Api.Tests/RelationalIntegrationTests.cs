@@ -1307,6 +1307,40 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(ZoneStatus.Green, dashboard.Status);
     }
 
+    // Roadmap #122 diagnosis: the existing #116 rule-(4) tests only cover a device that has NEVER
+    // polled (LastSeenAt null) or one that just polled (fresh). The live bug report is a device
+    // that WAS online and has since gone stale - DeviceDiagnosticUpsertAsync always stamps "now",
+    // so this needs LastSeenAt pushed into the past directly, then Fleet vs. the zone dashboard
+    // compared for the SAME device to see whether they actually disagree.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitDashboard_Status_RedWhenEnabledDeviceWentStale_MatchesFleet(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d = await MakeEnabledDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
+
+        await using (var db = _fx.NewContext(t))
+        {
+            var diag = await db.DeviceDiagnostics.FirstAsync(x => x.DeviceID == d.IDDevice.Value);
+            diag.LastSeenAt = DateTime.UtcNow.AddHours(-2); // well past ComputeOnline's window at the default 60s SleepSeconds
+            await db.SaveChangesAsync();
+        }
+
+        var fleet = Assert.Single(await _repo.DeviceFleetGetAsync(tenantId), f => f.IDDevice == d.IDDevice);
+        Assert.False(fleet.Online, "Fleet should show this device offline");
+
+        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        var zoneDashboard = Assert.Single(await _repo.DeviceUnitZoneDashboardListGetAsync(unit.IDDeviceUnit!.Value));
+        var zoneSingle = await _repo.DeviceUnitZoneDashboardGetAsync(zone.IDDeviceUnitZone!.Value);
+
+        Assert.Equal(ZoneStatus.Red, dashboard.Status);
+        Assert.Equal(ZoneStatus.Red, zoneDashboard.Status);
+        Assert.Equal(ZoneStatus.Red, zoneSingle!.Status);
+    }
+
     // Roadmap #116 rule (3): a reading with no explicit dateCreated is stamped at the server's
     // UtcNow (existing SensorDataPushAsync behavior), so it must land in the trend's LAST bucket
     // (index 23 = the current hour) and nowhere else.

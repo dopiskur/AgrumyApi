@@ -31,7 +31,14 @@
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">
-            @zone.DeviceUnitZoneName <partial name="_ZoneStatusBadge" model="zone.Status" />
+            @* Roadmap #122 fix: the badge does NOT live here - this header is outside the
+               #zoneDetails div the live-refresh below replaces, so it would freeze at whatever
+               status the page had on its initial load and silently go stale (confirmed live: a
+               device going offline updated its row in the device table below within one poll,
+               but this header badge stayed green). It now lives in _ZoneDetails.cshtml instead,
+               same place the Index/Zones cube views already keep theirs - both of those refresh
+               correctly because their badge is part of the polled fragment. *@
+            @zone.DeviceUnitZoneName
             @if (hasAnyRole(RoleNames.DeviceManagers))
             {
                 <partial name="_InlineRename" model="renameModel" />
