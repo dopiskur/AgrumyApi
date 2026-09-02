@@ -44,11 +44,39 @@ namespace api.Controllers.View
 
         /// <summary>Single zone detail - roll-up plus the actual assigned devices (#82: "Zona
         /// prikazuje i detalje - kontroler + senzori"), with the Add Controller/Add Sensor/Remove
-        /// controls DeviceManagers roles see.</summary>
-        public async Task<ActionResult> Zone(int idDeviceUnitZone) => View(await api.DeviceUnitZoneDashboardGet(idDeviceUnitZone));
+        /// controls DeviceManagers roles see. Roadmap #116 rule (5): the device list itself is
+        /// Fleet's own rows (Device/_FleetRows.cshtml), filtered to this zone - not a second
+        /// hand-built table.</summary>
+        public async Task<ActionResult> Zone(int idDeviceUnitZone) => View(await BuildZoneViewAsync(idDeviceUnitZone));
 
         public async Task<ActionResult> ZoneDetails(int idDeviceUnitZone) =>
-            PartialView("_ZoneDetails", await api.DeviceUnitZoneDashboardGet(idDeviceUnitZone));
+            PartialView("_ZoneDetails", await BuildZoneViewAsync(idDeviceUnitZone));
+
+        private async Task<ZoneViewModel> BuildZoneViewAsync(int idDeviceUnitZone)
+        {
+            DeviceUnitZoneDashboard dashboard = await api.DeviceUnitZoneDashboardGet(idDeviceUnitZone);
+
+            // Roadmap #71 follow-up: LastSeenAt is stored/served in UTC - convert for display only,
+            // same as DeviceController.GetFleetForDisplayAsync.
+            IList<DeviceFleetStatus> fleet = (await api.DeviceFleetGet())
+                .Where(f => f.DeviceUnitZoneID == idDeviceUnitZone)
+                .ToList();
+            string? timeZone = (await api.UserGetSelf()).TimeZone;
+            foreach (var d in fleet)
+            {
+                if (d.LastSeenAt is DateTime utc)
+                {
+                    d.LastSeenAt = TimeZoneHelper.ToUserLocalTime(utc, timeZone);
+                }
+            }
+
+            return new ZoneViewModel
+            {
+                Dashboard = dashboard,
+                Fleet = fleet,
+                DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone,
+            };
+        }
 
         // ---- Unit management (roadmap #82) --------------------------------------
 
@@ -57,8 +85,11 @@ namespace api.Controllers.View
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> UnitAdd(string deviceUnitName)
         {
-            await api.DeviceUnitAdd(new DeviceUnit { DeviceUnitName = deviceUnitName });
-            return RedirectToAction(nameof(Index));
+            DeviceUnit unit = await api.DeviceUnitAdd(new DeviceUnit { DeviceUnitName = deviceUnitName });
+            // Roadmap #116 rule (1): auto-create + auto-enter a "Default" zone - same "skip the
+            // obvious next step" reasoning as the existing auto-enter-the-only-zone behavior below.
+            DeviceUnitZone zone = await api.DeviceUnitZoneAdd(new DeviceUnitZone { DeviceUnitID = unit.IDDeviceUnit!.Value, DeviceUnitZoneName = "Default" });
+            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone = zone.IDDeviceUnitZone });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -68,6 +99,16 @@ namespace api.Controllers.View
         {
             await api.DeviceUnitDelete(idDeviceUnit);
             return RedirectToAction(nameof(Index));
+        }
+
+        /// <summary>Roadmap #116 rule (2): lightweight inline rename, no separate page.</summary>
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> UnitRename(int idDeviceUnit, string deviceUnitName)
+        {
+            await api.DeviceUnitUpdate(new DeviceUnit { IDDeviceUnit = idDeviceUnit, DeviceUnitName = deviceUnitName });
+            return RedirectToAction(nameof(Zones), new { idDeviceUnit });
         }
 
         // ---- Zone management (roadmap #82) --------------------------------------
@@ -88,6 +129,16 @@ namespace api.Controllers.View
         {
             await api.DeviceUnitZoneDelete(idDeviceUnitZone);
             return RedirectToAction(nameof(Zones), new { idDeviceUnit });
+        }
+
+        /// <summary>Roadmap #116 rule (2): lightweight inline rename, no separate page.</summary>
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> ZoneRename(int idDeviceUnitZone, string deviceUnitZoneName)
+        {
+            await api.DeviceUnitZoneUpdate(new DeviceUnitZone { IDDeviceUnitZone = idDeviceUnitZone, DeviceUnitZoneName = deviceUnitZoneName });
+            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
         }
 
         // ---- Device assignment (roadmap #82) ------------------------------------

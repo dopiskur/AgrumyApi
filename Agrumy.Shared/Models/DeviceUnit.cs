@@ -48,6 +48,39 @@ namespace api.Models
         public double? Wind { get; set; }
     }
 
+    /// <summary>Roadmap #116 rule (4): traffic-light health summary for a Unit/Zone cube - pure
+    /// aggregation of data that already exists, no new tracking mechanism. Priority Red > Orange >
+    /// Green (a single offline device makes the whole cube Red even if nothing else is wrong).</summary>
+    public enum ZoneStatus
+    {
+        Green = 0,
+        Orange = 1,
+        Red = 2,
+    }
+
+    /// <summary>Roadmap #116 rule (3): last-24h hourly average per sensor type, for the cube's mini
+    /// sparklines - same field set/semantics as SensorAverages, but each is 24 buckets instead of
+    /// one number. Index 0 = the bucket ending 24h ago (oldest), index 23 = the bucket ending now
+    /// (current hour, may be partial). A null bucket means no device in scope reported that type in
+    /// that hour - rendered as a gap in the sparkline, not a zero.</summary>
+    public class SensorTrend
+    {
+        public const int HourBuckets = 24;
+
+        public double?[] Temperature { get; set; } = new double?[HourBuckets];
+        public double?[] SoilTemperature { get; set; } = new double?[HourBuckets];
+        public double?[] Humidity { get; set; } = new double?[HourBuckets];
+        public double?[] Moisture { get; set; } = new double?[HourBuckets];
+        public double?[] Light { get; set; } = new double?[HourBuckets];
+        public double?[] Co2 { get; set; } = new double?[HourBuckets];
+        public double?[] Tvoc { get; set; } = new double?[HourBuckets];
+        public double?[] Barometer { get; set; } = new double?[HourBuckets];
+        public double?[] LiquidPH { get; set; } = new double?[HourBuckets];
+        public double?[] RainLevel { get; set; } = new double?[HourBuckets];
+        public double?[] WaterLevel { get; set; } = new double?[HourBuckets];
+        public double?[] Wind { get; set; } = new double?[HourBuckets];
+    }
+
     /// <summary>Roadmap #81: one Unit cube on the top-level dashboard - name plus a roll-up over
     /// every sensor in every zone of this unit.</summary>
     public class DeviceUnitDashboard
@@ -57,6 +90,8 @@ namespace api.Models
         public int ZoneCount { get; set; }
         public int DeviceCount { get; set; }
         public SensorAverages Averages { get; set; } = new();
+        public ZoneStatus Status { get; set; } // roadmap #116 rule (4)
+        public SensorTrend Trend { get; set; } = new(); // roadmap #116 rule (3)
     }
 
     /// <summary>Roadmap #81: one Zone cube inside a Unit's drill-down - same shape as
@@ -71,6 +106,8 @@ namespace api.Models
         public int DeviceCount { get; set; }
         public SensorAverages Averages { get; set; } = new();
         public IList<Device> Devices { get; set; } = new List<Device>();
+        public ZoneStatus Status { get; set; } // roadmap #116 rule (4)
+        public SensorTrend Trend { get; set; } = new(); // roadmap #116 rule (3)
     }
 
     /// <summary>Roadmap #82: body of the Add Controller/Add Sensor action - assigns one

@@ -141,6 +141,10 @@ namespace api.Models
         public string? FirmwareVersion { get; set; }
         public int? Battery { get; set; }
         public bool Online { get; set; }
+        // Roadmap #116: lets the Web layer filter one shared DeviceFleetGet() response down to a
+        // single zone's devices for DeviceUnitController.ZoneDetails, instead of a second endpoint.
+        public int? DeviceUnitID { get; set; }
+        public int? DeviceUnitZoneID { get; set; }
 
         // 3 missed polls + fixed grace, not a bare multiple of SleepSeconds: a cycle is sleep time
         // PLUS work time (TLS handshakes, sensor reads), and a single dropped poll on a flaky WiFi

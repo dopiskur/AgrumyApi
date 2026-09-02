@@ -11,11 +11,25 @@ namespace api.Dal
     {
         /// <summary>One device's latest telemetry reading plus its current Unit/Zone, the shape the
         /// #81 dashboard averages are computed from. A record, not the SensorData DTO, because it
-        /// only carries what aggregation needs - not DeviceID/TenantID/DateCreated.</summary>
+        /// only carries what aggregation needs - not DeviceID/TenantID/DateCreated. Enabled/Online/
+        /// HasRecentProblemEvent (roadmap #116 rule (4)) ride along on the same per-device query
+        /// rather than a second pass over the same device set.</summary>
         private sealed record UnitZoneDeviceSnapshot(
-            int? DeviceUnitID, int? DeviceUnitZoneID,
+            int? DeviceUnitID, int? DeviceUnitZoneID, bool Enabled, bool Online, bool HasRecentProblemEvent,
             double? Temperature, double? SoilTemperature, double? Humidity, int? Moisture, int? Light,
             int? Co2, int? Tvoc, double? Barometer, double? LiquidPH, int? RainLevel, int? WaterLevel, double? Wind);
+
+        /// <summary>Roadmap #116 rule (4): event types that make a zone/unit Orange (unless it's
+        /// already Red). SafetyLimitTripped (roadmap #36, not built yet) belongs in this list too
+        /// once it exists - DeviceEventType has no such member today, so it can't be referenced yet;
+        /// adding it here is the ONLY change #36 needs to make on this side.</summary>
+        private static readonly int[] ProblemEventTypeIds =
+        [
+            (int)DeviceEventType.AuthFailed,
+            (int)DeviceEventType.ConfigSyncFailed,
+            (int)DeviceEventType.CrashLoopRollback,
+            (int)DeviceEventType.OtaFailed,
+        ];
 
         // ---- Unit CRUD (roadmap #82) -------------------------------------------------
 
@@ -209,24 +223,30 @@ namespace api.Dal
             }
             var snapshots = await GetDeviceSnapshotsAsync(scopedDevices);
 
-            var zoneCounts = await db.DeviceUnitZones.AsNoTracking()
+            var zonesByUnit = (await db.DeviceUnitZones.AsNoTracking()
                 .Where(z => z.IDDeviceUnitZone != 0)
+                .Select(z => new { z.DeviceUnitID, z.IDDeviceUnitZone })
+                .ToListAsync())
                 .GroupBy(z => z.DeviceUnitID)
-                .Select(g => new { UnitID = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(g => g.UnitID, g => g.Count);
+                .ToDictionary(g => g.Key, g => g.Select(z => z.IDDeviceUnitZone).ToList());
 
-            return unitRows.Select(u =>
+            var result = new List<DeviceUnitDashboard>();
+            foreach (var u in unitRows)
             {
                 var scoped = snapshots.Where(s => s.DeviceUnitID == u.IDDeviceUnit).ToList();
-                return new DeviceUnitDashboard
+                var zoneIds = zonesByUnit.GetValueOrDefault(u.IDDeviceUnit) ?? [];
+                result.Add(new DeviceUnitDashboard
                 {
                     IDDeviceUnit = u.IDDeviceUnit,
                     DeviceUnitName = u.DeviceUnitName,
-                    ZoneCount = zoneCounts.GetValueOrDefault(u.IDDeviceUnit),
+                    ZoneCount = zoneIds.Count,
                     DeviceCount = scoped.Count,
                     Averages = Average(scoped),
-                };
-            }).ToList();
+                    Status = ComputeStatus(scoped),
+                    Trend = await BuildTrendAsync(zoneIds),
+                });
+            }
+            return result;
         }
 
         public async Task<IList<DeviceUnitZoneDashboard>> DeviceUnitZoneDashboardListGetAsync(int idDeviceUnit)
@@ -237,18 +257,22 @@ namespace api.Dal
 
             var snapshots = await GetDeviceSnapshotsAsync(db.Devices.AsNoTracking().Where(d => d.DeviceUnitID == idDeviceUnit));
 
-            return zoneRows.Select(z =>
+            var result = new List<DeviceUnitZoneDashboard>();
+            foreach (var z in zoneRows)
             {
                 var scoped = snapshots.Where(s => s.DeviceUnitZoneID == z.IDDeviceUnitZone).ToList();
-                return new DeviceUnitZoneDashboard
+                result.Add(new DeviceUnitZoneDashboard
                 {
                     IDDeviceUnitZone = z.IDDeviceUnitZone,
                     IDDeviceUnit = z.DeviceUnitID,
                     DeviceUnitZoneName = z.DeviceUnitZoneName,
                     DeviceCount = scoped.Count,
                     Averages = Average(scoped),
-                };
-            }).ToList();
+                    Status = ComputeStatus(scoped),
+                    Trend = await BuildTrendAsync([z.IDDeviceUnitZone]),
+                });
+            }
+            return result;
         }
 
         public async Task<DeviceUnitZoneDashboard?> DeviceUnitZoneDashboardGetAsync(int idDeviceUnitZone)
@@ -270,6 +294,8 @@ namespace api.Dal
                 DeviceCount = deviceRows.Count,
                 Averages = Average(snapshots),
                 Devices = deviceRows.Select(ToDto).ToList(),
+                Status = ComputeStatus(snapshots),
+                Trend = await BuildTrendAsync([idDeviceUnitZone]),
             };
         }
 
@@ -280,11 +306,24 @@ namespace api.Dal
         /// subquery, which EF cannot translate to a single-column scalar subquery.</summary>
         private async Task<List<UnitZoneDeviceSnapshot>> GetDeviceSnapshotsAsync(IQueryable<DeviceRow> devices)
         {
+            DateTime utcNow = DateTime.UtcNow;
+            DateTime problemEventCutoff = utcNow.AddHours(-24);
+
             var deviceLatestIds = await devices
                 .Select(d => new
                 {
                     d.DeviceUnitID,
                     d.DeviceUnitZoneID,
+                    d.Enabled,
+                    d.SleepSeconds,
+                    LastSeenAt = db.DeviceDiagnostics.AsNoTracking()
+                        .Where(x => x.DeviceID == d.IDDevice)
+                        .Select(x => x.LastSeenAt)
+                        .FirstOrDefault(),
+                    // Roadmap #116 rule (4): a plain EXISTS-shaped correlated subquery, same
+                    // portability reasoning as the scalar subqueries below (no LATERAL/APPLY).
+                    HasRecentProblemEvent = db.EventDevices.AsNoTracking()
+                        .Any(e => e.DeviceID == d.IDDevice && e.Date >= problemEventCutoff && ProblemEventTypeIds.Contains(e.EventID)),
                     LatestSensorDataId = db.SensorData.AsNoTracking()
                         .Where(s => s.DeviceID == d.IDDevice)
                         .OrderByDescending(s => s.DateCreated)
@@ -303,12 +342,90 @@ namespace api.Dal
             return deviceLatestIds.Select(d =>
             {
                 SensorDataRow? s = d.LatestSensorDataId != null && latestById.TryGetValue(d.LatestSensorDataId.Value, out var row) ? row : null;
+                bool enabled = d.Enabled == true;
+                // A disabled device is expected to be silent (same rule as OfflineAlertCandidatesGetAsync,
+                // roadmap #40) - its own offline-ness must not redden a zone/unit nobody expects it to report into.
+                bool online = !enabled || DeviceFleetStatus.ComputeOnline(d.LastSeenAt, d.SleepSeconds, utcNow);
                 return new UnitZoneDeviceSnapshot(
-                    d.DeviceUnitID, d.DeviceUnitZoneID,
+                    d.DeviceUnitID, d.DeviceUnitZoneID, enabled, online, d.HasRecentProblemEvent,
                     s?.Temperature, s?.SoilTemperature, s?.Humidity, s?.Moisture, s?.Light,
                     s?.Co2, s?.Tvoc, s?.Barometer, s?.LiquidPH, s?.RainLevel, s?.WaterLevel, s?.Wind);
             }).ToList();
         }
+
+        /// <summary>Roadmap #116 rule (4): Red beats Orange beats Green. Only ENABLED devices'
+        /// online state counts toward Red (see GetDeviceSnapshotsAsync); a disabled device is
+        /// always considered "online" for this purpose so it can never redden its zone.</summary>
+        private static ZoneStatus ComputeStatus(IReadOnlyCollection<UnitZoneDeviceSnapshot> snapshots)
+        {
+            if (snapshots.Any(s => s.Enabled && !s.Online))
+            {
+                return ZoneStatus.Red;
+            }
+            if (snapshots.Any(s => s.HasRecentProblemEvent))
+            {
+                return ZoneStatus.Orange;
+            }
+            return ZoneStatus.Green;
+        }
+
+        /// <summary>Roadmap #116 rule (3): last-24h hourly average per sensor type across every
+        /// device in the given zones - one query per cube (acceptable at typical unit/zone counts;
+        /// revisit if that ever becomes the bottleneck instead of sensorData's own growth, see the
+        /// roadmap's own performance note on this item). Filters sensorData directly by
+        /// DeviceUnitZoneID rather than going through GetDeviceSnapshotsAsync's per-device
+        /// correlated-subquery shape, since a trend needs every reading in the window, not just the
+        /// latest one - ix_sensorData_deviceUnitZone_date (roadmap #116 migration) backs this.</summary>
+        private async Task<SensorTrend> BuildTrendAsync(List<int> zoneIds)
+        {
+            var trend = new SensorTrend();
+            if (zoneIds.Count == 0)
+            {
+                return trend;
+            }
+
+            DateTime utcNow = DateTime.UtcNow;
+            DateTime cutoff = utcNow.AddHours(-SensorTrend.HourBuckets);
+
+            var rows = await db.SensorData.AsNoTracking()
+                .Where(s => zoneIds.Contains(s.DeviceUnitZoneID) && s.DateCreated >= cutoff)
+                .Select(s => new
+                {
+                    s.DateCreated, s.Temperature, s.SoilTemperature, s.Humidity, s.Moisture, s.Light,
+                    s.Co2, s.Tvoc, s.Barometer, s.LiquidPH, s.RainLevel, s.WaterLevel, s.Wind,
+                })
+                .ToListAsync();
+
+            var byBucket = rows
+                .Where(r => r.DateCreated != null)
+                .Select(r => (Bucket: HourBucketIndex(r.DateCreated!.Value, utcNow), Row: r))
+                .Where(x => x.Bucket >= 0 && x.Bucket < SensorTrend.HourBuckets)
+                .GroupBy(x => x.Bucket, x => x.Row);
+
+            foreach (var bucket in byBucket)
+            {
+                var rowsInBucket = bucket.ToList();
+                trend.Temperature[bucket.Key] = rowsInBucket.Select(r => r.Temperature).Average();
+                trend.SoilTemperature[bucket.Key] = rowsInBucket.Select(r => r.SoilTemperature).Average();
+                trend.Humidity[bucket.Key] = rowsInBucket.Select(r => r.Humidity).Average();
+                trend.Moisture[bucket.Key] = rowsInBucket.Select(r => r.Moisture).Average();
+                trend.Light[bucket.Key] = rowsInBucket.Select(r => r.Light).Average();
+                trend.Co2[bucket.Key] = rowsInBucket.Select(r => r.Co2).Average();
+                trend.Tvoc[bucket.Key] = rowsInBucket.Select(r => r.Tvoc).Average();
+                trend.Barometer[bucket.Key] = rowsInBucket.Select(r => r.Barometer).Average();
+                trend.LiquidPH[bucket.Key] = rowsInBucket.Select(r => r.LiquidPH).Average();
+                trend.RainLevel[bucket.Key] = rowsInBucket.Select(r => r.RainLevel).Average();
+                trend.WaterLevel[bucket.Key] = rowsInBucket.Select(r => r.WaterLevel).Average();
+                trend.Wind[bucket.Key] = rowsInBucket.Select(r => r.Wind).Average();
+            }
+            return trend;
+        }
+
+        /// <summary>0 = the bucket ending 24h ago (oldest) .. 23 = the bucket ending now (current
+        /// hour). A timestamp older than the 24h window or (defensively) in the future falls
+        /// outside [0, HourBuckets) - the caller filters those out.</summary>
+        private static int HourBucketIndex(DateTime dateCreated, DateTime utcNow) =>
+            SensorTrend.HourBuckets - 1 - (int)Math.Floor((utcNow - dateCreated).TotalHours);
 
         /// <summary>Per-sensor-type average across snapshots, each type independent - LINQ's
         /// nullable Average() already ignores null elements and returns null (not an exception) for

@@ -1,25 +1,59 @@
-@model api.Models.SensorAverages
+@model api.ViewModels.SensorSummaryViewModel
 @{
     // Roadmap #81: one badge per sensor type actually present in scope - types are never mixed or
     // averaged together, and a type nobody in this unit/zone reports simply doesn't get a badge
     // (the underlying average is null, not zero - LINQ's nullable Average() already tells the
     // difference between "no data" and "data averaging to zero").
-    (string Label, string Icon, double? Value, string Unit)[] rows =
+    var averages = Model.Averages;
+    var trend = Model.Trend;
+    (string Label, string Icon, double? Value, string Unit, double?[]? Trend)[] rows =
     [
-        ("Temp", "bi-thermometer-half", Model.Temperature, "°C"),
-        ("Soil temp", "bi-thermometer", Model.SoilTemperature, "°C"),
-        ("Humidity", "bi-droplet-half", Model.Humidity, "%"),
-        ("Moisture", "bi-moisture", Model.Moisture, "%"),
-        ("Light", "bi-brightness-high", Model.Light, "lx"),
-        ("CO2", "bi-cloud", Model.Co2, "ppm"),
-        ("TVOC", "bi-wind", Model.Tvoc, "ppb"),
-        ("Pressure", "bi-speedometer2", Model.Barometer, "hPa"),
-        ("pH", "bi-eyedropper", Model.LiquidPH, ""),
-        ("Rain", "bi-cloud-rain", Model.RainLevel, ""),
-        ("Water level", "bi-water", Model.WaterLevel, ""),
-        ("Wind", "bi-wind", Model.Wind, "m/s"),
+        ("Temp", "bi-thermometer-half", averages.Temperature, "°C", trend?.Temperature),
+        ("Soil temp", "bi-thermometer", averages.SoilTemperature, "°C", trend?.SoilTemperature),
+        ("Humidity", "bi-droplet-half", averages.Humidity, "%", trend?.Humidity),
+        ("Moisture", "bi-moisture", averages.Moisture, "%", trend?.Moisture),
+        ("Light", "bi-brightness-high", averages.Light, "lx", trend?.Light),
+        ("CO2", "bi-cloud", averages.Co2, "ppm", trend?.Co2),
+        ("TVOC", "bi-wind", averages.Tvoc, "ppb", trend?.Tvoc),
+        ("Pressure", "bi-speedometer2", averages.Barometer, "hPa", trend?.Barometer),
+        ("pH", "bi-eyedropper", averages.LiquidPH, "", trend?.LiquidPH),
+        ("Rain", "bi-cloud-rain", averages.RainLevel, "", trend?.RainLevel),
+        ("Water level", "bi-water", averages.WaterLevel, "", trend?.WaterLevel),
+        ("Wind", "bi-wind", averages.Wind, "m/s", trend?.Wind),
     ];
     var present = rows.Where(r => r.Value != null).ToList();
+
+    // Roadmap #116 rule (3): a plain inline SVG polyline, not a chart library instance - cheap
+    // enough to render dozens of these on one dashboard page (the roadmap's own performance note
+    // on this item warns specifically against instantiating a full ECharts per cube). Min-max
+    // normalized within its own 24 points only, not shared across sparklines - each is read as "is
+    // it trending up/down", not compared in absolute scale to its neighbors.
+    static string? SparklinePoints(double?[]? values)
+    {
+        if (values == null)
+        {
+            return null;
+        }
+        var points = values
+            .Select((v, i) => (Index: i, Value: v))
+            .Where(p => p.Value != null)
+            .Select(p => (p.Index, Value: p.Value!.Value))
+            .ToList();
+        if (points.Count < 2)
+        {
+            return null;
+        }
+        double min = points.Min(p => p.Value);
+        double max = points.Max(p => p.Value);
+        double range = max - min;
+        const double width = 56, height = 16;
+        return string.Join(" ", points.Select(p =>
+        {
+            double x = (double)p.Index / (values.Length - 1) * width;
+            double y = range < 0.0001 ? height / 2 : height - (p.Value - min) / range * height;
+            return FormattableString.Invariant($"{x:0.#},{y:0.#}");
+        }));
+    }
 }
 @if (present.Count == 0)
 {
@@ -28,10 +62,16 @@
 else
 {
     <div class="d-flex flex-wrap gap-1">
-        @foreach (var (label, icon, value, unit) in present)
+        @foreach (var (label, icon, value, unit, sparkline) in present)
         {
-            <span class="badge text-bg-light border text-dark fw-normal">
+            <span class="badge text-bg-light border text-dark fw-normal d-inline-flex align-items-center">
                 <i class="bi @icon me-1"></i>@label: @(((double)value!).ToString("0.#"))@unit
+                @if (SparklinePoints(sparkline) is string points)
+                {
+                    <svg width="56" height="16" viewBox="0 0 56 16" class="ms-1" aria-hidden="true">
+                        <polyline points="@points" fill="none" stroke="currentColor" stroke-width="1.5" />
+                    </svg>
+                }
             </span>
         }
     </div>

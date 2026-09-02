@@ -2,6 +2,14 @@
 @{
     ViewData["Title"] = Model.Unit.DeviceUnitName;
     Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
+    var renameModel = new InlineRenameViewModel
+    {
+        Action = nameof(api.Controllers.View.DeviceUnitController.UnitRename),
+        IdFieldName = "idDeviceUnit",
+        IdValue = Model.Unit.IDDeviceUnit!.Value,
+        NameFieldName = "deviceUnitName",
+        CurrentName = Model.Unit.DeviceUnitName,
+    };
 }
 
 <nav aria-label="breadcrumb">
@@ -13,7 +21,13 @@
 
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">@Model.Unit.DeviceUnitName - Zones</h3>
+        <h3 class="card-title">
+            @Model.Unit.DeviceUnitName - Zones
+            @if (hasAnyRole(RoleNames.DeviceManagers))
+            {
+                <partial name="_InlineRename" model="renameModel" />
+            }
+        </h3>
         @if (hasAnyRole(RoleNames.DeviceManagers))
         {
             <div class="float-end d-flex align-items-center gap-3">

@@ -1137,6 +1137,121 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(20.0, zoneDetail.Averages.Temperature);
     }
 
+    // ---- device unit / zone traffic-light status + 24h trend (roadmap #116) ---------
+
+    private async Task<Device> MakeEnabledDevice(RelationalIntegrationFixture.Target t, int tenantId)
+    {
+        var d = new Device
+        {
+            TenantID = tenantId, DeviceTypeID = t.DeviceTypeId, DeviceTypeServiceID = 1, ConfigVersion = 1,
+            DeviceName = "dev_" + U(), MacAddress = U(), ApiId = Guid.NewGuid().ToString(), ApiKey = Guid.NewGuid().ToString(),
+            ServicePoint = "api.agrumy.com", DeviceSensorEnabled = true, DeviceControllerEnabled = true, Enabled = true,
+        };
+        await _repo.DeviceAddAsync(d);
+        var saved = await _repo.DeviceGetAsync(tenantId, null, d.ApiId, null);
+        Assert.NotNull(saved);
+        return saved;
+    }
+
+    // Roadmap #116 rule (4): an enabled device that has never polled (LastSeenAt null) counts as
+    // offline, same as ComputeOnline already treats a never-seen device on Fleet.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitDashboard_Status_RedWhenEnabledDeviceNeverSeen(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d = await MakeEnabledDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+
+        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        Assert.Equal(ZoneStatus.Red, dashboard.Status);
+        var zoneDashboard = Assert.Single(await _repo.DeviceUnitZoneDashboardListGetAsync(unit.IDDeviceUnit!.Value));
+        Assert.Equal(ZoneStatus.Red, zoneDashboard.Status);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitDashboard_Status_GreenWhenOnlineAndNoProblems(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d = await MakeEnabledDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
+
+        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        Assert.Equal(ZoneStatus.Green, dashboard.Status);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitDashboard_Status_OrangeWhenOnlineButRecentProblemEvent(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d = await MakeEnabledDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
+        await _repo.EventDevicePushAsync(d.IDDevice.Value, tenantId, DeviceEventType.AuthFailed, "test");
+
+        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        Assert.Equal(ZoneStatus.Orange, dashboard.Status);
+    }
+
+    // A NoInternet event is deliberately NOT in the #116 rule-(4) problem set (only AuthFailed/
+    // ConfigSyncFailed/CrashLoopRollback/OtaFailed, plus SafetyLimitTripped once #36 exists).
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitDashboard_Status_NoInternetEvent_DoesNotCountAsProblem(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d = await MakeEnabledDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
+        await _repo.EventDevicePushAsync(d.IDDevice.Value, tenantId, DeviceEventType.NoInternet, "test");
+
+        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        Assert.Equal(ZoneStatus.Green, dashboard.Status);
+    }
+
+    // A disabled device is expected to be silent (same rule as OfflineAlertCandidatesGetAsync,
+    // roadmap #40) - it must never redden a zone/unit nobody expects it to report into.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitDashboard_Status_DisabledOfflineDevice_DoesNotRedden(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d = await MakeDevice(t, tenantId); // MakeDevice leaves Enabled at its false default
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+
+        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        Assert.Equal(ZoneStatus.Green, dashboard.Status);
+    }
+
+    // Roadmap #116 rule (3): a reading with no explicit dateCreated is stamped at the server's
+    // UtcNow (existing SensorDataPushAsync behavior), so it must land in the trend's LAST bucket
+    // (index 23 = the current hour) and nowhere else.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitZoneDashboard_Trend_BucketsRecentReadingIntoCurrentHour(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d = await MakeDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+
+        await _repo.SensorDataPushAsync(new JsonArray(new JsonObject { ["temperature"] = "22.5" }),
+            d.IDDevice!.Value, tenantId, unit.IDDeviceUnit, zone.IDDeviceUnitZone);
+
+        var zoneDetail = await _repo.DeviceUnitZoneDashboardGetAsync(zone.IDDeviceUnitZone!.Value);
+        Assert.NotNull(zoneDetail);
+        Assert.Equal(22.5, zoneDetail!.Trend.Temperature[^1]);
+        Assert.All(zoneDetail.Trend.Temperature.Take(zoneDetail.Trend.Temperature.Length - 1), Assert.Null);
+    }
+
     // Roadmap #82: deleting a Unit cascades its Zones and unassigns (not deletes) their devices.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitDelete_CascadesZones_AndUnassignsDevices_WithoutDeletingThem(DbProviderKind provider)

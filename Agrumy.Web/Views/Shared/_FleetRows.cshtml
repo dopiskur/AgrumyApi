@@ -19,7 +19,17 @@
 }
 @* Roadmap #90: this partial IS #fleetTable's tbody content, shared by Fleet.cshtml's initial
    render and DeviceController.FleetRows' polling refresh - one source of truth for row markup,
-   so a column added to one is never silently missing from the other. *@
+   so a column added to one is never silently missing from the other. Roadmap #116 rule (5):
+   also reused (with the same rows, filtered) by DeviceUnitController's Zone page - lives in
+   Views/Shared/, not Views/Device/, so the partial-view search path resolves it from either. *@
+@{
+    // Roadmap #116 rule (5): DeviceUnitController.ZoneDetails reuses this same partial for its
+    // zone-scoped device list (rather than a second hand-built table) and flips this on so the
+    // action column also gets a "Remove from zone" button - Fleet.cshtml never sets it, so its
+    // own rendering is unchanged.
+    bool zoneScoped = ViewData["ZoneScoped"] as bool? == true;
+    Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
+}
 @foreach (var item in Model)
 {
     var (signalLabel, signalCss) = SignalQuality(item.RssiDbm);
@@ -63,6 +73,15 @@
                 <a asp-controller="SensorData" asp-action="Report" asp-route-idDevice="@item.IDDevice" class="btn btn-danger" title="Reports" aria-label="Reports"><i class="bi bi-file-earmark-bar-graph"></i></a>
                 <a asp-controller="Device" asp-action="Details" asp-route-idDevice="@item.IDDevice" class="btn btn-primary" title="Settings" aria-label="Settings"><i class="bi bi-gear"></i></a>
                 <a asp-controller="Device" asp-action="Events" asp-route-idDevice="@item.IDDevice" class="btn btn-outline-secondary" title="Events" aria-label="Events"><i class="bi bi-clock-history"></i></a>
+                @if (zoneScoped && hasAnyRole(RoleNames.DeviceManagers))
+                {
+                    <form asp-controller="DeviceUnit" asp-action="Remove" method="post" class="d-inline"
+                          onsubmit="return confirm('Remove this device from the zone? It stays registered and keeps reporting - it just stops counting toward this zone.');">
+                        <input type="hidden" name="idDevice" value="@item.IDDevice" />
+                        <input type="hidden" name="idDeviceUnitZone" value="@item.DeviceUnitZoneID" />
+                        <button type="submit" class="btn btn-outline-danger" title="Remove from zone" aria-label="Remove from zone"><i class="bi bi-x-lg"></i></button>
+                    </form>
+                }
             </div>
         </td>
     </tr>

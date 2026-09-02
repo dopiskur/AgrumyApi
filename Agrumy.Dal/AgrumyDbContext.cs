@@ -297,6 +297,10 @@ namespace api.Dal
                 // Legacy Battery/Moisture/WaterLevel are tinyint(1); the DTO exposes them as int, so a fresh DB uses int (old tinyint(1) columns still read fine).
                 e.HasIndex(x => new { x.DeviceID, x.TenantID, x.DateCreated })
                  .HasDatabaseName("ix_sensorData_device_tenant_date");
+                // Roadmap #116 rule (3): the 24h trend sparkline query filters directly by zone,
+                // not by device - see db/migrations/2026-09-02-sensordata-deviceunitzone-index.sql.
+                e.HasIndex(x => new { x.DeviceUnitZoneID, x.DateCreated })
+                 .HasDatabaseName("ix_sensorData_deviceUnitZone_date");
                 // Legacy fk_sensorData_* (no FK on sensorData.TenantID).
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);

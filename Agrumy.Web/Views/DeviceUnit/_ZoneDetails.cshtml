@@ -1,57 +1,41 @@
-@model api.Models.DeviceUnitZoneDashboard
-@{
-    Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
-}
+@model api.ViewModels.ZoneViewModel
 @* Same live-refresh convention as Device/_FleetRows - shared by Zone.cshtml's initial render and
    DeviceUnitController.ZoneDetails' polling refresh. *@
-<h6 class="text-uppercase text-secondary small mb-2">Sensor averages</h6>
-<partial name="_SensorAverages" model="Model.Averages" />
+<h6 class="text-uppercase text-secondary small mb-2">Sensor averages (last 24h trend)</h6>
+<partial name="_SensorAverages" model="new api.ViewModels.SensorSummaryViewModel { Averages = Model.Dashboard.Averages, Trend = Model.Dashboard.Trend }" />
 
 <hr />
 
-<h6 class="text-uppercase text-secondary small mb-2">Devices in this zone</h6>
-@if (Model.Devices.Count == 0)
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="text-uppercase text-secondary small mb-0">Devices in this zone</h6>
+    <span class="text-secondary small">Times shown in @Model.DisplayTimeZone</span>
+</div>
+@* Roadmap #116 rule (5): Device/_FleetRows.cshtml, not a second hand-built device table -
+   ViewData["ZoneScoped"] switches that partial's action column to include "Remove from zone". *@
+@{ ViewData["ZoneScoped"] = true; }
+@if (Model.Fleet.Count == 0)
 {
     <p class="text-secondary">No devices assigned yet.</p>
 }
 else
 {
-    <table class="table table-sm table-hover mb-0">
-        <thead>
-            <tr>
-                <th>Device</th>
-                <th>Role</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var d in Model.Devices)
-            {
+    <div class="table-responsive p-0">
+        <table id="zoneFleetTable" class="table table-hover">
+            <thead>
                 <tr>
-                    <td><a asp-controller="Device" asp-action="Details" asp-route-idDevice="@d.IDDevice">@d.DeviceName</a></td>
-                    <td>
-                        @if (d.DeviceControllerEnabled == true)
-                        {
-                            <span class="badge text-bg-primary me-1">Controller</span>
-                        }
-                        @if (d.DeviceSensorEnabled == true)
-                        {
-                            <span class="badge text-bg-secondary">Sensor</span>
-                        }
-                    </td>
-                    <td class="text-end">
-                        @if (hasAnyRole(RoleNames.DeviceManagers))
-                        {
-                            <form asp-action="Remove" method="post" class="d-inline"
-                                  onsubmit="return confirm('Remove this device from the zone? It stays registered and keeps reporting - it just stops counting toward this zone.');">
-                                <input type="hidden" name="idDevice" value="@d.IDDevice" />
-                                <input type="hidden" name="idDeviceUnitZone" value="@Model.IDDeviceUnitZone" />
-                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i> Remove</button>
-                            </form>
-                        }
-                    </td>
+                    <th>Device</th>
+                    <th>Status</th>
+                    <th class="d-none d-md-table-cell">Last seen</th>
+                    <th class="d-none d-md-table-cell">Signal</th>
+                    <th class="d-none d-md-table-cell">Uptime</th>
+                    <th class="d-none d-md-table-cell">Firmware</th>
+                    <th class="d-none d-md-table-cell">Battery</th>
+                    <th></th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                <partial name="_FleetRows" model="Model.Fleet" />
+            </tbody>
+        </table>
+    </div>
 }

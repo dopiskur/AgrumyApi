@@ -73,6 +73,8 @@ namespace api.Dal
                 FirmwareVersion = r.Diag?.FirmwareVersion,
                 Battery = r.Battery,
                 Online = DeviceFleetStatus.ComputeOnline(r.Diag?.LastSeenAt, r.Device.SleepSeconds, utcNow),
+                DeviceUnitID = r.Device.DeviceUnitID,
+                DeviceUnitZoneID = r.Device.DeviceUnitZoneID,
             }).ToList();
         }
 
