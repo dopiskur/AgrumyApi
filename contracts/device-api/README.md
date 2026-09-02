@@ -33,8 +33,7 @@ From the **actual current behaviour of both code bases**, not from docs:
 Gotchas captured in the schemas (see per-field `description` text):
 `devicePin` is sent as a **string**; the config-request key is **PascalCase**
 (`ConfigVersion`) unlike every other payload; `sensorPH` keeps an uppercase suffix;
-`*IntervalLenght` is a real (misspelled) property name; the SensorData `rainLevel`
-key does **not** match the stored proc's `$.rainlevel` path.
+the SensorData `rainLevel` key does **not** match the stored proc's `$.rainlevel` path.
 
 ## Enforcement
 

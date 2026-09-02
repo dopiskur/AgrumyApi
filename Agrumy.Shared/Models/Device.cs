@@ -223,19 +223,19 @@ namespace api.Models
         // Manual timming
         public bool? VentilationIntervalEnabled {  get; set; }
         public int? VentilationInterval {  get; set; }
-        public int? VentilationIntervalLenght { get; set; }
+        public int? VentilationIntervalLength { get; set; }
 
         public bool? LightIntervalEnabled { get; set; }
         public int? LightInterval { get; set; }
-        public int? LightIntervalLenght { get; set; }
+        public int? LightIntervalLength { get; set; }
 
         public bool? HeatingIntervalEnabled { get; set; }
         public int? HeatingInterval { get; set; }
-        public int? HeatingIntervalLenght { get; set; }
+        public int? HeatingIntervalLength { get; set; }
 
         public bool? WaterPumpIntervalEnabled { get; set; }
         public int? WaterPumpInterval { get; set; }
-        public int? WaterPumpIntervalLenght { get; set; }
+        public int? WaterPumpIntervalLength { get; set; }
 
         // Roadmap #39: a third relay-control mode alongside threshold (dead-zone) and interval
         // (duty-cycle) above - "be on during this wall-clock window on these days", independent of

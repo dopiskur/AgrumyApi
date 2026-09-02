@@ -80,16 +80,16 @@ namespace api.Dal.Entities
         // Default member initializers match the DB column defaults (all 0/false).
         public bool? VentilationIntervalEnabled { get; set; } = false;
         public int? VentilationInterval { get; set; } = 0;
-        public int? VentilationIntervalLenght { get; set; } = 0;
+        public int? VentilationIntervalLength { get; set; } = 0;
         public bool? LightIntervalEnabled { get; set; } = false;
         public int? LightInterval { get; set; } = 0;
-        public int? LightIntervalLenght { get; set; } = 0;
+        public int? LightIntervalLength { get; set; } = 0;
         public bool? HeatingIntervalEnabled { get; set; } = false;
         public int? HeatingInterval { get; set; } = 0;
-        public int? HeatingIntervalLenght { get; set; } = 0;
+        public int? HeatingIntervalLength { get; set; } = 0;
         public bool? WaterPumpIntervalEnabled { get; set; } = false;
         public int? WaterPumpInterval { get; set; } = 0;
-        public int? WaterPumpIntervalLenght { get; set; } = 0;
+        public int? WaterPumpIntervalLength { get; set; } = 0;
 
         // Roadmap #39 - see api.Models.DeviceConfigController for the full field-shape story.
         public bool? VentilationScheduleEnabled { get; set; } = false;
