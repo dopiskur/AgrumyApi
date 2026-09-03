@@ -3,14 +3,10 @@ using Microsoft.Extensions.Configuration;
 
 namespace api
 {
-    /// <summary>
-    /// Roadmap #104: replaces the values <see cref="Config"/> used to compute from its own,
-    /// host-pipeline-bypassing <c>ConfigurationBuilder</c>. Bind() reads from the real host
-    /// <see cref="IConfiguration"/> (each process's own <c>builder.Configuration</c>), so this
-    /// respects <c>appsettings.{Environment}.json</c> overrides, standard env-var/user-secrets
-    /// providers, and is constructor-injectable/mockable via <c>IOptions&lt;AgrumySettings&gt;</c> -
-    /// none of which the old CWD-relative static approach could do.
-    /// </summary>
+    /// <summary>Bind() reads from the real host <see cref="IConfiguration"/> (each process's own
+    /// <c>builder.Configuration</c>), so this respects <c>appsettings.{Environment}.json</c>
+    /// overrides and standard env-var/user-secrets providers, and is constructor-injectable/
+    /// mockable via <c>IOptions&lt;AgrumySettings&gt;</c>.</summary>
     public class AgrumySettings
     {
         public string? DefaultConnection { get; set; }
@@ -26,10 +22,9 @@ namespace api
 
         public string? ApiService { get; set; }
 
-        // ServerConfig:Reload (roadmap #10 hysteresis) - if true, overwrite the DB serverConfig
-        // row's hysteresis fields from ServerConfig:Hysteresis on every startup instead of only
-        // seeding them once when the row is first created. Defaults false: an operator flips this
-        // to force the DB back to the file's values; leaving it true keeps clobbering any admin-UI
+        // If true, overwrite the DB serverConfig row's hysteresis fields from
+        // ServerConfig:Hysteresis on every startup instead of only seeding them once when the row
+        // is first created. Defaults false, since leaving it true keeps clobbering any admin-UI
         // edit on every restart.
         public bool ServerConfigReload { get; set; }
 
@@ -40,54 +35,47 @@ namespace api
         public double HysteresisHumidity { get; set; } = 5.0;
         public double HysteresisLight { get; set; } = 20.0;
 
-        // Roadmap #12: low-battery alert defaults - see api.Models.ServerConfig.BatteryLowThreshold/
-        // BatteryLowHysteresis for the dead-zone rule they feed into.
+        // See api.Models.ServerConfig.BatteryLowThreshold/BatteryLowHysteresis for the dead-zone rule they feed into.
         public double BatteryLowThreshold { get; set; } = 20.0;
         public double BatteryLowHysteresis { get; set; } = 5.0;
 
-        // Roadmap #36: WaterPump-only device-side safety limit defaults - 30 min max continuous
-        // run (generous over any reasonable single watering cycle, but bounds a stuck sensor/logic
-        // error's worst case) and a 5 min cooldown (time for water to drain into the ground before
-        // the next attempt trusts a fresh reading). Only seeds NEW devices at creation (same rule
-        // as the hysteresis defaults above) - an existing device's DeviceConfigController row is
-        // never retroactively changed by editing these.
+        // WaterPump-only device-side safety limit defaults - 30 min max continuous run and a 5 min
+        // cooldown. Only seeds NEW devices at creation - an existing device's DeviceConfigController
+        // row is never retroactively changed by editing these.
         public int WaterPumpMaxRunSeconds { get; set; } = 1800;
         public int WaterPumpCooldownSeconds { get; set; } = 300;
 
-        // Roadmap #28: how long a device's identical repeated event is ignored server-side.
+        // How long a device's identical repeated event is ignored server-side.
         public int EventDedupeMinutes { get; set; } = 10;
 
-        // Roadmap #24: how long a user must wait between "resend activation email" requests.
+        // How long a user must wait between "resend activation email" requests.
         public int ActivationResendCooldownMinutes { get; set; } = 10;
 
-        // Roadmap #64: off by default - UserRegistration rejects an unknown tenant name instead of
-        // silently creating one until an admin opts in.
+        // Off by default - UserRegistration rejects an unknown tenant name instead of silently
+        // creating one until an admin opts in.
         public bool AllowSelfServiceTenantCreation { get; set; }
 
-        // Roadmap #39: no fallback constant - unlike the numeric defaults above, there is no
-        // universally-reasonable default IANA zone to assume for a fleet's physical location. Null
-        // (unset) is a valid, common state: TimeZoneHelper.GetUtcOffsetSeconds treats it as UTC
-        // (offset 0) rather than throwing, so schedule mode is inert-but-safe until an admin sets
-        // this on the Server Settings page.
+        // No fallback constant - there is no universally-reasonable default IANA zone to assume for
+        // a fleet's physical location. Null (unset) is a valid, common state:
+        // TimeZoneHelper.GetUtcOffsetSeconds treats it as UTC (offset 0) rather than throwing, so
+        // schedule mode is inert-but-safe until an admin sets this on the Server Settings page.
         public string? ScheduleTimeZone { get; set; }
 
-        // Roadmap #94. LocalPath: where the Local repository keeps its .bin files (relative to the
-        // content root unless absolute; null = FirmwareStorage.DefaultRelativePath). GitHubRepository: only the SEED for the DB serverConfig
-        // row - the admin page edits the live value. GitHubToken: optional, see HttpFirmwareFetcher.
+        // LocalPath: where the Local repository keeps its .bin files (relative to the content root
+        // unless absolute; null = FirmwareStorage.DefaultRelativePath). GitHubRepository: only the
+        // SEED for the DB serverConfig row - the admin page edits the live value. GitHubToken:
+        // optional, see HttpFirmwareFetcher.
         public string? FirmwareLocalPath { get; set; }
         public string FirmwareGitHubRepository { get; set; } = "dopiskur/AgrumyFirmware";
         public string? FirmwareGitHubToken { get; set; }
 
-        // Roadmap #15: days of sensorData history to keep automatically - same "no universal
-        // default" reasoning as ScheduleTimeZone above (null = admin hasn't opted in yet, data
-        // just accumulates until purged manually via roadmap #126).
+        // Days of sensorData history to keep automatically - null = admin hasn't opted in yet, data
+        // just accumulates until purged manually.
         public int? SensorDataRetentionDays { get; set; }
 
-        // Roadmap #11: OpenWeatherMap API key - same "credential lives in appsettings.json, not the
-        // DB" split as Firmware:GitHubToken above (a secret, not an operational admin-tunable value,
-        // so it is never exposed through ServerConfigApiController). Location/poll-interval/
-        // threshold ARE operational and live in api.Models.ServerConfig instead, seeded from the two
-        // defaults below.
+        // OpenWeatherMap API key - a secret, not an operational admin-tunable value, so it is never
+        // exposed through ServerConfigApiController. Location/poll-interval/threshold ARE
+        // operational and live in api.Models.ServerConfig instead, seeded from the two defaults below.
         public string? WeatherApiKey { get; set; }
         public int WeatherPollIntervalMinutes { get; set; } = 15;
         public double WeatherRainSkipThreshold { get; set; } = 50.0;

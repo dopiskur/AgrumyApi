@@ -1,7 +1,7 @@
 namespace api.Dal.Entities
 {
-    /// <summary>Roadmap #82: TenantID null means the shared global sentinel row (IDDeviceUnit=0
-    /// "Default", see EfRepository.SeedDeviceUnitSentinelsAsync), not a real per-tenant Unit.</summary>
+    /// <summary>TenantID null means the shared global sentinel row (IDDeviceUnit=0 "Default", see
+    /// EfRepository.SeedDeviceUnitSentinelsAsync), not a real per-tenant Unit.</summary>
     public class DeviceUnitRow
     {
         public int IDDeviceUnit { get; set; }
@@ -10,10 +10,10 @@ namespace api.Dal.Entities
         public bool? ZoneEnabled { get; set; }
     }
 
-    /// <summary>Roadmap #81/#82: DeviceUnitID is the real "Unit contains many Zones" FK (replacing
-    /// the removed, backwards deviceUnit.DeviceUnitZoneID) - see the containment migration comment
-    /// in db/migrations/2026-09-02-deviceunit-zone-containment.sql. TenantID null means the shared
-    /// global sentinel row (IDDeviceUnitZone=0 "Disabled"), same convention as DeviceUnitRow.</summary>
+    /// <summary>DeviceUnitID is the real "Unit contains many Zones" FK - see the containment
+    /// migration comment in db/migrations/2026-09-02-deviceunit-zone-containment.sql. TenantID
+    /// null means the shared global sentinel row (IDDeviceUnitZone=0 "Disabled"), same convention
+    /// as DeviceUnitRow.</summary>
     public class DeviceUnitZoneRow
     {
         public int IDDeviceUnitZone { get; set; }
@@ -21,18 +21,17 @@ namespace api.Dal.Entities
         public int DeviceUnitID { get; set; }
         public string? DeviceUnitZoneName { get; set; }
 
-        // Roadmap #21/#36 - see api.Models.DeviceUnitZone's own copy of these for the full explanation.
+        // See api.Models.DeviceUnitZone's own copy of these for the full explanation.
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
 
-        // Roadmap #11 - see api.Models.DeviceUnitZone.SkipWaterPumpWhenRainPredicted.
+        // See api.Models.DeviceUnitZone.SkipWaterPumpWhenRainPredicted.
         public bool SkipWaterPumpWhenRainPredicted { get; set; }
     }
 
-    /// <summary>Roadmap #21 - see api.Models.DeviceUnitZoneRule for the full explanation.
-    /// ConditionConfig is stored as plain text (JSON), matching AgrumyDbContext's provider-neutral
-    /// "no vendor-specific HasColumnType" principle - (de)serialized at the application layer, not a
-    /// native JSON column type.</summary>
+    /// <summary>See api.Models.DeviceUnitZoneRule for the full explanation. ConditionConfig is
+    /// stored as plain text (JSON), matching AgrumyDbContext's provider-neutral "no vendor-specific
+    /// HasColumnType" principle - (de)serialized at the application layer, not a native JSON column type.</summary>
     public class DeviceUnitZoneRuleRow
     {
         public int IDDeviceUnitZoneRule { get; set; }
@@ -102,9 +101,6 @@ namespace api.Dal.Entities
         public double? HumidityHysteresis { get; set; }
         public double? LightHysteresis { get; set; }
 
-        // These columns exist in every deployed deviceConfigController table (pre-dating this
-        // codebase's EF Core migration) but were never declared on this entity, so EF silently
-        // never read or wrote them - the Web admin's Interval tab always saved into the void.
         // Default member initializers match the DB column defaults (all 0/false).
         public bool? VentilationIntervalEnabled { get; set; } = false;
         public int? VentilationInterval { get; set; } = 0;
@@ -119,8 +115,7 @@ namespace api.Dal.Entities
         public int? WaterPumpInterval { get; set; } = 0;
         public int? WaterPumpIntervalLength { get; set; } = 0;
 
-        // Roadmap #36 - see api.Models.DeviceConfigController.WaterPumpMaxRunSeconds/
-        // WaterPumpCooldownSeconds.
+        // See api.Models.DeviceConfigController.WaterPumpMaxRunSeconds/WaterPumpCooldownSeconds.
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
 
@@ -135,13 +130,11 @@ namespace api.Dal.Entities
         public int? Relay8 { get; set; }
     }
 
-    /// <summary>Roadmap #115: one wall-clock window for one relay function on one
-    /// deviceConfigController - replaces the old flat Schedule{Enabled,DaysOfWeek,Start,Duration}
-    /// columns (see api.Models.DeviceConfigController for the wire-shape story). RelayFunction
-    /// matches deviceTypeRelay's seed IDs (1=Ventilation, 2=Light, 3=Heating, 4=Water pump), same
+    /// <summary>One wall-clock window for one relay function on one deviceConfigController (see
+    /// api.Models.DeviceConfigController for the wire-shape story). RelayFunction matches
+    /// deviceTypeRelay's seed IDs (1=Ventilation, 2=Light, 3=Heating, 4=Water pump), same
     /// convention as ActuatorController::RelayFunctionType on the device side. A row's mere
-    /// presence means it is active - there is no separate Enabled column (confirmed design: zero
-    /// rows for a function already means "never on in schedule mode").</summary>
+    /// presence means it is active - there is no separate Enabled column.</summary>
     public class DeviceScheduleSlotRow
     {
         public int IDDeviceScheduleSlot { get; set; }
@@ -156,7 +149,7 @@ namespace api.Dal.Entities
     {
         public int IDDeviceConfigSensor { get; set; }
         public int? SensorBattery { get; set; }
-        // Roadmap #12 - see api.Models.DeviceConfigSensor.BatteryDividerR1/R2.
+        // See api.Models.DeviceConfigSensor.BatteryDividerR1/R2.
         public double? BatteryDividerR1 { get; set; }
         public double? BatteryDividerR2 { get; set; }
         public int? SensorTemp { get; set; }
@@ -176,7 +169,7 @@ namespace api.Dal.Entities
     public class DeviceRow
     {
         public int IDDevice { get; set; }
-        // Roadmap #112: non-nullable, matching the DB column now that it is NOT NULL DEFAULT 0.
+        // Non-nullable, matching the DB column (NOT NULL DEFAULT 0).
         public int TenantID { get; set; }
         public int? DeviceTypeID { get; set; }
         public int? DeviceUnitID { get; set; }
@@ -200,17 +193,17 @@ namespace api.Dal.Entities
         public bool? Reboot { get; set; }
         public bool? Reset { get; set; }
         public bool? FirmwareUpdate { get; set; }
-        // Roadmap #93 - see api.Models.Device.FirmwareTargetVersion.
+        // See api.Models.Device.FirmwareTargetVersion.
         public string? FirmwareTargetVersion { get; set; }
         public int? ConfigVersion { get; set; }
-        // Roadmap #34 - see api.Models.DeviceConfig.CommandVersion for the full story.
+        // See api.Models.DeviceConfig.CommandVersion for the full story.
         public int CommandVersion { get; set; }
         public DateTime? DateCreated { get; set; }
         public DateTime? DateModified { get; set; }
     }
 
-    /// <summary>Roadmap #34: one discrete, one-shot device action - see api.Models.CommandStatus
-    /// for why Acknowledged is a real, persisted state and not just an implementation detail.</summary>
+    /// <summary>One discrete, one-shot device action - see api.Models.CommandStatus for why
+    /// Acknowledged is a real, persisted state and not just an implementation detail.</summary>
     public class DeviceCommandRow
     {
         public int IDDeviceCommand { get; set; }
@@ -222,8 +215,8 @@ namespace api.Dal.Entities
         public DateTime? ExecutedAt { get; set; }
     }
 
-    /// <summary>One row per device, upserted on every config poll (roadmap #7) - the poll itself is
-    /// the heartbeat, so LastSeenAt needs no extra endpoint or firmware request. Keyed by DeviceID
+    /// <summary>One row per device, upserted on every config poll - the poll itself is the
+    /// heartbeat, so LastSeenAt needs no extra endpoint or firmware request. Keyed by DeviceID
     /// (1:1 with device) rather than an identity column so the upsert is a plain read-or-insert.</summary>
     public class DeviceDiagnosticRow
     {
@@ -233,27 +226,24 @@ namespace api.Dal.Entities
         public long? UptimeSeconds { get; set; }
         public int? RssiDbm { get; set; }
         public long? FreeHeapBytes { get; set; }
-        // Roadmap #40: when OfflineAlertBackgroundService last notified admins about this device's
-        // CURRENT offline streak - null means either never offline, or back online since the last
-        // alert (cleared on the tick that observes it's reachable again). One notification per
-        // streak, not one per tick, without a separate dedup table.
+        // When OfflineAlertBackgroundService last notified admins about this device's CURRENT
+        // offline streak - null means either never offline, or back online since the last alert.
+        // One notification per streak, not one per tick, without a separate dedup table.
         public DateTime? OfflineNotifiedAt { get; set; }
-        // Roadmap #12: same dedup-by-streak rule as OfflineNotifiedAt above, but for
-        // LowBatteryAlertEvaluator - null means either never low, or recovered above
-        // ServerConfig.BatteryLowThreshold + BatteryLowHysteresis since the last alert.
+        // Same dedup-by-streak rule as OfflineNotifiedAt above, but for LowBatteryAlertEvaluator -
+        // null means either never low, or recovered above ServerConfig.BatteryLowThreshold +
+        // BatteryLowHysteresis since the last alert.
         public DateTime? LowBatteryNotifiedAt { get; set; }
         public string? FirmwareVersion { get; set; }
-        // Roadmap #94 - see api.Models.DeviceConfigPoll.Board.
+        // See api.Models.DeviceConfigPoll.Board.
         public string? Board { get; set; }
-        // Roadmap #149 - see api.Models.DeviceConfigPoll.Kit.
+        // See api.Models.DeviceConfigPoll.Kit.
         public string? Kit { get; set; }
     }
 
-    /// <summary>Roadmap #149: catalog of recognized commercial kits (physical boards) and whether
-    /// each one is known to have real, wired relay hardware - Kit itself is the key (a build-flag
-    /// string, e.g. "KC868-A6"), not an auto-increment id, since it only ever needs to be looked up
-    /// by the exact string the firmware reports, never joined by a numeric FK elsewhere. Seeded with
-    /// the currently-known kits (EfRepository); no admin UI yet to add more - a new kit needs a code
+    /// <summary>Catalog of recognized commercial kits (physical boards) and whether each one is
+    /// known to have real, wired relay hardware - Kit itself is the key (a build-flag string, e.g.
+    /// "KC868-A6"), not an auto-increment id. No admin UI yet to add more - a new kit needs a code
     /// change either way (a new PlatformIO environment) before its Kit string could ever appear.</summary>
     public class DeviceTypeKitRow
     {
@@ -261,8 +251,8 @@ namespace api.Dal.Entities
         public bool ControllerCapable { get; set; }
     }
 
-    // Roadmap #94 columns (Board/Source/FileName/SizeBytes/Sha256/PublishedAt) - see
-    // api.Models.DeviceFirmware for what each means; DeviceTypeID is the pre-#94 legacy key.
+    // Board/Source/FileName/SizeBytes/Sha256/PublishedAt - see api.Models.DeviceFirmware for what
+    // each means; DeviceTypeID is the legacy key.
     public class DeviceFirmwareRow
     {
         public int IDDeviceFirmware { get; set; }
@@ -277,7 +267,7 @@ namespace api.Dal.Entities
         public DateTime? PublishedAt { get; set; }
         public DateTime? DateAdded { get; set; }
 
-        // Roadmap #41 - see api.Models.DeviceFirmware's own copy of these for the full explanation.
+        // See api.Models.DeviceFirmware's own copy of these for the full explanation.
         public string? FullImageFileName { get; set; }
         public string? FullImageUrl { get; set; }
         public long? FullImageSizeBytes { get; set; }
