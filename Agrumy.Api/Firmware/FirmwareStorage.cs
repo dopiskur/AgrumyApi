@@ -3,12 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace api.Firmware
 {
-    /// <summary>Roadmap #94 Local repository: the directory this API serves .bin files from
-    /// (Firmware:LocalPath, default "firmware-store" under the content root - NOT "firmware", which
-    /// on a case-insensitive filesystem is this very source folder when running from the project
-    /// directory). File names are always the release convention, validated by
-    /// FirmwareVersion.TryParseFileName before anything is written or read, so a request path can
-    /// never escape the directory.</summary>
+    /// <summary>The directory this API serves .bin files from (Firmware:LocalPath, default "firmware-store" under the content root - NOT "firmware", which on a case-insensitive filesystem collides with this source folder when running from the project directory). File names are always the release convention, validated before anything is written or read, so a request path can never escape the directory.</summary>
     public sealed class FirmwareStorage(IOptions<AgrumySettings> settings, IHostEnvironment environment)
     {
         public const string DefaultRelativePath = "firmware-store";
@@ -24,9 +19,7 @@ namespace api.Firmware
 
         public string PathFor(string fileName)
         {
-            // Roadmap #41: the OTA and full-image conventions share this one flat directory - either
-            // is a "recognized, safe" name here (FirmwareCatalogService decides which convention is
-            // ALLOWED to become a catalog entry at each write path, not this gate).
+            // OTA and full-image conventions share this one flat directory - either is a "recognized, safe" name here; FirmwareCatalogService decides which is ALLOWED at each write path.
             if (!FirmwareVersion.TryParseFileName(fileName, out _, out _) &&
                 !FirmwareVersion.TryParseFullImageFileName(fileName, out _, out _))
             {

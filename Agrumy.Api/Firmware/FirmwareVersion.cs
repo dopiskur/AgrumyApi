@@ -2,30 +2,17 @@ using System.Text.RegularExpressions;
 
 namespace api.Firmware
 {
-    /// <summary>Roadmap #94: semver ordering for catalog versions and the release file naming
-    /// convention, in one place - a string sort puts "1.10.0" before "1.9.0" and DateAdded (the
-    /// pre-#94 "latest" rule) is meaningless once rows arrive from a GitHub sync in whatever order
-    /// the API lists them. Pure, no I/O, so it is unit-tested directly.</summary>
+    /// <summary>Semver ordering for catalog versions and the release file naming convention, in one place - a string sort puts "1.10.0" before "1.9.0". Pure, no I/O, so it is unit-tested directly.</summary>
     public readonly partial record struct FirmwareVersion(int Major, int Minor, int Patch, string? PreRelease) : IComparable<FirmwareVersion>
     {
-        /// <summary>agrumy-{board}-v{version}.bin - what AgrumyFirmware's release.yml produces, what the
-        /// GitHub/Custom syncs accept, and what the import scanner/upload validate BEFORE a file
-        /// enters the catalog (roadmap #94-2: a stray/renamed file must not pollute the store).</summary>
+        /// <summary>agrumy-{board}-v{version}.bin - what AgrumyFirmware's release.yml produces, what the GitHub/Custom syncs accept, and what the import scanner/upload validate before a file enters the catalog.</summary>
         [GeneratedRegex(@"^agrumy-(?<board>[a-z0-9]+)-v(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?)\.bin$")]
         private static partial Regex FileNameRegex();
 
         [GeneratedRegex(@"^v?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(?:-(?<pre>[0-9A-Za-z][0-9A-Za-z.-]*))?$")]
         private static partial Regex VersionRegex();
 
-        /// <summary>agrumy-{board}-full-v{version}.bin - roadmap #41's blank-chip web-installer
-        /// image (bootloader + partition table + boot_app0 + the OTA app above, merged to one file
-        /// flashable at offset 0). The "full-" marker sits BEFORE "v", not appended after the
-        /// version, on purpose: FileNameRegex's own pre-release group
-        /// (<c>(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?</c>) already accepts an arbitrary "-something" tail on
-        /// the version itself, so a suffix-after-version convention would have silently parsed as a
-        /// version like "1.2.3-full" instead of being rejected. A prefix before "v" can never collide
-        /// with that, since FileNameRegex's board group excludes hyphens and so cannot match past the
-        /// literal "-full-" at all.</summary>
+        /// <summary>agrumy-{board}-full-v{version}.bin - the blank-chip web-installer image (bootloader + partition table + boot_app0 + the OTA app, merged to one file flashable at offset 0). The "full-" marker sits BEFORE "v", not appended after the version: FileNameRegex's pre-release group already accepts an arbitrary "-something" tail on the version, so a suffix-after-version convention would silently parse as a version like "1.2.3-full" instead of being rejected.</summary>
         [GeneratedRegex(@"^agrumy-(?<board>[a-z0-9]+)-full-v(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?)\.bin$")]
         private static partial Regex FullImageFileNameRegex();
 
@@ -57,10 +44,7 @@ namespace api.Firmware
         /// <summary>Canonical form without a leading "v" - the catalog/heartbeat wire form.</summary>
         public static string? Normalize(string? text) => TryParse(text, out var v) ? v.ToString() : null;
 
-        /// <summary>True when <paramref name="candidate"/> is a valid version strictly newer than
-        /// <paramref name="running"/>. An unparseable running version (dev build, pre-#94 "0.1.4"
-        /// still parses; garbage doesn't) counts as older than any real release, so a device on an
-        /// unknown build is offered the latest rather than never updated.</summary>
+        /// <summary>True when <paramref name="candidate"/> is a valid version strictly newer than <paramref name="running"/>. An unparseable running version counts as older than any real release, so a device on an unknown build is offered the latest rather than never updated.</summary>
         public static bool IsNewer(string? candidate, string? running)
         {
             if (!TryParse(candidate, out var c))
@@ -112,9 +96,7 @@ namespace api.Firmware
 
         public static string BuildFileName(string board, string version) => $"agrumy-{board}-v{Normalize(version) ?? version}.bin";
 
-        /// <summary>Roadmap #41 counterpart of <see cref="TryParseFileName"/> - matches ONLY the
-        /// full-image convention, never the plain OTA one (and vice versa: TryParseFileName never
-        /// matches this one, see FullImageFileNameRegex's own remarks).</summary>
+        /// <summary>Counterpart of <see cref="TryParseFileName"/> - matches only the full-image convention, never the plain OTA one (and vice versa).</summary>
         public static bool TryParseFullImageFileName(string? fileName, out string board, out string version)
         {
             board = "";

@@ -53,11 +53,7 @@ namespace api.Security
 
     public sealed class DeviceApiKeyRequirement : IAuthorizationRequirement;
 
-    // Narrow IDeviceRepository facet (roadmap #74) - the only data-layer call here is the ApiId lookup.
-    // Roadmap #105: ILogger added so a rejection reaches the log instead of a bare `return` - the
-    // client-facing result is an identical 401 either way (no info leak), but server-side a
-    // firmware bug (missing header), a misconfig/attack (bad key) and an unknown apiId used to be
-    // indistinguishable.
+    // ILogger lets a rejection reach the log instead of a bare `return` - the client-facing result is an identical 401 either way (no info leak), but server-side a firmware bug, a misconfig/attack, and an unknown apiId are now distinguishable.
     public sealed partial class DeviceApiKeyHandler(IDeviceRepository repo, ILogger<DeviceApiKeyHandler> logger)
         : AuthorizationHandler<DeviceApiKeyRequirement>
     {
@@ -93,9 +89,7 @@ namespace api.Security
                 return;
             }
 
-            // apiId is an identifier, not a secret (see DeviceApiController.DeviceRegistration) -
-            // safe to log in full; apiKey is never logged (roadmap #20 masking standard - here,
-            // simply never touches the log at all).
+            // apiId is an identifier, not a secret - safe to log in full; apiKey is never logged.
             if (DeviceAuth.ConstantTimeEquals(apiKey, device.ApiKey))
             {
                 http.Items[DeviceAuth.ApiIdItemKey] = apiId;
@@ -116,9 +110,7 @@ namespace api.Security
         [LoggerMessage(Level = LogLevel.Warning, Message = "Device Session auth rejected: missing apiId header or Authorization token.")]
         private static partial void LogMissingHeader(ILogger logger);
 
-        // Roadmap #105: a cache miss (never authenticated / evicted) and a TTL-expired entry
-        // (roadmap #109) both surface as GetDeviceCacheAsync returning an empty DeviceCache -
-        // indistinguishable from here, so both fall under this one category rather than guessing.
+        // A cache miss (never authenticated / evicted) and a TTL-expired entry both surface as GetDeviceCacheAsync returning an empty DeviceCache - indistinguishable from here, so both fall under this one category.
         [LoggerMessage(Level = LogLevel.Warning, Message = "Device Session auth rejected: no valid session for apiId {ApiId}.")]
         private static partial void LogExpiredSession(ILogger logger, string apiId);
 

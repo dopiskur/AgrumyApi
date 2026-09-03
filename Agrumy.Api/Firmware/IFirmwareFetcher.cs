@@ -2,9 +2,7 @@ using System.Net.Http.Headers;
 
 namespace api.Firmware
 {
-    /// <summary>Roadmap #94: the only thing in the firmware code that touches the network, behind
-    /// an interface so FirmwareCatalogService is unit-testable with canned GitHub/manifest
-    /// responses (same reasoning as INotificationChannel in roadmap #6).</summary>
+    /// <summary>The only thing in the firmware code that touches the network, behind an interface so FirmwareCatalogService is unit-testable with canned GitHub/manifest responses.</summary>
     public interface IFirmwareFetcher
     {
         /// <summary>GET a JSON/text document. <paramref name="gitHubApi"/> adds the GitHub REST
@@ -29,8 +27,7 @@ namespace api.Firmware
             {
                 request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
                 request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
-                // Optional: unauthenticated GitHub allows 60 requests/hour per IP, which is plenty
-                // for an admin clicking "refresh" - a token only matters for a busy shared egress IP.
+                // Optional: unauthenticated GitHub allows 60 requests/hour per IP, plenty for an admin clicking "refresh" - a token only matters for a busy shared egress IP.
                 if (!string.IsNullOrWhiteSpace(settings.Value.FirmwareGitHubToken))
                 {
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.Value.FirmwareGitHubToken);
