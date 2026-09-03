@@ -774,25 +774,19 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         });
         Assert.Equal(v0 + 1, (await _repo.DeviceGetByIdAsync(d.IDDevice))!.ConfigVersion);
 
+        // Roadmap #21: only relay-pin mapping is left on the per-device Controller row - threshold/
+        // schedule moved to the zone (see the DeviceUnitZoneRule* tests further down).
         await _repo.DeviceConfigControllerUpdateAsync(d.IDDevice, new DeviceConfigController
         {
-            IDDeviceConfigController = d.DeviceConfigControllerID, TempLow = 5.5, TempHigh = 30.25, RelayEnabled = true, Relay1 = 2,
-            // Roadmap #39/#115.
-            LightSchedule = [new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 21600, Duration = 43200 }],
+            IDDeviceConfigController = d.DeviceConfigControllerID, RelayEnabled = true, Relay1 = 2,
         });
         var back = await _repo.DeviceGetByIdAsync(d.IDDevice);
         Assert.NotNull(back);
         Assert.Equal(v0 + 2, back.ConfigVersion);
 
         var ctrl = await _repo.DeviceConfigControllerGetAsync(d.DeviceConfigControllerID);
-        Assert.Equal(5.5, ctrl!.TempLow);   // real double (proc truncated via int params)
-        Assert.Equal(30.25, ctrl.TempHigh);
-        Assert.True(ctrl.RelayEnabled);
-        var slot = Assert.Single(ctrl.LightSchedule);
-        Assert.Equal(0b0111110, slot.DaysOfWeek);
-        Assert.Equal(21600, slot.Start);
-        Assert.Equal(43200, slot.Duration);
-        Assert.Empty(ctrl.VentilationSchedule); // untouched groups stay empty, not null
+        Assert.True(ctrl!.RelayEnabled);
+        Assert.Equal(2, ctrl.Relay1);
         Assert.Equal(1, (await _repo.DeviceConfigSensorGetAsync(d.DeviceConfigSensorID))!.SensorTemp);
     }
 
@@ -850,69 +844,149 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await _repo.DeviceConfigControllerUpdateAsync(a.IDDevice, new DeviceConfigController
         {
             IDDeviceConfigController = b.DeviceConfigControllerID, // tampered: points at B's row
-            TempLow = 12.5,
+            Relay1 = 12,
         });
-        Assert.Equal(12.5, (await _repo.DeviceConfigControllerGetAsync(a.DeviceConfigControllerID))!.TempLow);
-        Assert.NotEqual(12.5, (await _repo.DeviceConfigControllerGetAsync(b.DeviceConfigControllerID))!.TempLow);
+        Assert.Equal(12, (await _repo.DeviceConfigControllerGetAsync(a.DeviceConfigControllerID))!.Relay1);
+        Assert.NotEqual(12, (await _repo.DeviceConfigControllerGetAsync(b.DeviceConfigControllerID))!.Relay1);
     }
 
+    // Roadmap #21: WaterPump safety limits moved from the device to the zone - seeded from
+    // AgrumySettings on zone creation (same rule the pre-#21 per-device seeding used), editable
+    // per zone from here on. See DeviceUnitZoneRule* tests further down for the Rules themselves.
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceConfigController_WaterPumpSafetyLimits_SeededFromServerConfig_ThenPerDeviceOverride(DbProviderKind provider)
+    public async Task DeviceUnitZone_WaterPumpSafetyLimits_SeededOnCreate_ThenOverridable(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
+        var (_, zone) = await MakeUnitAndZone(tenantId);
 
-        // A brand new device is seeded from ServerConfig(1)'s current defaults - same rule as the
-        // hysteresis fields (roadmap #10), applied to roadmap #36's WaterPump safety limits.
-        ServerConfig serverDefaults = await _repo.ServerConfigGetAsync(1);
-        var d = await MakeDevice(t, tenantId);
+        Assert.NotNull(zone.WaterPumpMaxRunSeconds);
+        Assert.NotNull(zone.WaterPumpCooldownSeconds);
 
-        var seeded = await _repo.DeviceConfigControllerGetAsync(d.DeviceConfigControllerID);
-        Assert.Equal(serverDefaults.WaterPumpMaxRunSeconds, seeded!.WaterPumpMaxRunSeconds);
-        Assert.Equal(serverDefaults.WaterPumpCooldownSeconds, seeded.WaterPumpCooldownSeconds);
+        zone.WaterPumpMaxRunSeconds = 900;
+        zone.WaterPumpCooldownSeconds = 120;
+        await _repo.DeviceUnitZoneUpdateAsync(zone);
 
-        // Per-device override from here on - editing it must not disturb the server-wide default.
-        await _repo.DeviceConfigControllerUpdateAsync(d.IDDevice, new DeviceConfigController
-        {
-            IDDeviceConfigController = d.DeviceConfigControllerID,
-            WaterPumpMaxRunSeconds = 900,
-            WaterPumpCooldownSeconds = 120,
-        });
-
-        var overridden = await _repo.DeviceConfigControllerGetAsync(d.DeviceConfigControllerID);
+        var overridden = await _repo.DeviceUnitZoneGetByIdAsync(zone.IDDeviceUnitZone);
         Assert.Equal(900, overridden!.WaterPumpMaxRunSeconds);
         Assert.Equal(120, overridden.WaterPumpCooldownSeconds);
-        Assert.Equal(serverDefaults.WaterPumpMaxRunSeconds, (await _repo.ServerConfigGetAsync(1)).WaterPumpMaxRunSeconds);
     }
 
-    // Roadmap #115: a second save with a DIFFERENT slot set must fully replace the first, not
-    // append to it - the delete-all-then-reinsert pattern in DeviceConfigControllerUpdateAsync is
-    // the one place this could silently accumulate stale rows instead.
+    // Roadmap #21: unlike the pre-#21 per-device schedule (a whole-list replace on every save),
+    // rules are individually addressable rows - adding/deleting one must not disturb the others.
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceConfigController_ScheduleUpdate_ReplacesPriorSlots_DoesNotAccumulate(DbProviderKind provider)
+    public async Task DeviceUnitZoneRule_AddAndDelete_AreIndependent_NotWholeListReplace(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
+        var (_, zone) = await MakeUnitAndZone(tenantId);
+
+        int rule1 = await _repo.DeviceUnitZoneRuleAddAsync(new DeviceUnitZoneRule
+        {
+            DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
+            RelayFunction = RelayFunction.Ventilation,
+            ConditionType = ConditionType.Schedule,
+            ConditionConfig = JsonSerializer.SerializeToNode(new ScheduleConditionConfig(0b0111110, 21600, 1800), ConditionConfigJson.Options),
+        });
+        int rule2 = await _repo.DeviceUnitZoneRuleAddAsync(new DeviceUnitZoneRule
+        {
+            DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
+            RelayFunction = RelayFunction.Ventilation,
+            ConditionType = ConditionType.Schedule,
+            ConditionConfig = JsonSerializer.SerializeToNode(new ScheduleConditionConfig(0b0111110, 50400, 900), ConditionConfigJson.Options),
+        });
+        Assert.Equal(2, (await _repo.DeviceUnitZoneRulesGetAsync(zone.IDDeviceUnitZone!.Value)).Count);
+
+        await _repo.DeviceUnitZoneRuleDeleteAsync(rule1);
+
+        var remaining = Assert.Single(await _repo.DeviceUnitZoneRulesGetAsync(zone.IDDeviceUnitZone!.Value));
+        Assert.Equal(rule2, remaining.IDDeviceUnitZoneRule);
+        var config = remaining.ConditionConfig.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options);
+        Assert.Equal(50400, config!.Start);
+    }
+
+    // Roadmap #21: a zone may hold several rules for the SAME function - OR semantics (user
+    // decision), so both must survive and be independently readable, not collapsed into one.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitZoneRule_MultipleRulesSameFunction_BothPersist(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (_, zone) = await MakeUnitAndZone(tenantId);
+
+        await _repo.DeviceUnitZoneRuleAddAsync(new DeviceUnitZoneRule
+        {
+            DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
+            RelayFunction = RelayFunction.WaterPump,
+            ConditionType = ConditionType.Threshold,
+            ConditionConfig = JsonSerializer.SerializeToNode(new ThresholdConditionConfig(10, 5), ConditionConfigJson.Options),
+        });
+        await _repo.DeviceUnitZoneRuleAddAsync(new DeviceUnitZoneRule
+        {
+            DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
+            RelayFunction = RelayFunction.WaterPump,
+            ConditionType = ConditionType.Interval,
+            ConditionConfig = JsonSerializer.SerializeToNode(new IntervalConditionConfig(3600, 300), ConditionConfigJson.Options),
+        });
+
+        var rules = await _repo.DeviceUnitZoneRulesGetAsync(zone.IDDeviceUnitZone!.Value);
+        Assert.Equal(2, rules.Count);
+        Assert.All(rules, r => Assert.Equal(RelayFunction.WaterPump, r.RelayFunction));
+        Assert.Contains(rules, r => r.ConditionType == ConditionType.Threshold);
+        Assert.Contains(rules, r => r.ConditionType == ConditionType.Interval);
+    }
+
+    // Roadmap #21: BuildDeviceConfigAsync-equivalent path - a device assigned to a zone must see
+    // that zone's rules AND safety limits merged onto its DeviceConfigController, while relay-pin
+    // mapping still comes from the device's own row.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitZoneRule_AssignedDevice_ReadsZonesRulesAndSafetyLimits(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (_, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeDevice(t, tenantId);
-
-        await _repo.DeviceConfigControllerUpdateAsync(d.IDDevice, new DeviceConfigController
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceUnitZoneRuleAddAsync(new DeviceUnitZoneRule
         {
-            IDDeviceConfigController = d.DeviceConfigControllerID,
-            VentilationSchedule =
-            [
-                new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 21600, Duration = 1800 },
-                new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 50400, Duration = 900 },
-            ],
+            DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
+            RelayFunction = RelayFunction.Light,
+            ConditionType = ConditionType.Threshold,
+            ConditionConfig = JsonSerializer.SerializeToNode(new ThresholdConditionConfig(200, 20), ConditionConfigJson.Options),
         });
-        Assert.Equal(2, (await _repo.DeviceConfigControllerGetAsync(d.DeviceConfigControllerID))!.VentilationSchedule.Count);
 
-        await _repo.DeviceConfigControllerUpdateAsync(d.IDDevice, new DeviceConfigController
+        var rules = await _repo.DeviceUnitZoneRulesGetAsync(zone.IDDeviceUnitZone!.Value);
+        var rule = Assert.Single(rules);
+        Assert.Equal(RelayFunction.Light, rule.RelayFunction);
+
+        var zoneAfter = await _repo.DeviceUnitZoneGetByIdAsync(zone.IDDeviceUnitZone);
+        Assert.Equal(zone.WaterPumpMaxRunSeconds, zoneAfter!.WaterPumpMaxRunSeconds);
+
+        // Confirms the device's own DeviceUnitZoneID now resolves back to this same zone - the
+        // link BuildDeviceConfigAsync follows to merge Rules/safety-limits onto the device's config.
+        var deviceAfter = await _repo.DeviceGetByIdAsync(d.IDDevice);
+        Assert.Equal(zone.IDDeviceUnitZone, deviceAfter!.DeviceUnitZoneID);
+    }
+
+    // Roadmap #21: deleting a zone must not orphan its rules - app-level cleanup (this codebase's
+    // convention, not a DB CASCADE), same as devices being unassigned first.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitZoneDelete_AlsoDeletesItsRules(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (_, zone) = await MakeUnitAndZone(tenantId);
+        int ruleId = await _repo.DeviceUnitZoneRuleAddAsync(new DeviceUnitZoneRule
         {
-            IDDeviceConfigController = d.DeviceConfigControllerID,
-            VentilationSchedule = [new DeviceScheduleSlot { DaysOfWeek = 0b1000001, Start = 0, Duration = 60 }],
+            DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
+            RelayFunction = RelayFunction.Heating,
+            ConditionType = ConditionType.Threshold,
+            ConditionConfig = JsonSerializer.SerializeToNode(new ThresholdConditionConfig(18, 1), ConditionConfigJson.Options),
         });
-        var slot = Assert.Single((await _repo.DeviceConfigControllerGetAsync(d.DeviceConfigControllerID))!.VentilationSchedule);
-        Assert.Equal(0b1000001, slot.DaysOfWeek);
+
+        await _repo.DeviceUnitZoneDeleteAsync(zone.IDDeviceUnitZone!.Value);
+
+        Assert.Null(await _repo.DeviceUnitZoneRuleGetByIdAsync(ruleId));
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]

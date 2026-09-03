@@ -357,39 +357,10 @@
     "deviceConfigController": {
       "type": "object",
       "additionalProperties": false,
-      "description": "camelCase serialization of api.Models.DeviceConfigController.",
+      "description": "camelCase serialization of api.Models.DeviceConfigController. Roadmap #21: threshold/hysteresis/interval/schedule all replaced by 'rules', resolved from the device's ASSIGNED ZONE (DeviceApiController.BuildDeviceConfigAsync), not from this device's own row - only relay-pin mapping below is still per-device.",
       "required": [
         "idDeviceConfigController",
-        "tempLow",
-        "tempHigh",
-        "humidLow",
-        "humidHigh",
-        "moistLow",
-        "moistHigh",
-        "lightLow",
-        "lightHigh",
-        "waterLow",
-        "waterHigh",
-        "waterLevelHysteresis",
-        "temperatureHysteresis",
-        "humidityHysteresis",
-        "lightHysteresis",
-        "ventilationIntervalEnabled",
-        "ventilationInterval",
-        "ventilationIntervalLength",
-        "lightIntervalEnabled",
-        "lightInterval",
-        "lightIntervalLength",
-        "heatingIntervalEnabled",
-        "heatingInterval",
-        "heatingIntervalLength",
-        "waterPumpIntervalEnabled",
-        "waterPumpInterval",
-        "waterPumpIntervalLength",
-        "ventilationSchedule",
-        "lightSchedule",
-        "heatingSchedule",
-        "waterPumpSchedule",
+        "rules",
         "waterPumpMaxRunSeconds",
         "waterPumpCooldownSeconds",
         "relayEnabled",
@@ -409,198 +380,26 @@
             "null"
           ]
         },
-        "tempLow": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "tempHigh": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "humidLow": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "humidHigh": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "moistLow": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "moistHigh": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "lightLow": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "lightHigh": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "waterLow": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "waterHigh": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "waterLevelHysteresis": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "description": "Roadmap #10. Dead-zone margin above waterLow before relayWaterPump turns off."
-        },
-        "temperatureHysteresis": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "description": "Roadmap #10. Dead-zone margin above tempLow before relayHeating turns off."
-        },
-        "humidityHysteresis": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "description": "Roadmap #10. Dead-zone margin below humidHigh before relayVentilation turns off (opposite direction from the other three - ventilation triggers ON above its threshold)."
-        },
-        "lightHysteresis": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "description": "Roadmap #10. Dead-zone margin above lightLow before relayLight turns off."
-        },
-        "ventilationIntervalEnabled": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "ventilationInterval": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "ventilationIntervalLength": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "lightIntervalEnabled": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "lightInterval": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "lightIntervalLength": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "heatingIntervalEnabled": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "heatingInterval": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "heatingIntervalLength": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "waterPumpIntervalEnabled": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "waterPumpInterval": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "waterPumpIntervalLength": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "ventilationSchedule": {
+        "rules": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/deviceScheduleSlot"
+            "$ref": "#/definitions/deviceUnitZoneRule"
           },
-          "description": "Roadmap #39/#115. Third relay-control mode alongside the Interval fields above and Threshold (tempLow etc.) - zero or more wall-clock on/off windows, independent of any sensor reading. The function is on whenever local time falls in ANY window (OR'd together, AgrumyFirmware's RelayLogic::computeAnyScheduleState); an empty array means it never turns on in schedule mode - no separate 'enabled' flag."
-        },
-        "lightSchedule": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/deviceScheduleSlot"
-          }
-        },
-        "heatingSchedule": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/deviceScheduleSlot"
-          }
-        },
-        "waterPumpSchedule": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/deviceScheduleSlot"
-          }
+          "description": "Roadmap #21. Every automation rule for the zone this device is assigned to - empty when unassigned. Several rules may target the SAME relayFunction: OR semantics, any rule that evaluates on wins (AgrumyFirmware's ActuatorController::evaluateRule/initController)."
         },
         "waterPumpMaxRunSeconds": {
-          "type": ["integer", "null"],
-          "description": "Roadmap #36. Hard ceiling (seconds) on continuous WaterPump run time, enforced device-side AFTER threshold/interval/schedule decides the pump should run - AgrumyFirmware's ActuatorController::applyWaterPumpSafetyLimits. 0/null disables it."
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Roadmap #21/#36. Hard ceiling (seconds) on continuous WaterPump run time, enforced device-side AFTER any rule decides the pump should run - AgrumyFirmware's ActuatorController::applyWaterPumpSafetyLimits. Copied from the assigned zone (api.Models.DeviceUnitZone), not this row. 0/null disables it."
         },
         "waterPumpCooldownSeconds": {
-          "type": ["integer", "null"],
-          "description": "Roadmap #36. Minimum OFF time (seconds) before the next WaterPump attempt is allowed, same enforcement point as waterPumpMaxRunSeconds. 0/null disables it."
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Roadmap #21/#36. Minimum OFF time (seconds) before the next WaterPump attempt is allowed, same enforcement point as waterPumpMaxRunSeconds. Copied from the assigned zone. 0/null disables it."
         },
         "relayEnabled": {
           "type": [
@@ -658,10 +457,92 @@
         }
       }
     },
-    "deviceScheduleSlot": {
+    "deviceUnitZoneRule": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Roadmap #115. camelCase serialization of api.Models.DeviceScheduleSlot - one wall-clock window within one of deviceConfigController's four schedule arrays.",
+      "description": "Roadmap #21. camelCase serialization of api.Models.DeviceUnitZoneRule - one automation rule living on a zone.",
+      "required": [
+        "idDeviceUnitZoneRule",
+        "deviceUnitZoneID",
+        "relayFunction",
+        "conditionType",
+        "conditionConfig"
+      ],
+      "properties": {
+        "idDeviceUnitZoneRule": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "relayFunction": {
+          "type": "integer",
+          "description": "1=Ventilation, 2=Light, 3=Heating, 4=WaterPump (api.Models.RelayFunction) - which of the device's relay1..8 pins this rule targets, resolved device-side against its OWN relay-pin mapping above (the rule itself carries no pin number)."
+        },
+        "conditionType": {
+          "type": "integer",
+          "description": "1=Threshold, 2=Interval, 3=Schedule (api.Models.ConditionType) - selects which of the three conditionConfig shapes below applies. Composite (AND/OR across different condition types) is deliberately out of scope."
+        },
+        "conditionConfig": {
+          "description": "Shape depends on conditionType - exactly one of the three definitions below.",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/thresholdConditionConfig"
+            },
+            {
+              "$ref": "#/definitions/intervalConditionConfig"
+            },
+            {
+              "$ref": "#/definitions/scheduleConditionConfig"
+            }
+          ]
+        },
+        "deviceUnitZoneID": {
+          "type": "integer",
+          "description": "Which zone this rule belongs to - redundant with the top-level deviceConfig.deviceUnitZoneID (the device already knows its own zone), present because DeviceUnitZoneRule is the same model used for the DB/admin-API CRUD side, not split into a firmware-only DTO."
+        }
+      }
+    },
+    "thresholdConditionConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Roadmap #21. camelCase serialization of api.Models.ThresholdConditionConfig. Which metric/direction this compares is implicit in the rule's relayFunction (Ventilation=humidity/above, Light=light/below, Heating=temperature/below, WaterPump=waterLevel/below - AgrumyFirmware's ActuatorController::evaluateRule, unchanged from the pre-#21 thresholdRelayFunction switch), not a field here.",
+      "required": [
+        "threshold",
+        "hysteresis"
+      ],
+      "properties": {
+        "threshold": {
+          "type": "number"
+        },
+        "hysteresis": {
+          "type": "number",
+          "description": "Dead-zone margin - must not be negative (enforced server-side, DeviceUnitApiController.RuleConditionConfigError)."
+        }
+      }
+    },
+    "intervalConditionConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Roadmap #21. camelCase serialization of api.Models.IntervalConditionConfig - on for intervalLength seconds out of every interval-second period, grid-aligned to epoch (AgrumyFirmware's computeIntervalState).",
+      "required": [
+        "interval",
+        "intervalLength"
+      ],
+      "properties": {
+        "interval": {
+          "type": "integer"
+        },
+        "intervalLength": {
+          "type": "integer",
+          "description": "Must not exceed interval (enforced server-side)."
+        }
+      }
+    },
+    "scheduleConditionConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Roadmap #21. camelCase serialization of api.Models.ScheduleConditionConfig - ONE wall-clock window (unlike the pre-#21 deviceScheduleSlot list, multiple windows for the same function are now multiple Schedule-type rules, OR'd together like any other pair of rules for that function).",
       "required": [
         "daysOfWeek",
         "start",
@@ -670,7 +551,7 @@
       "properties": {
         "daysOfWeek": {
           "type": "integer",
-          "description": "7-bit mask, bit 0 = Sunday .. bit 6 = Saturday (matches C's tm_wday - see AgrumyFirmware's ActuatorController::scheduleRelayFunction)."
+          "description": "7-bit mask, bit 0 = Sunday .. bit 6 = Saturday (matches C's tm_wday - see AgrumyFirmware's ActuatorController::evaluateRule)."
         },
         "start": {
           "type": "integer",
@@ -678,7 +559,7 @@
         },
         "duration": {
           "type": "integer",
-          "description": "Seconds. start+duration must not exceed 86400 (no crossing local midnight in v1) - enforced server-side, DeviceApiController.ScheduleWindowError."
+          "description": "Seconds. start+duration must not exceed 86400 (no crossing local midnight in v1) - enforced server-side, DeviceUnitApiController.RuleConditionConfigError."
         }
       }
     },

@@ -20,14 +20,7 @@ namespace api.Dal
         {
             var row = await db.DeviceConfigControllers.AsNoTracking()
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigController == deviceConfigControllerID);
-            if (row == null)
-            {
-                return null;
-            }
-            var slots = await db.DeviceScheduleSlots.AsNoTracking()
-                .Where(s => s.DeviceConfigControllerID == deviceConfigControllerID)
-                .ToListAsync();
-            return ToDto(row, slots);
+            return row == null ? null : ToDto(row);
         }
 
         public async Task<Device?> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID)
@@ -65,37 +58,10 @@ namespace api.Dal
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigController == ownConfigControllerId);
             if (row != null)
             {
-                // The proc declared these params as int (columns are double) so historically the
-                // values were truncated. Phase 1 stores the real double instead - a deliberate,
-                // documented deviation from the proc.
-                row.TempLow = cfg.TempLow;
-                row.TempHigh = cfg.TempHigh;
-                row.HumidLow = cfg.HumidLow;
-                row.HumidHigh = cfg.HumidHigh;
-                row.MoistLow = cfg.MoistLow;
-                row.MoistHigh = cfg.MoistHigh;
-                row.LightLow = cfg.LightLow;
-                row.LightHigh = cfg.LightHigh;
-                row.WaterLow = cfg.WaterLow;
-                row.WaterHigh = cfg.WaterHigh;
-                row.WaterLevelHysteresis = cfg.WaterLevelHysteresis;
-                row.TemperatureHysteresis = cfg.TemperatureHysteresis;
-                row.HumidityHysteresis = cfg.HumidityHysteresis;
-                row.LightHysteresis = cfg.LightHysteresis;
-                row.VentilationIntervalEnabled = cfg.VentilationIntervalEnabled;
-                row.VentilationInterval = cfg.VentilationInterval;
-                row.VentilationIntervalLength = cfg.VentilationIntervalLength;
-                row.LightIntervalEnabled = cfg.LightIntervalEnabled;
-                row.LightInterval = cfg.LightInterval;
-                row.LightIntervalLength = cfg.LightIntervalLength;
-                row.HeatingIntervalEnabled = cfg.HeatingIntervalEnabled;
-                row.HeatingInterval = cfg.HeatingInterval;
-                row.HeatingIntervalLength = cfg.HeatingIntervalLength;
-                row.WaterPumpIntervalEnabled = cfg.WaterPumpIntervalEnabled;
-                row.WaterPumpInterval = cfg.WaterPumpInterval;
-                row.WaterPumpIntervalLength = cfg.WaterPumpIntervalLength;
-                row.WaterPumpMaxRunSeconds = cfg.WaterPumpMaxRunSeconds;
-                row.WaterPumpCooldownSeconds = cfg.WaterPumpCooldownSeconds;
+                // Roadmap #21: only the relay-pin mapping is left here - threshold/hysteresis/
+                // interval/schedule/#36-safety-limits all moved to the device's assigned
+                // DeviceUnitZone (EfRepository.DeviceUnits.cs's DeviceUnitZoneRule* members), edited
+                // from the Zone page now, not this per-device form.
                 row.RelayEnabled = cfg.RelayEnabled;
                 row.Relay1 = cfg.Relay1;
                 row.Relay2 = cfg.Relay2;
@@ -105,19 +71,6 @@ namespace api.Dal
                 row.Relay6 = cfg.Relay6;
                 row.Relay7 = cfg.Relay7;
                 row.Relay8 = cfg.Relay8;
-
-                // Roadmap #115: delete-all-then-reinsert - AgrumyDbContext does not configure EF
-                // relationships for LINQ joins (see its class comment), so this is the simplest
-                // correct way to replace a controller's full slot set on every save. Immediate
-                // (not queued on the change tracker), so it runs before the AddRange below.
-                await db.DeviceScheduleSlots
-                    .Where(s => s.DeviceConfigControllerID == row.IDDeviceConfigController)
-                    .ExecuteDeleteAsync();
-                db.DeviceScheduleSlots.AddRange(
-                    BuildScheduleSlotRows(row.IDDeviceConfigController, 1, cfg.VentilationSchedule)
-                    .Concat(BuildScheduleSlotRows(row.IDDeviceConfigController, 2, cfg.LightSchedule))
-                    .Concat(BuildScheduleSlotRows(row.IDDeviceConfigController, 3, cfg.HeatingSchedule))
-                    .Concat(BuildScheduleSlotRows(row.IDDeviceConfigController, 4, cfg.WaterPumpSchedule)));
             }
 
             var deviceRow = await db.Devices.FirstOrDefaultAsync(d => d.IDDevice == idDevice);
@@ -128,17 +81,6 @@ namespace api.Dal
 
             await db.SaveChangesAsync(); // one transaction: config row + ConfigVersion bump
         }
-
-        private static IEnumerable<DeviceScheduleSlotRow> BuildScheduleSlotRows(
-            int deviceConfigControllerId, int relayFunction, IEnumerable<DeviceScheduleSlot>? slots) =>
-            (slots ?? []).Select(s => new DeviceScheduleSlotRow
-            {
-                DeviceConfigControllerID = deviceConfigControllerId,
-                RelayFunction = relayFunction,
-                DaysOfWeek = s.DaysOfWeek,
-                Start = s.Start,
-                Duration = s.Duration,
-            });
 
         public async Task DeviceConfigSensorUpdateAsync(int? idDevice, DeviceConfigSensor? cfg)
         {
@@ -204,41 +146,12 @@ namespace api.Dal
             SensorWind = c.SensorWind,
         };
 
-        private static DeviceConfigController ToDto(DeviceConfigControllerRow c, IList<DeviceScheduleSlotRow> slots) => new()
+        // Roadmap #21: relay-pin mapping only - Rules/WaterPumpMaxRunSeconds/WaterPumpCooldownSeconds
+        // on the DTO are populated by DeviceApiController.BuildDeviceConfigAsync from the device's
+        // assigned zone, not from this row - see DeviceConfigController's own remarks.
+        private static DeviceConfigController ToDto(DeviceConfigControllerRow c) => new()
         {
             IDDeviceConfigController = c.IDDeviceConfigController,
-            TempLow = c.TempLow,
-            TempHigh = c.TempHigh,
-            HumidLow = c.HumidLow,
-            HumidHigh = c.HumidHigh,
-            MoistLow = c.MoistLow,
-            MoistHigh = c.MoistHigh,
-            LightLow = c.LightLow,
-            LightHigh = c.LightHigh,
-            WaterLow = c.WaterLow,
-            WaterHigh = c.WaterHigh,
-            WaterLevelHysteresis = c.WaterLevelHysteresis,
-            TemperatureHysteresis = c.TemperatureHysteresis,
-            HumidityHysteresis = c.HumidityHysteresis,
-            LightHysteresis = c.LightHysteresis,
-            VentilationIntervalEnabled = c.VentilationIntervalEnabled,
-            VentilationInterval = c.VentilationInterval,
-            VentilationIntervalLength = c.VentilationIntervalLength,
-            LightIntervalEnabled = c.LightIntervalEnabled,
-            LightInterval = c.LightInterval,
-            LightIntervalLength = c.LightIntervalLength,
-            HeatingIntervalEnabled = c.HeatingIntervalEnabled,
-            HeatingInterval = c.HeatingInterval,
-            HeatingIntervalLength = c.HeatingIntervalLength,
-            WaterPumpIntervalEnabled = c.WaterPumpIntervalEnabled,
-            WaterPumpInterval = c.WaterPumpInterval,
-            WaterPumpIntervalLength = c.WaterPumpIntervalLength,
-            WaterPumpMaxRunSeconds = c.WaterPumpMaxRunSeconds,
-            WaterPumpCooldownSeconds = c.WaterPumpCooldownSeconds,
-            VentilationSchedule = ScheduleSlotsFor(slots, 1),
-            LightSchedule = ScheduleSlotsFor(slots, 2),
-            HeatingSchedule = ScheduleSlotsFor(slots, 3),
-            WaterPumpSchedule = ScheduleSlotsFor(slots, 4),
             RelayEnabled = c.RelayEnabled,
             Relay1 = c.Relay1,
             Relay2 = c.Relay2,
@@ -249,10 +162,5 @@ namespace api.Dal
             Relay7 = c.Relay7,
             Relay8 = c.Relay8,
         };
-
-        private static List<DeviceScheduleSlot> ScheduleSlotsFor(IList<DeviceScheduleSlotRow> slots, int relayFunction) =>
-            slots.Where(s => s.RelayFunction == relayFunction)
-                 .Select(s => new DeviceScheduleSlot { DaysOfWeek = s.DaysOfWeek, Start = s.Start, Duration = s.Duration })
-                 .ToList();
     }
 }

@@ -1,6 +1,9 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using api.Dal.Interface;
 using api.Models;
 using api.Security;
+using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -82,6 +85,18 @@ namespace api.Controllers.API
             return Ok(await Repo.DeviceUnitZonesGetAsync(unit!.IDDeviceUnit!.Value));
         }
 
+        /// <summary>Roadmap #21: single zone by id - added so a caller that needs to patch ONE
+        /// field (e.g. Web's ZoneRename/SafetyLimitsUpdate) can fetch-then-resubmit the whole
+        /// object, rather than posting a partial DTO that would blank out every field it didn't
+        /// set (DeviceUnitZoneUpdateAsync overwrites unconditionally, it does not merge).</summary>
+        [Authorize]
+        [HttpGet("ZoneById")]
+        public async Task<ActionResult<DeviceUnitZone>> DeviceUnitZoneGetById(int? idDeviceUnitZone)
+        {
+            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceUnitZone, forWrite: false);
+            return error ?? Ok(zone);
+        }
+
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost("Zone")]
         public async Task<ActionResult<DeviceUnitZone>> DeviceUnitZoneAdd([FromBody] DeviceUnitZone zone)
@@ -104,6 +119,18 @@ namespace api.Controllers.API
             {
                 return error;
             }
+
+            // Roadmap #36 (A)/#21: same "catch human error server-side" layer the old per-device
+            // check used - see api.Utils.SafetyLimitValidation for why the range itself lives there, shared.
+            if (!SafetyLimitValidation.IsValid(zone.WaterPumpMaxRunSeconds))
+            {
+                return BadRequest($"WaterPump max run time must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.");
+            }
+            if (!SafetyLimitValidation.IsValid(zone.WaterPumpCooldownSeconds))
+            {
+                return BadRequest($"WaterPump cooldown must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.");
+            }
+
             zone.TenantID = existing!.TenantID; // payload cannot move a zone to another tenant
             zone.DeviceUnitID = existing.DeviceUnitID; // ...or to another unit - rename only
             await Repo.DeviceUnitZoneUpdateAsync(zone);
@@ -121,6 +148,119 @@ namespace api.Controllers.API
             }
             await Repo.DeviceUnitZoneDeleteAsync(zone!.IDDeviceUnitZone!.Value);
             return true;
+        }
+
+        #endregion
+
+        #region Zone Rules (roadmap #21)
+
+        [Authorize]
+        [HttpGet("Zone/Rule")]
+        public async Task<ActionResult<IList<DeviceUnitZoneRule>>> DeviceUnitZoneRulesGet(int? idDeviceUnitZone)
+        {
+            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceUnitZone, forWrite: false);
+            if (error != null)
+            {
+                return error;
+            }
+            return Ok(await Repo.DeviceUnitZoneRulesGetAsync(zone!.IDDeviceUnitZone!.Value));
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("Zone/Rule")]
+        public async Task<ActionResult<int>> DeviceUnitZoneRuleAdd([FromBody] DeviceUnitZoneRule rule)
+        {
+            var (_, error) = await EnsureOwnedZoneAsync(rule.DeviceUnitZoneID, forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            if (RuleConditionConfigError(rule.ConditionType, rule.ConditionConfig) is string configError)
+            {
+                return BadRequest(configError);
+            }
+            return Ok(await Repo.DeviceUnitZoneRuleAddAsync(rule));
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpDelete("Zone/Rule")]
+        public async Task<ActionResult<bool>> DeviceUnitZoneRuleDelete(int? idDeviceUnitZoneRule)
+        {
+            DeviceUnitZoneRule? rule = await Repo.DeviceUnitZoneRuleGetByIdAsync(idDeviceUnitZoneRule);
+            if (rule == null)
+            {
+                return NotFound();
+            }
+            var (_, error) = await EnsureOwnedZoneAsync(rule.DeviceUnitZoneID, forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            await Repo.DeviceUnitZoneRuleDeleteAsync(idDeviceUnitZoneRule!.Value);
+            return true;
+        }
+
+        /// <summary>Roadmap #21: shape+bound check per ConditionType, mirroring the pre-#21
+        /// ScheduleWindowError/SafetyLimitError's "catch human error server-side" role - the
+        /// firmware would otherwise just silently treat a malformed rule as inert (see
+        /// AgrumyFirmware's ConfigParser/evaluateRule), a confusing way to discover a typo.
+        /// Threshold's own threshold VALUE is deliberately unbounded (humidity/light/temperature/
+        /// water-level all have different sane ranges depending on the sensor and unit; only
+        /// Hysteresis, a dead-zone width, has a universal "must not be negative" rule).</summary>
+        private static string? RuleConditionConfigError(ConditionType type, JsonNode? config)
+        {
+            try
+            {
+                switch (type)
+                {
+                    case ConditionType.Threshold:
+                        var threshold = config.Deserialize<ThresholdConditionConfig>(ConditionConfigJson.Options)
+                            ?? throw new JsonException("missing threshold config");
+                        if (threshold.Hysteresis < 0)
+                        {
+                            return "Threshold rule: hysteresis must not be negative.";
+                        }
+                        return null;
+                    case ConditionType.Interval:
+                        var interval = config.Deserialize<IntervalConditionConfig>(ConditionConfigJson.Options)
+                            ?? throw new JsonException("missing interval config");
+                        if (interval.Interval <= 0)
+                        {
+                            return "Interval rule: interval must be greater than 0.";
+                        }
+                        if (interval.IntervalLength <= 0 || interval.IntervalLength > interval.Interval)
+                        {
+                            return "Interval rule: on-duration must be greater than 0 and not exceed the interval.";
+                        }
+                        return null;
+                    case ConditionType.Schedule:
+                        var schedule = config.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options)
+                            ?? throw new JsonException("missing schedule config");
+                        // Roadmap #39/#115: same bounds the pre-#21 per-slot check used - v1
+                        // deliberately does not support a window crossing local midnight, and
+                        // DaysOfWeek must fit the 7-bit mask AgrumyFirmware's evaluateRule expects
+                        // (bit 0 = Sunday .. bit 6 = Saturday).
+                        if (schedule.DaysOfWeek < 0 || schedule.DaysOfWeek > 0b1111111)
+                        {
+                            return "Schedule rule: days of week must be a value from 0 to 127.";
+                        }
+                        if (schedule.Start < 0 || schedule.Start > 86399)
+                        {
+                            return "Schedule rule: start must be between 0 and 86399 seconds since local midnight.";
+                        }
+                        if (schedule.Duration < 1 || schedule.Start + schedule.Duration > 86400)
+                        {
+                            return "Schedule rule: duration must be at least 1 second and not cross local midnight (start + duration <= 86400).";
+                        }
+                        return null;
+                    default:
+                        return "Unknown condition type.";
+                }
+            }
+            catch (JsonException)
+            {
+                return $"{type} rule: conditionConfig does not match the expected shape for this condition type.";
+            }
         }
 
         #endregion

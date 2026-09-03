@@ -141,6 +141,10 @@ namespace api.Controllers.API
             return true;
         }
 
+        /// <summary>Roadmap #21: only relay-pin mapping is left on the per-device Controller row -
+        /// threshold/hysteresis/interval/schedule/#36-safety-limits moved to the device's assigned
+        /// zone (DeviceUnitApiController's Zone/Rule endpoints), so there is no longer anything on
+        /// this DTO for ScheduleWindowError/SafetyLimitError-style validation to check.</summary>
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPut("Controller")]
         public async Task<ActionResult<bool>> DeviceConfigControllerUpdate(DeviceUpdate? deviceUpdate)
@@ -148,23 +152,6 @@ namespace api.Controllers.API
             if (deviceUpdate?.Device?.IDDevice == null)
             {
                 return BadRequest("Device is required.");
-            }
-
-            // Roadmap #39: reject here, not on the device - a device that received a malformed
-            // window would just have scheduleRelayFunction() silently treat it as "never on"
-            // (positionInCycle can never be negative), which is a confusing way to discover a typo.
-            if (ScheduleWindowError(deviceUpdate.Controller) is string scheduleError)
-            {
-                return BadRequest(scheduleError);
-            }
-
-            // Roadmap #36 (A): same "catch human error server-side" layer as the schedule check
-            // above - the device-side hard ceiling (B) is the real safety net and would just clamp
-            // a nonsense value's practical effect anyway, but a typo like a negative number should
-            // fail loudly at save time rather than silently disable the limit on-device.
-            if (SafetyLimitError(deviceUpdate.Controller) is string safetyLimitError)
-            {
-                return BadRequest(safetyLimitError);
             }
 
             var (_, error) = await EnsureOwnedDeviceAsync(
@@ -176,72 +163,6 @@ namespace api.Controllers.API
 
             await Repo.DeviceConfigControllerUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Controller);
             return true;
-        }
-
-        /// <summary>Roadmap #39/#115: v1 deliberately does not support a schedule window crossing
-        /// local midnight (see api.Models.DeviceConfigController's comment) - Start+Duration must
-        /// fit in one calendar day, and DaysOfWeek must fit the 7-bit mask AgrumyFirmware's
-        /// ActuatorController::scheduleRelayFunction expects (bit 0 = Sunday .. bit 6 = Saturday).
-        /// Every slot in every function's list is checked (no more per-function Enabled gate - a
-        /// slot's presence in the list already means it is active); returns the first failure
-        /// found, or null if every slot is sound. A device-side cap on how many slots actually get
-        /// used (MAX_SCHEDULE_SLOTS_PER_FUNCTION, AgrumyFirmware's RelayLogic.h) is NOT enforced here
-        /// deliberately - a caller sending more than the firmware can hold just gets extras it
-        /// silently ignores, not a hard save-time rejection tied to one particular firmware build.</summary>
-        private static string? ScheduleWindowError(DeviceConfigController? cfg)
-        {
-            if (cfg == null)
-            {
-                return null;
-            }
-
-            (IEnumerable<DeviceScheduleSlot>? Slots, string Label)[] groups =
-            [
-                (cfg.VentilationSchedule, "Ventilation"),
-                (cfg.LightSchedule, "Light"),
-                (cfg.HeatingSchedule, "Heating"),
-                (cfg.WaterPumpSchedule, "Water pump"),
-            ];
-
-            foreach (var (slots, label) in groups)
-            {
-                foreach (var slot in slots ?? [])
-                {
-                    if (slot.DaysOfWeek < 0 || slot.DaysOfWeek > 0b1111111)
-                    {
-                        return $"{label} schedule: days of week must be a value from 0 to 127.";
-                    }
-                    if (slot.Start < 0 || slot.Start > 86399)
-                    {
-                        return $"{label} schedule: start must be between 0 and 86399 seconds since local midnight.";
-                    }
-                    if (slot.Duration < 1 || slot.Start + slot.Duration > 86400)
-                    {
-                        return $"{label} schedule: duration must be at least 1 second and not cross local midnight (start + duration <= 86400).";
-                    }
-                }
-            }
-            return null;
-        }
-
-        /// <summary>Roadmap #36 (A): per-device override version of the same bound
-        /// ServerConfigApiController.Update enforces on the server-wide defaults - see
-        /// api.Utils.SafetyLimitValidation for why the range itself lives there, shared.</summary>
-        private static string? SafetyLimitError(DeviceConfigController? cfg)
-        {
-            if (cfg == null)
-            {
-                return null;
-            }
-            if (!SafetyLimitValidation.IsValid(cfg.WaterPumpMaxRunSeconds))
-            {
-                return $"WaterPump max run time must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.";
-            }
-            if (!SafetyLimitValidation.IsValid(cfg.WaterPumpCooldownSeconds))
-            {
-                return $"WaterPump cooldown must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.";
-            }
-            return null;
         }
 
         /// <summary>
@@ -506,7 +427,22 @@ namespace api.Controllers.API
             }
             if (deviceConfig.DeviceControllerEnabled == true)
             {
-                deviceConfig.DeviceConfigController = await Repo.DeviceConfigControllerGetAsync(device.DeviceConfigControllerID);
+                // Roadmap #21: the relay-pin mapping still comes from the device's own row, but
+                // Rules and the #36 safety limits now come from whichever zone the device is
+                // assigned to - merged into the SAME DeviceConfigController object the firmware
+                // already expects, so it never needs to know two DB tables feed it now. No zone
+                // assigned (DeviceUnitZoneID null/0) means an empty Rules list - every relay
+                // function simply stays off, the same "no rules configured yet" safe default a
+                // brand-new device already got pre-#21.
+                DeviceConfigController? controller = await Repo.DeviceConfigControllerGetAsync(device.DeviceConfigControllerID);
+                if (controller != null && device.DeviceUnitZoneID is int idZone and not 0)
+                {
+                    controller.Rules = await Repo.DeviceUnitZoneRulesGetAsync(idZone);
+                    DeviceUnitZone? zone = await Repo.DeviceUnitZoneGetByIdAsync(idZone);
+                    controller.WaterPumpMaxRunSeconds = zone?.WaterPumpMaxRunSeconds;
+                    controller.WaterPumpCooldownSeconds = zone?.WaterPumpCooldownSeconds;
+                }
+                deviceConfig.DeviceConfigController = controller;
             }
 
             return deviceConfig;

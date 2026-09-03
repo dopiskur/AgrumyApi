@@ -157,6 +157,20 @@ namespace api.Dal.Interface
         [Delete("/api/DeviceUnit/Zone")]
         Task DeviceUnitZoneDelete(int? idDeviceUnitZone);
 
+        [Get("/api/DeviceUnit/ZoneById")]
+        Task<DeviceUnitZone> DeviceUnitZoneGetById(int? idDeviceUnitZone);
+
+        // ---- Zone rules (roadmap #21) ---------------------------------------
+
+        [Get("/api/DeviceUnit/Zone/Rule")]
+        Task<IList<DeviceUnitZoneRule>> DeviceUnitZoneRulesGet(int? idDeviceUnitZone);
+
+        [Post("/api/DeviceUnit/Zone/Rule")]
+        Task<int> DeviceUnitZoneRuleAdd([Body] DeviceUnitZoneRule rule);
+
+        [Delete("/api/DeviceUnit/Zone/Rule")]
+        Task DeviceUnitZoneRuleDelete(int? idDeviceUnitZoneRule);
+
         [Get("/api/DeviceUnit/Unassigned")]
         Task<IList<Device>> DeviceUnassignedGet(bool controllerCapable);
 

@@ -20,6 +20,23 @@ namespace api.Dal.Entities
         public int? TenantID { get; set; }
         public int DeviceUnitID { get; set; }
         public string? DeviceUnitZoneName { get; set; }
+
+        // Roadmap #21/#36 - see api.Models.DeviceUnitZone's own copy of these for the full explanation.
+        public int? WaterPumpMaxRunSeconds { get; set; }
+        public int? WaterPumpCooldownSeconds { get; set; }
+    }
+
+    /// <summary>Roadmap #21 - see api.Models.DeviceUnitZoneRule for the full explanation.
+    /// ConditionConfig is stored as plain text (JSON), matching AgrumyDbContext's provider-neutral
+    /// "no vendor-specific HasColumnType" principle - (de)serialized at the application layer, not a
+    /// native JSON column type.</summary>
+    public class DeviceUnitZoneRuleRow
+    {
+        public int IDDeviceUnitZoneRule { get; set; }
+        public int DeviceUnitZoneID { get; set; }
+        public int RelayFunction { get; set; }
+        public int ConditionType { get; set; }
+        public string ConditionConfig { get; set; } = "{}";
     }
 
     public class DeviceTypeRow

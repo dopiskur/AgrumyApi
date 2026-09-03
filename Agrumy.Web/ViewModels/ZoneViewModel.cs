@@ -10,5 +10,11 @@ namespace api.ViewModels
         public required DeviceUnitZoneDashboard Dashboard { get; init; }
         public IList<DeviceFleetStatus> Fleet { get; init; } = [];
         public string DisplayTimeZone { get; init; } = "UTC";
+
+        // Roadmap #21: the raw zone entity (WaterPumpMaxRunSeconds/CooldownSeconds) and its rules -
+        // null/empty when the zone has no controller-capable device assigned, since the automation
+        // section is not shown at all in that case (see Zone.cshtml).
+        public DeviceUnitZone? Zone { get; init; }
+        public IList<DeviceUnitZoneRule> Rules { get; init; } = [];
     }
 }

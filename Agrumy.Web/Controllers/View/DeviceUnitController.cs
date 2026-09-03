@@ -70,11 +70,25 @@ namespace api.Controllers.View
                 }
             }
 
+            // Roadmap #21: the automation-rules section only appears when the zone has a
+            // controller-capable device assigned (existing #82 rule (a)/(b) convention, same test
+            // Zone.cshtml already uses) - skip both calls otherwise, nothing to show.
+            bool hasController = dashboard.Devices.Any(d => d.DeviceControllerEnabled == true);
+            DeviceUnitZone? zone = null;
+            IList<DeviceUnitZoneRule> rules = [];
+            if (hasController)
+            {
+                zone = await api.DeviceUnitZoneGetById(idDeviceUnitZone);
+                rules = await api.DeviceUnitZoneRulesGet(idDeviceUnitZone);
+            }
+
             return new ZoneViewModel
             {
                 Dashboard = dashboard,
                 Fleet = fleet,
                 DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone,
+                Zone = zone,
+                Rules = rules,
             };
         }
 
@@ -131,13 +145,86 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Zones), new { idDeviceUnit });
         }
 
-        /// <summary>Roadmap #116 rule (2): lightweight inline rename, no separate page.</summary>
+        /// <summary>Roadmap #116 rule (2): lightweight inline rename, no separate page.
+        /// Roadmap #21: fetch-then-patch, not a bare partial DTO - DeviceUnitZoneUpdateAsync
+        /// overwrites every field unconditionally (it does not merge), so posting just the name
+        /// would silently blank WaterPumpMaxRunSeconds/CooldownSeconds back to null on every rename.</summary>
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> ZoneRename(int idDeviceUnitZone, string deviceUnitZoneName)
         {
-            await api.DeviceUnitZoneUpdate(new DeviceUnitZone { IDDeviceUnitZone = idDeviceUnitZone, DeviceUnitZoneName = deviceUnitZoneName });
+            DeviceUnitZone zone = await api.DeviceUnitZoneGetById(idDeviceUnitZone);
+            zone.DeviceUnitZoneName = deviceUnitZoneName;
+            await api.DeviceUnitZoneUpdate(zone);
+            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+        }
+
+        // ---- Automation rules (roadmap #21) --------------------------------------
+
+        /// <summary>Same fetch-then-patch reasoning as ZoneRename above.</summary>
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> SafetyLimitsUpdate(int idDeviceUnitZone, int? waterPumpMaxRunSeconds, int? waterPumpCooldownSeconds)
+        {
+            DeviceUnitZone zone = await api.DeviceUnitZoneGetById(idDeviceUnitZone);
+            zone.WaterPumpMaxRunSeconds = waterPumpMaxRunSeconds;
+            zone.WaterPumpCooldownSeconds = waterPumpCooldownSeconds;
+            try
+            {
+                await api.DeviceUnitZoneUpdate(zone);
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+        }
+
+        /// <summary>One ConditionType's worth of fields arrives per form (the Zone page renders a
+        /// separate small "Add Threshold/Interval/Schedule rule" form per function, not one
+        /// dynamic JS-driven form) - only the fields matching conditionType are meaningful, same
+        /// convention as the Rule wire shape itself. ConditionConfig is built HERE, server-side,
+        /// using ConditionConfigJson.Options - never the options-less JsonSerializer overloads,
+        /// which would leak PascalCase onto the wire (caught by a contract test while building this
+        /// feature, see api.Models.ConditionConfigJson's own remarks).</summary>
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> RuleAdd(int idDeviceUnitZone, RelayFunction relayFunction, ConditionType conditionType,
+            double? threshold, double? hysteresis, int? interval, int? intervalLength, int? daysOfWeek, int? start, int? duration)
+        {
+            System.Text.Json.Nodes.JsonNode? config = conditionType switch
+            {
+                ConditionType.Threshold => System.Text.Json.JsonSerializer.SerializeToNode(new ThresholdConditionConfig(threshold ?? 0, hysteresis ?? 0), ConditionConfigJson.Options),
+                ConditionType.Interval => System.Text.Json.JsonSerializer.SerializeToNode(new IntervalConditionConfig(interval ?? 0, intervalLength ?? 0), ConditionConfigJson.Options),
+                ConditionType.Schedule => System.Text.Json.JsonSerializer.SerializeToNode(new ScheduleConditionConfig(daysOfWeek ?? 0, start ?? 0, duration ?? 0), ConditionConfigJson.Options),
+                _ => null,
+            };
+            try
+            {
+                await api.DeviceUnitZoneRuleAdd(new DeviceUnitZoneRule
+                {
+                    DeviceUnitZoneID = idDeviceUnitZone,
+                    RelayFunction = relayFunction,
+                    ConditionType = conditionType,
+                    ConditionConfig = config,
+                });
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> RuleDelete(int idDeviceUnitZoneRule, int idDeviceUnitZone)
+        {
+            await api.DeviceUnitZoneRuleDelete(idDeviceUnitZoneRule);
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
         }
 

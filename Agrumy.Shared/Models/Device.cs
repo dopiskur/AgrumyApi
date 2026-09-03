@@ -254,76 +254,31 @@ namespace api.Models
 
     }
 
+    /// <summary>Roadmap #21: what's LEFT of this per-DEVICE model after threshold/hysteresis/
+    /// interval/schedule/#36-safety-limits all moved to the ZONE (see DeviceUnitZone/
+    /// DeviceUnitZoneRule) - just the relay-pin mapping, which stays device-side because it is a
+    /// physical/hardware fact about THIS controller, not a rule. Rules/WaterPumpMaxRunSeconds/
+    /// WaterPumpCooldownSeconds below are populated from the device's ASSIGNED ZONE, not from this
+    /// row, when DeviceApiController builds a config-poll response - see BuildDeviceConfigAsync.
+    /// This is still the one JSON object the firmware receives either way; it does not need to know
+    /// two different DB tables feed it now.</summary>
     public class DeviceConfigController()
     {
-        // Sensor values
         [HiddenInput(DisplayValue = true)]
         public int? IDDeviceConfigController { get; set; }
-        public double? TempLow { get; set; }
-        public double? TempHigh { get; set; }
-        public double? HumidLow { get; set; }
-        public double? HumidHigh { get; set; }
-        public double? MoistLow { get; set; }
-        public double? MoistHigh { get; set; }
-        public double? LightLow { get; set; }
-        public double? LightHigh { get; set; }
-        public double? WaterLow { get; set; }
-        public double? WaterHigh { get; set; }
 
-        // Hysteresis (dead zone) margins for the threshold-based relay logic - prevents
-        // chattering when a sensor value sits right at its threshold. Seeded from ServerConfig's
-        // matching fields when the device is created; editable per device from here on.
-        public double? WaterLevelHysteresis { get; set; }
-        public double? TemperatureHysteresis { get; set; }
-        public double? HumidityHysteresis { get; set; }
-        public double? LightHysteresis { get; set; }
+        // Roadmap #21: the zone's rules for whichever RelayFunction(s) this device's Relay1-8
+        // mapping below actually wires up - empty when the device has no assigned zone (safe
+        // default: no rules means every relay function stays off, same "never a false positive"
+        // principle as the rest of this codebase, not a special case the firmware needs to detect).
+        public IList<DeviceUnitZoneRule> Rules { get; set; } = [];
 
-        // Manual timming
-        public bool? VentilationIntervalEnabled {  get; set; }
-        public int? VentilationInterval {  get; set; }
-        public int? VentilationIntervalLength { get; set; }
-
-        public bool? LightIntervalEnabled { get; set; }
-        public int? LightInterval { get; set; }
-        public int? LightIntervalLength { get; set; }
-
-        public bool? HeatingIntervalEnabled { get; set; }
-        public int? HeatingInterval { get; set; }
-        public int? HeatingIntervalLength { get; set; }
-
-        public bool? WaterPumpIntervalEnabled { get; set; }
-        public int? WaterPumpInterval { get; set; }
-        public int? WaterPumpIntervalLength { get; set; }
-
-        // Roadmap #39/#115: a third relay-control mode alongside threshold (dead-zone) and
-        // interval (duty-cycle) above - "be on during any of these wall-clock windows on these
-        // days", independent of any sensor reading. Each function gets zero or more windows,
-        // OR'd together by the firmware (AgrumyFirmware's RelayLogic::computeAnyScheduleState) -
-        // zero windows means that function never turns on in schedule mode, no separate "enabled"
-        // flag needed (confirmed design, #115). DaysOfWeek is a 7-bit mask matching C's tm_wday
-        // convention (bit 0 = Sunday .. bit 6 = Saturday - see AgrumyFirmware's
-        // ActuatorController::scheduleRelayFunction), so the firmware needs zero day-numbering
-        // translation. Start/Duration are seconds since LOCAL midnight (not UTC) - "local"
-        // resolved via ServerConfig.ScheduleTimeZone and delivered to the device as a plain UTC
-        // offset (DeviceConfig.UtcOffsetSeconds) rather than an IANA id, so the firmware needs no
-        // timezone database, just integer math refreshed every config poll. v1 deliberately does
-        // not support a window crossing local midnight (Start + Duration must stay within the
-        // same calendar day) - see DeviceApiController's validation.
-        public List<DeviceScheduleSlot> VentilationSchedule { get; set; } = [];
-        public List<DeviceScheduleSlot> LightSchedule { get; set; } = [];
-        public List<DeviceScheduleSlot> HeatingSchedule { get; set; } = [];
-        public List<DeviceScheduleSlot> WaterPumpSchedule { get; set; } = [];
-
-        // Roadmap #36: WaterPump-only device-side hard safety limits - independent of whichever
-        // mode (threshold/interval/schedule above) decided the pump should run, applied by the
-        // firmware AFTER that decision (AgrumyFirmware's ActuatorController::
-        // applyWaterPumpSafetyLimits), not instead of it. Null/0 disables either one. Seeded from
-        // ServerConfig's matching defaults when the device is created, same pattern as the
-        // hysteresis fields above - editable per device from here on.
+        // Roadmap #36: copied from the assigned zone's own fields (DeviceUnitZone.WaterPumpMax
+        // RunSeconds/CooldownSeconds) - see that class's remarks for why these are not Rules.
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
 
-        // Relay
+        // Relay-pin mapping - physical/hardware, stays per-device (roadmap #21 explicit decision).
         public bool? RelayEnabled { get; set; }
         public int? Relay1 { get; set; }
         public int? Relay2 { get; set; }

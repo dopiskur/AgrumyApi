@@ -1223,53 +1223,12 @@ public class ApiControllerTests
         Assert.Equal(403, obj.StatusCode);
     }
 
-    // ---- DeviceApiController.DeviceConfigControllerUpdate - roadmap #39/#115 schedule validation ----
+    // ---- DeviceApiController.DeviceConfigControllerUpdate - roadmap #21: relay-pin mapping only,
+    // no more schedule/safety-limit validation here (moved to DeviceUnitApiController's Zone/Rule
+    // endpoints and DeviceUnitZoneUpdate - see RelationalIntegrationTests.cs for those) -----------
 
     [Fact]
-    public async Task DeviceConfigControllerUpdate_ScheduleCrossesMidnight_Returns400_AndNeverTouchesRepo()
-    {
-        var controller = NewDeviceController();
-        SetCaller(controller, "admin", 0);
-
-        var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
-        {
-            Device = new Device { IDDevice = 8 },
-            Controller = new DeviceConfigController
-            {
-                VentilationSchedule =
-                [
-                    new DeviceScheduleSlot { DaysOfWeek = 0b1111111, Start = 86000, Duration = 1000 }, // 86000 + 1000 > 86400 - crosses local midnight
-                ],
-            },
-        });
-
-        Assert.IsType<BadRequestObjectResult>(result.Result);
-        // MockBehavior.Strict: DeviceGetByIdAsync has no setup, so reaching this point already
-        // proves validation ran BEFORE the ownership lookup/DB write, not after.
-    }
-
-    [Fact]
-    public async Task DeviceConfigControllerUpdate_EmptyScheduleList_SkipsValidation()
-    {
-        // Roadmap #115: no separate "enabled" flag any more - an empty list is simply nothing to
-        // validate (equivalent to the old "disabled" case), not a call that must fail.
-        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 0 });
-        _repo.Setup(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>())).Returns(Task.CompletedTask);
-
-        var controller = NewDeviceController();
-        SetCaller(controller, "admin", 0);
-
-        var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
-        {
-            Device = new Device { IDDevice = 8 },
-            Controller = new DeviceConfigController { VentilationSchedule = [] },
-        });
-
-        Assert.True(result.Value);
-    }
-
-    [Fact]
-    public async Task DeviceConfigControllerUpdate_ValidMultiSlotSchedule_Persists()
+    public async Task DeviceConfigControllerUpdate_RelayMappingOnly_Persists()
     {
         _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 0 });
         _repo.Setup(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>())).Returns(Task.CompletedTask);
@@ -1280,93 +1239,11 @@ public class ApiControllerTests
         var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
         {
             Device = new Device { IDDevice = 8 },
-            Controller = new DeviceConfigController
-            {
-                LightSchedule =
-                [
-                    new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 21600, Duration = 1800 },  // Mon-Fri 06:00-06:30
-                    new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 50400, Duration = 900 },    // Mon-Fri 14:00-14:15
-                ],
-            },
+            Controller = new DeviceConfigController { RelayEnabled = true, Relay1 = 16 },
         });
 
         Assert.True(result.Value);
         _repo.Verify(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task DeviceConfigControllerUpdate_OneBadSlotAmongManyGood_Returns400()
-    {
-        // A single out-of-range slot must reject the whole save, even with other valid slots
-        // present in the same or a different function's list.
-        var controller = NewDeviceController();
-        SetCaller(controller, "admin", 0);
-
-        var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
-        {
-            Device = new Device { IDDevice = 8 },
-            Controller = new DeviceConfigController
-            {
-                VentilationSchedule = [new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 21600, Duration = 1800 }],
-                WaterPumpSchedule = [new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 0, Duration = 0 }], // duration < 1
-            },
-        });
-
-        Assert.IsType<BadRequestObjectResult>(result.Result);
-    }
-
-    // ---- DeviceApiController.DeviceConfigControllerUpdate - roadmap #36 safety-limit validation --
-
-    [Fact]
-    public async Task DeviceConfigControllerUpdate_WaterPumpMaxRunSecondsNegative_Returns400_AndNeverTouchesRepo()
-    {
-        var controller = NewDeviceController();
-        SetCaller(controller, "admin", 0);
-
-        var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
-        {
-            Device = new Device { IDDevice = 8 },
-            Controller = new DeviceConfigController { WaterPumpMaxRunSeconds = -1 },
-        });
-
-        Assert.IsType<BadRequestObjectResult>(result.Result);
-        // MockBehavior.Strict: DeviceGetByIdAsync has no setup, so reaching this point already
-        // proves validation ran before the ownership lookup/DB write, same as the schedule checks above.
-    }
-
-    [Fact]
-    public async Task DeviceConfigControllerUpdate_WaterPumpCooldownSecondsTooLarge_Returns400()
-    {
-        var controller = NewDeviceController();
-        SetCaller(controller, "admin", 0);
-
-        var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
-        {
-            Device = new Device { IDDevice = 8 },
-            Controller = new DeviceConfigController { WaterPumpCooldownSeconds = 86401 }, // > 24h
-        });
-
-        Assert.IsType<BadRequestObjectResult>(result.Result);
-    }
-
-    [Fact]
-    public async Task DeviceConfigControllerUpdate_WaterPumpLimitsNullOrZero_SkipsValidation()
-    {
-        // Null/0 is "disabled", a real intentional state (api.Models.DeviceConfigController's
-        // comment) - must not be rejected the way an actually-out-of-range value is.
-        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 0 });
-        _repo.Setup(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>())).Returns(Task.CompletedTask);
-
-        var controller = NewDeviceController();
-        SetCaller(controller, "admin", 0);
-
-        var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
-        {
-            Device = new Device { IDDevice = 8 },
-            Controller = new DeviceConfigController { WaterPumpMaxRunSeconds = 0, WaterPumpCooldownSeconds = null },
-        });
-
-        Assert.True(result.Value);
     }
 
     // ---- ServerConfigApiController.Update - roadmap #39 ScheduleTimeZone validation -------------

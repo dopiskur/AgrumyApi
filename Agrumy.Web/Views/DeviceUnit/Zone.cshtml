@@ -87,6 +87,15 @@
     </div>
 </div>
 
+@* Roadmap #21: automation rules ONLY shown when the zone has a controller-capable device
+   assigned - a zone without one has no device to run them, and the roadmap's explicit decision
+   is to omit the section entirely here, not show it disabled/greyed. Outside the live-refreshed
+   #zoneDetails div on purpose - these are edited via full-page form posts, not polled. *@
+@if (hasController)
+{
+    <partial name="_ZoneRules" model="Model" />
+}
+
 @section Scripts {
     <script src="~/js/live-refresh.js"></script>
     <script>

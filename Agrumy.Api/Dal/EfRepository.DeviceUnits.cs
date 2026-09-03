@@ -117,6 +117,10 @@ namespace api.Dal
                 TenantID = zone.TenantID,
                 DeviceUnitID = zone.DeviceUnitID,
                 DeviceUnitZoneName = zone.DeviceUnitZoneName,
+                // Roadmap #21/#36: seeded from AgrumySettings on creation, same pattern the pre-#21
+                // per-device seeding used - editable per zone from here on.
+                WaterPumpMaxRunSeconds = settings.WaterPumpMaxRunSeconds,
+                WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds,
             };
             db.DeviceUnitZones.Add(row);
             await db.SaveChangesAsync();
@@ -133,7 +137,24 @@ namespace api.Dal
             // TenantID/DeviceUnitID intentionally not overwritten - renaming a zone must not
             // silently move it to another unit or tenant.
             row.DeviceUnitZoneName = zone.DeviceUnitZoneName;
+            row.WaterPumpMaxRunSeconds = zone.WaterPumpMaxRunSeconds;
+            row.WaterPumpCooldownSeconds = zone.WaterPumpCooldownSeconds;
             await db.SaveChangesAsync();
+            // Roadmap #21: safety limits are part of what a device reads from its zone on config
+            // poll (BuildDeviceConfigAsync) - same "config changed, bump so the next poll picks it
+            // up" reasoning as every other config write, DeviceAssignToZoneAsync above included.
+            await DeviceUnitZoneConfigVersionBumpAsync(idDeviceUnitZone: row.IDDeviceUnitZone);
+        }
+
+        /// <summary>Roadmap #21: every device currently assigned to this zone (in practice at most
+        /// one controller, #82 rule (a), but sensor-only devices in the same zone are bumped too -
+        /// harmless extra poll, simpler than resolving "the" controller specifically) gets its
+        /// ConfigVersion bumped, so the next config poll picks up a zone-level rule/safety-limit
+        /// change. Bulk update, not a fetch-then-loop.</summary>
+        public async Task DeviceUnitZoneConfigVersionBumpAsync(int idDeviceUnitZone)
+        {
+            await db.Devices.Where(d => d.DeviceUnitZoneID == idDeviceUnitZone)
+                .ExecuteUpdateAsync(s => s.SetProperty(d => d.ConfigVersion, d => (d.ConfigVersion ?? 0) + 1));
         }
 
         public async Task DeviceUnitZoneDeleteAsync(int idDeviceUnitZone)
@@ -148,8 +169,66 @@ namespace api.Dal
                 await DeviceUnassignFromZoneAsync(deviceId);
             }
 
+            // Roadmap #21: app-level cleanup, not a DB-level CASCADE (this codebase's own
+            // convention - see AgrumyDbContext's DeviceUnitZoneRuleRow config, DeleteBehavior.NoAction).
+            await db.DeviceUnitZoneRules.Where(r => r.DeviceUnitZoneID == idDeviceUnitZone).ExecuteDeleteAsync();
+
             await db.DeviceUnitZones.Where(z => z.IDDeviceUnitZone == idDeviceUnitZone).ExecuteDeleteAsync();
         }
+
+        // ---- roadmap #21: zone rules ---------------------------------------------------------
+
+        public async Task<IList<DeviceUnitZoneRule>> DeviceUnitZoneRulesGetAsync(int idDeviceUnitZone)
+        {
+            var rows = await db.DeviceUnitZoneRules.AsNoTracking()
+                .Where(r => r.DeviceUnitZoneID == idDeviceUnitZone)
+                .OrderBy(r => r.RelayFunction).ThenBy(r => r.IDDeviceUnitZoneRule)
+                .ToListAsync();
+            return rows.Select(ToDtoRule).ToList();
+        }
+
+        public async Task<DeviceUnitZoneRule?> DeviceUnitZoneRuleGetByIdAsync(int? idDeviceUnitZoneRule)
+        {
+            var row = await db.DeviceUnitZoneRules.AsNoTracking().FirstOrDefaultAsync(r => r.IDDeviceUnitZoneRule == idDeviceUnitZoneRule);
+            return row == null ? null : ToDtoRule(row);
+        }
+
+        public async Task<int> DeviceUnitZoneRuleAddAsync(DeviceUnitZoneRule rule)
+        {
+            var row = new DeviceUnitZoneRuleRow
+            {
+                DeviceUnitZoneID = rule.DeviceUnitZoneID,
+                RelayFunction = (int)rule.RelayFunction,
+                ConditionType = (int)rule.ConditionType,
+                ConditionConfig = rule.ConditionConfig?.ToJsonString() ?? "{}",
+            };
+            db.DeviceUnitZoneRules.Add(row);
+            await db.SaveChangesAsync();
+            await DeviceUnitZoneConfigVersionBumpAsync(rule.DeviceUnitZoneID);
+            return row.IDDeviceUnitZoneRule;
+        }
+
+        public async Task DeviceUnitZoneRuleDeleteAsync(int idDeviceUnitZoneRule)
+        {
+            int idZone = await db.DeviceUnitZoneRules.AsNoTracking()
+                .Where(r => r.IDDeviceUnitZoneRule == idDeviceUnitZoneRule)
+                .Select(r => r.DeviceUnitZoneID)
+                .FirstOrDefaultAsync();
+            await db.DeviceUnitZoneRules.Where(r => r.IDDeviceUnitZoneRule == idDeviceUnitZoneRule).ExecuteDeleteAsync();
+            if (idZone != 0)
+            {
+                await DeviceUnitZoneConfigVersionBumpAsync(idZone);
+            }
+        }
+
+        private static DeviceUnitZoneRule ToDtoRule(DeviceUnitZoneRuleRow r) => new()
+        {
+            IDDeviceUnitZoneRule = r.IDDeviceUnitZoneRule,
+            DeviceUnitZoneID = r.DeviceUnitZoneID,
+            RelayFunction = (RelayFunction)r.RelayFunction,
+            ConditionType = (ConditionType)r.ConditionType,
+            ConditionConfig = System.Text.Json.Nodes.JsonNode.Parse(r.ConditionConfig),
+        };
 
         public async Task<bool> DeviceUnitZoneHasControllerAsync(int idDeviceUnitZone)
         {
@@ -478,6 +557,8 @@ namespace api.Dal
             TenantID = z.TenantID,
             DeviceUnitID = z.DeviceUnitID,
             DeviceUnitZoneName = z.DeviceUnitZoneName,
+            WaterPumpMaxRunSeconds = z.WaterPumpMaxRunSeconds,
+            WaterPumpCooldownSeconds = z.WaterPumpCooldownSeconds,
         };
     }
 }

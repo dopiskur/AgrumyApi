@@ -149,15 +149,28 @@ public class ContractTests
     [Theory]
     [InlineData("config.response.schema.json")]
     [InlineData("register.response.schema.json")]
-    public void DeviceConfig_WithScheduleSlots_MatchesResponseSchema(string schema)
+    public void DeviceConfig_WithZoneRules_MatchesResponseSchema(string schema)
     {
-        // Roadmap #115: exercises the deviceScheduleSlot definition itself, not just the "always
-        // empty array" default every other test here happens to send.
+        // Roadmap #21: exercises all three deviceUnitZoneRule/conditionConfig definitions, not just
+        // the "always empty rules array" default every other test here happens to send.
         var cfg = FullConfig();
-        cfg.DeviceConfigController!.VentilationSchedule =
+        cfg.DeviceConfigController!.Rules =
         [
-            new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 21600, Duration = 1800 },  // Mon-Fri 06:00-06:30
-            new DeviceScheduleSlot { DaysOfWeek = 0b0111110, Start = 50400, Duration = 900 },    // Mon-Fri 14:00-14:15
+            new DeviceUnitZoneRule
+            {
+                IDDeviceUnitZoneRule = 1, RelayFunction = RelayFunction.WaterPump, ConditionType = ConditionType.Threshold,
+                ConditionConfig = JsonSerializer.SerializeToNode(new ThresholdConditionConfig(10, 5), ConditionConfigJson.Options),
+            },
+            new DeviceUnitZoneRule
+            {
+                IDDeviceUnitZoneRule = 2, RelayFunction = RelayFunction.Heating, ConditionType = ConditionType.Interval,
+                ConditionConfig = JsonSerializer.SerializeToNode(new IntervalConditionConfig(3600, 300), ConditionConfigJson.Options),
+            },
+            new DeviceUnitZoneRule
+            {
+                IDDeviceUnitZoneRule = 3, RelayFunction = RelayFunction.Light, ConditionType = ConditionType.Schedule,
+                ConditionConfig = JsonSerializer.SerializeToNode(new ScheduleConditionConfig(0b0111110, 21600, 1800), ConditionConfigJson.Options), // Mon-Fri 06:00-06:30
+            },
         ];
 
         AssertValid(schema, JsonSerializer.Serialize(cfg, Mvc));

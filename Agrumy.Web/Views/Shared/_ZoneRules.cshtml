@@ -1,0 +1,153 @@
+@using System.Text.Json
+@model api.ViewModels.ZoneViewModel
+@{
+    var rulesByFunction = Model.Rules.GroupBy(r => r.RelayFunction).ToDictionary(g => g.Key, g => g.ToList());
+    (RelayFunction Value, string Label)[] functions =
+    [
+        (RelayFunction.Ventilation, "Ventilation"),
+        (RelayFunction.Light, "Light"),
+        (RelayFunction.Heating, "Heating"),
+        (RelayFunction.WaterPump, "Water pump"),
+    ];
+
+    // Roadmap #21: read-only summary line per rule - the actual authoritative shape lives in
+    // ConditionConfig (JSON), this just renders it human-readably. Deserialize with
+    // ConditionConfigJson.Options (case-insensitive/camelCase) - the options-less overload would
+    // fail to bind against the camelCase JSON this same page's Add forms produce.
+    string Summarize(DeviceUnitZoneRule rule)
+    {
+        switch (rule.ConditionType)
+        {
+            case ConditionType.Threshold:
+                var t = rule.ConditionConfig?.Deserialize<ThresholdConditionConfig>(ConditionConfigJson.Options);
+                return $"threshold {t?.Threshold:0.##}, hysteresis {t?.Hysteresis:0.##}";
+            case ConditionType.Interval:
+                var iv = rule.ConditionConfig?.Deserialize<IntervalConditionConfig>(ConditionConfigJson.Options);
+                return $"on {iv?.IntervalLength}s out of every {iv?.Interval}s";
+            case ConditionType.Schedule:
+                var s = rule.ConditionConfig?.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options);
+                int start = s?.Start ?? 0, end = start + (s?.Duration ?? 0);
+                return $"{start / 3600:00}:{start % 3600 / 60:00}-{end / 3600:00}:{end % 3600 / 60:00}, days 0b{Convert.ToString(s?.DaysOfWeek ?? 0, 2).PadLeft(7, '0')}";
+            default:
+                return "?";
+        }
+    }
+}
+
+<div class="card mb-3">
+    <div class="card-header">
+        <h3 class="card-title">Automation rules</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-secondary small">
+            Roadmap #21: a function may have several rules - any rule that evaluates "on" wins (OR).
+            Threshold's metric/direction (which sensor, which side of the threshold turns it on) is
+            fixed per function - see AgrumyFirmware's ActuatorController::evaluateRule.
+        </p>
+
+        @foreach (var (function, label) in functions)
+        {
+            var rules = rulesByFunction.GetValueOrDefault(function, []);
+            <div class="mb-4">
+                <h6 class="fw-semibold">@label</h6>
+                @if (rules.Count == 0)
+                {
+                    <p class="text-secondary small mb-2">No rules - this function never turns on.</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush mb-2">
+                        @foreach (var rule in rules)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span><span class="badge text-bg-secondary me-2">@rule.ConditionType</span>@Summarize(rule)</span>
+                                <form asp-action="RuleDelete" method="post" onsubmit="return confirm('Remove this rule?');">
+                                    <input type="hidden" name="idDeviceUnitZoneRule" value="@rule.IDDeviceUnitZoneRule" />
+                                    <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </li>
+                        }
+                    </ul>
+                }
+
+                <div class="d-flex flex-wrap gap-2">
+                    <details class="d-inline-block">
+                        <summary class="btn btn-sm btn-outline-primary" style="cursor:pointer;">+ Threshold rule</summary>
+                        <form asp-action="RuleAdd" method="post" class="d-flex flex-wrap align-items-end gap-2 mt-2">
+                            <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
+                            <input type="hidden" name="relayFunction" value="@((int)function)" />
+                            <input type="hidden" name="conditionType" value="@((int)ConditionType.Threshold)" />
+                            <div>
+                                <label class="form-label small mb-0">Threshold</label>
+                                <input type="number" step="any" name="threshold" class="form-control form-control-sm" style="width:8rem" required />
+                            </div>
+                            <div>
+                                <label class="form-label small mb-0">Hysteresis</label>
+                                <input type="number" step="any" min="0" name="hysteresis" class="form-control form-control-sm" style="width:8rem" required />
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                        </form>
+                    </details>
+                    <details class="d-inline-block">
+                        <summary class="btn btn-sm btn-outline-primary" style="cursor:pointer;">+ Interval rule</summary>
+                        <form asp-action="RuleAdd" method="post" class="d-flex flex-wrap align-items-end gap-2 mt-2">
+                            <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
+                            <input type="hidden" name="relayFunction" value="@((int)function)" />
+                            <input type="hidden" name="conditionType" value="@((int)ConditionType.Interval)" />
+                            <div>
+                                <label class="form-label small mb-0">Every (s)</label>
+                                <input type="number" min="1" name="interval" class="form-control form-control-sm" style="width:8rem" required />
+                            </div>
+                            <div>
+                                <label class="form-label small mb-0">On for (s)</label>
+                                <input type="number" min="1" name="intervalLength" class="form-control form-control-sm" style="width:8rem" required />
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                        </form>
+                    </details>
+                    <details class="d-inline-block">
+                        <summary class="btn btn-sm btn-outline-primary" style="cursor:pointer;">+ Schedule rule</summary>
+                        <form asp-action="RuleAdd" method="post" class="d-flex flex-wrap align-items-end gap-2 mt-2">
+                            <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
+                            <input type="hidden" name="relayFunction" value="@((int)function)" />
+                            <input type="hidden" name="conditionType" value="@((int)ConditionType.Schedule)" />
+                            <div>
+                                <label class="form-label small mb-0">Days (0-127 mask)</label>
+                                <input type="number" min="0" max="127" name="daysOfWeek" class="form-control form-control-sm" style="width:8rem" required title="7-bit mask, bit 0 = Sunday .. bit 6 = Saturday" />
+                            </div>
+                            <div>
+                                <label class="form-label small mb-0">Start (s since local midnight)</label>
+                                <input type="number" min="0" max="86399" name="start" class="form-control form-control-sm" style="width:10rem" required />
+                            </div>
+                            <div>
+                                <label class="form-label small mb-0">Duration (s)</label>
+                                <input type="number" min="1" name="duration" class="form-control form-control-sm" style="width:8rem" required />
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                        </form>
+                    </details>
+                </div>
+            </div>
+        }
+
+        <hr />
+        <h6 class="fw-semibold">WaterPump safety limits (roadmap #36)</h6>
+        <p class="text-secondary small">
+            A hard ceiling the device enforces AFTER any rule above decides the pump should run,
+            independent of it. 0 disables either one.
+        </p>
+        <form asp-action="SafetyLimitsUpdate" method="post" class="d-flex flex-wrap align-items-end gap-2">
+            <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
+            <div>
+                <label class="form-label small mb-0">Max run seconds</label>
+                <input type="number" min="0" name="waterPumpMaxRunSeconds" class="form-control form-control-sm" style="width:10rem" value="@Model.Zone.WaterPumpMaxRunSeconds" />
+            </div>
+            <div>
+                <label class="form-label small mb-0">Cooldown seconds</label>
+                <input type="number" min="0" name="waterPumpCooldownSeconds" class="form-control form-control-sm" style="width:10rem" value="@Model.Zone.WaterPumpCooldownSeconds" />
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">Save</button>
+        </form>
+    </div>
+</div>

@@ -96,5 +96,25 @@ namespace api.Dal.Interface
         /// <summary>Single-zone detail: roll-up plus the actual device list (#82: "Zona prikazuje i
         /// detalje - kontroler + senzori"). Null if the zone id does not exist.</summary>
         Task<DeviceUnitZoneDashboard?> DeviceUnitZoneDashboardGetAsync(int idDeviceUnitZone);
+
+        // ---- Zone rules (roadmap #21) -------------------------------------------------
+
+        /// <summary>Every rule belonging to this zone, ordered by RelayFunction. Several rows may
+        /// share the same RelayFunction (OR semantics, resolved by whoever evaluates them - the
+        /// firmware for config-poll, nothing server-side needs to combine them).</summary>
+        Task<IList<DeviceUnitZoneRule>> DeviceUnitZoneRulesGetAsync(int idDeviceUnitZone);
+
+        /// <summary>Single rule by id (no tenant filter) - for ownership checks before an authorized
+        /// write (resolve its DeviceUnitZoneID, then check that zone's tenant) - or null if none.</summary>
+        Task<DeviceUnitZoneRule?> DeviceUnitZoneRuleGetByIdAsync(int? idDeviceUnitZoneRule);
+
+        Task<int> DeviceUnitZoneRuleAddAsync(DeviceUnitZoneRule rule);
+
+        /// <summary>A no-op if the id does not exist.</summary>
+        Task DeviceUnitZoneRuleDeleteAsync(int idDeviceUnitZoneRule);
+
+        /// <summary>Bumps ConfigVersion for every device currently assigned to this zone - called
+        /// after any change to the zone's rules or safety limits so the next config poll picks it up.</summary>
+        Task DeviceUnitZoneConfigVersionBumpAsync(int idDeviceUnitZone);
     }
 }

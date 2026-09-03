@@ -5,22 +5,7 @@
     var cfg = Model.DeviceConfigController!;
     string ControllerField(string name) => $"{nameof(Model.DeviceConfigController)}.{name}";
 
-    var ventilationIntervalToggle = new EnabledToggleFieldViewModel { Name = ControllerField(nameof(cfg.VentilationIntervalEnabled)), Label = "Ventilation interval", Value = cfg.VentilationIntervalEnabled };
-    var lightIntervalToggle = new EnabledToggleFieldViewModel { Name = ControllerField(nameof(cfg.LightIntervalEnabled)), Label = "Light interval", Value = cfg.LightIntervalEnabled };
-    var heatingIntervalToggle = new EnabledToggleFieldViewModel { Name = ControllerField(nameof(cfg.HeatingIntervalEnabled)), Label = "Heating interval", Value = cfg.HeatingIntervalEnabled };
-    var waterPumpIntervalToggle = new EnabledToggleFieldViewModel { Name = ControllerField(nameof(cfg.WaterPumpIntervalEnabled)), Label = "Water pump interval", Value = cfg.WaterPumpIntervalEnabled };
     var relayEnabledToggle = new EnabledToggleFieldViewModel { Name = ControllerField(nameof(cfg.RelayEnabled)), Label = "Relay", Value = cfg.RelayEnabled };
-
-    // Roadmap #39/#115: one entry per relay function, each holding that function's current list
-    // of windows - EditController.cshtml only wires the loop, _ScheduleField.cshtml renders it
-    // (rows) and wwwroot/js/schedule-fields.js wires the client-side Add/Remove.
-    var scheduleGroups = new ScheduleFieldViewModel[]
-    {
-        new() { ListFieldName = ControllerField(nameof(cfg.VentilationSchedule)), Label = "Ventilation", Slots = cfg.VentilationSchedule },
-        new() { ListFieldName = ControllerField(nameof(cfg.LightSchedule)), Label = "Light", Slots = cfg.LightSchedule },
-        new() { ListFieldName = ControllerField(nameof(cfg.HeatingSchedule)), Label = "Heating", Slots = cfg.HeatingSchedule },
-        new() { ListFieldName = ControllerField(nameof(cfg.WaterPumpSchedule)), Label = "Water pump", Slots = cfg.WaterPumpSchedule },
-    };
 
     // Same SelectList source for all 8 relay slots - only the bound property and its current
     // value differ, so build the (field name, selected value) pairs once and loop below.
@@ -31,37 +16,6 @@
         (nameof(cfg.Relay5), cfg.Relay5), (nameof(cfg.Relay6), cfg.Relay6),
         (nameof(cfg.Relay7), cfg.Relay7), (nameof(cfg.Relay8), cfg.Relay8),
     };
-
-    // Roadmap #89: fixed granularity set for the interval "how often" period - the value stored
-    // and sent to the device is still plain seconds (#85's epoch-modulo formula on the device
-    // doesn't care what produced it, contract unchanged), only this dropdown's option list is new.
-    // 1min/5min dropped when the device deep-sleeps (#26): fine-grained scheduling contradicts a
-    // device that sleeps between cycles specifically to save battery.
-    var intervalGranularities = new (string Label, int Seconds)[]
-    {
-        ("1 min", 60), ("5 min", 300), ("15 min", 900), ("30 min", 1800), ("60 min", 3600),
-        ("2 h", 7200), ("3 h", 10800), ("4 h", 14400), ("6 h", 21600), ("8 h", 28800),
-        ("12 h", 43200), ("24 h", 86400),
-    };
-    bool sleepDeep = Model.Device?.SleepDeepEnabled == true;
-    var allowedGranularities = sleepDeep
-        ? intervalGranularities.Where(g => g.Seconds > 300)
-        : intervalGranularities;
-
-    SelectFieldViewModel IntervalGranularitySelect(string fieldName, int? currentValue)
-    {
-        var items = allowedGranularities
-            .Select(g => new SelectListItem(g.Label, g.Seconds.ToString(), currentValue == g.Seconds))
-            .ToList();
-        // A value that predates this dropdown (or came from some other source) won't match any
-        // fixed option - keep it selectable instead of silently swapping it for the top option
-        // the moment this form is saved.
-        if (currentValue.HasValue && !allowedGranularities.Any(g => g.Seconds == currentValue))
-        {
-            items.Insert(0, new SelectListItem($"{currentValue} s (current)", currentValue.ToString(), true));
-        }
-        return new SelectFieldViewModel { Name = ControllerField(fieldName), Label = fieldName, Items = items };
-    }
 }
 
 <div class="card">
@@ -69,6 +23,15 @@
         <h3 class="card-title">Edit Controller - @Html.DisplayFor(model => model.Device!.DeviceName)</h3>
     </div>
     <div class="card-body">
+        @* Roadmap #21: threshold/interval/schedule/hysteresis/safety-limit tabs moved to the
+           device's assigned zone (Zone page, only shown there when the zone HAS a controller
+           assigned) - relay-pin mapping below is the only thing left here, a physical/hardware
+           fact about this device, not a rule. *@
+        <p class="text-secondary small">
+            Automation rules (thresholds, intervals, schedules, WaterPump safety limits) now live on
+            this device's assigned zone - see the
+            <a asp-controller="DeviceUnit" asp-action="Zone" asp-route-idDeviceUnitZone="@Model.Device?.DeviceUnitZoneID">Zone page</a>.
+        </p>
         <form asp-action="EditController">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             @* Roadmap #78: identity, not editable data - EfRepository.DeviceConfigControllerUpdateAsync
@@ -81,194 +44,18 @@
                 @Html.HiddenFor(m => m.Device!.IDDevice)
             </div>
 
-            <ul class="nav nav-tabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-relays" type="button" role="tab">Relays</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-thresholds" type="button" role="tab">Thresholds</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-intervals" type="button" role="tab">Intervals</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-schedules" type="button" role="tab">Schedules</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-hysteresis" type="button" role="tab">Hysteresis</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-safety-limits" type="button" role="tab">Safety Limits</button>
-                </li>
-            </ul>
-            <div class="tab-content border border-top-0 rounded-bottom p-3 mb-3">
-                <div class="tab-pane fade show active" id="tab-relays" role="tabpanel">
-                    <partial name="_EnabledToggleField" model="relayEnabledToggle" />
+            <partial name="_EnabledToggleField" model="relayEnabledToggle" />
 
-                    @foreach (var slot in relaySlots)
-                    {
-                        var selectModel = new SelectFieldViewModel
-                        {
-                            Name = ControllerField(slot.Name),
-                            Label = slot.Name,
-                            Items = new SelectList(Model.DeviceTypeRelay, nameof(DeviceTypeRelay.IDDeviceTypeRelay), nameof(DeviceTypeRelay.RelayName), slot.Selected),
-                        };
-                        <partial name="_SelectField" model="selectModel" />
-                    }
-                </div>
-
-                <div class="tab-pane fade" id="tab-thresholds" role="tabpanel">
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.TempLow" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.TempLow" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.TempLow" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.TempHigh" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.TempHigh" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.TempHigh" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.HumidLow" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.HumidLow" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.HumidLow" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.HumidHigh" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.HumidHigh" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.HumidHigh" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.MoistLow" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.MoistLow" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.MoistLow" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.MoistHigh" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.MoistHigh" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.MoistHigh" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.LightLow" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.LightLow" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.LightLow" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.LightHigh" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.LightHigh" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.LightHigh" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.WaterLow" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.WaterLow" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.WaterLow" class="text-danger"></span>
-                    </div>
-                    <div class="mb-0">
-                        <label asp-for="DeviceConfigController.WaterHigh" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.WaterHigh" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.WaterHigh" class="text-danger"></span>
-                    </div>
-                </div>
-
-                <div class="tab-pane fade" id="tab-intervals" role="tabpanel">
-                    @if (sleepDeep)
-                    {
-                        <p class="text-muted small">This device deep-sleeps between cycles - 1 min / 5 min periods are hidden below (roadmap #26/#85).</p>
-                    }
-                    <partial name="_EnabledToggleField" model="ventilationIntervalToggle" />
-                    <partial name="_SelectField" model="IntervalGranularitySelect(nameof(cfg.VentilationInterval), cfg.VentilationInterval)" />
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.VentilationIntervalLength" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.VentilationIntervalLength" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.VentilationIntervalLength" class="text-danger"></span>
-                    </div>
-
-                    <partial name="_EnabledToggleField" model="lightIntervalToggle" />
-                    <partial name="_SelectField" model="IntervalGranularitySelect(nameof(cfg.LightInterval), cfg.LightInterval)" />
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.LightIntervalLength" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.LightIntervalLength" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.LightIntervalLength" class="text-danger"></span>
-                    </div>
-
-                    <partial name="_EnabledToggleField" model="heatingIntervalToggle" />
-                    <partial name="_SelectField" model="IntervalGranularitySelect(nameof(cfg.HeatingInterval), cfg.HeatingInterval)" />
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.HeatingIntervalLength" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.HeatingIntervalLength" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.HeatingIntervalLength" class="text-danger"></span>
-                    </div>
-
-                    <partial name="_EnabledToggleField" model="waterPumpIntervalToggle" />
-                    <partial name="_SelectField" model="IntervalGranularitySelect(nameof(cfg.WaterPumpInterval), cfg.WaterPumpInterval)" />
-                    <div class="mb-0">
-                        <label asp-for="DeviceConfigController.WaterPumpIntervalLength" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.WaterPumpIntervalLength" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.WaterPumpIntervalLength" class="text-danger"></span>
-                    </div>
-                </div>
-
-                <div class="tab-pane fade" id="tab-schedules" role="tabpanel">
-                    @* Roadmap #39: a third relay-control mode alongside Thresholds and Intervals
-                       above - "be on during this wall-clock window on these days", evaluated in
-                       ServerConfig.ScheduleTimeZone (see Server Settings), independent of any
-                       sensor reading. If more than one mode is enabled for the same relay function,
-                       whichever runs last in ControllerController::initController wins for that
-                       tick - same "last write wins" behavior Thresholds/Intervals already have
-                       between each other, not something new #39 introduces. *@
-                    @foreach (var group in scheduleGroups)
-                    {
-                        <partial name="_ScheduleField" model="group" />
-                        @if (group != scheduleGroups[^1])
-                        {
-                            <hr />
-                        }
-                    }
-                </div>
-
-                <div class="tab-pane fade" id="tab-hysteresis" role="tabpanel">
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.WaterLevelHysteresis" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.WaterLevelHysteresis" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.WaterLevelHysteresis" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.TemperatureHysteresis" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.TemperatureHysteresis" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.TemperatureHysteresis" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.HumidityHysteresis" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.HumidityHysteresis" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.HumidityHysteresis" class="text-danger"></span>
-                    </div>
-                    <div class="mb-0">
-                        <label asp-for="DeviceConfigController.LightHysteresis" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.LightHysteresis" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.LightHysteresis" class="text-danger"></span>
-                    </div>
-                </div>
-
-                <div class="tab-pane fade" id="tab-safety-limits" role="tabpanel">
-                    <p class="text-secondary">
-                        Water pump only (roadmap #36) - a hard ceiling the device enforces AFTER
-                        whichever mode above (Thresholds/Intervals/Schedules) decides the pump
-                        should run, independent of it. 0 disables either one. Seeded from the
-                        <a asp-controller="ServerConfig" asp-action="Index">Server Settings</a>
-                        defaults when this device was created; editable per device from here on.
-                    </p>
-                    <div class="mb-3">
-                        <label asp-for="DeviceConfigController.WaterPumpMaxRunSeconds" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.WaterPumpMaxRunSeconds" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.WaterPumpMaxRunSeconds" class="text-danger"></span>
-                    </div>
-                    <div class="mb-0">
-                        <label asp-for="DeviceConfigController.WaterPumpCooldownSeconds" class="form-label"></label>
-                        <input asp-for="DeviceConfigController.WaterPumpCooldownSeconds" class="form-control" />
-                        <span asp-validation-for="DeviceConfigController.WaterPumpCooldownSeconds" class="text-danger"></span>
-                    </div>
-                </div>
-            </div>
+            @foreach (var slot in relaySlots)
+            {
+                var selectModel = new SelectFieldViewModel
+                {
+                    Name = ControllerField(slot.Name),
+                    Label = slot.Name,
+                    Items = new SelectList(Model.DeviceTypeRelay, nameof(DeviceTypeRelay.IDDeviceTypeRelay), nameof(DeviceTypeRelay.RelayName), slot.Selected),
+                };
+                <partial name="_SelectField" model="selectModel" />
+            }
 
             <div class="mb-0">
                 <input type="submit" value="Save" class="btn btn-primary" />
@@ -277,7 +64,3 @@
         </form>
     </div>
 </div>
-
-@section Scripts {
-    <script src="~/js/schedule-fields.js"></script>
-}

@@ -31,6 +31,7 @@ namespace api.Dal
         public DbSet<DeviceRow> Devices => Set<DeviceRow>();
         public DbSet<DeviceUnitRow> DeviceUnits => Set<DeviceUnitRow>();
         public DbSet<DeviceUnitZoneRow> DeviceUnitZones => Set<DeviceUnitZoneRow>();
+        public DbSet<DeviceUnitZoneRuleRow> DeviceUnitZoneRules => Set<DeviceUnitZoneRuleRow>();
         public DbSet<DeviceTypeRow> DeviceTypes => Set<DeviceTypeRow>();
         public DbSet<DeviceTypeServiceRow> DeviceTypeServices => Set<DeviceTypeServiceRow>();
         public DbSet<DeviceTypeRelayRow> DeviceTypeRelays => Set<DeviceTypeRelayRow>();
@@ -161,6 +162,18 @@ namespace api.Dal
                 e.Property(x => x.IDDeviceUnitZone).ValueGeneratedNever();
                 e.Property(x => x.DeviceUnitZoneName).HasMaxLength(120);
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
+            });
+
+            // Roadmap #21: one rule per row, several rows may share (DeviceUnitZoneID, RelayFunction)
+            // - OR semantics across them, resolved in application code (EfRepository), not here.
+            modelBuilder.Entity<DeviceUnitZoneRuleRow>(e =>
+            {
+                e.ToTable("deviceUnitZoneRule");
+                e.HasKey(x => x.IDDeviceUnitZoneRule);
+                e.Property(x => x.IDDeviceUnitZoneRule).ValueGeneratedOnAdd();
+                e.Property(x => x.ConditionConfig).IsRequired();
+                e.HasOne<DeviceUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceUnitZoneID).OnDelete(DeleteBehavior.NoAction);
+                e.HasIndex(x => x.DeviceUnitZoneID).HasDatabaseName("ix_deviceUnitZoneRule_zone");
             });
 
             modelBuilder.Entity<DeviceTypeRow>(e =>
