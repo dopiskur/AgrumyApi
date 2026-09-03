@@ -2,7 +2,6 @@
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
     Func<string, string> navActive = c => string.Equals(c, currentController, StringComparison.OrdinalIgnoreCase) ? "active" : "";
     var currentUserEmail = User.Identity?.Name;
-    // #66 Phase 2: menu items gate on the same comma-separated role lists the controllers use.
     Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
 }
 <!doctype html>
@@ -35,7 +34,6 @@
 </head>
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
     <div class="app-wrapper">
-        <!--begin::Header-->
         <nav class="app-header navbar navbar-expand bg-body">
             <div class="container-fluid">
                 <ul class="navbar-nav">
@@ -49,8 +47,6 @@
                 <ul class="navbar-nav ms-auto align-items-center">
                     @if (!string.IsNullOrEmpty(currentUserEmail))
                     {
-                        @* Self-service entry point lives under the user's own identity, not in the
-                           main (admin-oriented) sidebar - see ProfileController. *@
                         <li class="nav-item dropdown me-2">
                             <a class="nav-link" href="#" id="user-menu" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-person-circle me-1"></i><span class="d-none d-sm-inline">@currentUserEmail</span>
@@ -91,8 +87,6 @@
                 </ul>
             </div>
         </nav>
-        <!--end::Header-->
-        <!--begin::Sidebar-->
         <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
             <div class="sidebar-brand">
                 <a asp-area="" asp-controller="Home" asp-action="Index" class="brand-link">
@@ -158,8 +152,6 @@
                 </nav>
             </div>
         </aside>
-        <!--end::Sidebar-->
-        <!--begin::App Main-->
         <main class="app-main">
             <div class="app-content-header">
                 <div class="container-fluid">
@@ -184,19 +176,14 @@
                 </div>
             </div>
         </main>
-        <!--end::App Main-->
         <footer class="app-footer">
             <strong>&copy; 2024-2026 <a asp-controller="Home" asp-action="Privacy" class="text-decoration-none">Agrumy</a>.</strong> All rights reserved.
         </footer>
     </div>
 
-    @* Roadmap #34: one token for every page's device-commands.js fetch() calls - cheaper than
-       each command-button host view carrying its own antiforgery form. *@
     @Html.AntiForgeryToken()
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <!-- Loaded once here instead of per-view - every form page used to each repeat its own
-         Scripts section just to pull in client-side validation. -->
     <partial name="_ValidationScriptsPartial" />
     <script src="~/lib/adminlte/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="~/lib/adminlte/dist/js/adminlte.min.js"></script>

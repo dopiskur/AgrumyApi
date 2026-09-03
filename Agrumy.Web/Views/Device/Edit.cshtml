@@ -24,10 +24,6 @@
     <div class="card-body">
         <form asp-action="Edit">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            @* Roadmap #78: identity, not editable data - the server resolves the target row from
-               idDevice and forces TenantID back to the existing owner regardless of what's posted
-               (see DeviceApiController.DeviceUpdate/EfRepository.Devices.Config), so an editable
-               input here was misleading, not a real control. *@
             <div class="mb-3">
                 <label asp-for="Device.IDDevice" class="form-label"></label>
                 <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.IDDevice)</p>
@@ -40,10 +36,6 @@
 
             <partial name="_SelectField" model="deviceTypeSelect" />
 
-            @* Roadmap #82: assignment moved to the Dashboard's Add Controller/Add Sensor/Remove
-               flow (DeviceUnitController) - it needs to validate the "one controller per zone" rule
-               and keep DeviceUnitID/DeviceUnitZoneID consistent with each other, neither of which a
-               bare numeric field here could do. DeviceUpdateAsync no longer writes either column. *@
             <div class="mb-3">
                 <label class="form-label">Unit / Zone</label>
                 @if (device.DeviceUnitZoneID is int zoneId && zoneId != 0)
@@ -63,11 +55,6 @@
                 @Html.HiddenFor(m => m.Device!.DeviceUnitID)
                 @Html.HiddenFor(m => m.Device!.DeviceUnitZoneID)
             </div>
-            @* Roadmap #150: read-only, same reasoning as #78's IDDevice/TenantID above - the
-               DeviceUpdate proc these columns predate never set them (EfRepository.Devices.cs
-               comment: "did NOT set MacAddress or the config-id columns"), so an editable input
-               here silently discarded whatever the admin typed. The view was the bug, not the API
-               - fixed here, not by making the API honor a write it was never meant to accept. *@
             <div class="mb-3">
                 <label asp-for="Device.DeviceConfigSensorID" class="form-label"></label>
                 <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.DeviceConfigSensorID)</p>
@@ -82,8 +69,6 @@
                 <input asp-for="Device.DeviceName" class="form-control" />
                 <span asp-validation-for="Device.DeviceName" class="text-danger"></span>
             </div>
-            @* Roadmap #150: read-only, same reasoning as the config-id fields above - DeviceUpdateAsync
-               never writes MacAddress either. *@
             <div class="mb-3">
                 <label asp-for="Device.MacAddress" class="form-label"></label>
                 <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.MacAddress)</p>

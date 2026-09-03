@@ -17,16 +17,7 @@
         return t.Days > 0 ? $"{t.Days}d {t.Hours}h" : t.Hours > 0 ? $"{t.Hours}h {t.Minutes}m" : $"{t.Minutes}m {t.Seconds}s";
     }
 }
-@* Roadmap #90: this partial IS #fleetTable's tbody content, shared by Fleet.cshtml's initial
-   render and DeviceController.FleetRows' polling refresh - one source of truth for row markup,
-   so a column added to one is never silently missing from the other. Roadmap #116 rule (5):
-   also reused (with the same rows, filtered) by DeviceUnitController's Zone page - lives in
-   Views/Shared/, not Views/Device/, so the partial-view search path resolves it from either. *@
 @{
-    // Roadmap #116 rule (5): DeviceUnitController.ZoneDetails reuses this same partial for its
-    // zone-scoped device list (rather than a second hand-built table) and flips this on so the
-    // action column also gets a "Remove from zone" button - Fleet.cshtml never sets it, so its
-    // own rendering is unchanged.
     bool zoneScoped = ViewData["ZoneScoped"] as bool? == true;
     Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
 }
@@ -36,10 +27,6 @@
     <tr>
         <td>@item.DeviceName</td>
         <td>
-            @* No separate "never seen" state - a device only ever exists via device-side
-               self-registration (there's no manual "add device" flow), so a null LastSeenAt
-               just means it hasn't reported in yet or its diagnostic row predates roadmap #7 -
-               either way it reads the same as any other silent device: Offline. *@
             @if (item.Online)
             {
                 <span class="badge text-bg-success">Online</span>
@@ -64,8 +51,6 @@
         <td class="d-none d-md-table-cell">@Uptime(item.UptimeSeconds)</td>
         <td class="d-none d-md-table-cell">
             @(item.FirmwareVersion ?? "-")
-            @* Roadmap #93(b): the Update button appears ONLY when the catalog has something newer
-               for this device's board, and is replaced by a pending marker once requested. *@
             @if (item.FirmwareUpdatePending)
             {
                 <span class="badge text-bg-info ms-1" title="Update requested - installs on the next config poll">&rarr; @(item.FirmwareTargetVersion ?? "latest")</span>
@@ -81,9 +66,6 @@
         </td>
         <td class="d-none d-md-table-cell">@(item.Battery?.ToString() ?? "-")</td>
         <td>
-            @* Icon-only + btn-group on purpose: four full-text buttons made this the widest
-               column on the table, forcing the most horizontal scroll on a phone (roadmap #22) -
-               title= gives back the label as a hover/long-press tooltip. *@
             <div class="btn-group btn-group-sm" role="group" aria-label="Device actions">
                 <a asp-controller="SensorData" asp-action="Index" asp-route-idDevice="@item.IDDevice" class="btn btn-success" title="Sensor data" aria-label="Sensor data"><i class="bi bi-graph-up"></i></a>
                 <a asp-controller="SensorData" asp-action="Report" asp-route-idDevice="@item.IDDevice" class="btn btn-danger" title="Reports" aria-label="Reports"><i class="bi bi-file-earmark-bar-graph"></i></a>

@@ -1,8 +1,5 @@
 @model api.ViewModels.ZoneViewModel
-@* Same live-refresh convention as Device/_FleetRows - shared by Zone.cshtml's initial render and
-   DeviceUnitController.ZoneDetails' polling refresh. *@
-@* Roadmap #122 fix: the status badge lives HERE, inside the polled fragment, not in Zone.cshtml's
-   static header - see that file's comment for why it went stale there. *@
+@* Status badge lives here, inside the polled fragment - see Zone.cshtml's header comment for why it can't move there. *@
 <p class="mb-2">Status: <partial name="_ZoneStatusBadge" model="Model.Dashboard.Status" /></p>
 <h6 class="text-uppercase text-secondary small mb-2">Sensor averages (last 24h trend)</h6>
 <partial name="_SensorAverages" model="new api.ViewModels.SensorSummaryViewModel { Averages = Model.Dashboard.Averages, Trend = Model.Dashboard.Trend }" />
@@ -13,8 +10,7 @@
     <h6 class="text-uppercase text-secondary small mb-0">Devices in this zone</h6>
     <span class="text-secondary small">Times shown in @Model.DisplayTimeZone</span>
 </div>
-@* Roadmap #116 rule (5): Device/_FleetRows.cshtml, not a second hand-built device table -
-   ViewData["ZoneScoped"] switches that partial's action column to include "Remove from zone". *@
+@* ViewData["ZoneScoped"] switches _FleetRows' action column to include "Remove from zone". *@
 @{ ViewData["ZoneScoped"] = true; }
 @if (Model.Fleet.Count == 0)
 {
