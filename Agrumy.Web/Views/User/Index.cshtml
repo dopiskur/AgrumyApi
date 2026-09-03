@@ -12,9 +12,6 @@
         </div>
     </div>
     <div class="card-body table-responsive p-0">
-        @* No table-wide text-nowrap, and Username/DevicePin/GroupName/Enabled collapse below md -
-           Email (the unique identifier) + Actions are the only columns you need at a glance on a
-           phone, same reasoning as Fleet's column collapse (roadmap #22). *@
         <table id="usersTable" class="table table-hover">
             <thead>
                 <tr>
@@ -55,7 +52,6 @@
                         @Html.DisplayFor(modelItem => item.Enabled)
                     </td>
                     <td>
-                        @* Icon-only + btn-group, same pattern as Fleet (roadmap #22). *@
                         <div class="btn-group btn-group-sm" role="group" aria-label="User actions">
                             <a asp-action="Details" asp-route-idUser="@item.IDUser" class="btn btn-primary" title="Details" aria-label="Details"><i class="bi bi-info-circle"></i></a>
                             <a asp-action="Edit" asp-route-idUser="@item.IDUser" class="btn btn-warning" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>

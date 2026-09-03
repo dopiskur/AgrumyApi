@@ -31,8 +31,6 @@
         @if (hasAnyRole(RoleNames.DeviceManagers))
         {
             <div class="float-end d-flex align-items-center gap-3">
-                @* Roadmap #34: Unit-target fan-out (CommandQueueService.IssueCommandAsync) - one
-                   command per controller across every zone under this unit, per-device deduped. *@
                 <partial name="_DeviceCommandButtons" model="new DeviceCommandButtonsViewModel { TargetType = CommandTargetType.Unit, TargetId = Model.Unit.IDDeviceUnit!.Value }" />
                 <form asp-action="ZoneAdd" method="post" class="d-flex gap-2">
                     <input type="hidden" name="idDeviceUnit" value="@Model.Unit.IDDeviceUnit" />
