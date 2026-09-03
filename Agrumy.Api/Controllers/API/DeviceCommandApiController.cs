@@ -7,10 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.API
 {
-    /// <summary>Roadmap #34: issues a device command, resolved/fanned-out server-side by
-    /// CommandQueueService. Ownership checks mirror DeviceApiController.EnsureOwnedDeviceAsync and
-    /// DeviceUnitApiController.EnsureOwnedUnitAsync/EnsureOwnedZoneAsync (duplicated here, not
-    /// shared - same per-controller convention this codebase already uses for those two).</summary>
+    /// <summary>Issues a device command, resolved/fanned-out server-side by CommandQueueService. Ownership checks mirror DeviceApiController/DeviceUnitApiController (duplicated here, not shared, per this codebase's existing per-controller convention).</summary>
     [Route("/api/DeviceCommand")]
     public class DeviceCommandApiController(IRepository repo, ICache cache, CommandQueueService commandQueue) : ApiControllerBase(repo, cache)
     {

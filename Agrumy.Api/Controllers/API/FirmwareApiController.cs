@@ -9,10 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace api.Controllers.API
 {
-    /// <summary>Roadmap #94: the firmware catalog and its population paths. Every write is Global
-    /// admin only (the catalog is install-wide, same rule as ServerConfigApiController); reads are
-    /// open to device managers so the per-device update UI (#93) can list versions. Download is
-    /// anonymous on purpose - see the action's own comment.</summary>
+    /// <summary>The firmware catalog and its population paths. Every write is Global admin only (the catalog is install-wide, same rule as ServerConfigApiController); reads are open to device managers so the per-device update UI can list versions. Download is anonymous on purpose - see the action's own comment.</summary>
     [Route("/api/Firmware")]
     public class FirmwareApiController(IRepository repo, ICache cache, FirmwareCatalogService catalog, IOptions<AgrumySettings> settings) : ApiControllerBase(repo, cache)
     {
@@ -43,9 +40,7 @@ namespace api.Controllers.API
             return Ok(await catalog.ImportFromDirectoryAsync(request.Path, PublicBaseUrl, cancellationToken));
         }
 
-        /// <summary>Multipart upload of one release-convention .bin (roadmap #94-2c / #93-c-2). 4 MB
-        /// is well above any ESP32 app partition (esp32dev's is 1.28 MB), so a wrong file is rejected
-        /// before it is even read.</summary>
+        /// <summary>Multipart upload of one release-convention .bin. 4 MB is well above any ESP32 app partition (esp32dev's is 1.28 MB), so a wrong file is rejected before it is even read.</summary>
         [Authorize(Roles = "admin")]
         [HttpPost("Upload")]
         [RequestSizeLimit(4 * 1024 * 1024)]
@@ -79,9 +74,7 @@ namespace api.Controllers.API
         [HttpGet("Manifest")]
         public async Task<ActionResult<FirmwareManifest>> Manifest() => Ok(await catalog.BuildManifestAsync(PublicBaseUrl));
 
-        /// <summary>Roadmap #94-C1: the browser "Build offline repo" tool reads every catalog file
-        /// through here (same-origin via Agrumy.Web's proxy) instead of hitting GitHub directly -
-        /// a release asset's redirect target does not answer cross-origin fetches from a page.</summary>
+        /// <summary>The browser "Build offline repo" tool reads every catalog file through here (same-origin via Agrumy.Web's proxy) instead of hitting GitHub directly - a release asset's redirect target does not answer cross-origin fetches from a page.</summary>
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpGet("Fetch")]
         public async Task<ActionResult> Fetch(string fileName, CancellationToken cancellationToken)
@@ -94,18 +87,13 @@ namespace api.Controllers.API
             return File(opened.Value.Content, "application/octet-stream", opened.Value.FileName);
         }
 
-        /// <summary>The Local repository's OTA download (roadmap #94-2). Anonymous because the
-        /// firmware's OTA download (DeviceController::firmwareUpdate) is a bare HTTP GET with no
-        /// auth headers - exactly like a GitHub release asset, which is public too; a .bin is not a
-        /// secret. The file name is validated against the release convention (FirmwareStorage.PathFor)
-        /// so the path can never leave the storage directory.</summary>
+        /// <summary>The Local repository's OTA download. Anonymous because the firmware's OTA download (DeviceController::firmwareUpdate) is a bare HTTP GET with no auth headers - exactly like a GitHub release asset, which is public too; a .bin is not a secret. The file name is validated against the release convention (FirmwareStorage.PathFor) so the path can never leave the storage directory.</summary>
         [AllowAnonymous]
         [EnableRateLimiting("device-data")]
         [HttpGet("Download/{fileName}")]
         public ActionResult Download(string fileName)
         {
-            // Roadmap #41: the same flat store also holds full-image files (FirmwareStorage.PathFor
-            // already accepts either convention) - this direct download stays available for both.
+            // The same flat store also holds full-image files (FirmwareStorage.PathFor accepts either convention) - this direct download stays available for both.
             if (!FirmwareVersion.TryParseFileName(fileName, out _, out _) &&
                 !FirmwareVersion.TryParseFullImageFileName(fileName, out _, out _))
             {
