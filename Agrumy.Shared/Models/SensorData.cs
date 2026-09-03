@@ -40,7 +40,9 @@ namespace api.Models
 
     public class TimeRange
     {
-        [Range(1, 30)]
+        // Roadmap #78: was [Range(1, 30)], stale against SensorDataController's real 1-1440
+        // (one day of minute-resolution data) cap - fixed to match actual usage.
+        [Range(1, 1440)]
         public int? Range { get; set; } = 1;
     }
 

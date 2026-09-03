@@ -18,11 +18,18 @@
     <div class="card-body">
         <form asp-action="Edit">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            @* Roadmap #78: identity, not editable data - UserApiController.UserUpdate looks the
+               target row up by IDUser, a posted change here would just point the save at a
+               different user. *@
             <div class="mb-3">
                 <label asp-for="UserUpdate.IDUser" class="form-label"></label>
-                <input asp-for="UserUpdate.IDUser" class="form-control" />
-                <span asp-validation-for="UserUpdate.IDUser" class="text-danger"></span>
+                <p class="form-control-plaintext">@Html.DisplayFor(m => m.UserUpdate!.IDUser)</p>
+                @Html.HiddenFor(m => m.UserUpdate!.IDUser)
             </div>
+            @* Unlike Device.TenantID, this one is real: UserApiController.UserUpdate applies it
+               when the caller manages users globally (#65/#66 - cross-tenant reassignment is a
+               deliberate Global-admin power), so it stays an editable field. A non-Global caller's
+               edit here is simply ignored server-side, not rejected. *@
             <div class="mb-3">
                 <label asp-for="UserUpdate.TenantID" class="form-label"></label>
                 <input asp-for="UserUpdate.TenantID" class="form-control" />

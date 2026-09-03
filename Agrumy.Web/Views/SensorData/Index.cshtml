@@ -15,9 +15,11 @@
                 <div class="col-auto">
                     <label class="form-label" for="timeRange">Time range</label>
                     <div class="input-group">
-                        @* Plain input on purpose: TimeRange.Range carries a stale [Range(1,30)]
-                           attribute that binding with asp-for would enforce against the real
-                           1-1440 minute usage. *@
+                        @* Plain input on purpose (roadmap #78): this GET binds to
+                           SensorDataController.Index's flat "timeRange" parameter, not to
+                           TimeRange.Range - asp-for would emit name="TimeRange.Range" and break
+                           that binding, so the field stays a manual <input>. min/max match
+                           TimeRange.Range's [Range(1, 1440)] now that it's no longer stale. *@
                         <input type="number" min="1" max="1440" id="timeRange" name="timeRange" value="@Model.TimeRange!.Range" class="form-control" />
                         <div class="input-group-text"><span class="bi bi-clock-history"></span></div>
                     </div>

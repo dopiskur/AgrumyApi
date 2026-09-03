@@ -71,15 +71,14 @@
     <div class="card-body">
         <form asp-action="EditController">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            @* Roadmap #78: identity, not editable data - EfRepository.DeviceConfigControllerUpdateAsync
+               resolves the target row from Device.IDDevice's own DeviceConfigControllerID server-side,
+               it never trusts a posted DeviceConfigController.IDDeviceConfigController value, so only
+               the device id needs to round-trip through the form. *@
             <div class="mb-3">
                 <label asp-for="Device.IDDevice" class="form-label"></label>
-                <input asp-for="Device.IDDevice" class="form-control" />
-                <span asp-validation-for="Device.IDDevice" class="text-danger"></span>
-            </div>
-            <div class="mb-3">
-                <label asp-for="DeviceConfigController.IDDeviceConfigController" class="form-label"></label>
-                <input asp-for="DeviceConfigController.IDDeviceConfigController" class="form-control" />
-                <span asp-validation-for="DeviceConfigController.IDDeviceConfigController" class="text-danger"></span>
+                <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.IDDevice)</p>
+                @Html.HiddenFor(m => m.Device!.IDDevice)
             </div>
 
             <ul class="nav nav-tabs" role="tablist">

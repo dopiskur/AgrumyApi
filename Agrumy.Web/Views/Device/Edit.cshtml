@@ -24,15 +24,18 @@
     <div class="card-body">
         <form asp-action="Edit">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            @* Roadmap #78: identity, not editable data - the server resolves the target row from
+               idDevice and forces TenantID back to the existing owner regardless of what's posted
+               (see DeviceApiController.DeviceUpdate/EfRepository.Devices.Config), so an editable
+               input here was misleading, not a real control. *@
             <div class="mb-3">
                 <label asp-for="Device.IDDevice" class="form-label"></label>
-                <input asp-for="Device.IDDevice" class="form-control" />
-                <span asp-validation-for="Device.IDDevice" class="text-danger"></span>
+                <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.IDDevice)</p>
+                @Html.HiddenFor(m => m.Device!.IDDevice)
             </div>
             <div class="mb-3">
                 <label asp-for="Device.TenantID" class="form-label"></label>
-                <input asp-for="Device.TenantID" class="form-control" />
-                <span asp-validation-for="Device.TenantID" class="text-danger"></span>
+                <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.TenantID)</p>
             </div>
 
             <partial name="_SelectField" model="deviceTypeSelect" />

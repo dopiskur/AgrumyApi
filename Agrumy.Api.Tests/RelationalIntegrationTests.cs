@@ -796,6 +796,37 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(1, (await _repo.DeviceConfigSensorGetAsync(d.DeviceConfigSensorID))!.SensorTemp);
     }
 
+    // Roadmap #78: DeviceConfig*UpdateAsync must resolve the row to write from idDevice's OWN
+    // config-id column, never from the DeviceConfig*.ID* field on the posted payload - the Web
+    // Edit/EditSensor/EditController forms used to render that id as a plain editable input, and
+    // the API layer only checks device ownership of idDevice, not of whatever config id rides
+    // along in the body. This proves device A's sensor/controller config survives untouched even
+    // when the payload's id is tampered to point at device B's row.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceConfigUpdate_IgnoresTamperedConfigId_NeverWritesAnotherDevicesRow(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var a = await MakeDevice(t, tenantId);
+        var b = await MakeDevice(t, tenantId);
+
+        await _repo.DeviceConfigSensorUpdateAsync(a.IDDevice, new DeviceConfigSensor
+        {
+            IDDeviceConfigSensor = b.DeviceConfigSensorID, // tampered: points at B's row, not A's
+            SensorTemp = 7,
+        });
+        Assert.Equal(7, (await _repo.DeviceConfigSensorGetAsync(a.DeviceConfigSensorID))!.SensorTemp);
+        Assert.NotEqual(7, (await _repo.DeviceConfigSensorGetAsync(b.DeviceConfigSensorID))!.SensorTemp);
+
+        await _repo.DeviceConfigControllerUpdateAsync(a.IDDevice, new DeviceConfigController
+        {
+            IDDeviceConfigController = b.DeviceConfigControllerID, // tampered: points at B's row
+            TempLow = 12.5,
+        });
+        Assert.Equal(12.5, (await _repo.DeviceConfigControllerGetAsync(a.DeviceConfigControllerID))!.TempLow);
+        Assert.NotEqual(12.5, (await _repo.DeviceConfigControllerGetAsync(b.DeviceConfigControllerID))!.TempLow);
+    }
+
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceConfigController_WaterPumpSafetyLimits_SeededFromServerConfig_ThenPerDeviceOverride(DbProviderKind provider)
     {

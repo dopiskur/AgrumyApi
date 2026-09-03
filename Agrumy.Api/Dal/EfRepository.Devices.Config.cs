@@ -51,8 +51,18 @@ namespace api.Dal
                 return;
             }
 
+            // Roadmap #78: resolve the target row from idDevice's OWN DeviceConfigControllerID, not
+            // cfg.IDDeviceConfigController - the caller's ownership was only checked against idDevice
+            // (DeviceApiController.DeviceConfigControllerUpdate), so trusting a client-supplied config
+            // id here would let a tampered id overwrite any other device's (even another tenant's)
+            // controller config.
+            int? ownConfigControllerId = await db.Devices.AsNoTracking()
+                .Where(d => d.IDDevice == idDevice)
+                .Select(d => d.DeviceConfigControllerID)
+                .FirstOrDefaultAsync();
+
             var row = await db.DeviceConfigControllers
-                .FirstOrDefaultAsync(c => c.IDDeviceConfigController == cfg.IDDeviceConfigController);
+                .FirstOrDefaultAsync(c => c.IDDeviceConfigController == ownConfigControllerId);
             if (row != null)
             {
                 // The proc declared these params as int (columns are double) so historically the
@@ -137,8 +147,15 @@ namespace api.Dal
                 return;
             }
 
+            // Roadmap #78: same fix as DeviceConfigControllerUpdateAsync above - resolve the row from
+            // idDevice's own DeviceConfigSensorID rather than trusting cfg.IDDeviceConfigSensor.
+            int? ownConfigSensorId = await db.Devices.AsNoTracking()
+                .Where(d => d.IDDevice == idDevice)
+                .Select(d => d.DeviceConfigSensorID)
+                .FirstOrDefaultAsync();
+
             var row = await db.DeviceConfigSensors
-                .FirstOrDefaultAsync(c => c.IDDeviceConfigSensor == cfg.IDDeviceConfigSensor);
+                .FirstOrDefaultAsync(c => c.IDDeviceConfigSensor == ownConfigSensorId);
             if (row != null)
             {
                 row.SensorBattery = cfg.SensorBattery;
