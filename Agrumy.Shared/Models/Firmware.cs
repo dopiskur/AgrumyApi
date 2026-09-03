@@ -99,5 +99,11 @@ namespace api.Models
         /// <summary>Absolute download URL, or null when the file sits next to the manifest (USB
         /// directory layout).</summary>
         public string? Url { get; set; }
+        /// <summary>Roadmap #41: "ota" (default/absent, back-compat with every manifest written
+        /// before this field existed) or "full" - the blank-chip-flashable merged image sibling of
+        /// the "ota" row with the same Board+version. Absent/anything-but-"full" is treated as OTA
+        /// everywhere this is read (api.Firmware.FirmwareCatalogService), so an older Custom
+        /// repository's manifest.json (no such field at all) keeps working unchanged.</summary>
+        public string? Kind { get; set; }
     }
 }

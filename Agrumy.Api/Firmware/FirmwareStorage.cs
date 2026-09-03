@@ -24,7 +24,11 @@ namespace api.Firmware
 
         public string PathFor(string fileName)
         {
-            if (!FirmwareVersion.TryParseFileName(fileName, out _, out _))
+            // Roadmap #41: the OTA and full-image conventions share this one flat directory - either
+            // is a "recognized, safe" name here (FirmwareCatalogService decides which convention is
+            // ALLOWED to become a catalog entry at each write path, not this gate).
+            if (!FirmwareVersion.TryParseFileName(fileName, out _, out _) &&
+                !FirmwareVersion.TryParseFullImageFileName(fileName, out _, out _))
             {
                 throw new ArgumentException($"'{fileName}' is not a release-convention firmware file name.", nameof(fileName));
             }

@@ -17,6 +17,18 @@ namespace api.Firmware
         [GeneratedRegex(@"^v?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(?:-(?<pre>[0-9A-Za-z][0-9A-Za-z.-]*))?$")]
         private static partial Regex VersionRegex();
 
+        /// <summary>agrumy-{board}-full-v{version}.bin - roadmap #41's blank-chip web-installer
+        /// image (bootloader + partition table + boot_app0 + the OTA app above, merged to one file
+        /// flashable at offset 0). The "full-" marker sits BEFORE "v", not appended after the
+        /// version, on purpose: FileNameRegex's own pre-release group
+        /// (<c>(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?</c>) already accepts an arbitrary "-something" tail on
+        /// the version itself, so a suffix-after-version convention would have silently parsed as a
+        /// version like "1.2.3-full" instead of being rejected. A prefix before "v" can never collide
+        /// with that, since FileNameRegex's board group excludes hyphens and so cannot match past the
+        /// literal "-full-" at all.</summary>
+        [GeneratedRegex(@"^agrumy-(?<board>[a-z0-9]+)-full-v(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?)\.bin$")]
+        private static partial Regex FullImageFileNameRegex();
+
         public static bool TryParse(string? text, out FirmwareVersion version)
         {
             version = default;
@@ -99,5 +111,28 @@ namespace api.Firmware
         }
 
         public static string BuildFileName(string board, string version) => $"agrumy-{board}-v{Normalize(version) ?? version}.bin";
+
+        /// <summary>Roadmap #41 counterpart of <see cref="TryParseFileName"/> - matches ONLY the
+        /// full-image convention, never the plain OTA one (and vice versa: TryParseFileName never
+        /// matches this one, see FullImageFileNameRegex's own remarks).</summary>
+        public static bool TryParseFullImageFileName(string? fileName, out string board, out string version)
+        {
+            board = "";
+            version = "";
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                return false;
+            }
+            Match m = FullImageFileNameRegex().Match(fileName.Trim());
+            if (!m.Success)
+            {
+                return false;
+            }
+            board = m.Groups["board"].Value;
+            version = m.Groups["version"].Value;
+            return true;
+        }
+
+        public static string BuildFullImageFileName(string board, string version) => $"agrumy-{board}-full-v{Normalize(version) ?? version}.bin";
     }
 }

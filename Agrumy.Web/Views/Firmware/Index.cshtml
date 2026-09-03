@@ -8,6 +8,14 @@
         FirmwareSource.Custom => "Custom repository: " + Model.Config.FirmwareCustomRepositoryUrl,
         _ => "GitHub Releases: " + Model.Config.FirmwareGitHubRepository,
     };
+    // Roadmap #41: one button per board that has a blank-chip image available - Model.Catalog is
+    // already board-then-newest-version-first (FirmwareCatalogService.ListAsync), so the first
+    // FullImage-carrying row per board group IS that board's latest installable build.
+    var installableBoards = Model.Catalog
+        .Where(f => f.Board != null && f.FullImageFileName != null && (f.Source == source || f.Source == FirmwareSource.Local))
+        .GroupBy(f => f.Board!)
+        .Select(g => g.First())
+        .ToList();
 }
 
 @if (TempData["Message"] is string message)
@@ -69,6 +77,30 @@
                 <div class="form-text">Stored in the local repository and offered to devices of that board regardless of the active source.</div>
             </div>
         </div>
+
+        <hr />
+        @* Roadmap #41: Web Serial API - Chromium only (Chrome/Edge/Opera), needs HTTPS. The
+           esp-web-install-button element itself detects both and swaps in the "unsupported"/
+           "not-allowed" slot content below, no feature-detection JS needed here. *@
+        <h6 class="text-uppercase text-secondary small">Install to a device via USB</h6>
+        @if (installableBoards.Count == 0)
+        {
+            <p class="text-secondary small mb-0">No blank-chip installable image in the catalog yet for any board - refresh/pull a release built after roadmap #41.</p>
+        }
+        else
+        {
+            <p class="text-secondary small mb-2">Flashes a brand-new, never-programmed board straight from the browser - no PlatformIO, no USB toolchain.</p>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                @foreach (var f in installableBoards)
+                {
+                    <esp-web-install-button manifest="@Url.Action("InstallManifest", new { board = f.Board })">
+                        <button type="button" slot="activate" class="btn btn-outline-primary"><i class="bi bi-usb-symbol"></i> Install @f.Board (@f.Version)</button>
+                        <span slot="unsupported" class="text-secondary small">@f.Board: this browser does not support Web Serial - use Chrome or Edge on desktop.</span>
+                        <span slot="not-allowed" class="text-secondary small">@f.Board: Web Serial requires HTTPS.</span>
+                    </esp-web-install-button>
+                }
+            </div>
+        }
 
         <hr />
         @* Roadmap #94-C1: File System Access API - Chromium only (Chrome/Edge/Opera), needs HTTPS. *@
@@ -141,5 +173,13 @@
 </div>
 
 @section Scripts {
+    @* Roadmap #41: loaded straight from jsDelivr, not vendored via libman.json like the rest of
+       wwwroot/lib/ - esp-web-tools ships as ~150 small ES modules with relative imports between
+       them (lit + esptool-js dependencies included), so mirroring the exact file set through
+       LibMan's explicit per-file list would be fragile against any upstream restructuring; a CDN
+       reference resolves those relative imports against jsDelivr itself, which is how ESPHome/WLED/
+       Meshtastic's own flasher pages use this exact library too. Pinned to an exact version, same
+       discipline as every NuGet package in this repo. *@
+    <script type="module" src="https://cdn.jsdelivr.net/npm/esp-web-tools@10.4.0/dist/install-button.min.js"></script>
     <script src="~/js/offline-repo.js"></script>
 }

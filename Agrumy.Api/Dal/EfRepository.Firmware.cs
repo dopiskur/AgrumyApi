@@ -46,6 +46,10 @@ namespace api.Dal
                 Sha256 = firmware.Sha256,
                 PublishedAt = firmware.PublishedAt,
                 DateAdded = DateTime.UtcNow,
+                FullImageFileName = firmware.FullImageFileName,
+                FullImageUrl = firmware.FullImageUrl,
+                FullImageSizeBytes = firmware.FullImageSizeBytes,
+                FullImageSha256 = firmware.FullImageSha256,
             };
             db.DeviceFirmwares.Add(row);
             await db.SaveChangesAsync();
@@ -98,6 +102,10 @@ namespace api.Dal
             Sha256 = f.Sha256,
             PublishedAt = f.PublishedAt,
             DateAdded = f.DateAdded,
+            FullImageFileName = f.FullImageFileName,
+            FullImageUrl = f.FullImageUrl,
+            FullImageSizeBytes = f.FullImageSizeBytes,
+            FullImageSha256 = f.FullImageSha256,
         };
     }
 }

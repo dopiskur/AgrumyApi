@@ -363,4 +363,86 @@ public class FirmwareCatalogServiceTests
         Assert.Equal(["1.1.0", "1.0.0"], manifest.Releases.Select(r => r.Version));
         Assert.Equal("local", Assert.Single(manifest.Releases[1].Files).Url);
     }
+
+    // ---- roadmap #41: blank-chip web-installer full image, paired with its OTA sibling -----------
+
+    private const string FullImageAssetName = "agrumy-esp32dev-full-v1.1.0.bin";
+
+    /// <summary>Splices one extra asset entry into the v1.1.0 release's asset list already set up
+    /// by SetupGitHubReleases, right before the manifest.json entry.</summary>
+    private void AddAssetToV110Release(string assetName, long size)
+    {
+        static string AssetUrl(string name) => $"https://github.com/dopiskur/AgrumyFirmware/releases/download/v1.1.0/{name}";
+        string insertion = "{\"name\":\"" + assetName + "\",\"browser_download_url\":\"" + AssetUrl(assetName) + "\",\"size\":" + size + "},{\"name\":\"manifest.json\"";
+        _fetcher.Texts[GitHubReleasesUrl] = _fetcher.Texts[GitHubReleasesUrl].Replace("{\"name\":\"manifest.json\"", insertion);
+        _fetcher.Binaries[AssetUrl(assetName)] = FakeFirmwareFetcher.Bytes(assetName);
+    }
+
+    private void AddFullImageAssetToGitHubReleases() => AddAssetToV110Release(FullImageAssetName, 900);
+
+    [Fact]
+    public async Task GitHub_Refresh_Pairs_FullImage_Asset_Onto_Its_OTA_Row()
+    {
+        SetSource(FirmwareSource.GitHub);
+        SetupGitHubReleases();
+        AddFullImageAssetToGitHubReleases();
+
+        await NewService().SyncAsync(FirmwareSyncMode.Refresh, "https://api.agrumy.com");
+
+        var dev110 = Assert.Single(_rows, r => r.Board == "esp32dev" && r.Version == "1.1.0");
+        Assert.Equal(FullImageAssetName, dev110.FullImageFileName);
+        Assert.Equal(900, dev110.FullImageSizeBytes);
+        Assert.StartsWith("https://github.com/", dev110.FullImageUrl);
+        // The full-image asset must never become its OWN catalog row.
+        Assert.DoesNotContain(_rows, r => r.FileName == FullImageAssetName);
+    }
+
+    [Fact]
+    public async Task GitHub_Refresh_Orphan_FullImage_Asset_Without_Matching_OTA_Is_Ignored()
+    {
+        SetSource(FirmwareSource.GitHub);
+        SetupGitHubReleases();
+        const string orphan = "agrumy-esp32c3-full-v1.1.0.bin"; // no agrumy-esp32c3-v1.1.0.bin asset in this release
+        AddAssetToV110Release(orphan, 1);
+
+        FirmwareSyncResult result = await NewService().SyncAsync(FirmwareSyncMode.Refresh, "https://api.agrumy.com");
+
+        Assert.Equal(3, result.Added); // unchanged from the plain SetupGitHubReleases case - the orphan added nothing
+        Assert.DoesNotContain(_rows, r => r.Board == "esp32c3");
+        Assert.DoesNotContain(_rows, r => r.FullImageFileName == orphan);
+    }
+
+    [Fact]
+    public async Task Local_PullIncremental_Downloads_And_Stores_FullImage_Sibling()
+    {
+        SetSource(FirmwareSource.Local);
+        SetupGitHubReleases();
+        AddFullImageAssetToGitHubReleases();
+
+        await NewService().SyncAsync(FirmwareSyncMode.PullIncremental, "https://api.agrumy.com/");
+
+        var dev110 = Assert.Single(_rows, r => r.Board == "esp32dev" && r.Version == "1.1.0");
+        Assert.Equal(FullImageAssetName, dev110.FullImageFileName);
+        Assert.Equal("https://api.agrumy.com/api/Firmware/Download/" + FullImageAssetName, dev110.FullImageUrl);
+        Assert.True(File.Exists(Path.Combine(_root, FullImageAssetName)));
+    }
+
+    [Fact]
+    public async Task Manifest_Emits_A_Second_Full_Kind_Entry_When_The_Row_Has_A_FullImage()
+    {
+        SetSource(FirmwareSource.GitHub);
+        _rows.Add(new DeviceFirmware
+        {
+            IDDeviceFirmware = 1, Board = "esp32dev", Version = "1.0.0", Source = FirmwareSource.GitHub,
+            FileName = "agrumy-esp32dev-v1.0.0.bin", Url = "ota-url",
+            FullImageFileName = "agrumy-esp32dev-full-v1.0.0.bin", FullImageUrl = "full-url", FullImageSizeBytes = 900,
+        });
+
+        FirmwareManifest manifest = await NewService().BuildManifestAsync("https://api.agrumy.com");
+
+        var files = Assert.Single(manifest.Releases).Files;
+        Assert.Equal(2, files.Count);
+        Assert.Contains(files, f => f.Kind == "ota" && f.Url == "ota-url");
+        Assert.Contains(files, f => f.Kind == "full" && f.Url == "full-url" && f.SizeBytes == 900);
+    }
 }

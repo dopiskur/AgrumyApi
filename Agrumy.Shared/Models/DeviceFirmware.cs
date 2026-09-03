@@ -43,5 +43,26 @@ namespace api.Models
 
         public DateTime? PublishedAt { get; set; }
         public DateTime? DateAdded { get; set; }
+
+        // ---- roadmap #41: blank-chip web installer -----------------------------------------
+        // A merged image (bootloader + partition table + boot_app0 + this row's own OTA app
+        // binary, all at their real flash offsets, offset 0 once merged) published ALONGSIDE the
+        // OTA file above by the same release - see AgrumyFirmware release.yml's merge_bin step and
+        // api.Firmware.FirmwareVersion.TryParseFullImageFileName (agrumy-{board}-full-v{version}.bin).
+        // Null when this board+version predates #41 or no such sibling was published - the web
+        // installer simply has nothing to offer for that row, OTA is unaffected either way.
+
+        /// <summary>File name in the full-image naming convention. For Local rows this is also the
+        /// name inside the API's storage directory, alongside <see cref="FileName"/>.</summary>
+        public string? FullImageFileName { get; set; }
+
+        /// <summary>Download URL for the full image, same sourcing rules as <see cref="Url"/>.</summary>
+        public string? FullImageUrl { get; set; }
+
+        public long? FullImageSizeBytes { get; set; }
+
+        /// <summary>Lower-case hex SHA-256 of the full image (a distinct file, distinct hash from
+        /// <see cref="Sha256"/> which covers only the OTA app binary).</summary>
+        public string? FullImageSha256 { get; set; }
     }
 }

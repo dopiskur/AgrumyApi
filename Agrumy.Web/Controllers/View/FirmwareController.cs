@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using api.Dal.Interface;
 using api.Models;
 using api.Security;
@@ -72,7 +73,9 @@ namespace api.Controllers.View
         public async Task<ActionResult> OfflineManifest() => Json(await api.FirmwareManifest());
 
         /// <summary>Roadmap #94-C1: streams one catalog file to the browser tool through this app
-        /// and the API, so GitHub-hosted assets never need cross-origin fetch permission.</summary>
+        /// and the API, so GitHub-hosted assets never need cross-origin fetch permission. Roadmap
+        /// #41 reuses this UNCHANGED for the web installer's full-image bytes too - it is keyed by
+        /// plain file name, and FirmwareCatalogService.OpenAsync already resolves either convention.</summary>
         public async Task<ActionResult> OfflineFile(string fileName)
         {
             HttpResponseMessage response = await api.FirmwareFetch(fileName);
@@ -85,6 +88,39 @@ namespace api.Controllers.View
                 ?? fileName;
             return File(await response.Content.ReadAsStreamAsync(), "application/octet-stream", downloadName);
         }
+
+        /// <summary>Roadmap #41: an esp-web-tools manifest (https://esphome.github.io/esp-web-tools/)
+        /// for the latest catalog build of <paramref name="board"/> that has a full-image sibling -
+        /// same-origin JSON (the browser's &lt;esp-web-install-button&gt; fetches this directly, no
+        /// JWT available to it) whose one part points back at OfflineFile above, not at Agrumy.Api
+        /// directly - same cross-origin reasoning as OfflineManifest/OfflineFile already document.</summary>
+        public async Task<ActionResult> InstallManifest(string board)
+        {
+            string? chipFamily = EspChipFamily.ForBoard(board);
+            if (chipFamily == null)
+            {
+                return NotFound();
+            }
+            DeviceFirmware? latest = (await api.FirmwareList(board)).FirstOrDefault(f => f.FullImageFileName != null);
+            if (latest == null)
+            {
+                return NotFound();
+            }
+            return Json(new EspWebToolsManifest(
+                $"Agrumy {board}",
+                latest.Version ?? "unknown",
+                NewInstallPromptErase: true,
+                [new EspWebToolsBuild(chipFamily, [new EspWebToolsPart(Url.Action(nameof(OfflineFile), new { fileName = latest.FullImageFileName })!, Offset: 0)])]
+            ));
+        }
+
+        // ---- esp-web-tools manifest shape (roadmap #41) - external tool's fixed schema, snake_case
+        // on the wire (esp-web-tools reads new_install_prompt_erase literally), so this is kept
+        // separate from FirmwareManifest (api.Models), which is Agrumy's OWN, unrelated JSON contract.
+        private sealed record EspWebToolsManifest(string Name, string Version,
+            [property: JsonPropertyName("new_install_prompt_erase")] bool NewInstallPromptErase, List<EspWebToolsBuild> Builds);
+        private sealed record EspWebToolsBuild(string ChipFamily, List<EspWebToolsPart> Parts);
+        private sealed record EspWebToolsPart(string Path, int Offset);
 
         private async Task RunAndReport(Func<Task<FirmwareSyncResult>> action)
         {

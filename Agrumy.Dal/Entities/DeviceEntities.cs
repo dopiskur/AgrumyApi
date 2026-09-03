@@ -242,5 +242,11 @@ namespace api.Dal.Entities
         public string? Sha256 { get; set; }
         public DateTime? PublishedAt { get; set; }
         public DateTime? DateAdded { get; set; }
+
+        // Roadmap #41 - see api.Models.DeviceFirmware's own copy of these for the full explanation.
+        public string? FullImageFileName { get; set; }
+        public string? FullImageUrl { get; set; }
+        public long? FullImageSizeBytes { get; set; }
+        public string? FullImageSha256 { get; set; }
     }
 }

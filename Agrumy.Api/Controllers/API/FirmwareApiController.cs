@@ -104,7 +104,10 @@ namespace api.Controllers.API
         [HttpGet("Download/{fileName}")]
         public ActionResult Download(string fileName)
         {
-            if (!FirmwareVersion.TryParseFileName(fileName, out _, out _))
+            // Roadmap #41: the same flat store also holds full-image files (FirmwareStorage.PathFor
+            // already accepts either convention) - this direct download stays available for both.
+            if (!FirmwareVersion.TryParseFileName(fileName, out _, out _) &&
+                !FirmwareVersion.TryParseFullImageFileName(fileName, out _, out _))
             {
                 return NotFound();
             }

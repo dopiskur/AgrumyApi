@@ -83,4 +83,38 @@ public class FirmwareVersionTests
     [Fact]
     public void BuildFileName_RoundTrips() =>
         Assert.Equal("agrumy-esp32dev-v1.2.0.bin", FirmwareVersion.BuildFileName("esp32dev", "v1.2.0"));
+
+    // ---- roadmap #41: full-image (blank-chip web installer) convention -----------------------
+
+    [Theory]
+    [InlineData("agrumy-esp32dev-full-v1.2.0.bin", "esp32dev", "1.2.0")]
+    [InlineData("agrumy-esp32s3usbotg-full-v0.3.1-rc1.bin", "esp32s3usbotg", "0.3.1-rc1")]
+    public void FullImageFileName_Convention_Parses(string name, string board, string version)
+    {
+        Assert.True(FirmwareVersion.TryParseFullImageFileName(name, out var b, out var v));
+        Assert.Equal(board, b);
+        Assert.Equal(version, v);
+    }
+
+    [Fact]
+    public void BuildFullImageFileName_RoundTrips() =>
+        Assert.Equal("agrumy-esp32dev-full-v1.2.0.bin", FirmwareVersion.BuildFullImageFileName("esp32dev", "v1.2.0"));
+
+    /// <summary>The whole reason the "-full-" marker sits BEFORE "v" instead of being appended after
+    /// the version: an after-the-version suffix would collide with FileNameRegex's own pre-release
+    /// grammar (which already accepts an arbitrary "-something" tail) and get silently parsed as a
+    /// version like "1.2.3-full" instead of being rejected. Each convention's regex must reject the
+    /// other's file names outright, not just "usually" disambiguate them.</summary>
+    [Fact]
+    public void OtaAndFullImage_Conventions_Never_Match_Each_Others_FileName()
+    {
+        const string ota = "agrumy-esp32dev-v1.2.0.bin";
+        const string full = "agrumy-esp32dev-full-v1.2.0.bin";
+
+        Assert.True(FirmwareVersion.TryParseFileName(ota, out _, out _));
+        Assert.False(FirmwareVersion.TryParseFullImageFileName(ota, out _, out _));
+
+        Assert.True(FirmwareVersion.TryParseFullImageFileName(full, out _, out _));
+        Assert.False(FirmwareVersion.TryParseFileName(full, out _, out _));
+    }
 }

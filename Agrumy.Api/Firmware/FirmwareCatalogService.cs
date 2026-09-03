@@ -200,6 +200,37 @@ namespace api.Firmware
                         result.Warnings.Add($"{remote.FileName}: SHA-256 mismatch against the release manifest - discarded.");
                         continue;
                     }
+
+                    // Roadmap #41: pull the full-image sibling too, when the release published one -
+                    // a download failure here downgrades to a warning rather than aborting the whole
+                    // row (the OTA half already succeeded and is worth keeping either way).
+                    string? fullImageFileName = null, fullImageSha = null;
+                    long? fullImageSize = null;
+                    if (remote.FullImageFileName != null && remote.FullImageUrl != null)
+                    {
+                        try
+                        {
+                            await using Stream fullContent = await fetcher.GetStreamAsync(remote.FullImageUrl, cancellationToken);
+                            (long fiSize, string fiSha) = await storage.SaveAsync(remote.FullImageFileName, fullContent, cancellationToken);
+                            if (remote.FullImageSha256 != null && !string.Equals(remote.FullImageSha256, fiSha, StringComparison.OrdinalIgnoreCase))
+                            {
+                                storage.Delete(remote.FullImageFileName);
+                                result.Warnings.Add($"{remote.FullImageFileName}: SHA-256 mismatch against the release manifest - discarded.");
+                            }
+                            else
+                            {
+                                fullImageFileName = remote.FullImageFileName;
+                                fullImageSize = fiSize;
+                                fullImageSha = fiSha;
+                            }
+                        }
+                        catch (Exception ex) when (ex is HttpRequestException or IOException)
+                        {
+                            log.LogWarning(ex, "Firmware pull of full-image {File} failed", remote.FullImageFileName);
+                            result.Warnings.Add($"{remote.FullImageFileName}: download failed ({ex.Message}).");
+                        }
+                    }
+
                     await firmwareRepo.FirmwareAddAsync(new DeviceFirmware
                     {
                         Board = remote.Board,
@@ -210,6 +241,10 @@ namespace api.Firmware
                         SizeBytes = size,
                         Sha256 = sha,
                         PublishedAt = remote.PublishedAt,
+                        FullImageFileName = fullImageFileName,
+                        FullImageUrl = fullImageFileName == null ? null : LocalDownloadUrl(publicBaseUrl, fullImageFileName),
+                        FullImageSizeBytes = fullImageSize,
+                        FullImageSha256 = fullImageSha,
                     });
                     result.Added++;
                 }
@@ -237,6 +272,10 @@ namespace api.Firmware
                     SizeBytes = remote.SizeBytes,
                     Sha256 = remote.Sha256,
                     PublishedAt = remote.PublishedAt,
+                    FullImageFileName = remote.FullImageFileName,
+                    FullImageUrl = remote.FullImageUrl,
+                    FullImageSizeBytes = remote.FullImageSizeBytes,
+                    FullImageSha256 = remote.FullImageSha256,
                 });
                 result.Added++;
             }
@@ -279,13 +318,29 @@ namespace api.Firmware
                 result.Warnings.Add($"No {ManifestFileName} in the directory - files imported without checksum verification.");
             }
 
+            // Roadmap #41: a full-image file only ever attaches to an OTA row created in THIS SAME
+            // pass - collected up front so the OTA loop below can look one up by (board, version)
+            // without a second directory scan.
+            Dictionary<(string Board, string Version), string> fullImagePaths = new();
+            foreach (string filePath in Directory.EnumerateFiles(path, "*.bin"))
+            {
+                string fileName = Path.GetFileName(filePath);
+                if (FirmwareVersion.TryParseFullImageFileName(fileName, out string fiBoard, out string fiVersion))
+                {
+                    fullImagePaths[(fiBoard, FirmwareVersion.Normalize(fiVersion)!)] = filePath;
+                }
+            }
+
             foreach (string filePath in Directory.EnumerateFiles(path, "*.bin"))
             {
                 string fileName = Path.GetFileName(filePath);
                 if (!FirmwareVersion.TryParseFileName(fileName, out string board, out string version))
                 {
-                    result.Warnings.Add($"{fileName}: not in the agrumy-<board>-v<version>.bin naming convention - skipped.");
-                    result.Skipped++;
+                    if (!FirmwareVersion.TryParseFullImageFileName(fileName, out _, out _))
+                    {
+                        result.Warnings.Add($"{fileName}: not in the agrumy-<board>-v<version>.bin naming convention - skipped.");
+                        result.Skipped++;
+                    } // else: a full-image file, handled below alongside its OTA sibling (or silently skipped, see the warning after this loop).
                     continue;
                 }
                 if (manifestSha.TryGetValue(fileName, out string? expectedSha))
@@ -299,8 +354,31 @@ namespace api.Firmware
                     }
                 }
 
+                string? fullImagePath = fullImagePaths.GetValueOrDefault((board, FirmwareVersion.Normalize(version)!));
+                if (fullImagePath != null)
+                {
+                    string fullImageFileName = Path.GetFileName(fullImagePath);
+                    if (manifestSha.TryGetValue(fullImageFileName, out string? fiExpectedSha))
+                    {
+                        string fiActualSha = await FirmwareStorage.ComputeSha256Async(fullImagePath, cancellationToken);
+                        if (!string.Equals(fiActualSha, fiExpectedSha, StringComparison.OrdinalIgnoreCase))
+                        {
+                            result.Warnings.Add($"{fullImageFileName}: SHA-256 does not match {ManifestFileName} - imported OTA-only (full image discarded).");
+                            fullImagePath = null;
+                        }
+                    }
+                }
+
                 await using FileStream content = File.OpenRead(filePath);
-                await AddLocalAsync(board, version, fileName, content, publicBaseUrl, cancellationToken);
+                if (fullImagePath != null)
+                {
+                    await using FileStream fullImageContent = File.OpenRead(fullImagePath);
+                    await AddLocalAsync(board, version, fileName, content, publicBaseUrl, cancellationToken, Path.GetFileName(fullImagePath), fullImageContent);
+                }
+                else
+                {
+                    await AddLocalAsync(board, version, fileName, content, publicBaseUrl, cancellationToken);
+                }
                 result.Added++;
             }
             return result;
@@ -318,11 +396,18 @@ namespace api.Firmware
             return (await AddLocalAsync(board, version, fileName!, content, publicBaseUrl, cancellationToken), null);
         }
 
-        private async Task<DeviceFirmware> AddLocalAsync(string board, string version, string fileName, Stream content, string publicBaseUrl, CancellationToken cancellationToken)
+        /// <summary>Roadmap #41: <paramref name="fullImageFileName"/>/<paramref name="fullImageContent"/>
+        /// are optional - only ImportFromDirectoryAsync ever supplies them today (it can see both
+        /// files in the same directory scan); UploadAsync's single-file form stays OTA-only.</summary>
+        private async Task<DeviceFirmware> AddLocalAsync(string board, string version, string fileName, Stream content, string publicBaseUrl,
+            CancellationToken cancellationToken, string? fullImageFileName = null, Stream? fullImageContent = null)
         {
             (long size, string sha) = await storage.SaveAsync(fileName, content, cancellationToken);
+            (long fiSize, string fiSha)? fullImage = fullImageFileName != null && fullImageContent != null
+                ? await storage.SaveAsync(fullImageFileName, fullImageContent, cancellationToken)
+                : null;
 
-            // Same board+version already stored locally: the new file replaced it on disk, so the
+            // Same board+version already stored locally: the new file(s) replaced it on disk, so the
             // stale row (old size/sha) must go too - one row per (board, version, source).
             foreach (var stale in (await firmwareRepo.FirmwareListForBoardAsync(board, [FirmwareSource.Local]))
                          .Where(r => FirmwareVersion.AreEqual(r.Version, version) && r.IDDeviceFirmware != null))
@@ -340,6 +425,10 @@ namespace api.Firmware
                 SizeBytes = size,
                 Sha256 = sha,
                 PublishedAt = DateTime.UtcNow,
+                FullImageFileName = fullImage == null ? null : fullImageFileName,
+                FullImageUrl = fullImage == null ? null : LocalDownloadUrl(publicBaseUrl, fullImageFileName!),
+                FullImageSizeBytes = fullImage?.fiSize,
+                FullImageSha256 = fullImage?.fiSha,
             };
             firmware.IDDeviceFirmware = await firmwareRepo.FirmwareAddAsync(firmware);
             return firmware;
@@ -380,22 +469,27 @@ namespace api.Firmware
                          .GroupBy(r => FirmwareVersion.Normalize(r.Version)!)
                          .OrderByDescending(g => FirmwareVersion.Parse(g.Key)))
             {
+                List<DeviceFirmware> boardRows = group
+                    .GroupBy(r => r.Board!) // a board present from two sources: one entry, Local preferred (served by this host)
+                    .Select(b => b.OrderBy(r => r.Source == FirmwareSource.Local ? 0 : 1).First())
+                    .ToList();
+                var files = new List<FirmwareManifestFile>();
+                foreach (DeviceFirmware r in boardRows)
+                {
+                    files.Add(new FirmwareManifestFile { Board = r.Board, FileName = r.FileName, SizeBytes = r.SizeBytes, Sha256 = r.Sha256, Url = r.Url, Kind = "ota" });
+                    // Roadmap #41: the full-image sibling, when this row has one - a second manifest
+                    // entry, not a field on the OTA one, so a reader that only understands the older
+                    // (pre-#41) flat file list still gets a correct OTA-only picture.
+                    if (r.FullImageFileName != null)
+                    {
+                        files.Add(new FirmwareManifestFile { Board = r.Board, FileName = r.FullImageFileName, SizeBytes = r.FullImageSizeBytes, Sha256 = r.FullImageSha256, Url = r.FullImageUrl, Kind = "full" });
+                    }
+                }
                 manifest.Releases.Add(new FirmwareManifestRelease
                 {
                     Version = group.Key,
                     PublishedAt = group.Max(r => r.PublishedAt),
-                    Files = group
-                        .GroupBy(r => r.Board!) // a board present from two sources: one entry, Local preferred (served by this host)
-                        .Select(b => b.OrderBy(r => r.Source == FirmwareSource.Local ? 0 : 1).First())
-                        .Select(r => new FirmwareManifestFile
-                        {
-                            Board = r.Board,
-                            FileName = r.FileName,
-                            SizeBytes = r.SizeBytes,
-                            Sha256 = r.Sha256,
-                            Url = r.Url,
-                        })
-                        .ToList(),
+                    Files = files,
                 });
             }
             return manifest;
@@ -406,33 +500,42 @@ namespace api.Firmware
         /// Keyed by file name (what the manifest carries), Local preferred when two sources have it.</summary>
         public async Task<(Stream Content, string FileName)?> OpenAsync(string? fileName, CancellationToken cancellationToken = default)
         {
-            if (!FirmwareVersion.TryParseFileName(fileName, out string board, out _))
+            // Roadmap #41: a full-image file name is never a catalog row's own FileName - it lives on
+            // that row's FullImageFileName column instead (see DeviceFirmware's remarks) - so this
+            // needs to know which field to match/read before it can find or open anything.
+            bool isFullImage = FirmwareVersion.TryParseFullImageFileName(fileName, out string board, out _);
+            if (!isFullImage && !FirmwareVersion.TryParseFileName(fileName, out board, out _))
             {
                 return null;
             }
             FirmwareSource active = (await configRepo.ServerConfigGetAsync(1)).FirmwareSource;
             DeviceFirmware? row = (await firmwareRepo.FirmwareListForBoardAsync(board, VisibleSources(active)))
-                .Where(r => string.Equals(r.FileName, fileName, StringComparison.OrdinalIgnoreCase))
+                .Where(r => string.Equals(isFullImage ? r.FullImageFileName : r.FileName, fileName, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(r => r.Source == FirmwareSource.Local ? 0 : 1)
                 .FirstOrDefault();
-            if (row?.FileName == null)
+            if (row == null)
             {
                 return null;
             }
+            string? url = isFullImage ? row.FullImageUrl : row.Url;
             if (row.Source == FirmwareSource.Local)
             {
-                return storage.Exists(row.FileName) ? (File.OpenRead(storage.PathFor(row.FileName)), row.FileName) : null;
+                return storage.Exists(fileName!) ? (File.OpenRead(storage.PathFor(fileName!)), fileName!) : null;
             }
-            if (string.IsNullOrWhiteSpace(row.Url))
+            if (string.IsNullOrWhiteSpace(url))
             {
                 return null;
             }
-            return (await fetcher.GetStreamAsync(row.Url, cancellationToken), row.FileName);
+            return (await fetcher.GetStreamAsync(url, cancellationToken), fileName!);
         }
 
         // ---- remote readers ------------------------------------------------------------------
 
-        internal sealed record RemoteFile(string Board, string Version, string FileName, string Url, long? SizeBytes, string? Sha256, DateTime? PublishedAt);
+        /// <summary>Roadmap #41: FullImage* fields are the paired blank-chip image for this same
+        /// Board+Version, when the remote source published one alongside the OTA file - null when it
+        /// didn't (an older release, or a source that predates #41).</summary>
+        internal sealed record RemoteFile(string Board, string Version, string FileName, string Url, long? SizeBytes, string? Sha256, DateTime? PublishedAt,
+            string? FullImageFileName = null, string? FullImageUrl = null, long? FullImageSizeBytes = null, string? FullImageSha256 = null);
 
         private sealed record GitHubRelease(
             [property: JsonPropertyName("tag_name")] string? TagName,
@@ -476,15 +579,42 @@ namespace api.Firmware
                     }
                 }
 
+                // Roadmap #41: two passes over the same asset list - the OTA pass is UNCHANGED
+                // (TryParseFileName structurally never matches a "-full-v..." name, see its remarks),
+                // then full-image assets are matched onto their same-board+version OTA RemoteFile.
+                var releaseFiles = new List<RemoteFile>();
                 foreach (GitHubAsset asset in assets)
                 {
                     if (asset.BrowserDownloadUrl == null || !FirmwareVersion.TryParseFileName(asset.Name, out string board, out string version))
                     {
                         continue;
                     }
-                    files.Add(new RemoteFile(board, FirmwareVersion.Normalize(version)!, asset.Name!, asset.BrowserDownloadUrl, asset.Size,
+                    releaseFiles.Add(new RemoteFile(board, FirmwareVersion.Normalize(version)!, asset.Name!, asset.BrowserDownloadUrl, asset.Size,
                         sha.TryGetValue(asset.Name!, out var s) ? s : null, release.PublishedAt));
                 }
+                foreach (GitHubAsset asset in assets)
+                {
+                    if (asset.BrowserDownloadUrl == null || !FirmwareVersion.TryParseFullImageFileName(asset.Name, out string board, out string version))
+                    {
+                        continue;
+                    }
+                    string normalized = FirmwareVersion.Normalize(version)!;
+                    int i = releaseFiles.FindIndex(f => f.Board == board && FirmwareVersion.AreEqual(f.Version, normalized));
+                    if (i < 0)
+                    {
+                        log.LogWarning("Release {Tag}: full-image asset {Asset} has no matching OTA asset for {Board} {Version} - ignored",
+                            release.TagName, asset.Name, board, normalized);
+                        continue;
+                    }
+                    releaseFiles[i] = releaseFiles[i] with
+                    {
+                        FullImageFileName = asset.Name,
+                        FullImageUrl = asset.BrowserDownloadUrl,
+                        FullImageSizeBytes = asset.Size,
+                        FullImageSha256 = sha.TryGetValue(asset.Name!, out var fs) ? fs : null,
+                    };
+                }
+                files.AddRange(releaseFiles);
             }
             return files;
         }
@@ -497,6 +627,10 @@ namespace api.Firmware
             var files = new List<RemoteFile>();
             foreach (FirmwareManifestRelease release in manifest?.Releases ?? [])
             {
+                // Roadmap #41: same two-pass shape as FetchGitHubReleasesAsync - which file is OTA vs
+                // full-image is decided by its FILE NAME convention (matching that method, and robust
+                // against a manifest whose Kind field is missing/wrong), not the Kind field itself.
+                var releaseFiles = new List<RemoteFile>();
                 foreach (FirmwareManifestFile file in release.Files)
                 {
                     if (!FirmwareVersion.TryParseFileName(file.FileName, out string board, out string version))
@@ -505,8 +639,30 @@ namespace api.Firmware
                     }
                     // Relative (or absent - USB layout) URLs resolve against the manifest itself.
                     string url = new Uri(baseUri, file.Url ?? file.FileName!).ToString();
-                    files.Add(new RemoteFile(board, FirmwareVersion.Normalize(version)!, file.FileName!, url, file.SizeBytes, file.Sha256, release.PublishedAt));
+                    releaseFiles.Add(new RemoteFile(board, FirmwareVersion.Normalize(version)!, file.FileName!, url, file.SizeBytes, file.Sha256, release.PublishedAt));
                 }
+                foreach (FirmwareManifestFile file in release.Files)
+                {
+                    if (!FirmwareVersion.TryParseFullImageFileName(file.FileName, out string board, out string version))
+                    {
+                        continue;
+                    }
+                    string normalized = FirmwareVersion.Normalize(version)!;
+                    int i = releaseFiles.FindIndex(f => f.Board == board && FirmwareVersion.AreEqual(f.Version, normalized));
+                    if (i < 0)
+                    {
+                        continue; // no matching OTA entry in this manifest - ignore, same as GitHub's path.
+                    }
+                    string url = new Uri(baseUri, file.Url ?? file.FileName!).ToString();
+                    releaseFiles[i] = releaseFiles[i] with
+                    {
+                        FullImageFileName = file.FileName,
+                        FullImageUrl = url,
+                        FullImageSizeBytes = file.SizeBytes,
+                        FullImageSha256 = file.Sha256,
+                    };
+                }
+                files.AddRange(releaseFiles);
             }
             return files;
         }

@@ -304,6 +304,10 @@ namespace api.Dal
                 e.Property(x => x.Board).HasMaxLength(40);
                 e.Property(x => x.FileName).HasMaxLength(120);
                 e.Property(x => x.Sha256).HasMaxLength(64);
+                // Roadmap #41: same caps as the OTA columns above - full-image file names are only a
+                // few characters longer (agrumy-{board}-full-v{version}.bin vs -v{version}.bin).
+                e.Property(x => x.FullImageFileName).HasMaxLength(120);
+                e.Property(x => x.FullImageSha256).HasMaxLength(64);
                 e.Property(x => x.DateAdded).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 // Roadmap #94: the "which .bin for this board" lookups all filter on (Board, Source).
                 e.HasIndex(x => new { x.Board, x.Source }).HasDatabaseName("ix_deviceFirmware_board_source");
