@@ -2,9 +2,9 @@ using api.Models;
 
 namespace api.Dal.Interface
 {
-    /// <summary>User facet of the data layer (roadmap #74): accounts, secrets, composable roles,
-    /// email activation, and the legacy userGroup mapping (kept here because groups exist solely
-    /// as the pre-#66 role assignment for users).</summary>
+    /// <summary>User facet of the data layer: accounts, secrets, composable roles, email
+    /// activation, and the legacy userGroup mapping (kept here because groups exist solely as the
+    /// legacy role assignment for users).</summary>
     public interface IUserRepository
     {
         Task UserAddAsync(User user, UserSecret userHash);
@@ -14,9 +14,9 @@ namespace api.Dal.Interface
         /// authorization-bearing column (see EfRepository.UserProfileSetAsync). False if no such user.</summary>
         Task<bool> UserProfileSetAsync(string email, string? firstName, string? lastName, string? timeZone);
 
-        /// <summary>Roadmap #70: sole writer of the device-registration PIN - a value+expiry
-        /// (re)issues it, nulls explicitly clear it (NOT called after a successful registration;
-        /// the PIN is multi-use within its own expiry). False if no such user.</summary>
+        /// <summary>Sole writer of the device-registration PIN - a value+expiry (re)issues it,
+        /// nulls explicitly clear it (NOT called after a successful registration; the PIN is
+        /// multi-use within its own expiry). False if no such user.</summary>
         Task<bool> UserSetDevicePinAsync(int idUser, string? devicePin, DateTime? expiresAtUtc);
 
         Task<bool> UserDeleteAsync(int? idUser);
@@ -25,7 +25,7 @@ namespace api.Dal.Interface
         Task<User?> UserGetAsync(int? idUser, string? email, string? username);
         Task<IList<User>> UsersGetAsync(int? tenantID);
 
-        /// <summary>Every user in every tenant - roadmap #65, callers must enforce the global-admin check themselves.</summary>
+        /// <summary>Every user in every tenant - callers must enforce the global-admin check themselves.</summary>
         Task<IList<User>> UsersGetAllAsync();
 
         /// <summary>The password hash+salt for the user matched by id / email / username, or null if none matches.</summary>
@@ -33,7 +33,7 @@ namespace api.Dal.Interface
 
         Task<bool> UserSetPasswordAsync(string? email, UserSecret userSecret);
 
-        /// <summary>Roadmap #91: true while the fresh-install bootstrap Global Admin (seeded by
+        /// <summary>True while the fresh-install bootstrap Global Admin (seeded by
         /// EfRepository.SeedBootstrapAdminAsync with PwdHash=NULL) still has no password - drives
         /// Agrumy.Web's first-run "set password" screen. Always false once
         /// BootstrapAdminSetPasswordAsync has succeeded once, since nothing else ever leaves
@@ -41,17 +41,15 @@ namespace api.Dal.Interface
         Task<bool> BootstrapAdminPendingAsync();
 
         /// <summary>Sets the password on the pending bootstrap admin (the row with PwdHash IS
-        /// NULL) - the ONLY writer of that row's password, and the WHERE clause itself is the
-        /// permanent-unavailability guarantee roadmap #91 asks for: once this succeeds, no row
-        /// matches it again, so calling it a second time is a no-op that returns false. False also
-        /// when there was never a pending row to begin with (e.g. an existing, already-populated
-        /// database).</summary>
+        /// NULL) - the ONLY writer of that row's password; once this succeeds, no row matches it
+        /// again, so calling it a second time is a no-op that returns false. False also when there
+        /// was never a pending row to begin with.</summary>
         Task<bool> BootstrapAdminSetPasswordAsync(UserSecret secret);
 
         Task<IList<UserRole>> UserRoleGetAsync();
 
-        // Roadmap #66: a user can hold several roles at once - the userUserRole junction table is
-        // the source of truth for this set, independent of the legacy single UserGroupID/userGroup.
+        // A user can hold several roles at once - the userUserRole junction table is the source of
+        // truth for this set, independent of the legacy single UserGroupID/userGroup.
 
         /// <summary>Every role name currently assigned to this user via userUserRole. Empty (never
         /// null) for a user nobody has migrated/assigned yet.</summary>
@@ -62,7 +60,7 @@ namespace api.Dal.Interface
         /// ever offers api.Security.RoleNames.All as choices).</summary>
         Task UserRolesSetAsync(int idUser, IEnumerable<string> roleNames);
 
-        // Email activation (roadmap #24)
+        // Email activation
 
         /// <summary>Attaches a fresh activation token to a just-registered user. Always issues - no
         /// cooldown check, this is the first send.</summary>
@@ -78,11 +76,11 @@ namespace api.Dal.Interface
         /// the token. Returns null if the hash matches nothing or the token already expired.</summary>
         Task<User?> UserActivateAsync(string tokenHash);
 
-        /// <summary>Every admin-role user in the given tenant - roadmap #63's "notify the tenant's
-        /// admins" step. Never empty for a real tenant: its creator always becomes its first admin.</summary>
+        /// <summary>Every admin-role user in the given tenant - used to notify a tenant's admins.
+        /// Never empty for a real tenant: its creator always becomes its first admin.</summary>
         Task<IList<User>> TenantAdminsGetAsync(int tenantId);
 
-        // Group (legacy pre-#66 role mapping)
+        // Group (legacy role mapping)
 
         Task<IList<UserGroup>> UserGroupsGetAsync();
 

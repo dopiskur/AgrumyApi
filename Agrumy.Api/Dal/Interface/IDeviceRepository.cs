@@ -2,10 +2,9 @@ using api.Models;
 
 namespace api.Dal.Interface
 {
-    /// <summary>Roadmap #40: the minimal shape OfflineAlertBackgroundService needs to decide
-    /// whether a notification is due - not the full Fleet dashboard DTO (DeviceFleetStatus),
-    /// since OfflineNotifiedAt is alert-bookkeeping state the Web UI has no business displaying.
-    /// TenantID mirrors DeviceRow.TenantID, non-nullable since roadmap #112.</summary>
+    /// <summary>The minimal shape OfflineAlertBackgroundService needs to decide whether a
+    /// notification is due - not the full Fleet dashboard DTO (DeviceFleetStatus), since
+    /// OfflineNotifiedAt is alert-bookkeeping state the Web UI has no business displaying.</summary>
     public sealed record OfflineAlertCandidate(
         int IDDevice,
         int TenantID,
@@ -14,9 +13,9 @@ namespace api.Dal.Interface
         DateTime? LastSeenAt,
         DateTime? OfflineNotifiedAt);
 
-    /// <summary>Roadmap #12: the minimal shape LowBatteryAlertEvaluator needs - Battery is the
-    /// latest sensorData row's reading (telemetry, not the #7 heartbeat - see
-    /// DeviceFleetStatus's class comment for why), null when the device has never reported one.</summary>
+    /// <summary>The minimal shape LowBatteryAlertEvaluator needs - Battery is the latest
+    /// sensorData row's reading (telemetry, not the heartbeat - see DeviceFleetStatus's class
+    /// comment for why), null when the device has never reported one.</summary>
     public sealed record LowBatteryAlertCandidate(
         int IDDevice,
         int TenantID,
@@ -24,8 +23,8 @@ namespace api.Dal.Interface
         int? Battery,
         DateTime? LowBatteryNotifiedAt);
 
-    /// <summary>Device facet of the data layer (roadmap #74): device CRUD, sensor/controller
-    /// configs, firmware (OTA, roadmap #3), the fixed type lists, and device events (roadmap #28).</summary>
+    /// <summary>Device facet of the data layer: device CRUD, sensor/controller configs, firmware
+    /// (OTA), the fixed type lists, and device events.</summary>
     public interface IDeviceRepository
     {
         Task DeviceAddAsync(Device device);
@@ -42,7 +41,7 @@ namespace api.Dal.Interface
         Task<Device?> DeviceGetByApiIdAsync(string? apiId);
         Task<IList<Device>> DevicesGetAsync(int? tenantID);
 
-        /// <summary>Every device in every tenant - #66 Phase 2, callers must check CallerReadsDevicesGlobally themselves.</summary>
+        /// <summary>Every device in every tenant - callers must check CallerReadsDevicesGlobally themselves.</summary>
         Task<IList<Device>> DevicesGetAllAsync();
         Task<bool> DeviceCheckMacAddressAsync(int? tenantID, string? macAddress);
         Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID);
@@ -52,7 +51,7 @@ namespace api.Dal.Interface
         Task<Device?> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID);
         Task<Device?> DeviceGetByDeviceConfigControllerIdAsync(int? deviceConfigControllerID);
 
-        /// <summary>Newest published firmware for a device type (by DateAdded), or null if none. Roadmap #3 (OTA).</summary>
+        /// <summary>Newest published firmware for a device type (by DateAdded), or null if none.</summary>
         Task<DeviceFirmware?> DeviceFirmwareLatestGetAsync(int? deviceTypeID);
 
         // Device UPDATE
@@ -66,30 +65,25 @@ namespace api.Dal.Interface
         Task<IList<DeviceTypeRelay>> DeviceTypeRelayGetAsync();
         Task<IList<DeviceTypeSensor>> DeviceTypeSensorGetAsync();
 
-        // Device diagnostics / fleet (roadmap #7 + #8)
+        // Device diagnostics / fleet
 
-        /// <summary>
-        /// Records the diagnostics a device reported with its config poll (roadmap #7) - LastSeenAt
-        /// is set to the server clock, making the poll itself the heartbeat. deviceID/tenantID come
-        /// from the authenticated device identity, same rule as SensorDataPushAsync (#47). Null
-        /// diagnostic fields (pre-#7 firmware) still bump LastSeenAt without erasing earlier values.
-        /// </summary>
+        /// <summary>Records the diagnostics a device reported with its config poll - LastSeenAt is
+        /// set to the server clock, making the poll itself the heartbeat. deviceID/tenantID come
+        /// from the authenticated device identity, same rule as SensorDataPushAsync. Null
+        /// diagnostic fields still bump LastSeenAt without erasing earlier values.</summary>
         Task DeviceDiagnosticUpsertAsync(int deviceID, int tenantID, DeviceConfigPoll poll);
 
         /// <summary>Fleet status for every device in the tenant, or every device everywhere when
-        /// tenantID is null (roadmap #8) - callers must check CallerReadsDevicesGlobally before
-        /// passing null. Online is computed against the server clock via DeviceFleetStatus.ComputeOnline.</summary>
+        /// tenantID is null - callers must check CallerReadsDevicesGlobally before passing null.
+        /// Online is computed against the server clock via DeviceFleetStatus.ComputeOnline.</summary>
         Task<IList<DeviceFleetStatus>> DeviceFleetGetAsync(int? tenantID);
 
-        // Device events (roadmap #28)
+        // Device events
 
-        /// <summary>
-        /// Records one device event, unless an identical eventType for the same device was already
-        /// recorded within the last ServerConfig.EventDedupeMinutes (default 10) - a flapping
-        /// "NoInternet" every loop cycle should not flood the table. deviceID/tenantID come from the
-        /// authenticated device identity, same rule as SensorDataPushAsync. Returns false when the
-        /// push was deduped (nothing written), true when it was actually inserted.
-        /// </summary>
+        /// <summary>Records one device event, unless an identical eventType for the same device was
+        /// already recorded within the last ServerConfig.EventDedupeMinutes (default 10) - a
+        /// flapping "NoInternet" every loop cycle should not flood the table. Returns false when the
+        /// push was deduped (nothing written), true when it was actually inserted.</summary>
         Task<bool> EventDevicePushAsync(int deviceID, int tenantID, DeviceEventType eventType, string? message);
 
         /// <summary>Most recent events for one device, newest first, capped at <paramref name="limit"/>.
@@ -97,7 +91,7 @@ namespace api.Dal.Interface
         /// another tenant simply matches zero rows rather than leaking another tenant's events.</summary>
         Task<IList<DeviceEvent>> EventDeviceGetAsync(int? deviceID, int? tenantID, int limit = 100);
 
-        // Offline alert background worker (roadmap #40)
+        // Offline alert background worker
 
         /// <summary>Every enabled device, across every tenant - the worker is not tenant-scoped,
         /// it runs once for the whole install.</summary>
@@ -107,7 +101,7 @@ namespace api.Dal.Interface
         /// row - see OfflineAlertCandidate for what that field means.</summary>
         Task DeviceOfflineNotifiedSetAsync(int deviceID, DateTime? notifiedAt);
 
-        // Low-battery alert background worker (roadmap #12, #40 pattern)
+        // Low-battery alert background worker
 
         /// <summary>Every enabled device, across every tenant, with its latest telemetry battery
         /// reading - the worker is not tenant-scoped, it runs once for the whole install.</summary>
