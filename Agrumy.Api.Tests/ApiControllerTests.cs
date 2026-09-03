@@ -13,29 +13,18 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Controller tests with a mocked <see cref="IRepository"/> / <see cref="ICache"/> passed straight
-/// to the controller constructor. No database, no MVC pipeline (so the global DbExceptionFilter is
-/// not in play - its behaviour is covered by <see cref="DbExceptionFilterTests"/>).
-/// </summary>
+/// <summary>Controller tests with a mocked <see cref="IRepository"/>/<see cref="ICache"/>, bypassing the MVC pipeline (DbExceptionFilter behavior is covered by <see cref="DbExceptionFilterTests"/>).</summary>
 public class ApiControllerTests
 {
     private readonly Mock<IRepository> _repo = new(MockBehavior.Strict);
     private readonly Mock<ICache> _cache = new();
 
-    // Loose: most tests here don't care whether/how an activation or approval email was
-    // dispatched - only the handful that assert on it (see the roadmap #24/#63 section) add setups.
     private readonly Mock<INotificationDispatcher> _notifications = new();
 
-    // Roadmap #104: bound from the same appsettings.json TestConfig.Init() already read Config.*
-    // from (module initializer, runs once for the whole assembly) - a token UserApiController
-    // signs with this and JwtTokenProvider.ValidateToken (Config.secureKey) validates use the same
-    // key/issuer/audience.
+    // Bound from the same appsettings.json TestConfig.Init() reads Config.* from, so a token signed here and JwtTokenProvider.ValidateToken use the same key/issuer/audience.
     private static readonly IOptions<AgrumySettings> TestSettings = Options.Create(AgrumySettings.Bind(TestConfig.Configuration));
 
-    // Roadmap #34: CommandQueueService is a plain sealed class (not mocked) - IRepository already
-    // implements ICommandRepository/IDeviceRepository/IDeviceUnitRepository, so the same mock
-    // backs all three of its constructor params.
+    // CommandQueueService is a plain sealed class (not mocked); IRepository already implements all three interfaces it needs, so one mock backs all three constructor params.
     private DeviceApiController NewDeviceController() => new(_repo.Object, _cache.Object,
         new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), FirmwareTestSupport.NewCatalog(_repo.Object));
     private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _notifications.Object, TestSettings);
@@ -44,8 +33,7 @@ public class ApiControllerTests
     private static void SetCaller(ControllerBase controller, string role, int? tenantId) =>
         SetCallerRoles(controller, tenantId, role);
 
-    /// <summary>#66: same, but with the full multi-role claim set a real post-#66 token carries
-    /// (legacy alias first, then the granular roles - order matters only for CallerRole).</summary>
+    /// <summary>Same, but with the full multi-role claim set a real token carries (legacy alias first, then granular roles - order matters only for CallerRole).</summary>
     private static void SetCallerRoles(ControllerBase controller, int? tenantId, params string[] roles)
     {
         var claims = new List<Claim> { new("TenantID", tenantId.ToString() ?? "") };
@@ -56,7 +44,6 @@ public class ApiControllerTests
         };
     }
 
-    // ---- DeviceApiController.DeviceGet ----------------------------------------------------
 
     [Fact]
     public async Task DeviceGet_HappyPath_ReturnsOkWithDevice()
@@ -163,7 +150,6 @@ public class ApiControllerTests
         _repo.Verify(r => r.DeviceAddAsync(It.IsAny<Device>()), Times.Never);
     }
 
-    // ---- roadmap #7/#8: fleet online threshold ---------------------------------------------
 
     [Theory]
     // 60s poll: window is 60*3 + 90 = 270s.
@@ -201,15 +187,11 @@ public class ApiControllerTests
 
         var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 66, Rssi = -60 });
 
-        // The matching version path must still land the heartbeat - that's what LastSeenAt is for.
         _repo.Verify(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.Is<DeviceConfigPoll>(p => p.Rssi == -60)), Times.Once);
         Assert.IsType<OkResult>(result.Result); // empty body: device is up to date
     }
 
-    // Roadmap #106: the version check must use the device row GetConfig already read for the #7
-    // diagnostics upsert, not a session-cache copy - proven here by never stubbing Cache at all
-    // (a loose mock, so an untouched GetDeviceCacheAsync/SetItemAsync would silently return
-    // defaults rather than fail) and verifying neither is ever called.
+    // Uses the device row GetConfig already read, not a cache copy - proven by never stubbing Cache (a loose mock would silently return defaults rather than fail) and verifying neither method is called.
     [Fact]
     public async Task GetConfig_NeverTouchesSessionCache()
     {
@@ -224,8 +206,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // BuildDeviceConfigAsync always reads this
         _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // roadmap #34: none pending
 
-        // Version mismatch (65 sent, DB has 66) - must return the full config, sourced from the
-        // DB read, not a cache lookup that no longer carries ConfigVersion at all.
+        // Version mismatch must return the full config from the DB read, not a cache lookup that no longer carries ConfigVersion.
         var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 65 });
 
         Assert.IsType<OkObjectResult>(result.Result);
@@ -233,9 +214,7 @@ public class ApiControllerTests
         _cache.Verify(c => c.SetItemAsync(It.IsAny<string>(), It.IsAny<DeviceCache>()), Times.Never);
     }
 
-    // Roadmap #109: the old fixed 5-min sliding TTL meant a device sleeping longer than that (the
-    // #89 dropdown goes up to 24h) lost its session every cycle - Authenticate must size the TTL
-    // to the device's own SleepSeconds instead.
+    // Authenticate must size the session TTL to the device's own SleepSeconds, not a fixed default, or a slow-polling device loses its session mid-cycle.
     [Theory]
     [InlineData(null, 1800)]    // no SleepSeconds on record - 30-min floor
     [InlineData(60, 1800)]      // short poll - 2x60=120s would be far too short, floor applies
@@ -261,7 +240,6 @@ public class ApiControllerTests
         Assert.Equal(TimeSpan.FromSeconds(expectedTtlSeconds), capturedTtl);
     }
 
-    // ---- roadmap #70: PIN expiry + multi-use (follow-up: no longer consumed on first use) ----
 
     private static DeviceRegistration PinRegistration(string pin) => new()
     {
@@ -317,8 +295,6 @@ public class ApiControllerTests
     [Fact]
     public async Task DeviceRegistration_ValidPin_NotConsumed_ReusableForASecondDevice()
     {
-        // Roadmap #70 follow-up: single-use made bulk sensor registration a chore of regenerating
-        // the PIN between every device - it must now survive repeated use until its own expiry.
         StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
         _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF"))
              .ReturnsAsync(new Device { IDDevice = 500, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
@@ -341,12 +317,7 @@ public class ApiControllerTests
         _repo.Verify(r => r.UserSetDevicePinAsync(It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<DateTime?>()), Times.Never);
     }
 
-    // ---- UserApiController.UserRegistration ------------------------------------------------
-
-    /// <summary>Common post-UserAddAsync plumbing every UserRegistration call now goes through
-    /// (roadmap #24/#66): a lookup to recover the freshly-inserted IDUser, an activation token
-    /// write, and a starting role assignment. None of these are the point of most of these tests,
-    /// so they're stubbed permissively here.</summary>
+    /// <summary>Common post-UserAddAsync plumbing every UserRegistration call goes through: recovers the freshly-inserted IDUser, writes an activation token, and assigns a starting role. Stubbed permissively here since it isn't the point of most of these tests.</summary>
     private void StubActivationPlumbing(string email, int idUser)
     {
         _repo.Setup(r => r.UserGetAsync(null, email, null)).ReturnsAsync(new User { IDUser = idUser, Email = email });
@@ -434,8 +405,7 @@ public class ApiControllerTests
     [Fact]
     public async Task UserRegistration_ExistingTenantZero_AutoEnabled_NoOneToApprove()
     {
-        // TenantID 0 has no owning admin to ask, same "nobody to approve" reasoning as a brand-new
-        // tenant's own creator above - roadmap #63.
+        // TenantID 0 has no owning admin to ask, same "nobody to approve" reasoning as a brand-new tenant's own creator above.
         _repo.Setup(r => r.TenantGetAsync("default")).ReturnsAsync(true);
         _repo.Setup(r => r.TenantGetIdAsync("default")).ReturnsAsync(0);
         StubActivationPlumbing("newbie@example.com", 3);
@@ -453,7 +423,6 @@ public class ApiControllerTests
         Assert.True(capturedUser!.Enabled);
     }
 
-    // ---- UserApiController.UserLogin -----------------------------------------------------
 
     [Fact]
     public async Task UserLogin_CorrectCredentials_ReturnsOkWithToken()
@@ -466,8 +435,7 @@ public class ApiControllerTests
              .ReturnsAsync(new User { IDUser = 5, Email = "alice@example.com", UserRoleID = 1, TenantID = 0, EmailVerified = true, Enabled = true });
         _repo.Setup(r => r.UserSecretGetAsync(null, "alice@example.com", null))
              .ReturnsAsync(new UserSecret { PwdHash = hash, PwdSalt = salt });
-        // Roadmap #66: the real source of truth going forward - a non-empty set here means
-        // UserRoleGetAsync()'s legacy-fallback path is never touched.
+        // A non-empty role set here means UserRoleGetAsync()'s legacy-fallback path is never exercised.
         _repo.Setup(r => r.UserRoleNamesGetAsync(5)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         _repo.Setup(r => r.RefreshTokenAddAsync(5, It.IsAny<string>(), It.IsAny<DateTime>())).ReturnsAsync(1);
 
@@ -480,7 +448,7 @@ public class ApiControllerTests
         Assert.Equal("alice@example.com", login.Email);
         Assert.False(string.IsNullOrEmpty(login.Token));
         Assert.False(string.IsNullOrEmpty(login.RefreshToken));
-        // Legacy "user" alias first (pre-#66 checks read the first role claim), then the real role.
+        // Legacy "user" alias first (first-role-claim readers expect it), then the real role.
         Assert.Equal(new[] { "user", RoleNames.TenantReader }, JwtTokenProvider.ValidateToken(login.Token!));
     }
 
@@ -516,7 +484,6 @@ public class ApiControllerTests
         Assert.Equal("Wrong username or password", obj.Value);
     }
 
-    // ---- UserApiController.UserLogin - roadmap #68 (Enabled/EmailVerified were never checked) ----
 
     [Fact]
     public async Task UserLogin_CorrectPassword_EmailNotVerified_Returns403_NotAToken()
@@ -535,8 +502,7 @@ public class ApiControllerTests
 
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(403, obj.StatusCode);
-        // MockBehavior.Strict: an un-set-up RefreshTokenAddAsync call would throw, so reaching this
-        // point already proves no token was ever issued.
+        // MockBehavior.Strict: an un-set-up RefreshTokenAddAsync call would throw, proving no token was ever issued.
     }
 
     [Fact]
@@ -558,7 +524,6 @@ public class ApiControllerTests
         Assert.Equal(403, obj.StatusCode);
     }
 
-    // ---- UserApiController.BootstrapPending / BootstrapSetPassword (roadmap #91) ------
 
     [Fact]
     public async Task BootstrapPending_DelegatesToRepo()
@@ -602,7 +567,6 @@ public class ApiControllerTests
         Assert.Equal(403, obj.StatusCode);
     }
 
-    // ---- UserApiController.RefreshToken / RevokeRefreshToken --------------------------
 
     private static string HashRefreshToken(string plaintext) =>
         Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(plaintext)));
@@ -617,8 +581,7 @@ public class ApiControllerTests
             new RefreshTokenInfo { UserID = 5, ExpiresAt = DateTime.UtcNow.AddDays(10), RevokedAt = null });
         _repo.Setup(r => r.UserGetAsync(5, null, null))
              .ReturnsAsync(new User { IDUser = 5, Email = "alice@example.com", UserRoleID = 1, TenantID = 0, EmailVerified = true, Enabled = true });
-        // Roadmap #66: empty userUserRole set exercises the legacy UserGroupID-derived fallback in
-        // ResolveCallerTokenRolesAsync - covers an account the migration somehow missed.
+        // Empty userUserRole set exercises the legacy UserGroupID-derived fallback in ResolveCallerTokenRolesAsync, covering an account the migration missed.
         _repo.Setup(r => r.UserRoleNamesGetAsync(5)).ReturnsAsync(new List<string>());
         _repo.Setup(r => r.UserRoleGetAsync())
              .ReturnsAsync(new List<UserRole> { new() { IDUserRole = 1, RoleName = "user" } });
@@ -680,15 +643,13 @@ public class ApiControllerTests
 
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(401, obj.StatusCode);
-        // MockBehavior.Strict: an un-set-up RefreshTokenRotateAsync/RevokeAllForUserAsync call would
-        // throw, so reaching this point already proves neither was called.
+        // MockBehavior.Strict: an un-set-up RefreshTokenRotateAsync/RevokeAllForUserAsync call would throw, proving neither was called.
     }
 
     [Fact]
     public async Task RefreshToken_ValidToken_ButUserDisabledSinceIssue_Returns403_DoesNotRotate()
     {
-        // Roadmap #68: a refresh token issued before an admin disabled the account (or before email
-        // verification, hypothetically) must not keep minting fresh access tokens forever.
+        // A refresh token issued before an admin disabled the account must not keep minting fresh access tokens.
         string hash = HashRefreshToken("still-technically-valid");
         _repo.Setup(r => r.RefreshTokenGetAsync(hash)).ReturnsAsync(
             new RefreshTokenInfo { UserID = 11, ExpiresAt = DateTime.UtcNow.AddDays(10), RevokedAt = null });
@@ -714,7 +675,6 @@ public class ApiControllerTests
         Assert.IsType<OkResult>(result);
     }
 
-    // ---- tenant scoping ---------------------------------------------------------------
 
     [Fact]
     public async Task UserGet_DifferentTenant_Returns403()
@@ -756,8 +716,7 @@ public class ApiControllerTests
     [Fact]
     public async Task UsersGet_UsesCallerTenant_NotHardcodedDefault()
     {
-        // Strict mock: if the controller passed a hard-coded 0 instead of the caller's claim,
-        // this setup wouldn't match and the call would throw.
+        // Strict mock: a hard-coded 0 instead of the caller's claim wouldn't match this setup and would throw.
         _repo.Setup(r => r.UsersGetAsync(7)).ReturnsAsync(new List<User> { new() { IDUser = 1, TenantID = 7 } });
 
         var controller = NewUserController();
@@ -872,7 +831,6 @@ public class ApiControllerTests
         _repo.Verify(r => r.UserUpdateAsync(It.IsAny<User>()), Times.Never);
     }
 
-    // ---- UserApiController.Activate / ResendActivation - roadmap #24/#63 -------------------
 
     [Fact]
     public async Task Activate_ValidToken_TenantZero_VerifiesAndReportsCanSignIn()
@@ -925,8 +883,7 @@ public class ApiControllerTests
     [Fact]
     public async Task Activate_MissingToken_Returns400_DoesNotHitRepo()
     {
-        // Strict mock: an un-set-up UserActivateAsync call would throw, so reaching this point
-        // already proves the controller short-circuited before touching the repo.
+        // Strict mock: an un-set-up UserActivateAsync call would throw, proving the controller short-circuited before touching the repo.
         var controller = NewUserController();
         var result = await controller.Activate(null);
 
@@ -944,8 +901,7 @@ public class ApiControllerTests
         var result = await controller.ResendActivation(new ResendActivationRequest { Login = "verified@example.com" });
 
         Assert.IsType<OkObjectResult>(result);
-        // Strict mock: an un-set-up ServerConfigGetAsync/UserIssueActivationTokenAsync call would
-        // throw - reaching this point proves EmailVerified==true short-circuited before either ran.
+        // Strict mock: an un-set-up ServerConfigGetAsync/UserIssueActivationTokenAsync call would throw, proving EmailVerified==true short-circuited before either ran.
     }
 
     [Fact]
@@ -995,7 +951,6 @@ public class ApiControllerTests
         _notifications.Verify(n => n.DispatchAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    // ---- UserApiController - roadmap #65 (minimal Global admin) ---------------------------
 
     [Fact]
     public async Task UsersGet_GlobalAdmin_ReturnsEveryTenant_NotJustItsOwn()
@@ -1009,8 +964,7 @@ public class ApiControllerTests
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         Assert.Equal(2, Assert.IsAssignableFrom<IList<User>>(ok.Value).Count);
-        // Strict mock: an un-set-up UsersGetAsync(0) call would throw, proving the "all tenants"
-        // path was taken instead of the normal tenant-scoped one.
+        // Strict mock: an un-set-up UsersGetAsync(0) call would throw, proving the "all tenants" path was taken instead of the normal tenant-scoped one.
     }
 
     [Fact]
@@ -1074,7 +1028,6 @@ public class ApiControllerTests
         Assert.Equal("User deleted", ok.Value);
     }
 
-    // ---- UserApiController.UserRolesGet / UserRolesSet - roadmap #66 (composable roles) ----
 
     [Fact]
     public async Task UserRolesGet_DifferentTenant_Returns403()
@@ -1148,7 +1101,6 @@ public class ApiControllerTests
         Assert.IsType<OkResult>(result);
     }
 
-    // ---- #66 Phase 2: granular capability scoping (inline logic, attributes covered below) ----
 
     private ServerConfigApiController NewServerConfigController() => new(_repo.Object, _cache.Object);
     private SensorDataController NewSensorDataController() => new(_repo.Object, _cache.Object);
@@ -1170,8 +1122,7 @@ public class ApiControllerTests
     [Fact]
     public async Task DeviceUpdate_DefaultTenantDevice_CallerOwnsDefaultTenant_Succeeds()
     {
-        // Roadmap #111: TenantID=0 is a real default tenant, not a "no tenant" sentinel - its own
-        // (non-Global) admin must be able to manage a device whose row has TenantID=0.
+        // TenantID=0 is a real default tenant, not a "no tenant" sentinel - its own admin must be able to manage devices there.
         _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 0 });
         _repo.Setup(r => r.DeviceUpdateAsync(It.IsAny<Device>())).Returns(Task.CompletedTask);
 
@@ -1223,9 +1174,6 @@ public class ApiControllerTests
         Assert.Equal(403, obj.StatusCode);
     }
 
-    // ---- DeviceApiController.DeviceConfigControllerUpdate - roadmap #21: relay-pin mapping only,
-    // no more schedule/safety-limit validation here (moved to DeviceUnitApiController's Zone/Rule
-    // endpoints and DeviceUnitZoneUpdate - see RelationalIntegrationTests.cs for those) -----------
 
     [Fact]
     public async Task DeviceConfigControllerUpdate_RelayMappingOnly_Persists()
@@ -1246,7 +1194,6 @@ public class ApiControllerTests
         _repo.Verify(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>()), Times.Once);
     }
 
-    // ---- ServerConfigApiController.Update - roadmap #39 ScheduleTimeZone validation -------------
 
     [Fact]
     public async Task ServerConfigUpdate_UnknownScheduleTimeZone_Returns400_AndNeverWrites()
@@ -1257,8 +1204,7 @@ public class ApiControllerTests
         var result = await controller.Update(new ServerConfig { ScheduleTimeZone = "Not/AZone" });
 
         Assert.IsType<BadRequestObjectResult>(result);
-        // MockBehavior.Strict: ServerConfigUpdateAsync has no setup, so reaching this point already
-        // proves the bad id was rejected before any write.
+        // MockBehavior.Strict: ServerConfigUpdateAsync has no setup, proving the bad id was rejected before any write.
     }
 
     [Fact]
@@ -1281,8 +1227,7 @@ public class ApiControllerTests
     [Fact]
     public async Task ServerConfigUpdate_BlankScheduleTimeZone_ClearsToNull()
     {
-        // Blank is a valid, intentional "not configured" state (api.Models.ServerConfig's comment) -
-        // must not be rejected the way an actually-unknown id is.
+        // Blank is a valid "not configured" state (see api.Models.ServerConfig) - must not be rejected like an actually-invalid value.
         ServerConfig? saved = null;
         _repo.Setup(r => r.ServerConfigUpdateAsync(It.IsAny<ServerConfig>()))
              .Callback<ServerConfig>(c => saved = c)
@@ -1297,7 +1242,6 @@ public class ApiControllerTests
         Assert.Null(saved!.ScheduleTimeZone);
     }
 
-    // ---- ServerConfigApiController.Update - roadmap #36 safety-limit validation -----------------
 
     [Fact]
     public async Task ServerConfigUpdate_WaterPumpMaxRunSecondsNegative_Returns400_AndNeverWrites()
@@ -1308,8 +1252,7 @@ public class ApiControllerTests
         var result = await controller.Update(new ServerConfig { WaterPumpMaxRunSeconds = -1 });
 
         Assert.IsType<BadRequestObjectResult>(result);
-        // MockBehavior.Strict: ServerConfigUpdateAsync has no setup, so reaching this point already
-        // proves the bad value was rejected before any write.
+        // MockBehavior.Strict: ServerConfigUpdateAsync has no setup, proving the bad value was rejected before any write.
     }
 
     [Fact]
@@ -1323,7 +1266,6 @@ public class ApiControllerTests
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
-    // ---- ServerConfigApiController.Update - roadmap #15 retention-days validation ----------------
 
     [Fact]
     public async Task ServerConfigUpdate_SensorDataRetentionDaysNegative_Returns400_AndNeverWrites()
@@ -1334,8 +1276,7 @@ public class ApiControllerTests
         var result = await controller.Update(new ServerConfig { SensorDataRetentionDays = -1 });
 
         Assert.IsType<BadRequestObjectResult>(result);
-        // MockBehavior.Strict: ServerConfigUpdateAsync has no setup, so reaching this point already
-        // proves the bad value was rejected before any write.
+        // MockBehavior.Strict: ServerConfigUpdateAsync has no setup, proving the bad value was rejected before any write.
     }
 
     [Fact]
@@ -1357,8 +1298,7 @@ public class ApiControllerTests
     [Fact]
     public async Task DevicesGet_GlobalReader_SeesEveryTenant()
     {
-        // Strict mock: an un-set-up DevicesGetAsync(3) call would throw, proving the all-tenants
-        // path was taken.
+        // Strict mock: an un-set-up DevicesGetAsync(3) call would throw, proving the all-tenants path was taken.
         _repo.Setup(r => r.DevicesGetAllAsync()).ReturnsAsync(new List<Device>
         {
             new() { IDDevice = 1, TenantID = 0 }, new() { IDDevice = 2, TenantID = 7 },
@@ -1469,8 +1409,7 @@ public class ApiControllerTests
     [Fact]
     public async Task UserUpdate_TenantDevice_Returns403_DeviceGrantNeverImpliesUserManagement()
     {
-        // Defence in depth: even if the attribute somehow let a device-only grant through, the
-        // inline CallerManagesUsers check must still refuse.
+        // Defence in depth: even if the attribute somehow let a device-only grant through, the inline CallerManagesUsers check must still refuse.
         _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local" });
 
         var controller = NewUserController();
@@ -1485,8 +1424,7 @@ public class ApiControllerTests
     [Fact]
     public async Task ServerConfig_TenantAdmin_Returns403_ServerWideSettingsAreGlobalOnly()
     {
-        // Strict mock: an un-set-up ServerConfigGetAsync call would throw, so reaching the asserts
-        // proves the request was refused before touching the repo.
+        // Strict mock: an un-set-up ServerConfigGetAsync call would throw, proving the request was refused before touching the repo.
         var controller = NewServerConfigController();
         SetCallerRoles(controller, 5, "admin", RoleNames.TenantAdmin);
 
@@ -1548,11 +1486,7 @@ public class ApiControllerTests
     }
 }
 
-/// <summary>
-/// Regression guards for the #66 Phase 2 role gates. [Authorize] is middleware, so these assert
-/// the attribute's role list rather than driving a request - the inline tenant-scoping logic is
-/// covered by the direct-call tests above.
-/// </summary>
+/// <summary>Regression guards for the Phase 2 role gates: asserts the [Authorize] attribute's role list rather than driving a request.</summary>
 public class RoleGateAuthorizationTests
 {
     private static string? RolesOn(Type controller, string method) =>
