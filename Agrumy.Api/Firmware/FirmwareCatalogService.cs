@@ -5,12 +5,12 @@ using api.Models;
 
 namespace api.Firmware
 {
-    /// <summary>Roadmap #94/#93 business logic over the deviceFirmware catalog: which source is
-    /// active and which rows a device may be offered, the three ways a Local repository gets
-    /// populated (pull from GitHub, import a server-side directory, manual upload), the GitHub /
-    /// Custom-manifest reads, and the per-device offer resolution BuildDeviceConfigAsync uses. Kept
-    /// separate from FirmwareApiController/DeviceApiController the same way CommandQueueService is
-    /// (roadmap #34) - directly unit-testable with a mocked repository and a canned IFirmwareFetcher.</summary>
+    /// <summary>Business logic over the deviceFirmware catalog: which source is active and which
+    /// rows a device may be offered, the three ways a Local repository gets populated (pull from
+    /// GitHub, import a server-side directory, manual upload), the GitHub/Custom-manifest reads,
+    /// and the per-device offer resolution BuildDeviceConfigAsync uses. Kept separate from
+    /// FirmwareApiController/DeviceApiController so it stays directly unit-testable with a mocked
+    /// repository and a canned IFirmwareFetcher.</summary>
     public sealed class FirmwareCatalogService(
         IFirmwareRepository firmwareRepo,
         IServerConfigRepository configRepo,
@@ -25,9 +25,9 @@ namespace api.Firmware
         private static readonly JsonSerializerOptions ManifestJson = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
         /// <summary>Which catalog rows a device may be offered: the ACTIVE source's rows, plus
-        /// Local ones always - a manually uploaded .bin (#93-c-2) is hosted by this API regardless
-        /// of what the default source is, so hiding it just because GitHub is selected would make
-        /// "upload and install this build" silently do nothing.</summary>
+        /// Local ones always - a manually uploaded .bin is hosted by this API regardless of what
+        /// the default source is, so hiding it just because GitHub is selected would make "upload
+        /// and install this build" silently do nothing.</summary>
         public static IReadOnlyCollection<FirmwareSource> VisibleSources(FirmwareSource active) =>
             active == FirmwareSource.Local ? [FirmwareSource.Local] : [active, FirmwareSource.Local];
 
@@ -62,9 +62,8 @@ namespace api.Firmware
 
         /// <summary>The build to offer <paramref name="device"/> on this config poll, or null when
         /// nothing should be offered: FirmwareUpdate must be set; a pinned FirmwareTargetVersion wins
-        /// over "latest"; a device that has never reported its Board (pre-#94 firmware) falls back to
-        /// the legacy per-DeviceTypeID row so an old fleet still updates to a firmware that WILL
-        /// report it.</summary>
+        /// over "latest"; a device that has never reported its Board falls back to the legacy
+        /// per-DeviceTypeID row so an old fleet still updates to a firmware that WILL report it.</summary>
         public async Task<DeviceFirmware?> ResolveOfferAsync(Device device, string? board)
         {
             if (device.FirmwareUpdate != true)
@@ -87,7 +86,7 @@ namespace api.Firmware
             return device.DeviceTypeID == null ? null : await deviceRepo.DeviceFirmwareLatestGetAsync(device.DeviceTypeID);
         }
 
-        // ---- per-device update request (roadmap #93) ---------------------------------------
+        // ---- per-device update request ---------------------------------------
 
         /// <summary>Arms the OTA flag. Returns an error message (for a 400) when a specific version
         /// was requested that the catalog does not have for the device's board, or when the device
@@ -170,7 +169,7 @@ namespace api.Firmware
                 }
             }
 
-            // PullFull / PullIncremental (roadmap #94-2a): GitHub -> local store, whichever source is
+            // PullFull / PullIncremental: GitHub -> local store, regardless of whichever source is
             // currently active - an admin prepares the Local repository BEFORE switching to it.
             var result = new FirmwareSyncResult();
             if (mode == FirmwareSyncMode.PullFull)
@@ -201,9 +200,9 @@ namespace api.Firmware
                         continue;
                     }
 
-                    // Roadmap #41: pull the full-image sibling too, when the release published one -
-                    // a download failure here downgrades to a warning rather than aborting the whole
-                    // row (the OTA half already succeeded and is worth keeping either way).
+                    // Pull the full-image sibling too, when the release published one - a download
+                    // failure here downgrades to a warning rather than aborting the whole row (the
+                    // OTA half already succeeded and is worth keeping either way).
                     string? fullImageFileName = null, fullImageSha = null;
                     long? fullImageSize = null;
                     if (remote.FullImageFileName != null && remote.FullImageUrl != null)
@@ -282,7 +281,7 @@ namespace api.Firmware
             return result;
         }
 
-        // ---- roadmap #94-2b: import a directory on this server (mounted USB) -----------------
+        // ---- import a directory on this server (mounted USB) -----------------
 
         public async Task<FirmwareSyncResult> ImportFromDirectoryAsync(string? path, string publicBaseUrl, CancellationToken cancellationToken = default)
         {
@@ -318,9 +317,9 @@ namespace api.Firmware
                 result.Warnings.Add($"No {ManifestFileName} in the directory - files imported without checksum verification.");
             }
 
-            // Roadmap #41: a full-image file only ever attaches to an OTA row created in THIS SAME
-            // pass - collected up front so the OTA loop below can look one up by (board, version)
-            // without a second directory scan.
+            // A full-image file only ever attaches to an OTA row created in THIS SAME pass -
+            // collected up front so the OTA loop below can look one up by (board, version) without
+            // a second directory scan.
             Dictionary<(string Board, string Version), string> fullImagePaths = new();
             foreach (string filePath in Directory.EnumerateFiles(path, "*.bin"))
             {
@@ -384,7 +383,7 @@ namespace api.Firmware
             return result;
         }
 
-        // ---- roadmap #94-2c / #93-c-2: manual upload ---------------------------------------
+        // ---- manual upload ---------------------------------------
 
         /// <summary>Returns the error (for a 400) when the file name is not in the convention.</summary>
         public async Task<(DeviceFirmware? Firmware, string? Error)> UploadAsync(string? fileName, Stream content, string publicBaseUrl, CancellationToken cancellationToken = default)
@@ -396,9 +395,9 @@ namespace api.Firmware
             return (await AddLocalAsync(board, version, fileName!, content, publicBaseUrl, cancellationToken), null);
         }
 
-        /// <summary>Roadmap #41: <paramref name="fullImageFileName"/>/<paramref name="fullImageContent"/>
-        /// are optional - only ImportFromDirectoryAsync ever supplies them today (it can see both
-        /// files in the same directory scan); UploadAsync's single-file form stays OTA-only.</summary>
+        /// <summary><paramref name="fullImageFileName"/>/<paramref name="fullImageContent"/> are
+        /// optional - only ImportFromDirectoryAsync ever supplies them (it can see both files in
+        /// the same directory scan); UploadAsync's single-file form stays OTA-only.</summary>
         private async Task<DeviceFirmware> AddLocalAsync(string board, string version, string fileName, Stream content, string publicBaseUrl,
             CancellationToken cancellationToken, string? fullImageFileName = null, Stream? fullImageContent = null)
         {
@@ -449,7 +448,7 @@ namespace api.Firmware
             return true;
         }
 
-        // ---- manifest + file access (roadmap #94-C1 browser tool, Custom repositories) --------
+        // ---- manifest + file access (browser tool, Custom repositories) --------
 
         /// <summary>The visible catalog in manifest.json form - what the browser "Build offline
         /// repo" tool copies onto a USB stick (URLs stripped there) and what another Agrumy install
@@ -477,9 +476,9 @@ namespace api.Firmware
                 foreach (DeviceFirmware r in boardRows)
                 {
                     files.Add(new FirmwareManifestFile { Board = r.Board, FileName = r.FileName, SizeBytes = r.SizeBytes, Sha256 = r.Sha256, Url = r.Url, Kind = "ota" });
-                    // Roadmap #41: the full-image sibling, when this row has one - a second manifest
-                    // entry, not a field on the OTA one, so a reader that only understands the older
-                    // (pre-#41) flat file list still gets a correct OTA-only picture.
+                    // The full-image sibling, when this row has one - a second manifest entry, not
+                    // a field on the OTA one, so a reader that only understands a flat file list
+                    // still gets a correct OTA-only picture.
                     if (r.FullImageFileName != null)
                     {
                         files.Add(new FirmwareManifestFile { Board = r.Board, FileName = r.FullImageFileName, SizeBytes = r.FullImageSizeBytes, Sha256 = r.FullImageSha256, Url = r.FullImageUrl, Kind = "full" });
@@ -500,9 +499,9 @@ namespace api.Firmware
         /// Keyed by file name (what the manifest carries), Local preferred when two sources have it.</summary>
         public async Task<(Stream Content, string FileName)?> OpenAsync(string? fileName, CancellationToken cancellationToken = default)
         {
-            // Roadmap #41: a full-image file name is never a catalog row's own FileName - it lives on
-            // that row's FullImageFileName column instead (see DeviceFirmware's remarks) - so this
-            // needs to know which field to match/read before it can find or open anything.
+            // A full-image file name is never a catalog row's own FileName - it lives on that row's
+            // FullImageFileName column instead (see DeviceFirmware's remarks) - so this needs to
+            // know which field to match/read before it can find or open anything.
             bool isFullImage = FirmwareVersion.TryParseFullImageFileName(fileName, out string board, out _);
             if (!isFullImage && !FirmwareVersion.TryParseFileName(fileName, out board, out _))
             {
@@ -531,9 +530,8 @@ namespace api.Firmware
 
         // ---- remote readers ------------------------------------------------------------------
 
-        /// <summary>Roadmap #41: FullImage* fields are the paired blank-chip image for this same
-        /// Board+Version, when the remote source published one alongside the OTA file - null when it
-        /// didn't (an older release, or a source that predates #41).</summary>
+        /// <summary>FullImage* fields are the paired blank-chip image for this same Board+Version,
+        /// when the remote source published one alongside the OTA file - null when it didn't.</summary>
         internal sealed record RemoteFile(string Board, string Version, string FileName, string Url, long? SizeBytes, string? Sha256, DateTime? PublishedAt,
             string? FullImageFileName = null, string? FullImageUrl = null, long? FullImageSizeBytes = null, string? FullImageSha256 = null);
 
@@ -579,9 +577,9 @@ namespace api.Firmware
                     }
                 }
 
-                // Roadmap #41: two passes over the same asset list - the OTA pass is UNCHANGED
-                // (TryParseFileName structurally never matches a "-full-v..." name, see its remarks),
-                // then full-image assets are matched onto their same-board+version OTA RemoteFile.
+                // Two passes over the same asset list - the OTA pass is unchanged (TryParseFileName
+                // structurally never matches a "-full-v..." name), then full-image assets are
+                // matched onto their same-board+version OTA RemoteFile.
                 var releaseFiles = new List<RemoteFile>();
                 foreach (GitHubAsset asset in assets)
                 {
@@ -627,9 +625,9 @@ namespace api.Firmware
             var files = new List<RemoteFile>();
             foreach (FirmwareManifestRelease release in manifest?.Releases ?? [])
             {
-                // Roadmap #41: same two-pass shape as FetchGitHubReleasesAsync - which file is OTA vs
-                // full-image is decided by its FILE NAME convention (matching that method, and robust
-                // against a manifest whose Kind field is missing/wrong), not the Kind field itself.
+                // Same two-pass shape as FetchGitHubReleasesAsync - which file is OTA vs full-image
+                // is decided by its FILE NAME convention (robust against a manifest whose Kind
+                // field is missing/wrong), not the Kind field itself.
                 var releaseFiles = new List<RemoteFile>();
                 foreach (FirmwareManifestFile file in release.Files)
                 {

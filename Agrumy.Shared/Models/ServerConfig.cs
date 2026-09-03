@@ -10,69 +10,53 @@ namespace api.Models
         public int? PortHTTP { get; set; }
         public int? PortHTTPS { get; set; }
 
-        // Server-wide defaults, seeded from appsettings.json ServerConfig:Hysteresis on first
-        // read (or on every startup when ServerConfig:Reload is true), then editable at runtime
-        // via this admin settings page - no restart needed after the initial seed. Copied onto a
-        // new device's DeviceConfigController row when the device is created; per-device values
-        // are then independently editable under Device -> Controller.
+        // Server-wide defaults, seeded from appsettings.json ServerConfig:Hysteresis on first read
+        // (or on every startup when ServerConfig:Reload is true), then editable at runtime. Copied
+        // onto a new device's DeviceConfigController row when created; per-device values are then
+        // independently editable under Device -> Controller.
         public double? WaterLevelHysteresis { get; set; }
         public double? TemperatureHysteresis { get; set; }
         public double? HumidityHysteresis { get; set; }
         public double? LightHysteresis { get; set; }
 
-        // Roadmap #12: low-battery alert threshold/hysteresis (percent, from the latest
-        // sensorData.Battery reading) - same dead-zone principle as the four fields above, but
-        // for LowBatteryAlertEvaluator's periodic sweep (roadmap #40 pattern), not on-device
-        // relay logic, so there is no per-device DeviceConfigController override: an alert
-        // threshold has no reason to differ device-to-device the way a physical relay setpoint
-        // does. Fires when Battery <= BatteryLowThreshold, clears (rearms) once Battery >=
-        // BatteryLowThreshold + BatteryLowHysteresis - avoids alert-spam flapping right at the edge.
+        // Low-battery alert threshold/hysteresis (percent, from the latest sensorData.Battery
+        // reading), for LowBatteryAlertEvaluator's periodic sweep - no per-device override since an
+        // alert threshold has no reason to differ device-to-device. Fires when Battery <=
+        // BatteryLowThreshold, clears once Battery >= BatteryLowThreshold + BatteryLowHysteresis.
         public double? BatteryLowThreshold { get; set; }
         public double? BatteryLowHysteresis { get; set; }
 
-        // Roadmap #36: WaterPump-only device-side hard safety limits (seconds) - same seed/reload/
-        // per-device-override pattern as the hysteresis fields above, not the battery pair (those
-        // have no per-device override; these do, via DeviceConfigController.WaterPumpMaxRunSeconds/
-        // WaterPumpCooldownSeconds). Null/0 disables either one. Enforced device-side
-        // (AgrumyFirmware's ActuatorController::applyWaterPumpSafetyLimits), independent of
-        // whichever control mode (threshold/interval/schedule) decided the pump should run.
+        // WaterPump-only device-side hard safety limits (seconds). Null/0 disables either one.
+        // Enforced device-side (AgrumyFirmware's ActuatorController::applyWaterPumpSafetyLimits),
+        // independent of whichever control mode decided the pump should run. Per-device override
+        // via DeviceConfigController.WaterPumpMaxRunSeconds/WaterPumpCooldownSeconds.
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
 
-        // Roadmap #28: a device repeating the identical DeviceEventType within this many minutes
-        // of its last one is ignored server-side rather than stored - same seed/reload/admin-edit
-        // pattern as the hysteresis fields above.
+        // A device repeating the identical DeviceEventType within this many minutes of its last one
+        // is ignored server-side rather than stored.
         public int? EventDedupeMinutes { get; set; }
 
-        // Roadmap #24: minimum minutes between "resend activation email" requests for the same
-        // user - default 10, admin-editable (same seed/reload pattern as the fields above).
+        // Minimum minutes between "resend activation email" requests for the same user - default 10.
         public int? ActivationResendCooldownMinutes { get; set; }
 
-        // Roadmap #64: off by default. When true, UserRegistration is allowed to create a brand
-        // new tenant for a name it doesn't recognize instead of rejecting the registration.
-        // Non-nullable: the row always carries a concrete value (seeded on first read, see
-        // EfRepository.ServerConfigGetAsync) - bool? here made asp-for render a text box
-        // ("True"/"False") instead of a checkbox, since the InputTagHelper only auto-detects
-        // a checkbox for a non-nullable bool.
+        // When true, UserRegistration is allowed to create a brand new tenant for a name it doesn't
+        // recognize instead of rejecting the registration. Non-nullable: bool? here would make
+        // asp-for render a text box instead of a checkbox.
         [Display(Name = "Allow self-service tenant creation")]
         public bool AllowSelfServiceTenantCreation { get; set; }
 
-        // Roadmap #39: single install-wide IANA zone id (e.g. "Europe/Zagreb") schedule-mode relay
-        // windows (DeviceConfigController.*ScheduleStart/Duration) are evaluated against. Null =
-        // not configured yet - BuildDeviceConfigAsync then sends every device UtcOffsetSeconds=0
-        // (UTC), so an admin who enables a schedule before setting this just gets UTC-anchored
-        // windows rather than a hard failure. One zone for the whole install (not per-device/tenant)
-        // is a deliberate v1 simplification - nothing in the roadmap design asked for finer scope,
-        // and every fleet observed so far lives in one geographic timezone.
+        // Single install-wide IANA zone id (e.g. "Europe/Zagreb") schedule-mode relay windows are
+        // evaluated against. Null = not configured yet - BuildDeviceConfigAsync then sends every
+        // device UtcOffsetSeconds=0 (UTC) rather than failing.
         [Display(Name = "Schedule time zone")]
         public string? ScheduleTimeZone { get; set; }
 
-        // Roadmap #94: where firmware comes from - see api.Models.FirmwareSource for what each mode
-        // means. GitHub is the default so a fresh install needs no setup; the repository is
-        // editable so a fork can point at its own releases.
-        // String on the wire: Refit's default serializer writes enums as their names, and the API
-        // must read that back (it still accepts the integer form too). Admin-only DTO, not part of
-        // the firmware contract, so this does not touch the raw-int convention devices rely on.
+        // Where firmware comes from - see api.Models.FirmwareSource for what each mode means.
+        // GitHub is the default so a fresh install needs no setup.
+        // String on the wire: Refit's default serializer writes enums as their names. Admin-only
+        // DTO, not part of the firmware contract, so this does not touch the raw-int convention
+        // devices rely on.
         [Display(Name = "Firmware source")]
         [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
         public FirmwareSource FirmwareSource { get; set; }
@@ -86,55 +70,45 @@ namespace api.Models
         [Display(Name = "Custom repository manifest URL")]
         public string? FirmwareCustomRepositoryUrl { get; set; }
 
-        // Roadmap #15: days of sensorData history to keep automatically. PostgreSQL/TimescaleDB
-        // installs enforce this through add_retention_policy (EfRepository.ApplyRetentionPolicyAsync,
-        // re-applied on every save so an admin edit here takes effect without a restart); MariaDB/
-        // MySQL installs enforce it through SensorDataRetentionBackgroundService's daily purge
-        // (roadmap #40 pattern) - one shared value, two different mechanisms underneath, same
-        // #14 tiered-hybrid split as everywhere else. Null/0 = no automatic retention (admin
-        // hasn't opted in) - same "no universal default" reasoning as ScheduleTimeZone above.
+        // Days of sensorData history to keep automatically. PostgreSQL/TimescaleDB installs enforce
+        // this through add_retention_policy; MariaDB/MySQL installs enforce it through
+        // SensorDataRetentionBackgroundService's daily purge - one shared value, two mechanisms.
+        // Null/0 = no automatic retention.
         [Display(Name = "Sensor data retention (days)")]
         public int? SensorDataRetentionDays { get; set; }
 
-        // Roadmap #11: install-wide location OpenWeatherMap forecasts are pulled for - same "one
-        // zone for the whole install" v1 simplification as ScheduleTimeZone above (no fleet
-        // observed so far spans more than one geographic point). Null = not configured yet,
-        // WeatherBackgroundService stays inert (WeatherEvaluator.RunOnceAsync's early-return) rather
-        // than failing loudly - same "inert until set" precedent as ScheduleTimeZone.
+        // Install-wide location OpenWeatherMap forecasts are pulled for. Null = not configured yet,
+        // WeatherBackgroundService stays inert rather than failing loudly.
         [Display(Name = "Latitude")]
         public double? WeatherLocationLat { get; set; }
         [Display(Name = "Longitude")]
         public double? WeatherLocationLon { get; set; }
 
-        // Roadmap #11: admin-editable poll cadence, user decision 2026-09-04 ("konfigurabilno...
-        // moze svakih 15min default" - OpenWeatherMap's free tier allows 1000 calls/day, far more
-        // than hourly would ever use). WeatherBackgroundService itself ticks once a minute (a fixed,
-        // cheap DB read) and only actually calls the API once this many minutes have elapsed since
-        // WeatherCheckedAtUtc - see that field's remarks for why this makes the interval live-
-        // editable without an app restart, unlike PeriodicBackgroundService.Interval elsewhere.
+        // Admin-editable poll cadence. WeatherBackgroundService itself ticks once a minute (a
+        // fixed, cheap DB read) and only actually calls the API once this many minutes have elapsed
+        // since WeatherCheckedAtUtc - see that field's remarks for why this makes the interval
+        // live-editable without an app restart.
         [Display(Name = "Forecast poll interval (minutes)")]
         public int? WeatherPollIntervalMinutes { get; set; }
 
-        // Roadmap #11: rain-probability percentage (OpenWeatherMap's "pop" field, 0-100) at or above
-        // which WeatherEvaluator sets WeatherRainPredicted. User decision 2026-09-04: configurable,
-        // 50% default.
+        // Rain-probability percentage (OpenWeatherMap's "pop" field, 0-100) at or above which
+        // WeatherEvaluator sets WeatherRainPredicted.
         [Display(Name = "Rain-skip threshold (%)")]
         public double? WeatherRainSkipThreshold { get; set; }
 
-        // Roadmap #11: WeatherEvaluator's last computed result - read-only display on the Server
-        // Settings page, NOT settable via ServerConfigApiController.Update (that endpoint never
-        // touches these two; only WeatherEvaluator writes them, through the narrow
-        // ServerConfigWeatherStateSetAsync, so a stale admin form post can never clobber a fresher
-        // reading - same "narrow single-purpose update" lesson #21's ZoneRename fix established).
+        // WeatherEvaluator's last computed result - read-only display on the Server Settings page,
+        // NOT settable via ServerConfigApiController.Update; only WeatherEvaluator writes them,
+        // through the narrow ServerConfigWeatherStateSetAsync, so a stale admin form post can never
+        // clobber a fresher reading.
         [Display(Name = "Rain predicted")]
         public bool WeatherRainPredicted { get; set; }
         [Display(Name = "Forecast last checked")]
         public DateTime? WeatherCheckedAtUtc { get; set; }
     }
 
-    /// <summary>The only two fields of <see cref="ServerConfig"/> a pre-login, unauthenticated page
-    /// is allowed to see - roadmap #64's Register view uses this to decide whether to show the
-    /// "create a new tenant" option at all, without needing the admin-only /api/ServerConfig.</summary>
+    /// <summary>The only field of <see cref="ServerConfig"/> a pre-login, unauthenticated page is
+    /// allowed to see - Register uses this to decide whether to show the "create a new tenant"
+    /// option, without needing the admin-only /api/ServerConfig.</summary>
     public class PublicServerConfig
     {
         public bool AllowSelfServiceTenantCreation { get; set; }
