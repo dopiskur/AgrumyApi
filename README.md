@@ -71,12 +71,13 @@ maintain yourself. **ThingsBoard** covers similar ground to Agrumy (multi-tenant
 device fleets, telemetry, dashboards) far more completely, with an actual rule
 engine and support for many transport protocols.
 
-Agrumy doesn't have a rule engine at all - device behavior is a fixed set of
-threshold pairs (temp/humidity/moisture/light/water low-high) and interval
-settings (ventilation/light/heating/water-pump enabled + interval + length),
-configured per device through `DeviceConfigController`/`DeviceConfigSensor`. If
-you need to express "if X and not Y between 6pm and 10pm, do Z," you're writing
-C# to add it, not YAML.
+Agrumy's rule engine (roadmap #21) is deliberately narrow, not general-purpose:
+each relay function (ventilation/light/heating/water-pump) on a zone holds a set
+of Threshold/Interval/Schedule rules, any one of which turning "on" wins (OR
+only - no AND/composite conditions across rules or across functions). Threshold's
+metric and direction are fixed per function, not user-configurable. If you need
+"if X and not Y between 6pm and 10pm, do Z," you're still writing C# to add it,
+not YAML.
 
 Where Agrumy makes sense: you're building (or already run) your own firmware for
 a specific vertical - here, citrus/greenhouse irrigation and micro-climate - and
@@ -319,6 +320,8 @@ Device endpoints use the separate apiId/apiKey/apiAuth scheme described in
 | `POST/PUT/DELETE /api/DeviceUnit/Zone` | DeviceManagers | Create / update / delete a zone |
 | `GET /api/DeviceUnit/Unassigned` | DeviceManagers | Devices not yet placed in any zone |
 | `POST /api/DeviceUnit/Assign`, `POST /api/DeviceUnit/Unassign` | DeviceManagers | Place / remove a device from a zone |
+| `GET /api/DeviceUnit/Zone/Rule` | JWT | Roadmap #21: a zone's automation rules (Threshold/Interval/Schedule per relay function) |
+| `POST/DELETE /api/DeviceUnit/Zone/Rule` | DeviceManagers | Add / remove one rule - several rules per relay function are OR'd together, there is no whole-list replace |
 | `GET /api/DeviceUnit/Dashboard`, `Dashboard/Zones`, `Dashboard/Zone` | JWT | Roadmap #116: hierarchical dashboard rollups (per-unit, per-zone-list, per-zone) |
 
 **Firmware** (`FirmwareApiController`, roadmap #94/#93, `api/Firmware`)
