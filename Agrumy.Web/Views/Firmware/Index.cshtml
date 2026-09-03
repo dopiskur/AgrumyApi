@@ -8,14 +8,6 @@
         FirmwareSource.Custom => "Custom repository: " + Model.Config.FirmwareCustomRepositoryUrl,
         _ => "GitHub Releases: " + Model.Config.FirmwareGitHubRepository,
     };
-    // Roadmap #41: one button per board that has a blank-chip image available - Model.Catalog is
-    // already board-then-newest-version-first (FirmwareCatalogService.ListAsync), so the first
-    // FullImage-carrying row per board group IS that board's latest installable build.
-    var installableBoards = Model.Catalog
-        .Where(f => f.Board != null && f.FullImageFileName != null && (f.Source == source || f.Source == FirmwareSource.Local))
-        .GroupBy(f => f.Board!)
-        .Select(g => g.First())
-        .ToList();
 }
 
 @if (TempData["Message"] is string message)
@@ -83,7 +75,7 @@
            esp-web-install-button element itself detects both and swaps in the "unsupported"/
            "not-allowed" slot content below, no feature-detection JS needed here. *@
         <h6 class="text-uppercase text-secondary small">Install to a device via USB</h6>
-        @if (installableBoards.Count == 0)
+        @if (Model.AutoDetectBuilds.Count == 0 && Model.ManualBuilds.Count == 0)
         {
             <p class="text-secondary small mb-0">No blank-chip installable image in the catalog yet for any board - refresh/pull a release built after roadmap #41.</p>
         }
@@ -91,7 +83,22 @@
         {
             <p class="text-secondary small mb-2">Flashes a brand-new, never-programmed board straight from the browser - no PlatformIO, no USB toolchain.</p>
             <div class="d-flex flex-wrap gap-2 align-items-center">
-                @foreach (var f in installableBoards)
+                @* Roadmap #148: esp-web-tools reads the connected chip's family over Web Serial and
+                   picks the matching build itself - one button covers every board whose chip family
+                   is unambiguous in today's catalog, instead of the admin guessing which per-board
+                   button matches the physical board in front of them. *@
+                @if (Model.AutoDetectBuilds.Count > 0)
+                {
+                    <esp-web-install-button manifest="@Url.Action("InstallManifestAuto")">
+                        <button type="button" slot="activate" class="btn btn-outline-primary"><i class="bi bi-usb-symbol"></i> Install (auto-detect board)</button>
+                        <span slot="unsupported" class="text-secondary small">This browser does not support Web Serial - use Chrome or Edge on desktop.</span>
+                        <span slot="not-allowed" class="text-secondary small">Web Serial requires HTTPS.</span>
+                    </esp-web-install-button>
+                }
+                @* A board sharing its chip family with another catalog board (or one EspChipFamily
+                   doesn't recognize) can't be told apart from the chip alone - kept as an explicit,
+                   individually-labeled manual button rather than risk auto-selecting the wrong image. *@
+                @foreach (var f in Model.ManualBuilds)
                 {
                     <esp-web-install-button manifest="@Url.Action("InstallManifest", new { board = f.Board })">
                         <button type="button" slot="activate" class="btn btn-outline-primary"><i class="bi bi-usb-symbol"></i> Install @f.Board (@f.Version)</button>
@@ -100,6 +107,12 @@
                     </esp-web-install-button>
                 }
             </div>
+            @if (Model.ManualBuilds.Count > 0)
+            {
+                <p class="text-secondary small mt-2 mb-0">
+                    <i class="bi bi-info-circle"></i> The board(s) above share a chip with another catalog entry, so auto-detection cannot tell them apart safely - pick the correct one manually.
+                </p>
+            }
         }
 
         <hr />

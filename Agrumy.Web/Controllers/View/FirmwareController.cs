@@ -16,11 +16,47 @@ namespace api.Controllers.View
     [Authorize(Roles = RoleNames.GlobalAdmin)]
     public class FirmwareController(IApi api) : Controller
     {
-        public async Task<ActionResult> Index() => View(new FirmwareViewModel
+        public async Task<ActionResult> Index()
         {
-            Config = await api.ServerConfigGet(),
-            Catalog = await api.FirmwareList(null),
-        });
+            ServerConfig config = await api.ServerConfigGet();
+            IList<DeviceFirmware> catalog = await api.FirmwareList(null);
+            (IList<DeviceFirmware> auto, IList<DeviceFirmware> manual) = SplitInstallableBoards(catalog, config);
+
+            return View(new FirmwareViewModel
+            {
+                Config = config,
+                Catalog = catalog,
+                AutoDetectBuilds = auto,
+                ManualBuilds = manual,
+            });
+        }
+
+        /// <summary>Roadmap #41: one full-image build per board that has one, latest version first
+        /// (Catalog is already board-then-newest-version-first, FirmwareCatalogService.ListAsync).
+        /// Roadmap #148: then split by whether esp-web-tools can safely auto-select the board from
+        /// the physical chip alone - see FirmwareViewModel.AutoDetectBuilds/ManualBuilds and
+        /// InstallManifestAuto below. Shared by Index (to render the buttons) and InstallManifestAuto
+        /// (to build the combined manifest) so the two can never disagree about which boards qualify.</summary>
+        private static (IList<DeviceFirmware> Auto, IList<DeviceFirmware> Manual) SplitInstallableBoards(
+            IList<DeviceFirmware> catalog, ServerConfig config)
+        {
+            List<DeviceFirmware> installable = catalog
+                .Where(f => f.Board != null && f.FullImageFileName != null && (f.Source == config.FirmwareSource || f.Source == FirmwareSource.Local))
+                .GroupBy(f => f.Board!)
+                .Select(g => g.First())
+                .ToList();
+
+            var byFamily = installable
+                .Select(f => (Firmware: f, Family: EspChipFamily.ForBoard(f.Board)))
+                .GroupBy(x => x.Family)
+                .ToList();
+
+            List<DeviceFirmware> auto = byFamily.Where(g => g.Key != null && g.Count() == 1)
+                .SelectMany(g => g.Select(x => x.Firmware)).ToList();
+            List<DeviceFirmware> manual = byFamily.Where(g => g.Key == null || g.Count() > 1)
+                .SelectMany(g => g.Select(x => x.Firmware)).ToList();
+            return (auto, manual);
+        }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -112,6 +148,39 @@ namespace api.Controllers.View
                 NewInstallPromptErase: true,
                 [new EspWebToolsBuild(chipFamily, [new EspWebToolsPart(Url.Action(nameof(OfflineFile), new { fileName = latest.FullImageFileName })!, Offset: 0)])]
             ));
+        }
+
+        /// <summary>Roadmap #148: the combined manifest behind the single "Install (auto-detect
+        /// board)" button - one `builds` entry per SplitInstallableBoards' AutoDetectBuilds board,
+        /// each tagged with its own chipFamily. esp-web-tools reads the connected chip's actual
+        /// family over Web Serial before flashing and matches it against these entries itself
+        /// (https://esphome.github.io/esp-web-tools/) - the admin no longer has to know or guess
+        /// which per-board button corresponds to the physical board in front of them. Deliberately
+        /// excludes anything SplitInstallableBoards routed to ManualBuilds: chip family alone cannot
+        /// tell two boards of the same family apart, so a shared/unrecognized family stays a manual,
+        /// explicitly-labeled button (Index.cshtml) rather than risk silently offering the wrong
+        /// board's image to an auto-detected chip.</summary>
+        public async Task<ActionResult> InstallManifestAuto()
+        {
+            ServerConfig config = await api.ServerConfigGet();
+            IList<DeviceFirmware> catalog = await api.FirmwareList(null);
+            (IList<DeviceFirmware> auto, _) = SplitInstallableBoards(catalog, config);
+            if (auto.Count == 0)
+            {
+                return NotFound();
+            }
+
+            List<EspWebToolsBuild> builds = auto
+                .Select(f => new EspWebToolsBuild(
+                    EspChipFamily.ForBoard(f.Board)!,
+                    [new EspWebToolsPart(Url.Action(nameof(OfflineFile), new { fileName = f.FullImageFileName })!, Offset: 0)]))
+                .ToList();
+            // Every board in a release is normally built from the same tag (release.yml), so this is
+            // almost always one shared version - "mixed" only shows up if the catalog was assembled
+            // from builds at different times (e.g. an Upload replaced just one board's entry).
+            string version = auto.Select(f => f.Version).Distinct().Count() == 1 ? auto[0].Version ?? "unknown" : "mixed";
+
+            return Json(new EspWebToolsManifest("Agrumy", version, NewInstallPromptErase: true, builds));
         }
 
         // ---- esp-web-tools manifest shape (roadmap #41) - external tool's fixed schema, snake_case

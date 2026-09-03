@@ -12,6 +12,14 @@ namespace api.Utils
         {
             ["esp32dev"] = "ESP32",
             ["esp32s3usbotg"] = "ESP32-S3",
+            // Roadmap #149: same chip family as esp32dev/esp32s3usbotg respectively (different
+            // physical board, same MCU) - deliberately NOT yet in release.yml's build matrix
+            // (unverified on real hardware), so these never actually appear in the catalog today.
+            // Listed here anyway so FirmwareController's chip-family grouping (roadmap #148) treats
+            // them correctly the moment they do: a family with more than one catalog board falls
+            // back to manual per-board buttons instead of guessing.
+            ["kc868-a6"] = "ESP32",
+            ["esp32-s3-relay-6ch"] = "ESP32-S3",
         };
 
         public static string? ForBoard(string? board) => board != null && ByBoard.TryGetValue(board, out string? family) ? family : null;
