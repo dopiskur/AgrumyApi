@@ -1,6 +1,7 @@
 using api;
 using api.BackgroundWorkers;
 using api.Commands;
+using api.Diagnostics;
 using api.Firmware;
 using api.Dal;
 using api.Dal.Interface;
@@ -10,6 +11,7 @@ using api.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -141,6 +143,15 @@ builder.Services.AddSingleton<IFirmwareFetcher, HttpFirmwareFetcher>();
 builder.Services.AddSingleton<FirmwareStorage>();
 builder.Services.AddScoped<FirmwareCatalogService>();
 
+// Roadmap #143: health check (DB + cache-backend degradation, ties into #119) and per-route
+// request metrics. AgrumyMetrics is a singleton because its ConcurrentDictionary aggregate must
+// span every request/scope, not reset per HTTP request like the AddScoped registrations above.
+builder.Services.AddSingleton<AgrumyMetrics>();
+builder.Services
+    .AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database")
+    .AddCheck<CacheHealthCheck>("cache");
+
 builder.Services.AddControllers(options => options.Filters.AddService<DbExceptionFilter>());
 
 // Roadmap #84: the rate limiter below partitions by Connection.RemoteIpAddress - behind a reverse
@@ -197,7 +208,30 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 
-builder.Services.AddLogging();
+// Roadmap #143: structured logging. Plain-text console is fine to read live in Development, but on
+// the deployed instance (systemd/journald, see CLAUDE.md's kestrel-agrumy.service) it's opaque to
+// tooling - one JSON object per line is what `journalctl -o cat | jq` (or any log shipper) actually
+// needs to filter/query. ClearProviders() first so JSON console isn't just added alongside the
+// default plain-text one (CreateBuilder registers Console/Debug/EventSource by default).
+builder.Logging.ClearProviders();
+if (builder.Environment.IsDevelopment())
+{
+    builder.Logging.AddSimpleConsole(o =>
+    {
+        o.SingleLine = true;
+        o.TimestampFormat = "HH:mm:ss ";
+    });
+}
+else
+{
+    builder.Logging.AddJsonConsole(o =>
+    {
+        o.UseUtcTimestamp = true;
+        o.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+        o.IncludeScopes = true;
+    });
+}
+builder.Logging.AddDebug();
 
 // HTTPS enforcement is opt-out via Security:EnforceHttps=false (default true), e.g. while firmware is still on http://.
 bool enforceHttps = !bool.TryParse(builder.Configuration["Security:EnforceHttps"], out var eh) || eh;
@@ -267,11 +301,26 @@ if (enforceHttps)
 
 app.UseRouting();
 
+// Roadmap #143: after UseRouting (needs the matched route pattern) but before rate
+// limiting/auth/the endpoint itself, so recorded duration covers the whole request.
+app.UseMiddleware<RequestMetricsMiddleware>();
+
 app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// Roadmap #143. Unauthenticated on purpose - #139's post-restart/deploy probe and any external
+// uptime monitor need to reach this without a JWT; it exposes only up/down + which dependency,
+// nothing sensitive. Default HealthCheckOptions status-code mapping already does what #139 needs:
+// Healthy/Degraded -> 200, Unhealthy -> 503.
+app.MapHealthChecks("/health", new HealthCheckOptions { ResponseWriter = HealthCheckResponseWriter.WriteResponse });
+
+// Roadmap #143. Global-admin only - per-route request counts/latency are operational detail about
+// the whole server, not something a tenant admin needs or should see.
+app.MapGet("/metrics", (AgrumyMetrics metrics) => Results.Json(metrics.GetSnapshot()))
+    .RequireAuthorization(policy => policy.RequireRole(RoleNames.GlobalAdmin));
 
 // Run the DB check at startup, not lazily on first request, so a bad connection string shows in deploy logs; Startup:FailFastOnDbCheck controls stop-vs-warn.
 using (var scope = app.Services.CreateScope())
