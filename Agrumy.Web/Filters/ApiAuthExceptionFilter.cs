@@ -6,11 +6,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace api.Filters
 {
-    /// <summary>
-    /// A 401 from Agrumy.Api means the stored JWT has expired (it lives ~2h, the auth cookie 7 days)
-    /// or was revoked. Clear the now-useless cookie and send the user to the login page instead of
-    /// letting the <see cref="ApiException"/> surface as an error page.
-    /// </summary>
+    // A 401 here means the stored JWT expired (~2h) or was revoked; clear the now-useless cookie instead of showing an error page.
     public sealed class ApiAuthExceptionFilter : IAsyncExceptionFilter
     {
         public async Task OnExceptionAsync(ExceptionContext context)

@@ -6,8 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.View
 {
-    // #66 Phase 2: groups still drive the legacy role mapping, so editing them is privilege
-    // management - admins only, not every user-manager (see api's UserGroupAdd/Delete).
     [Authorize(Roles = RoleNames.Admins)]
     public class GroupController(IApi api) : Controller
     {

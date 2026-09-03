@@ -9,18 +9,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace api.Security
 {
-    /// <summary>
-    /// Attaches the signed-in user's JWT (stashed in the auth-cookie ticket by <c>LoginController</c>
-    /// via <c>props.StoreTokens</c>) as a <c>Bearer</c> header on every outgoing Agrumy.Api call.
-    ///
-    /// The API issues a ~2h access token but the auth cookie lives 7 days, so an expired access
-    /// token is the common case, not an error: on a 401 this handler redeems the stored refresh
-    /// token for a new access+refresh pair (via <see cref="RefreshCoordinator"/>, so concurrent
-    /// requests don't each burn the single-use refresh token), re-signs the cookie in with the new
-    /// tokens, and retries the original call once. If the refresh itself fails (refresh token also
-    /// expired/revoked/reused), the original 401 is returned unchanged and
-    /// <see cref="api.Filters.ApiAuthExceptionFilter"/> sends the user back to login.
-    /// </summary>
+    // Access token lives ~2h, the auth cookie 7 days: on a 401, redeem the refresh token via RefreshCoordinator, re-sign the cookie, and retry once.
     public sealed class BearerTokenHandler(
         IHttpContextAccessor accessor, IAuthApi authApi, RefreshCoordinator refreshCoordinator)
         : DelegatingHandler
@@ -102,12 +91,7 @@ namespace api.Security
                 new AuthenticationToken { Name = "refresh_token", Value = refreshToken },
             });
 
-            // #66: the fresh access token carries the user's CURRENT role set (the API re-reads
-            // userUserRole on every refresh) - rebuild the cookie's role claims from it instead of
-            // re-signing the stale ones, so a role change (or a pre-#66 single-role cookie)
-            // propagates to the Web session at the next ~2h token refresh, not after the 7-day
-            // cookie expiry. On any parsing hiccup keep the old principal - a refresh must never
-            // downgrade a working session.
+            // Rebuild role claims from the fresh token (not the stale cookie) so a role change propagates on refresh; keep the old principal on any parsing hiccup.
             await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
                 RebuildPrincipalFromToken(auth.Principal, accessToken), auth.Properties).ConfigureAwait(false);
         }
@@ -125,8 +109,7 @@ namespace api.Security
             return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
         }
 
-        /// <summary>An HttpRequestMessage can only be sent once - HttpClient disposes it after the
-        /// first send - so retrying needs a fresh clone of method/URI/headers/body.</summary>
+        // HttpRequestMessage can only be sent once (HttpClient disposes it after), so retrying needs a fresh clone.
         private static async Task<HttpRequestMessage> CloneAsync(HttpRequestMessage request)
         {
             var clone = new HttpRequestMessage(request.Method, request.RequestUri);

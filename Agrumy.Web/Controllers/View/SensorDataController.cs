@@ -18,16 +18,16 @@ namespace api.Controllers.View
             }
 
             var deviceView = new DeviceView { Device = await api.DeviceGet(idDevice) };
-            deviceView.TimeRange!.Range = timeRange; // reflect the selected range back to the form
+            deviceView.TimeRange!.Range = timeRange;
 
             ViewBag.EnumList = new SelectList(
                 Enum.GetValues<TimeRangeMDMY>().Select(e => new { ID = (int)e, Name = e.ToString() }),
                 "ID", "Name", timeMDMY);
-            ViewBag.TimeMDMY = timeMDMY; // the report form snapshots the currently displayed period
+            ViewBag.TimeMDMY = timeMDMY;
 
             deviceView.SensorDataJson = await api.SensorDataGet(idDevice, timeRange, timeMDMY, 0);
 
-            // Roadmap #71 follow-up: chart x-axis shows the user's local time; storage stays UTC.
+            // Chart x-axis shows the user's local time; storage stays UTC.
             string? timeZone = (await api.UserGetSelf()).TimeZone;
             deviceView.SensorDataJson = SensorDataTimeLocalizer.LocalizeDates(deviceView.SensorDataJson, timeZone);
             ViewBag.DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone;
@@ -35,8 +35,6 @@ namespace api.Controllers.View
             return View(deviceView);
         }
 
-        /// <summary>Report generation writes a sensorDataReport row, so it must be a POST with an
-        /// antiforgery token - it used to ride along as a buildReport=1 flag on the GET Index.</summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> GenerateReport(int? idDevice, int? timeRange = 60, int? timeMDMY = 0)
@@ -73,7 +71,7 @@ namespace api.Controllers.View
                 deviceView.SensorDataJson = single.FirstOrDefault()?.SensorData;
             }
 
-            // Same UTC-to-user-zone display conversion as Index - reports store UTC snapshots.
+            // Reports store UTC snapshots; convert for display.
             string? timeZone = (await api.UserGetSelf()).TimeZone;
             deviceView.SensorDataJson = SensorDataTimeLocalizer.LocalizeDates(deviceView.SensorDataJson, timeZone);
             ViewBag.DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone;

@@ -4,24 +4,18 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace api.ViewModels
 {
-    /// <summary>Self-service "My Profile" page (roadmap #71 follow-up): only the fields the profile
-    /// endpoint accepts, plus the time-zone dropdown source - deliberately NOT UserView/UserUpdate,
-    /// which carry admin-only fields (Enabled/UserGroupID/TenantID) this page must never post.</summary>
+    // Deliberately NOT UserView/UserUpdate, which carry admin-only fields (Enabled/UserGroupID/TenantID) this page must never post.
     public class ProfileViewModel
     {
         public string? Email { get; set; }
         public UserProfileUpdate Profile { get; set; } = new();
         public IEnumerable<SelectListItem> TimeZones { get; set; } = [];
 
-        // Roadmap #70: current device-registration PIN (multi-use within its 24h window),
-        // display-only - a new one is issued via the page's "Generate new PIN" post, never typed
-        // in by hand.
+        // Display-only; a new PIN is issued via the page's "Generate new PIN" post, never typed in by hand.
         public string? DevicePin { get; set; }
         public DateTime? DevicePinExpires { get; set; }
     }
 
-    /// <summary>Separate from UserSetPassword because that API model carries no Login field at all
-    /// (roadmap #83) - the API resolves identity from the caller's JWT, never from the form.</summary>
     public class ChangePasswordViewModel
     {
         [Required(ErrorMessage = "Old password is required")]
