@@ -4,12 +4,7 @@ using api.Notifications;
 
 namespace api.BackgroundWorkers
 {
-    /// <summary>Roadmap #12 (feature) + #40 (background-worker pattern), same shape as
-    /// OfflineAlertEvaluator: a device's latest telemetry battery reading (see
-    /// LowBatteryAlertCandidate) crossing ServerConfig.BatteryLowThreshold fires one alert per
-    /// low-battery streak, dead-zone-latched against BatteryLowHysteresis the same way #10's
-    /// relay threshold+hysteresis avoids chattering right at the boundary. Kept separate from
-    /// LowBatteryAlertBackgroundService so it is directly unit-testable with mocked repositories.</summary>
+    /// <summary>A device's latest battery reading crossing ServerConfig.BatteryLowThreshold fires one alert per low-battery streak, dead-zone-latched against BatteryLowHysteresis to avoid chattering at the boundary.</summary>
     public sealed class LowBatteryAlertEvaluator(
         IDeviceRepository deviceRepo, IUserRepository userRepo, IServerConfigRepository serverConfigRepo, INotificationDispatcher dispatcher)
     {
@@ -27,9 +22,7 @@ namespace api.BackgroundWorkers
             {
                 ct.ThrowIfCancellationRequested();
 
-                // Never-reported battery (no sensorData row yet, or a sensor type that doesn't
-                // report one) is NOT "low" for alerting purposes - same reasoning as
-                // OfflineAlertEvaluator's null-LastSeenAt skip: nothing to compare against threshold.
+                // Never-reported battery is NOT "low" for alerting purposes - nothing to compare against threshold.
                 if (d.Battery is not int battery)
                 {
                     continue;
@@ -40,9 +33,7 @@ namespace api.BackgroundWorkers
 
                 if (!low)
                 {
-                    // Only clear once the reading is fully back OUT of the dead zone (>= clearAt),
-                    // not merely "not low" (> threshold) - a reading sitting between threshold and
-                    // clearAt must not spuriously clear the mark and immediately re-fire next tick.
+                    // Only clear once the reading is fully back OUT of the dead zone (>= clearAt), not merely "not low" (> threshold), or it could spuriously re-fire next tick.
                     if (recovered && d.LowBatteryNotifiedAt is not null)
                     {
                         await deviceRepo.DeviceLowBatteryNotifiedSetAsync(d.IDDevice, null);
@@ -57,8 +48,7 @@ namespace api.BackgroundWorkers
 
                 string deviceLabel = string.IsNullOrWhiteSpace(d.DeviceName) ? $"Device {d.IDDevice}" : d.DeviceName;
 
-                // Same eventDevice table/timeline as device-pushed events (roadmap #28) - server-
-                // detected, not device-pushed, same as Offline.
+                // Same eventDevice table/timeline as device-pushed events - server-detected, not device-pushed, same as Offline.
                 await deviceRepo.EventDevicePushAsync(d.IDDevice, d.TenantID, DeviceEventType.LowBattery,
                     $"Battery at {battery}% (threshold {threshold:0.#}%)");
 

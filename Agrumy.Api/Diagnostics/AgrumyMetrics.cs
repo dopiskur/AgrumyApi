@@ -7,12 +7,7 @@ namespace api.Diagnostics
 
     public sealed record MetricsSnapshot(DateTimeOffset GeneratedAt, IReadOnlyList<RouteMetricsSnapshot> Routes);
 
-    /// <summary>Roadmap #143. Emits through a real <see cref="Meter"/> so any future OpenTelemetry
-    /// exporter can attach to it (meter name "Agrumy.Api") with no application-code change - same
-    /// "swap the backend later" shape as #72/#119's cache abstraction. The in-memory
-    /// per-route/method aggregate below is the "basic emission ... without an external package" half
-    /// of #143: it is what GET /metrics actually reads, independent of whether anything is listening
-    /// to the Meter.</summary>
+    /// <summary>Emits through a real <see cref="Meter"/> (name "Agrumy.Api") so a future OpenTelemetry exporter can attach with no code change. The in-memory per-route/method aggregate is what GET /metrics actually reads, independent of whether anything is listening to the Meter.</summary>
     public sealed class AgrumyMetrics
     {
         public const string MeterName = "Agrumy.Api";
@@ -53,9 +48,7 @@ namespace api.Diagnostics
             return new MetricsSnapshot(DateTimeOffset.UtcNow, routes);
         }
 
-        // Plain lock, not Interlocked-per-field: min/max/avg must reflect one consistent snapshot of
-        // count+total together (interleaved lock-free field updates could produce e.g. a count that
-        // doesn't match total, throwing avg off) - request volume here doesn't warrant a lock-free design.
+        // Plain lock, not Interlocked-per-field: min/max/avg must reflect one consistent snapshot of count+total together, or avg could be thrown off.
         private sealed class RouteStat
         {
             private readonly object gate = new();

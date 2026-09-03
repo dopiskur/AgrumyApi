@@ -3,10 +3,7 @@ using Microsoft.AspNetCore.Routing;
 
 namespace api.Diagnostics
 {
-    /// <summary>Roadmap #143. Must run after UseRouting (so <c>HttpContext.GetEndpoint()</c>
-    /// resolves the matched route pattern instead of the raw, high-cardinality path - e.g.
-    /// "/api/Device/{id}" rather than one metrics series per device id) but before authentication/
-    /// the endpoint executes, so timing covers the full request including auth/rate-limiting.</summary>
+    /// <summary>Must run after UseRouting (so <c>HttpContext.GetEndpoint()</c> resolves the matched route pattern, e.g. "/api/Device/{id}", not one series per device id) but before the endpoint executes, so timing covers the full request.</summary>
     internal sealed class RequestMetricsMiddleware(RequestDelegate next, AgrumyMetrics metrics)
     {
         public async Task InvokeAsync(HttpContext context)

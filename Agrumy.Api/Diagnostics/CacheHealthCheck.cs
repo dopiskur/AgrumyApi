@@ -3,14 +3,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace api.Diagnostics
 {
-    /// <summary>Roadmap #143, ties into #119's graceful-degradation decision: probes the raw
-    /// <see cref="IDistributedCache"/> directly rather than going through <see
-    /// cref="api.Dal.Interface.ICache"/>, because CacheRepository (roadmap #119) deliberately
-    /// swallows every backend exception and degrades to a miss/no-op - the same behaviour that keeps
-    /// the app running with a dead cache would also hide the failure from this check if probed
-    /// through it. A failed round-trip here reports Degraded, not Unhealthy: the API stays fully
-    /// functional (worst case is extra DB re-auth/recompute traffic), so this must never flip
-    /// #139's post-restart health check to a failing 503.</summary>
+    /// <summary>Probes the raw <see cref="IDistributedCache"/> directly rather than through <see cref="api.Dal.Interface.ICache"/>, because CacheRepository deliberately swallows every backend exception - probing through it would hide the failure from this check. A failed round-trip reports Degraded, not Unhealthy: the API stays fully functional with a dead cache.</summary>
     internal sealed class CacheHealthCheck(IDistributedCache cache) : IHealthCheck
     {
         private const string ProbeKey = "healthcheck:cache-probe";

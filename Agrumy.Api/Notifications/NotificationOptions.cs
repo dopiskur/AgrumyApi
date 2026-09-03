@@ -8,15 +8,10 @@ namespace api.Notifications
         public EmailChannelOptions Email { get; set; } = new();
         public PushChannelOptions Push { get; set; } = new();
 
-        // Roadmap #40: how often OfflineAlertBackgroundService sweeps every device. Independent of
-        // any one device's own SleepSeconds (there is no single "right" value across a fleet with
-        // mixed poll intervals) - 5 minutes comfortably beats ComputeOnline's minimum ~90s grace
-        // window without hammering the DB on every tick.
+        // How often OfflineAlertBackgroundService sweeps every device; 5 minutes comfortably beats ComputeOnline's minimum ~90s grace window without hammering the DB on every tick.
         public int OfflineCheckIntervalMinutes { get; set; } = 5;
 
-        // Roadmap #12: how often LowBatteryAlertEvaluator sweeps every device's latest telemetry
-        // battery reading. Longer than OfflineCheckIntervalMinutes by default - a battery drains
-        // over hours/days, not seconds, so there is no need to poll it as tightly as reachability.
+        // How often LowBatteryAlertEvaluator sweeps battery readings; longer than OfflineCheckIntervalMinutes by default since a battery drains over hours/days, not seconds.
         public int BatteryCheckIntervalMinutes { get; set; } = 30;
     }
 
@@ -35,11 +30,7 @@ namespace api.Notifications
         public string FromName { get; set; } = "Agrumy";
     }
 
-    /// <summary>
-    /// FCM (Android/iOS) push. Inert until <see cref="Enabled"/> is set AND the Android app exists to
-    /// register device tokens - see <see cref="FcmPushNotificationChannel"/>. Kept here so activation
-    /// is config-only once those prerequisites land.
-    /// </summary>
+    /// <summary>FCM (Android/iOS) push. Inert until <see cref="Enabled"/> is set AND the Android app exists to register device tokens - see <see cref="FcmPushNotificationChannel"/>.</summary>
     public sealed class PushChannelOptions
     {
         public bool Enabled { get; set; }

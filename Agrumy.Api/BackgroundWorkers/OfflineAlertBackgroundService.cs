@@ -3,8 +3,7 @@ using api.Notifications;
 
 namespace api.BackgroundWorkers
 {
-    /// <summary>Thin PeriodicBackgroundService wrapper - all the actual logic lives in
-    /// OfflineAlertEvaluator (kept separate so it's testable without a running timer).</summary>
+    /// <summary>Thin PeriodicBackgroundService wrapper - the actual logic lives in OfflineAlertEvaluator, kept separate for testability.</summary>
     public sealed class OfflineAlertBackgroundService(
         IServiceScopeFactory scopeFactory,
         IOptions<NotificationOptions> options,

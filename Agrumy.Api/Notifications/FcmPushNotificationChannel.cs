@@ -3,25 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace api.Notifications
 {
-    /// <summary>
-    /// Firebase Cloud Messaging push channel (Android now, iOS via APns later). PREPARED, NOT LIVE.
-    ///
-    /// It stays skipped because <see cref="PushChannelOptions.Enabled"/> defaults to false and,
-    /// more fundamentally, nothing yet supplies <see cref="NotificationRecipient.PushTokens"/> -
-    /// device tokens come from the Android app registering with the API, which does not exist yet
-    /// (roadmap #22/#27).
-    ///
-    /// To activate once the app ships:
-    ///  1. Add a package that mints Google OAuth2 access tokens from a service account
-    ///     (Google.Apis.Auth, or FirebaseAdmin which also wraps the send call).
-    ///  2. In <see cref="SendAsync"/>, get an access token from <see cref="PushChannelOptions.FcmCredentialsPath"/>
-    ///     and POST <see cref="BuildFcmPayload"/> to <see cref="SendEndpointFor"/> per device token.
-    ///  3. Add an endpoint + storage for per-user device tokens and populate
-    ///     <see cref="NotificationRecipient.PushTokens"/> from it.
-    ///  4. Set <c>Notifications:Push:Enabled=true</c> and <c>FcmProjectId</c>.
-    /// The FCM HTTP v1 request shape and endpoint are already built below, so the OAuth token is the
-    /// only real work left on this class.
-    /// </summary>
+    /// <summary>Firebase Cloud Messaging push channel (Android now, iOS via APNs later). PREPARED, NOT LIVE: stays skipped because <see cref="PushChannelOptions.Enabled"/> defaults to false and nothing yet supplies <see cref="NotificationRecipient.PushTokens"/> - device tokens come from the Android app registering with the API, which does not exist yet. The FCM HTTP v1 request shape and endpoint are already built below; minting an OAuth2 access token from a service account is the only real work left.</summary>
     public sealed class FcmPushNotificationChannel : INotificationChannel
     {
         private const string FcmSendEndpoint = "https://fcm.googleapis.com/v1/projects/{0}/messages:send";
@@ -57,16 +39,14 @@ namespace api.Notifications
                 return Task.FromResult(NotificationResult.Skipped("recipient has no registered device tokens"));
             }
 
-            // Config is present but the OAuth token step is deliberately not wired - fail loudly
-            // rather than silently no-op, so flipping Enabled on prematurely is obvious.
+            // Config is present but the OAuth token step is deliberately not wired - fail loudly rather than silently no-op.
             _logger.LogError(
                 "FCM push is configured but not wired: GetAccessTokenAsync needs an OAuth2 token provider. " +
                 "See FcmPushNotificationChannel remarks.");
             return Task.FromResult(NotificationResult.Failed("FCM send not implemented - missing OAuth2 token provider"));
         }
 
-        /// <summary>FCM HTTP v1 message body for a single device token. Ready for use once
-        /// <c>GetAccessTokenAsync</c> exists.</summary>
+        /// <summary>FCM HTTP v1 message body for a single device token. Ready for use once <c>GetAccessTokenAsync</c> exists.</summary>
         internal static string BuildFcmPayload(Notification notification, string deviceToken)
         {
             var message = new
