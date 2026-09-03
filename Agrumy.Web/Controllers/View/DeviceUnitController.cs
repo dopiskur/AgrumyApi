@@ -8,22 +8,13 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.View
 {
-    /// <summary>Roadmap #81 (hierarchical Unit -> Zone dashboard) and #82 (Unit/Zone CRUD + device
-    /// assignment). Complementary to DeviceController.Fleet, not a replacement - Fleet stays the
-    /// flat "every device, right now" view; this is physical/logical navigation by growing space.</summary>
     [Authorize]
     public class DeviceUnitController(IApi api) : Controller
     {
-        // ---- Dashboard (roadmap #81) --------------------------------------------
-
         public async Task<ActionResult> Index() => View(await api.DeviceUnitDashboardGet());
 
-        /// <summary>Roadmap #90: polled by Index.cshtml's live-refresh script, same pattern as
-        /// DeviceController.FleetRows - built in from the start per the roadmap note, not bolted on.</summary>
         public async Task<ActionResult> IndexCubes() => PartialView("_UnitCubes", await api.DeviceUnitDashboardGet());
 
-        /// <summary>Zone cubes within one unit - auto-enters the single zone directly (skips a
-        /// pointless one-cube grid) when the unit has exactly one, per the confirmed #81 design.</summary>
         public async Task<ActionResult> Zones(int idDeviceUnit)
         {
             IList<DeviceUnitZoneDashboard> zones = await api.DeviceUnitZoneDashboardListGet(idDeviceUnit);
@@ -42,11 +33,6 @@ namespace api.Controllers.View
         public async Task<ActionResult> ZonesCubes(int idDeviceUnit) =>
             PartialView("_ZoneCubes", await api.DeviceUnitZoneDashboardListGet(idDeviceUnit));
 
-        /// <summary>Single zone detail - roll-up plus the actual assigned devices (#82: "Zona
-        /// prikazuje i detalje - kontroler + senzori"), with the Add Controller/Add Sensor/Remove
-        /// controls DeviceManagers roles see. Roadmap #116 rule (5): the device list itself is
-        /// Fleet's own rows (Device/_FleetRows.cshtml), filtered to this zone - not a second
-        /// hand-built table.</summary>
         public async Task<ActionResult> Zone(int idDeviceUnitZone) => View(await BuildZoneViewAsync(idDeviceUnitZone));
 
         public async Task<ActionResult> ZoneDetails(int idDeviceUnitZone) =>
@@ -56,8 +42,7 @@ namespace api.Controllers.View
         {
             DeviceUnitZoneDashboard dashboard = await api.DeviceUnitZoneDashboardGet(idDeviceUnitZone);
 
-            // Roadmap #71 follow-up: LastSeenAt is stored/served in UTC - convert for display only,
-            // same as DeviceController.GetFleetForDisplayAsync.
+            // LastSeenAt is stored/served in UTC; convert here for display only.
             IList<DeviceFleetStatus> fleet = (await api.DeviceFleetGet())
                 .Where(f => f.DeviceUnitZoneID == idDeviceUnitZone)
                 .ToList();
@@ -70,9 +55,6 @@ namespace api.Controllers.View
                 }
             }
 
-            // Roadmap #21: the automation-rules section only appears when the zone has a
-            // controller-capable device assigned (existing #82 rule (a)/(b) convention, same test
-            // Zone.cshtml already uses) - skip both calls otherwise, nothing to show.
             bool hasController = dashboard.Devices.Any(d => d.DeviceControllerEnabled == true);
             DeviceUnitZone? zone = null;
             IList<DeviceUnitZoneRule> rules = [];
@@ -92,16 +74,12 @@ namespace api.Controllers.View
             };
         }
 
-        // ---- Unit management (roadmap #82) --------------------------------------
-
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> UnitAdd(string deviceUnitName)
         {
             DeviceUnit unit = await api.DeviceUnitAdd(new DeviceUnit { DeviceUnitName = deviceUnitName });
-            // Roadmap #116 rule (1): auto-create + auto-enter a "Default" zone - same "skip the
-            // obvious next step" reasoning as the existing auto-enter-the-only-zone behavior below.
             DeviceUnitZone zone = await api.DeviceUnitZoneAdd(new DeviceUnitZone { DeviceUnitID = unit.IDDeviceUnit!.Value, DeviceUnitZoneName = "Default" });
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone = zone.IDDeviceUnitZone });
         }
@@ -115,7 +93,6 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Index));
         }
 
-        /// <summary>Roadmap #116 rule (2): lightweight inline rename, no separate page.</summary>
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -124,8 +101,6 @@ namespace api.Controllers.View
             await api.DeviceUnitUpdate(new DeviceUnit { IDDeviceUnit = idDeviceUnit, DeviceUnitName = deviceUnitName });
             return RedirectToAction(nameof(Zones), new { idDeviceUnit });
         }
-
-        // ---- Zone management (roadmap #82) --------------------------------------
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
@@ -145,10 +120,7 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Zones), new { idDeviceUnit });
         }
 
-        /// <summary>Roadmap #116 rule (2): lightweight inline rename, no separate page.
-        /// Roadmap #21: fetch-then-patch, not a bare partial DTO - DeviceUnitZoneUpdateAsync
-        /// overwrites every field unconditionally (it does not merge), so posting just the name
-        /// would silently blank WaterPumpMaxRunSeconds/CooldownSeconds back to null on every rename.</summary>
+        // Fetch-then-patch: the update call overwrites every field unconditionally, so posting just the name would blank the other fields.
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -160,12 +132,6 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
         }
 
-        // ---- Automation rules (roadmap #21) --------------------------------------
-
-        /// <summary>Same fetch-then-patch reasoning as ZoneRename above. Roadmap #11's per-zone rain
-        /// opt-in rides along here rather than its own action - same "device-side WaterPump
-        /// override" section of the page as the #36 safety limits, applied at the same post-OR
-        /// architectural point.</summary>
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -186,19 +152,13 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
         }
 
-        /// <summary>One ConditionType's worth of fields arrives per form (the Zone page renders a
-        /// separate small "Add Threshold/Interval/Schedule rule" form per function, not one
-        /// dynamic JS-driven form) - only the fields matching conditionType are meaningful, same
-        /// convention as the Rule wire shape itself. ConditionConfig is built HERE, server-side,
-        /// using ConditionConfigJson.Options - never the options-less JsonSerializer overloads,
-        /// which would leak PascalCase onto the wire (caught by a contract test while building this
-        /// feature, see api.Models.ConditionConfigJson's own remarks).</summary>
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> RuleAdd(int idDeviceUnitZone, RelayFunction relayFunction, ConditionType conditionType,
             double? threshold, double? hysteresis, int? interval, int? intervalLength, int? daysOfWeek, int? start, int? duration)
         {
+            // Must use ConditionConfigJson.Options here - the options-less JsonSerializer overloads would leak PascalCase onto the wire.
             System.Text.Json.Nodes.JsonNode? config = conditionType switch
             {
                 ConditionType.Threshold => System.Text.Json.JsonSerializer.SerializeToNode(new ThresholdConditionConfig(threshold ?? 0, hysteresis ?? 0), ConditionConfigJson.Options),
@@ -232,10 +192,6 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
         }
 
-        // ---- Device assignment (roadmap #82) ------------------------------------
-
-        /// <summary>Roadmap #82 rule (b)/(d): controllerCapable picks which unassigned-device list
-        /// (and which button/heading copy) the picker shows - "Add Controller" or "Add Sensor".</summary>
         [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> AssignPicker(int idDeviceUnitZone, bool controllerCapable) =>
             View(new AssignPickerViewModel
@@ -256,9 +212,6 @@ namespace api.Controllers.View
             }
             catch (ApiException ex)
             {
-                // Roadmap #82 rule (a): the only current source is DeviceUnitApiController's
-                // "already has a controller" 409 - same ModelState convention as
-                // DeviceController.EditController's ScheduleWindowError handling.
                 ModelState.AddModelError(string.Empty, ex.Body);
                 return View(nameof(AssignPicker), new AssignPickerViewModel
                 {
@@ -271,7 +224,6 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
         }
 
-        /// <summary>Roadmap #82 rule (e): pure bookkeeping on the API side, no device-facing effect.</summary>
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]

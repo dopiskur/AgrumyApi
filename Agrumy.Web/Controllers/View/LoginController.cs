@@ -16,8 +16,6 @@ namespace api.Controllers.View
     {
         public async Task<ActionResult> Index(bool sessionExpired = false)
         {
-            // Roadmap #91: checked fresh on every load (not cached anywhere) so this redirect stops
-            // firing the instant SetupAdmin below succeeds - see BootstrapPendingSafeAsync.
             if (await BootstrapPendingSafeAsync())
             {
                 return RedirectToAction(nameof(SetupAdmin));
@@ -50,8 +48,7 @@ namespace api.Controllers.View
             }
             catch (Exception ex)
             {
-                // An unreachable/broken API must be distinguishable from a wrong password in the log -
-                // both render the same generic message below (see roadmap #48 debugging history).
+                // Distinguish from a wrong-password rejection in the log; the user sees the same generic message either way.
                 logger.LogError(ex, "Login call to Agrumy.Api failed.");
                 result = null;
                 roles = null;
@@ -63,10 +60,7 @@ namespace api.Controllers.View
                 return View(userLogin);
             }
 
-            // HttpOnly, SameSite=Strict cookie holding an encrypted ticket - the raw JWT and refresh
-            // token ride along as stored tokens for BearerTokenHandler, never exposed to page script.
-            // Roadmap #66: a caller can hold several roles at once - one Role claim per entry, same
-            // as the JWT itself; User.IsInRole(...) checks across all of them regardless of count.
+            // HttpOnly, SameSite=Strict cookie; the raw JWT/refresh token are stored tokens for BearerTokenHandler, never exposed to page script.
             var claims = new List<Claim> { new(ClaimTypes.Name, result.Email ?? "") };
             claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -90,9 +84,7 @@ namespace api.Controllers.View
 
         public async Task<ActionResult> Logout()
         {
-            // Best effort: kill the refresh token server-side so it can't be redeemed after logout.
-            // Must never block the local sign-out - a dead/unreachable API is not a reason to trap
-            // the user in a "logged in" cookie.
+            // Best effort: a dead/unreachable API must never block the local sign-out below.
             string? refreshToken = await HttpContext.GetTokenAsync("refresh_token");
             if (!string.IsNullOrEmpty(refreshToken))
             {
@@ -102,7 +94,6 @@ namespace api.Controllers.View
                 }
                 catch (Exception)
                 {
-                    // ignored - local sign-out below still proceeds
                 }
             }
 
@@ -110,11 +101,7 @@ namespace api.Controllers.View
             return RedirectToAction("Index", "Login");
         }
 
-        /// <summary>Roadmap #91: first-run "set password" screen for the bootstrap Global Admin.
-        /// CRITICAL - re-checks BootstrapPending on every load (GET and POST alike, not just once at
-        /// the Index redirect above) and bounces to the normal login form the moment it's false, so
-        /// this can never become a standing unauthenticated password-reset route once the real admin
-        /// account has a password.</summary>
+        // Re-checks BootstrapPending on every load (GET and POST) so this can never become a standing unauthenticated password-reset route.
         public async Task<ActionResult> SetupAdmin()
         {
             if (!await BootstrapPendingSafeAsync())
@@ -151,9 +138,7 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Index));
         }
 
-        /// <summary>Fails closed to the normal login form on any error - an unreachable API is not a
-        /// reason to show (or hide) the unauthenticated set-password screen by guesswork, same
-        /// reasoning as SetTenantCreationViewBagAsync below.</summary>
+        // Fails closed to the normal login form on any error.
         private async Task<bool> BootstrapPendingSafeAsync()
         {
             try
@@ -188,25 +173,16 @@ namespace api.Controllers.View
             }
             catch (ApiException ex)
             {
-                // e.g. "email already registered" / "unknown tenant name" (roadmap #64)
                 ModelState.AddModelError(string.Empty, ex.Body);
                 await SetTenantCreationViewBagAsync();
                 return View(value);
             }
 
-            // Roadmap #24/#63: Enabled alone was never the real gate (see roadmap #68) - email
-            // verification comes first for everyone, tenant-admin approval only after that and only
-            // for someone joining an existing, non-default tenant. Kept generic here since which of
-            // those applies depends on server-side state (tenant 0? brand new tenant?) this page
-            // doesn't have visibility into.
             TempData["Message"] = "Account created. Check your email for a verification link - " +
                 "depending on your tenant, you may also need an administrator's approval before you can sign in.";
             return RedirectToAction(nameof(Index));
         }
 
-        /// <summary>Roadmap #64: the Register view only offers a tenant-name field (and the "create
-        /// a new tenant" hint) when self-service tenant creation is on - fails closed (hides the
-        /// option) if the API call itself fails, same reasoning as any other anonymous-page best-effort call.</summary>
         private async Task SetTenantCreationViewBagAsync()
         {
             bool allow = false;

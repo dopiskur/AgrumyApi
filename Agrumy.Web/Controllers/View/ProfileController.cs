@@ -8,9 +8,6 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace api.Controllers.View
 {
-    /// <summary>Self-service "My Profile" (roadmap #71 follow-up) - open to EVERY authenticated
-    /// user, unlike UserController's user-manager gate: this page only ever edits the caller's own
-    /// record through the self-scoped API endpoints (Self / Profile / ChangePassword).</summary>
     [Authorize]
     public class ProfileController(IApi api) : Controller
     {
@@ -34,8 +31,7 @@ namespace api.Controllers.View
             }
             catch (ApiException ex)
             {
-                // Field-keyed (not string.Empty) so the error renders once, in this form - the page
-                // holds a second form (_ChangePassword) whose summary would otherwise repeat it.
+                // Field-keyed so the error renders once here, not repeated by the page's second form's summary.
                 ModelState.AddModelError("Profile.TimeZone", ex.Body);
                 return View(await RestoreDisplayFieldsAsync(value));
             }
@@ -44,8 +40,6 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Index));
         }
 
-        /// <summary>Roadmap #70: rotates the caller's device-registration PIN via the self-scoped
-        /// API endpoint; the redirect re-renders the page with the fresh PIN and its expiry.</summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> DevicePin()
@@ -64,8 +58,7 @@ namespace api.Controllers.View
             {
                 try
                 {
-                    // Reuses the existing old-password-proving API flow (POST /api/User/ChangePassword);
-                    // identity comes from the caller's own JWT server-side (roadmap #83), never from the form.
+                    // Identity comes from the caller's own JWT server-side, never from the form.
                     await api.ChangePassword(new UserSetPassword
                     {
                         OldPassword = value.OldPassword,
@@ -76,12 +69,10 @@ namespace api.Controllers.View
                 }
                 catch (ApiException ex)
                 {
-                    // Keyed to OldPassword for the same single-render reason as the profile form.
                     ModelState.AddModelError(nameof(ChangePasswordViewModel.OldPassword), ex.Body);
                 }
             }
 
-            // Re-render the combined page with the password errors visible and profile prefilled.
             return View(nameof(Index), BuildViewModel(self));
         }
 
@@ -101,8 +92,7 @@ namespace api.Controllers.View
             DevicePinExpires = self.DevicePinExpires,
         };
 
-        /// <summary>The PIN fields are display-only (never posted back), so an error re-render must
-        /// refetch them or the card would go blank while the user fixes a validation message.</summary>
+        // PIN fields are display-only (never posted back); refetch them so an error re-render doesn't blank the card.
         private async Task<ProfileViewModel> RestoreDisplayFieldsAsync(ProfileViewModel value)
         {
             User self = await api.UserGetSelf();

@@ -8,8 +8,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.View
 {
-    // #66 Phase 2: user pages open to every user-manager role, not only the legacy binary admin;
-    // fine-grained tenant scoping is enforced API-side, this attribute is just the menu-level gate.
     [Authorize(Roles = RoleNames.UserManagers)]
     public class UserController(IApi api) : Controller
     {
@@ -71,9 +69,6 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Details), new { idUser = userView.UserUpdate!.IDUser });
         }
 
-        /// <summary>Roadmap #66: a user can hold several roles at once - this edits the whole set,
-        /// separate from Edit()'s single legacy UserGroupID field (kept for backward compatibility).
-        /// Admin-only (not every user-manager) - same self-escalation reasoning as the API's UserRolesSet.</summary>
         [Authorize(Roles = RoleNames.Admins)]
         public async Task<ActionResult> Roles(int? idUser)
         {
