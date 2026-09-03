@@ -5,14 +5,13 @@ namespace api.Models
     public class Device
     {
         public int? ConfigVersion { get; set; } = 1;
-        // Roadmap #34 - see api.Models.DeviceConfig.CommandVersion for the full story.
+        // See api.Models.DeviceConfig.CommandVersion for the full story.
         public int? CommandVersion { get; set; }
 
         [HiddenInput(DisplayValue = true)]
         public int? IDDevice { get; set; }
-        // Roadmap #112: non-nullable - TenantID=0 is a real, meaningful default tenant (user
-        // confirmed), not a "no tenant" sentinel, so a nullable int let an impossible third state
-        // leak into every consumer as a `?? 0` fallback (see #96/#100/#106/#102/#108/#111).
+        // Non-nullable - TenantID=0 is a real, meaningful default tenant, not a "no tenant"
+        // sentinel, so a nullable int would let an impossible third state leak into every consumer.
         [HiddenInput(DisplayValue = true)]
         public int TenantID { get; set; } = 0;
 
@@ -52,9 +51,9 @@ namespace api.Models
         public bool? Reboot { get; set; }
         public bool? Reset { get; set; } = false;
         public bool? FirmwareUpdate { get; set; }
-        // Roadmap #93: null = "latest for the board" when FirmwareUpdate is set; a specific catalog
-        // version pins a rollback/downgrade. Both are cleared by DeviceApiController.GetConfig once
-        // the heartbeat reports that exact version running.
+        // Null = "latest for the board" when FirmwareUpdate is set; a specific catalog version
+        // pins a rollback/downgrade. Both cleared by DeviceApiController.GetConfig once the
+        // heartbeat reports that exact version running.
         public string? FirmwareTargetVersion { get; set; }
         public bool? Enabled { get; set; } = false;
 
@@ -69,8 +68,7 @@ namespace api.Models
     {
         public string? MacAddress { get; set; }
         public string? Email { get; set; }
-        // Roadmap #70: string, not int - the firmware always sent it as a string (char devicePin[8]),
-        // the int? binding only worked via Web-defaults number-from-string parsing.
+        // String, not int - the firmware always sends it as a string (char devicePin[8]).
         public string? DevicePin { get; set; }
         public string? ServicePoint { get; set; } = "api.agrumy.com";
         public int? ServiceType { get; set; } = 1;
@@ -94,11 +92,9 @@ namespace api.Models
         public int? SleepSeconds { get; set; } = 60;
         public bool? SleepDeep { get; set; } = false;
 
-        // Roadmap #39: current UTC offset (seconds, positive east of UTC) for
-        // ServerConfig.ScheduleTimeZone, computed fresh on every config sync
-        // (DeviceApiController.BuildDeviceConfigAsync via TimeZoneHelper.GetUtcOffsetSeconds) so a
-        // DST transition reaches every device within one poll cycle without the firmware needing a
-        // timezone database of its own. 0 (UTC) when no ScheduleTimeZone is configured yet.
+        // Current UTC offset (seconds, positive east of UTC) for ServerConfig.ScheduleTimeZone,
+        // computed fresh on every config sync so the firmware needs no timezone database of its
+        // own. 0 (UTC) when no ScheduleTimeZone is configured yet.
         public int? UtcOffsetSeconds { get; set; }
 
         public bool? DeviceSensorEnabled { get; set; } = false;
@@ -108,25 +104,21 @@ namespace api.Models
         public bool? Reboot { get; set; }
         public bool? Reset { get; set; }
         public bool? FirmwareUpdate { get; set; }
-        // Roadmap #3 (OTA): populated by BuildDeviceConfigAsync from the newest deviceFirmware
-        // row for the device's type, but only when FirmwareUpdate == true. Null otherwise.
+        // Populated by BuildDeviceConfigAsync from the newest deviceFirmware row for the device's
+        // type, but only when FirmwareUpdate == true. Null otherwise.
         public string? FirmwareVersion { get; set; }
         public string? FirmwareUrl { get; set; }
-        // Roadmap #131: DeviceFirmware.Sha256 for the offered build, when the catalog has one -
-        // firmware verifies it against the streamed .bin before Update.end(), Update.abort() on
-        // mismatch. Null whenever the source had no manifest hash (a Custom repository without one,
-        // or a GitHub release missing manifest.json) - OtaController skips the check rather than
-        // failing closed, it is not proof the .bin is bad.
+        // DeviceFirmware.Sha256 for the offered build, when the catalog has one - firmware verifies
+        // it against the streamed .bin, Update.abort() on mismatch. Null whenever the source had no
+        // manifest hash - the check is skipped rather than failing closed; it is not proof the .bin is bad.
         public string? FirmwareSha256 { get; set; }
         public bool? Enabled { get; set; }
         public DeviceConfigSensor? DeviceConfigSensor { get; set; }
         public DeviceConfigController? DeviceConfigController { get; set; }
 
-        // Roadmap #34: deliberately separate from ConfigVersion - issuing a command must not force
-        // a full config re-apply on the firmware side, and a config change must not touch the
-        // command queue. Sent on every response (Config poll AND Register) for the firmware's own
-        // bookkeeping (compare against what it last processed to skip redundant re-handling); the
-        // SERVER's decision to send a non-empty response at all is driven by whether a pending
+        // Deliberately separate from ConfigVersion - issuing a command must not force a full
+        // config re-apply on the firmware side, and a config change must not touch the command
+        // queue. The server's decision to send a non-empty response is driven by whether a pending
         // command actually exists (GetConfig), not by comparing this number.
         public int? CommandVersion { get; set; }
         // Null when there is nothing to do - present only when a real, unexpired Pending command
@@ -134,9 +126,9 @@ namespace api.Models
         public PendingCommand? PendingCommand { get; set; }
     }
 
-    /// <summary>Body of POST /api/Device/Config (roadmap #7): the poll doubles as the heartbeat, so
-    /// besides ConfigVersion the firmware reports its live diagnostics every cycle. All fields are
-    /// nullable so a pre-#7 firmware that sends only ConfigVersion still binds cleanly.</summary>
+    /// <summary>Body of POST /api/Device/Config: the poll doubles as the heartbeat, so besides
+    /// ConfigVersion the firmware reports its live diagnostics every cycle. All fields are
+    /// nullable so an older firmware that sends only ConfigVersion still binds cleanly.</summary>
     public class DeviceConfigPoll()
     {
         public int? ConfigVersion { get; set; }
@@ -144,18 +136,18 @@ namespace api.Models
         public int? Rssi { get; set; }
         public long? FreeHeap { get; set; }
         public string? FirmwareVersion { get; set; }
-        // Roadmap #94: PlatformIO environment the running image was built for (AGRUMY_BOARD build
-        // flag) - what selects the right catalog .bin for OTA. Null from a pre-#94 firmware.
+        // PlatformIO environment the running image was built for (AGRUMY_BOARD build flag) -
+        // selects the right catalog .bin for OTA. Null from an older firmware.
         public string? Board { get; set; }
-        // Roadmap #149: which commercial physical board this image was built for (AGRUMY_KIT build
-        // flag, e.g. "KC868-A6") - separate from Board, which only selects the OTA binary. Empty
-        // string on a generic chip-target environment, null from pre-#149 firmware.
+        // Which commercial physical board this image was built for (AGRUMY_KIT build flag, e.g.
+        // "KC868-A6") - separate from Board, which only selects the OTA binary. Empty string on a
+        // generic chip-target environment, null from an older firmware.
         public string? Kit { get; set; }
     }
 
-    /// <summary>One device's row on the fleet dashboard (roadmap #8). Battery comes from the latest
-    /// sensorData row, not the heartbeat - the firmware battery sensor is a stub until roadmap #12,
-    /// and telemetry is where a real reading will land anyway.</summary>
+    /// <summary>One device's row on the fleet dashboard. Battery comes from the latest sensorData
+    /// row, not the heartbeat - the firmware battery sensor is a stub, and telemetry is where a
+    /// real reading will land.</summary>
     public class DeviceFleetStatus()
     {
         public int? IDDevice { get; set; }
@@ -168,10 +160,9 @@ namespace api.Models
         public int? RssiDbm { get; set; }
         public long? FreeHeapBytes { get; set; }
         public string? FirmwareVersion { get; set; }
-        // Roadmap #93/#94: catalog state for the "Update" button - LatestFirmwareVersion is the
-        // newest catalog entry for this device's Board (null if the board is unknown or the catalog
-        // has nothing for it), FirmwareUpdateAvailable is "that is newer than what's running", and
-        // the Pending/Target pair mirrors Device.FirmwareUpdate/FirmwareTargetVersion.
+        // Catalog state for the "Update" button - LatestFirmwareVersion is the newest catalog
+        // entry for this device's Board, FirmwareUpdateAvailable is "that is newer than what's
+        // running", and the Pending/Target pair mirrors Device.FirmwareUpdate/FirmwareTargetVersion.
         public string? Board { get; set; }
         public string? LatestFirmwareVersion { get; set; }
         public bool FirmwareUpdateAvailable { get; set; }
@@ -179,16 +170,15 @@ namespace api.Models
         public string? FirmwareTargetVersion { get; set; }
         public int? Battery { get; set; }
         public bool Online { get; set; }
-        // Roadmap #149: which commercial physical board last reported in the heartbeat (empty =
-        // generic chip-target environment, null = never reported one).
+        // Which commercial physical board last reported in the heartbeat (empty = generic
+        // chip-target environment, null = never reported one).
         public string? Kit { get; set; }
-        // Roadmap #149: true when this device is treated as having real, wired relay hardware -
-        // either the admin already set DeviceType to Sensor+Controller (DeviceControllerEnabled),
-        // OR Kit names a board the deviceTypeKit lookup knows has relays. Drives whether the Web UI
-        // shows the Controller config tab at all (EfRepository.DeviceFleetGetAsync computes this).
+        // True when this device is treated as having real, wired relay hardware - either the admin
+        // already set DeviceType to Sensor+Controller, OR Kit names a board the deviceTypeKit
+        // lookup knows has relays. Drives whether the Web UI shows the Controller config tab.
         public bool ControllerCapable { get; set; }
-        // Roadmap #116: lets the Web layer filter one shared DeviceFleetGet() response down to a
-        // single zone's devices for DeviceUnitController.ZoneDetails, instead of a second endpoint.
+        // Lets the Web layer filter one shared DeviceFleetGet() response down to a single zone's
+        // devices for DeviceUnitController.ZoneDetails, instead of a second endpoint.
         public int? DeviceUnitID { get; set; }
         public int? DeviceUnitZoneID { get; set; }
 
@@ -230,21 +220,20 @@ namespace api.Models
     {
         [HiddenInput(DisplayValue = true)]
         public int? IDDeviceConfigSensor { get; set; }
-        // Roadmap #12: 0/null=Disabled(None), 1009=MAX17048 (I2C fuel gauge, recommended,
-        // coulomb counting), 2001=Analog voltage (VoltageDivider, fallback/necessity) - same
-        // deviceTypeSensor-backed dropdown mechanism as every other Sensor* field here (#91).
+        // 0/null=Disabled(None), 1009=MAX17048 (I2C fuel gauge, coulomb counting), 2001=Analog
+        // voltage (VoltageDivider) - same deviceTypeSensor-backed dropdown as every other Sensor* field here.
         public int? SensorBattery { get; set; }
         // VoltageDivider calibration (sensorBattery=2001 only) - the ACTUAL resistors the user
         // wired, in ohms, not an abstract preset ratio: V_battery = V_measured * (R1+R2)/R2.
         // Ignored by MAX17048, which reports state-of-charge directly.
         public double? BatteryDividerR1 { get; set; }
         public double? BatteryDividerR2 { get; set; }
-        public int? SensorTemp { get; set; }//
+        public int? SensorTemp { get; set; }
         public int? SensorTempSoil { get; set; }
         public int? SensorHumid { get; set; }
-        public int? SensorMoist { get; set; }//
-        public int? SensorLight { get; set; } // promijeniti u illumination 
-        public int? SensorCo2 { get; set; }//
+        public int? SensorMoist { get; set; }
+        public int? SensorLight { get; set; }
+        public int? SensorCo2 { get; set; }
         public int? SensorTvoc { get; set; }
         public int? SensorBarometer { get; set; }
         public int? SensorPH { get; set; }
@@ -254,41 +243,32 @@ namespace api.Models
 
     }
 
-    /// <summary>Roadmap #21: what's LEFT of this per-DEVICE model after threshold/hysteresis/
-    /// interval/schedule/#36-safety-limits all moved to the ZONE (see DeviceUnitZone/
-    /// DeviceUnitZoneRule) - just the relay-pin mapping, which stays device-side because it is a
-    /// physical/hardware fact about THIS controller, not a rule. Rules/WaterPumpMaxRunSeconds/
-    /// WaterPumpCooldownSeconds below are populated from the device's ASSIGNED ZONE, not from this
-    /// row, when DeviceApiController builds a config-poll response - see BuildDeviceConfigAsync.
-    /// This is still the one JSON object the firmware receives either way; it does not need to know
-    /// two different DB tables feed it now.</summary>
+    /// <summary>What's LEFT of this per-DEVICE model after thresholds/schedule/safety-limits all
+    /// moved to the ZONE (see DeviceUnitZone/DeviceUnitZoneRule) - just the relay-pin mapping,
+    /// which stays device-side because it is a physical/hardware fact about THIS controller.
+    /// Rules/WaterPumpMaxRunSeconds/WaterPumpCooldownSeconds below are populated from the device's
+    /// ASSIGNED ZONE, not from this row, when DeviceApiController builds a config-poll response -
+    /// see BuildDeviceConfigAsync.</summary>
     public class DeviceConfigController()
     {
         [HiddenInput(DisplayValue = true)]
         public int? IDDeviceConfigController { get; set; }
 
-        // Roadmap #21: the zone's rules for whichever RelayFunction(s) this device's Relay1-8
-        // mapping below actually wires up - empty when the device has no assigned zone (safe
-        // default: no rules means every relay function stays off, same "never a false positive"
-        // principle as the rest of this codebase, not a special case the firmware needs to detect).
+        // The zone's rules for whichever RelayFunction(s) this device's Relay1-8 mapping below
+        // actually wires up - empty when the device has no assigned zone, so every relay function
+        // simply stays off.
         public IList<DeviceUnitZoneRule> Rules { get; set; } = [];
 
-        // Roadmap #36: copied from the assigned zone's own fields (DeviceUnitZone.WaterPumpMax
-        // RunSeconds/CooldownSeconds) - see that class's remarks for why these are not Rules.
+        // Copied from the assigned zone's own fields - see DeviceUnitZone's remarks for why these are not Rules.
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
 
-        // Roadmap #11: final AND-NOT veto over WaterPump, computed server-side
-        // (DeviceApiController.BuildDeviceConfigAsync) from DeviceUnitZone.SkipWaterPumpWhenRain
-        // Predicted && ServerConfig.WeatherRainPredicted - same "server computes, firmware just
-        // applies" split UtcOffsetSeconds already uses for ScheduleTimeZone, so the device never
-        // needs its own copy of the zone's opt-in flag or the weather forecast. Not a Rule (see
-        // DeviceUnitZoneRule's remarks: OR-combining rules means a Weather rule could only ever
-        // ADD a reason to turn WaterPump on, never suppress one - this has to sit after the OR,
-        // same architectural slot as WaterPumpMaxRunSeconds/CooldownSeconds above).
+        // Final AND-NOT veto over WaterPump, computed server-side (BuildDeviceConfigAsync) from
+        // DeviceUnitZone.SkipWaterPumpWhenRainPredicted && ServerConfig.WeatherRainPredicted - not
+        // a Rule, since OR-combining rules could only ever ADD a reason to run, never suppress one.
         public bool SkipWaterPumpForRain { get; set; }
 
-        // Relay-pin mapping - physical/hardware, stays per-device (roadmap #21 explicit decision).
+        // Physical/hardware, stays per-device.
         public bool? RelayEnabled { get; set; }
         public int? Relay1 { get; set; }
         public int? Relay2 { get; set; }
@@ -301,9 +281,9 @@ namespace api.Models
 
     }
 
-    /// <summary>Roadmap #115: one wall-clock window within one of DeviceConfigController's four
-    /// per-function schedule lists. No RelayFunction/Enabled fields here - which function it
-    /// belongs to is which list it's in, and its presence in the list IS "enabled".</summary>
+    /// <summary>One wall-clock window within one of DeviceConfigController's four per-function
+    /// schedule lists. No RelayFunction/Enabled fields here - which function it belongs to is
+    /// which list it's in, and its presence in the list IS "enabled".</summary>
     public class DeviceScheduleSlot
     {
         /// <summary>7-bit mask, bit 0 = Sunday .. bit 6 = Saturday (C's tm_wday convention).</summary>
@@ -356,10 +336,6 @@ namespace api.Models
 
     }
 
-    // Roadmap #106: ConfigVersion used to live here too, but GetConfig now compares against the
-    // device row it already reads for the #7 diagnostics upsert - a second, independently-staled
-    // copy in the session cache was pure risk (root cause of #100 and the multi-instance drift
-    // #72 raised) with no benefit once that DB read became mandatory on every poll.
     public class DeviceCache()
     {
         public string? apiAuth { get; set; }
