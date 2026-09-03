@@ -2,7 +2,7 @@ using api.Firmware;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Roadmap #94: semver ordering + the release file naming convention (pure, no I/O).</summary>
+/// <summary>Semver ordering + the release file naming convention (pure, no I/O).</summary>
 public class FirmwareVersionTests
 {
     [Theory]
@@ -27,7 +27,7 @@ public class FirmwareVersionTests
     [Fact]
     public void Orders_Numerically_Not_Lexically()
     {
-        // The whole reason DateAdded/string order was replaced: "1.10.0" must sort after "1.9.0".
+        // "1.10.0" must sort after "1.9.0" (semver, not string order).
         Assert.True(FirmwareVersion.IsNewer("1.10.0", "1.9.0"));
         Assert.False(FirmwareVersion.IsNewer("1.9.0", "1.10.0"));
         Assert.False(FirmwareVersion.IsNewer("1.9.0", "1.9.0"));
@@ -43,8 +43,7 @@ public class FirmwareVersionTests
     [Fact]
     public void Unparseable_Running_Version_Counts_As_Older_Than_Any_Release()
     {
-        // A dev build ("0.0.0-dev-abc1234" from git describe fallback, or garbage) must still be
-        // offered the latest release rather than be stuck forever.
+        // A dev build ("0.0.0-dev-abc1234" from git describe fallback, or garbage) must still be offered the latest release rather than be stuck forever.
         Assert.True(FirmwareVersion.IsNewer("1.0.0", "garbage"));
         Assert.True(FirmwareVersion.IsNewer("1.0.0", null));
         Assert.False(FirmwareVersion.IsNewer(null, "1.0.0"));
@@ -84,7 +83,6 @@ public class FirmwareVersionTests
     public void BuildFileName_RoundTrips() =>
         Assert.Equal("agrumy-esp32dev-v1.2.0.bin", FirmwareVersion.BuildFileName("esp32dev", "v1.2.0"));
 
-    // ---- roadmap #41: full-image (blank-chip web installer) convention -----------------------
 
     [Theory]
     [InlineData("agrumy-esp32dev-full-v1.2.0.bin", "esp32dev", "1.2.0")]
@@ -100,11 +98,7 @@ public class FirmwareVersionTests
     public void BuildFullImageFileName_RoundTrips() =>
         Assert.Equal("agrumy-esp32dev-full-v1.2.0.bin", FirmwareVersion.BuildFullImageFileName("esp32dev", "v1.2.0"));
 
-    /// <summary>The whole reason the "-full-" marker sits BEFORE "v" instead of being appended after
-    /// the version: an after-the-version suffix would collide with FileNameRegex's own pre-release
-    /// grammar (which already accepts an arbitrary "-something" tail) and get silently parsed as a
-    /// version like "1.2.3-full" instead of being rejected. Each convention's regex must reject the
-    /// other's file names outright, not just "usually" disambiguate them.</summary>
+    /// <summary>The "-full-" marker sits BEFORE "v", not after the version, because an after-the-version suffix would collide with FileNameRegex's own pre-release grammar and get silently parsed as e.g. "1.2.3-full". Each convention's regex must reject the other's file names outright.</summary>
     [Fact]
     public void OtaAndFullImage_Conventions_Never_Match_Each_Others_FileName()
     {

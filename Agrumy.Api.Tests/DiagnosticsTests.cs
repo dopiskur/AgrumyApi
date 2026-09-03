@@ -9,8 +9,7 @@ using Xunit;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Roadmap #143: health checks (DB + cache-backend, the latter tied into #119's
-/// graceful-degradation decision) and the per-route metrics aggregate.</summary>
+/// <summary>Health checks (DB + cache-backend, the latter tied into the cache's graceful-degradation behavior) and the per-route metrics aggregate.</summary>
 public class DiagnosticsTests
 {
     private sealed class FakeSystemRepository(bool canConnect, Exception? throwOnConnect = null) : ISystemRepository
@@ -64,8 +63,7 @@ public class DiagnosticsTests
         Assert.Equal(HealthStatus.Healthy, result.Status);
     }
 
-    /// <summary>Same fake as CacheRepositoryTests' ThrowingCache - stands in for a Redis client
-    /// throwing a connection/timeout exception.</summary>
+    /// <summary>Same fake as CacheRepositoryTests' ThrowingCache - stands in for a Redis client throwing a connection/timeout exception.</summary>
     private sealed class ThrowingCache : IDistributedCache
     {
         public byte[]? Get(string key) => throw new InvalidOperationException("backend unreachable");
@@ -86,8 +84,7 @@ public class DiagnosticsTests
     [Fact]
     public async Task CacheHealthCheck_BackendThrows_ReturnsDegraded_NotUnhealthy()
     {
-        // Roadmap #119: a dead cache must not fail the overall health check (the API keeps working
-        // without it) - Degraded, not Unhealthy, is what keeps #139's post-restart probe passing.
+        // A dead cache must not fail the overall health check (the API keeps working without it) - Degraded, not Unhealthy.
         var check = new CacheHealthCheck(new ThrowingCache());
 
         HealthCheckResult result = await check.CheckHealthAsync(Context);

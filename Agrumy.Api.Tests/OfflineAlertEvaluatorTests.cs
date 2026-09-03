@@ -6,11 +6,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Roadmap #40 (infra) + #6 (offline alert). Exercises OfflineAlertEvaluator directly - no
-/// PeriodicTimer/IHostedService in the way, no database (IDeviceRepository/IUserRepository/
-/// INotificationDispatcher are mocked).
-/// </summary>
+/// <summary>Exercises OfflineAlertEvaluator directly - no database, repositories/dispatcher are mocked.</summary>
 public class OfflineAlertEvaluatorTests
 {
     private readonly Mock<IDeviceRepository> _devices = new(MockBehavior.Strict);
@@ -30,14 +26,12 @@ public class OfflineAlertEvaluatorTests
     [Fact]
     public async Task NeverSeen_Device_Is_Skipped_Not_Alerted()
     {
-        // LastSeenAt null = fresh registration, not yet through its first config poll - not the
-        // same thing as "was reachable, now is not".
+        // LastSeenAt null = fresh registration, not the same thing as "was reachable, now is not".
         SetupCandidates(Candidate(lastSeenAt: null));
 
         await NewEvaluator().RunOnceAsync();
 
-        // Strict mocks: any unexpected call (EventDevicePushAsync, TenantAdminsGetAsync,
-        // DispatchAsync, DeviceOfflineNotifiedSetAsync) would throw during RunOnceAsync above.
+        // Strict mocks: any unexpected call (EventDevicePushAsync, TenantAdminsGetAsync, DispatchAsync, DeviceOfflineNotifiedSetAsync) would throw during RunOnceAsync above.
     }
 
     [Fact]
@@ -99,7 +93,6 @@ public class OfflineAlertEvaluatorTests
 
         await NewEvaluator().RunOnceAsync();
 
-        // Strict mocks: EventDevicePushAsync/TenantAdminsGetAsync/DispatchAsync would throw if
-        // called - dedup means none of them should be.
+        // Strict mocks: EventDevicePushAsync/TenantAdminsGetAsync/DispatchAsync would throw if called - dedup means none of them should be.
     }
 }

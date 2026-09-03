@@ -9,11 +9,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Unit tests for the logic that moved out of stored procedures into C# during the EF Core
-/// rewrite (roadmap #42): the sensor-report shaping port and database-error classification.
-/// No database - these exercise pure functions only.
-/// </summary>
+/// <summary>Unit tests for the sensor-report shaping port and database-error classification. No database - pure functions only.</summary>
 public class SensorReportShaperTests
 {
     private static SensorDataRow Row(string dateCreated, int? co2 = 400, double? temp = 20.0) => new()
@@ -99,8 +95,7 @@ public class SensorReportShaperTests
 
 public class ClassifyExceptionTests
 {
-    // ClassifyException is a pure function - never touches the DbContext, so a never-connected one
-    // (throwaway connection string, roadmap #101) and default settings are enough to construct it.
+    // ClassifyException is a pure function - never touches the DbContext, so a never-connected one and default settings are enough to construct it.
     private readonly EfRepository _repo = new(
         new AgrumyDbContext(DbOptionsFactory.Build(DbProviderKind.MySql, "server=unused;database=unused;")),
         Options.Create(new AgrumySettings()),
@@ -153,6 +148,7 @@ public class ClassifyExceptionTests
     public void NotFoundArgumentException_IsUnknown_NotConnectionFailure()
     {
         // The DAL throws ArgumentException for "no such user/device"; that must not read as a DB outage.
+
         Assert.Equal(DbFailureKind.Unknown,
             _repo.ClassifyException(new ArgumentException("Wrong id, no such person")));
     }

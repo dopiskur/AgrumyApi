@@ -4,10 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Unit tests for the roadmap #6 notification channels. Covers config gating, the "skip, never
-/// throw" contract, message building, and dispatcher fan-out. No real SMTP / FCM traffic.
-/// </summary>
+/// <summary>Covers config gating, the "skip, never throw" contract, message building, and dispatcher fan-out. No real SMTP/FCM traffic.</summary>
 public class NotificationTests
 {
     private static IOptions<NotificationOptions> Opts(NotificationOptions o) => Options.Create(o);
@@ -22,7 +19,6 @@ public class NotificationTests
     private static FcmPushNotificationChannel Fcm(PushChannelOptions push) =>
         new(Opts(new NotificationOptions { Push = push }), NullLogger<FcmPushNotificationChannel>.Instance);
 
-    // ---- Email --------------------------------------------------------------
 
     [Fact]
     public void Email_IsConfigured_False_When_Disabled()
@@ -79,7 +75,6 @@ public class NotificationTests
         Assert.Contains("below the configured minimum", msg.TextBody);
     }
 
-    // ---- FCM push (prepared, inert) --------------------------------------
 
     [Fact]
     public void Fcm_IsConfigured_False_By_Default()
@@ -121,7 +116,6 @@ public class NotificationTests
             FcmPushNotificationChannel.SendEndpointFor("agrumy-prod"));
     }
 
-    // ---- Dispatcher ---------------------------------------------------------
 
     [Fact]
     public async Task Dispatcher_With_No_Configured_Channels_Returns_All_Skipped_And_Does_Not_Throw()
