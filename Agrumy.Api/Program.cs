@@ -15,7 +15,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using System.Net;
 using System.Text;
 using System.Threading.RateLimiting;
@@ -243,37 +243,35 @@ builder.Services.AddHsts(options =>
     options.IncludeSubDomains = true;
 });
 
-builder.Services.AddSwaggerGen(option =>
+// Roadmap #144: OpenAPI document generation via the built-in Microsoft.AspNetCore.OpenApi, not
+// Swashbuckle's SwaggerGen (see Agrumy.Api.csproj) - Swashbuckle.AspNetCore.SwaggerUI below still
+// renders a browsable page, pointed at the /openapi/v1.json this produces instead of its own output.
+builder.Services.AddOpenApi("v1", options =>
 {
-    option.SwaggerDoc("v1",
-        new OpenApiInfo { Title = "Agrumy Web API", Version = "v1" });
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    {
+        document.Info.Title = "Agrumy Web API";
+        document.Info.Version = "v1";
 
-    option.AddSecurityDefinition("Bearer",
-        new OpenApiSecurityScheme
+        var components = document.Components ??= new OpenApiComponents();
+        components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
         {
-            In = ParameterLocation.Header,
-            Description = "Please enter valid JWT",
-            Name = "Authorization",
             Type = SecuritySchemeType.Http,
+            Scheme = "Bearer",
             BearerFormat = "JWT",
-            Scheme = "Bearer"
+            In = ParameterLocation.Header,
+            Description = "Please enter valid JWT"
+        };
+
+        document.Security ??= [];
+        document.Security.Add(new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecuritySchemeReference("Bearer", document)] = []
         });
 
-    option.AddSecurityRequirement(
-        new OpenApiSecurityRequirement
-        {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "Bearer"
-                    }
-                },
-                new List<string>()
-            }
-        });
+        return Task.CompletedTask;
+    });
 });
 
 var app = builder.Build();
@@ -286,8 +284,10 @@ JwtTokenProvider.Logger = app.Services.GetRequiredService<ILoggerFactory>().Crea
 // limiter (roadmap #84) below, but also UseHttpsRedirection/UseHsts further down.
 app.UseForwardedHeaders();
 
-app.UseSwagger();
-app.UseSwaggerUI();
+// Roadmap #144: MapOpenApi() serves the Microsoft.AspNetCore.OpenApi-generated document;
+// UseSwaggerUI just renders it (SwaggerEndpoint below points at that route, not a Swashbuckle one).
+app.MapOpenApi();
+app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "Agrumy Web API v1"));
 
 // UseHsts only outside Development so local HTTP dev without a cert still works; UseHttpsRedirection is a no-op in dev with no https port.
 if (enforceHttps)

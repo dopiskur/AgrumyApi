@@ -6,6 +6,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>api</RootNamespace>
     <AssemblyName>Agrumy.Api</AssemblyName>
+    <!-- Roadmap #144: feeds Microsoft.AspNetCore.OpenApi's XML-comment support - a controller
+         action's <summary> becomes its OpenAPI description with no extra wiring. NoWarn suppresses
+         CS1591 (missing XML comment) for the ~34 pre-existing controllers that don't have one yet -
+         this flag exists so a comment that IS written gets picked up, not to force writing one on
+         every public member as part of this change. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,10 +35,13 @@
     <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.22.0" />
-    <!-- Swashbuckle 10.x pulls Microsoft.OpenApi v2, which renames the OpenApi model
-         namespace and reshapes the security-scheme API. 9.0.x is net10-compatible and
-         needs no code changes, so it stays until the Swagger setup is migrated. -->
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.1" />
+    <!-- Roadmap #144: Microsoft.AspNetCore.OpenApi (built-in, framework-versioned) generates the
+         OpenAPI document - see the AddOpenApi/MapOpenApi calls in Program.cs. Swashbuckle now
+         supplies only the browsable UI (SwaggerUI), pointed at that generated document instead of
+         its own SwaggerGen output, so this no longer needs the full Swashbuckle.AspNetCore
+         meta-package (which pulled in SwaggerGen and its now-unused Microsoft.OpenApi v1 pin). -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="9.0.1" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
     <PackageReference Include="System.Runtime.Caching" Version="10.0.0" />
   </ItemGroup>

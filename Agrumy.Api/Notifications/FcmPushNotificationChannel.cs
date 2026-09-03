@@ -66,7 +66,7 @@ namespace api.Notifications
         }
 
         /// <summary>FCM HTTP v1 message body for a single device token. Ready for use once
-        /// <see cref="GetAccessTokenAsync"/> exists.</summary>
+        /// <c>GetAccessTokenAsync</c> exists.</summary>
         internal static string BuildFcmPayload(Notification notification, string deviceToken)
         {
             var message = new
