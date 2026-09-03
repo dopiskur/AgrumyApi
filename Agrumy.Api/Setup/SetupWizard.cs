@@ -5,28 +5,23 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Setup
 {
-    /// <summary>Roadmap #30: the bare-metal/standalone install path never asks install.sh anything
-    /// about the database - it only installs prerequisites and starts Kestrel for the first time.
-    /// If ConnectionStrings:DefaultConnection is missing at boot, Program.cs routes here instead of
-    /// the normal pipeline: a minimal, unauthenticated page asking ONLY for DB connection details
-    /// (nothing that itself depends on a working database, unlike everything else the normal
-    /// pipeline registers - JWT auth, rate limiting, health checks, background workers). Once the
-    /// admin submits a connection that actually opens, this writes it into appsettings.json and
-    /// restarts (RestartUtil) - the NEXT boot has a real connection string, so the normal pipeline
-    /// takes over, EnsureSchemaAsync provisions the schema, and the EXISTING roadmap #91 bootstrap
-    /// Global Admin wizard (BootstrapPending) picks up from there completely unchanged.
+    /// <summary>If ConnectionStrings:DefaultConnection is missing at boot, Program.cs routes here
+    /// instead of the normal pipeline: a minimal, unauthenticated page asking ONLY for DB
+    /// connection details (nothing that itself depends on a working database). Once the admin
+    /// submits a connection that actually opens, this writes it into appsettings.json and restarts
+    /// (RestartUtil) - the NEXT boot has a real connection string, so the normal pipeline takes
+    /// over, EnsureSchemaAsync provisions the schema, and the existing bootstrap Global Admin
+    /// wizard (BootstrapPending) picks up from there unchanged.
     ///
     /// Container installs never reach this: install.sh writes docker-compose.yml's environment
-    /// section (ConnectionStrings__DefaultConnection etc.) before the container is ever created, so
-    /// ConnectionStrings:DefaultConnection is always already present at first boot there.</summary>
+    /// section before the container is ever created, so ConnectionStrings:DefaultConnection is
+    /// always already present at first boot there.</summary>
     internal static class SetupWizard
     {
         public static void ConfigureServices(WebApplicationBuilder builder)
         {
-            // Roadmap #30: the wizard's only real risk window is "whoever reaches this unauthenticated
-            // page before the admin does" - antiforgery is a cheap extra guard against a cross-site
-            // POST specifically, on top of that window normally being short and not yet
-            // publicly-DNS-resolvable during a fresh provisioning run.
+            // The wizard's only real risk window is "whoever reaches this unauthenticated page
+            // before the admin does" - antiforgery is a cheap extra guard against a cross-site POST specifically.
             builder.Services.AddAntiforgery();
             builder.Services.AddLogging();
         }
@@ -111,12 +106,11 @@ namespace api.Setup
             });
         }
 
-        /// <summary>Atomic write (temp file + rename, roadmap #30's explicit requirement) - a crash
-        /// or power loss mid-write must never leave a half-written appsettings.json behind, which
-        /// would turn "the wizard failed once" into "the app can never boot again without manual
-        /// repair". Merges into whatever appsettings.json install.sh already wrote (JWT keys, etc.)
-        /// rather than replacing it, and tolerates a missing file (empty object) for anyone testing
-        /// this without install.sh's normal flow.</summary>
+        /// <summary>Atomic write (temp file + rename) - a crash or power loss mid-write must never
+        /// leave a half-written appsettings.json behind, which would turn "the wizard failed once"
+        /// into "the app can never boot again without manual repair". Merges into whatever
+        /// appsettings.json already exists (JWT keys, etc.) rather than replacing it, and tolerates
+        /// a missing file (empty object).</summary>
         private static async Task WriteConnectionStringAsync(string contentRootPath, DbProviderKind provider, string connectionString)
         {
             string path = Path.Combine(contentRootPath, "appsettings.json");
