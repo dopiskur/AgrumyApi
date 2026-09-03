@@ -1,0 +1,33 @@
+# Roadmap #30: reverse-proxy template for the bare-metal/standalone install path - install.sh
+# substitutes the {{...}} placeholders below with real values and copies the result to
+# /etc/nginx/sites-available/agrumy.conf (symlinked into sites-enabled), then runs certbot
+# against it for TLS. Same "repo holds source, script applies" pattern as db/migrations/.
+#
+# Two server names, one server (CLAUDE.md: api.agrumy.com and admin.agrumy.com are the same
+# physical box, two DNS names) - Agrumy.Api on {{API_PORT}}, Agrumy.Web on {{WEB_PORT}}, both
+# plain HTTP behind this proxy (Security:EnforceHttps=false on the app side - TLS terminates
+# here, not in Kestrel).
+
+server {
+    listen 80;
+    server_name {{API_DOMAIN}};
+    location / {
+        proxy_pass http://127.0.0.1:{{API_PORT}};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen 80;
+    server_name {{ADMIN_DOMAIN}};
+    location / {
+        proxy_pass http://127.0.0.1:{{WEB_PORT}};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

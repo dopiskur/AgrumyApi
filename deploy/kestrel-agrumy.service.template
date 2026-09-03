@@ -1,0 +1,25 @@
+# Roadmap #30: systemd unit for Agrumy.Api (bare-metal/standalone path) - install.sh substitutes
+# {{...}} and installs this as /etc/systemd/system/kestrel-agrumy.service. Same naming as the
+# existing api.agrumy.com deployment (CLAUDE.md) so an install.sh-provisioned box matches what's
+# already documented there.
+#
+# Urls comes from appsettings.json (see appsettings.json.example's "// Startup" note and
+# CLAUDE.md's deploy notes) - this unit deliberately does NOT set ASPNETCORE_URLS, so a missing
+# "Urls" key in appsettings.json is a silent :5000-default port collision between this service and
+# kestrel-agrumyweb, not a unit-file bug; install.sh always writes an explicit Urls key.
+
+[Unit]
+Description=Agrumy.Api (Kestrel)
+After=network.target
+
+[Service]
+Type=simple
+User={{SERVICE_USER}}
+WorkingDirectory={{INSTALL_DIR}}
+ExecStart={{INSTALL_DIR}}/Agrumy.Api
+Restart=always
+RestartSec=5
+Environment=ASPNETCORE_ENVIRONMENT=Production
+
+[Install]
+WantedBy=multi-user.target

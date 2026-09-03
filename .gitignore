@@ -18,6 +18,10 @@ appsettings.json
 # ...except the test project's dummy config (no secrets, needed for the tests to run)
 !Agrumy.Api.Tests/appsettings.json
 
+# Roadmap #30: install.sh-generated container-path secrets (DB_PASSWORD/JWT_SECRET) - same rule as
+# appsettings.json above, real values never committed. .env.example is the committed template.
+.env
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 

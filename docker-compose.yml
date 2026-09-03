@@ -1,0 +1,73 @@
+# Roadmap #30: "Small/Simple deployment" preset (the #14 tiered-hybrid small-deployment tier) -
+# MariaDB, in-process cache (no Redis - CacheRepository's default, see Agrumy.Api/Program.cs), one
+# Kestrel process per app, zero extra infrastructure. install.sh's Quick Install -> Simple/Small
+# path runs this file as-is; a Custom install choosing MySQL/MariaDB also starts from this file.
+#
+# Secrets (DB_PASSWORD, JWT_SECRET) come from a .env file next to this one - install.sh generates
+# it (random values) and never commits it; see .env.example for the keys it must contain.
+#
+# Usage: docker compose up -d   (or: podman-compose up -d)
+
+services:
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: agrumy
+      MARIADB_USER: agrumy
+      MARIADB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      MARIADB_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Agrumy.Api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      Database__Provider: mysql
+      # SslMode=None: container-to-container traffic on Compose's own private network, not the
+      # public internet - see docker-compose.large.yml's Postgres connection string for the same
+      # reasoning applied to that provider's SSL setting.
+      ConnectionStrings__DefaultConnection: "server=db;port=3306;database=agrumy;user id=agrumy;password=${DB_PASSWORD};SslMode=None;"
+      JWT__SecureKey: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT__Issuer: ${AGRUMY_JWT_ISSUER:-https://api.agrumy.local}
+      JWT__Audience: agrumy-api
+      # Roadmap #30: TLS terminates at whatever reverse proxy an admin puts in front of this
+      # compose stack (not part of the container path itself in this v1 - see install.sh's
+      # standalone/bare-metal path for the nginx/Apache+certbot setup), so the app itself stays on
+      # plain HTTP behind it.
+      Security__EnforceHttps: "false"
+    ports:
+      - "5000:5000"
+
+  web:
+    build:
+      context: .
+      dockerfile: Agrumy.Web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      WebView__ApiService: http://api:5000
+      JWT__SecureKey: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT__Issuer: ${AGRUMY_JWT_ISSUER:-https://api.agrumy.local}
+      JWT__Audience: agrumy-api
+      DataProtection__KeyPath: /keys
+    volumes:
+      - web-keys:/keys
+    ports:
+      - "5001:5001"
+
+volumes:
+  db-data:
+  web-keys:

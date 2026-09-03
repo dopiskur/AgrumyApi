@@ -4,6 +4,13 @@
 * text=auto
 
 ###############################################################################
+# Roadmap #30: install.sh is fetched raw off GitHub for `curl | bash` (unaffected by any local
+# checkout's core.autocrlf), but also runnable straight from a Windows clone in Git Bash - force
+# LF regardless of that setting so a CRLF shebang/heredoc never breaks it either way.
+###############################################################################
+install.sh text eol=lf
+
+###############################################################################
 # Set default behavior for command prompt diff.
 #
 # This is need for earlier builds of msysgit that does not have it on by

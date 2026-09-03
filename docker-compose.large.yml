@@ -1,0 +1,90 @@
+# Roadmap #30: "Large/Scaled deployment" preset (the #14 tiered-hybrid large-deployment tier) -
+# PostgreSQL + TimescaleDB, Redis enabled by default (see the `redis` profile note below),
+# preparing for horizontal scaling. install.sh's Quick Install -> Large/Scaled path runs this file
+# as-is; a Custom install choosing PostgreSQL also starts from this file.
+#
+# Roadmap #14: timescale/timescaledb, not plain postgres - EfRepository.EnsureTimescaleHypertableAsync
+# runs `CREATE EXTENSION IF NOT EXISTS timescaledb` on every startup and warn-and-skips if it's
+# missing, so a plain postgres:17 image still works (verified against that exact image) for the
+# "Postgres without Timescale" edge case a Custom install can ask for - just swap this image, or
+# point ConnectionStrings__DefaultConnection at an external instance instead of using this `db`
+# service at all (roadmap #30's "container OR external connection string" choice).
+#
+# Roadmap #72: Redis is a `redis` COMPOSE PROFILE, not unconditionally started, so the SAME file
+# also covers the "Postgres+Timescale without Redis" Custom combo the roadmap calls out - only
+# `--profile redis` needs Redis, the default `docker compose -f docker-compose.large.yml up`
+# (what the Large/Scaled preset's install.sh path actually runs) already passes it.
+#
+# Usage: docker compose -f docker-compose.large.yml --profile redis up -d
+#        (or: podman-compose -f docker-compose.large.yml --profile redis up -d)
+
+services:
+  db:
+    image: timescale/timescaledb:latest-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agrumy
+      POSTGRES_USER: agrumy
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agrumy -d agrumy"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    profiles: ["redis"]
+    volumes:
+      - redis-data:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: Agrumy.Api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      Database__Provider: postgres
+      # SSL Mode omitted: container-to-container traffic on Compose's own private network, same
+      # reasoning as docker-compose.yml's MariaDB SslMode=None.
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=agrumy;Username=agrumy;Password=${DB_PASSWORD}"
+      JWT__SecureKey: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT__Issuer: ${AGRUMY_JWT_ISSUER:-https://api.agrumy.local}
+      JWT__Audience: agrumy-api
+      Security__EnforceHttps: "false"
+      # Roadmap #72: only meaningful when the redis service above is actually started (--profile
+      # redis) - CacheRepository falls back to the in-process default if this host is unreachable
+      # only in the sense that AddStackExchangeRedisCache itself would fail to connect, so keep the
+      # profile and this var in sync (both on, or both off).
+      Cache__Redis__ConnectionString: redis:6379
+    ports:
+      - "5000:5000"
+
+  web:
+    build:
+      context: .
+      dockerfile: Agrumy.Web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      WebView__ApiService: http://api:5000
+      JWT__SecureKey: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT__Issuer: ${AGRUMY_JWT_ISSUER:-https://api.agrumy.local}
+      JWT__Audience: agrumy-api
+      DataProtection__KeyPath: /keys
+    volumes:
+      - web-keys:/keys
+    ports:
+      - "5001:5001"
+
+volumes:
+  db-data:
+  redis-data:
+  web-keys:

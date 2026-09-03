@@ -355,6 +355,39 @@ Device endpoints use the separate apiId/apiKey/apiAuth scheme described in
 | `POST /api/SensorData` | rate-limited | Device telemetry push (includes `Battery` since roadmap #12) |
 | `DELETE /api/SensorData` | JWT admin | Bulk-delete sensor data for a device/time range |
 
+## Self-hosted install (roadmap #30)
+
+For anyone standing up their own instance (not the maintainer's own alpha
+deployment - see "Deployment" below for that):
+
+```
+curl -fsSL https://raw.githubusercontent.com/dopiskur/AgrumyService/master/install.sh | bash
+```
+
+`install.sh` asks two independent questions - a deployment preset (Simple/Small:
+MariaDB, no Redis; Large/Scaled: PostgreSQL+TimescaleDB, Redis; or Custom: pick
+each option individually) and a deployment mode:
+
+- **Container** (Docker or Podman) - builds and runs `docker-compose.yml`
+  (Small preset) or `docker-compose.large.yml` (Large/Scaled preset;
+  `--profile redis` toggles the Redis container within it). `appsettings.json`
+  is never touched here - config arrives as environment variables in the
+  compose file instead, already fully populated before either container starts.
+- **Bare-metal/standalone** - downloads the latest tagged release (see
+  `.github/workflows/release.yml`) as self-contained `linux-x64` binaries, no
+  .NET runtime needed on the target. Installs them as systemd services
+  (`deploy/kestrel-agrumy*.service.template`) behind nginx or Apache
+  (`deploy/nginx.conf.template` / `apache.conf.template`) with a certbot TLS
+  cert. This path never asks about the database up front - `Agrumy.Api` boots
+  into a minimal setup wizard the first time `appsettings.json` has no
+  `ConnectionStrings:DefaultConnection` (`Agrumy.Api/Setup/SetupWizard.cs`);
+  saving a connection there restarts the service, and the existing bootstrap
+  Global Admin wizard (roadmap #91) takes over from there unchanged.
+
+Safe to re-run - each step checks whether it's already done before acting, so
+re-running to add a component later (e.g. turn on Redis) doesn't repeat
+completed steps or overwrite existing secrets.
+
 ## Deployment
 
 CI (`.github/workflows/build.yml`) builds and tests on every push to `master`;

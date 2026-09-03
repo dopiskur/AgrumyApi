@@ -1,0 +1,20 @@
+# Roadmap #30: Apache alternative to nginx.conf.template - same substitution/apply pattern
+# (install.sh writes the real values to /etc/apache2/sites-available/agrumy.conf, enables
+# mod_proxy/mod_proxy_http/mod_headers + the site, then runs certbot --apache). Requires
+# ProxyPreserveHost so Agrumy sees the real Host header, not "127.0.0.1".
+
+<VirtualHost *:80>
+    ServerName {{API_DOMAIN}}
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:{{API_PORT}}/
+    ProxyPassReverse / http://127.0.0.1:{{API_PORT}}/
+    RequestHeader set X-Forwarded-Proto "http"
+</VirtualHost>
+
+<VirtualHost *:80>
+    ServerName {{ADMIN_DOMAIN}}
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:{{WEB_PORT}}/
+    ProxyPassReverse / http://127.0.0.1:{{WEB_PORT}}/
+    RequestHeader set X-Forwarded-Proto "http"
+</VirtualHost>

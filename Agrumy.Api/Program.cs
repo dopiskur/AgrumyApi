@@ -30,7 +30,24 @@ Config.Init(builder.Configuration);
 
 // Roadmap #101/#104: one AgrumySettings snapshot per process, bound from the real host
 // IConfiguration - see AgrumySettings.Bind for exactly which keys/env vars feed it.
-builder.Services.AddSingleton(Options.Create(AgrumySettings.Bind(builder.Configuration)));
+AgrumySettings settingsForBootCheck = AgrumySettings.Bind(builder.Configuration);
+builder.Services.AddSingleton(Options.Create(settingsForBootCheck));
+
+// Roadmap #30: the bare-metal/standalone install path never asks install.sh anything about the
+// database - appsettings.json legitimately has no ConnectionStrings:DefaultConnection the very
+// first time this boots. Route to the minimal setup wizard instead of the rest of this file (JWT
+// auth, rate limiting, health checks, background workers, ... - every one of them either needs a
+// working DB connection or is pointless without one) until an admin supplies one; see
+// Agrumy.Api/Setup/SetupWizard.cs. A container install's appsettings.json always arrives already
+// populated (docker-compose.yml's environment section), so it never takes this branch.
+if (string.IsNullOrWhiteSpace(settingsForBootCheck.DefaultConnection))
+{
+    api.Setup.SetupWizard.ConfigureServices(builder);
+    var wizardApp = builder.Build();
+    api.Setup.SetupWizard.MapEndpoints(wizardApp);
+    await wizardApp.RunAsync();
+    return;
+}
 
 // Roadmap #101: real scoped lifetime - one AgrumyDbContext per HTTP request/background-worker
 // tick (AddScoped, matching EfRepository's own scoped registration below), not a new one per
@@ -92,11 +109,21 @@ builder.Services.AddScoped<IDeviceUnitRepository>(sp => sp.GetRequiredService<Ef
 builder.Services.AddScoped<ICommandRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IFirmwareRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ISensorDataRepository>(sp => sp.GetRequiredService<EfRepository>());
-// Roadmap #72: in-process today (same practical behaviour as the old MemoryCache - lost on
-// restart, not shared across instances), but CacheRepository talks to IDistributedCache, so a
-// real scale-out backend is a swap of this one line (e.g. AddStackExchangeRedisCache(...)), not
-// an application code change.
-builder.Services.AddDistributedMemoryCache();
+// Roadmap #72/#30: in-process by default (same practical behaviour as the old MemoryCache - lost
+// on restart, not shared across instances) - CacheRepository only ever talks to IDistributedCache,
+// so which backend is wired here is the entire scale-out story, no application code change either
+// way. Cache:Redis:ConnectionString (docker-compose.large.yml's Large/Scaled preset sets it via
+// Cache__Redis__ConnectionString) switches to Redis; unset/empty (the Small preset, and every
+// bare-metal install unless an admin opts in) keeps the in-process default.
+string? redisConnectionString = builder.Configuration["Cache:Redis:ConnectionString"];
+if (string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    builder.Services.AddDistributedMemoryCache();
+}
+else
+{
+    builder.Services.AddStackExchangeRedisCache(options => options.Configuration = redisConnectionString);
+}
 builder.Services.AddScoped<ICache, CacheRepository>();
 builder.Services.AddScoped<DbExceptionFilter>();
 
