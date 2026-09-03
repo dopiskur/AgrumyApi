@@ -13,23 +13,15 @@ namespace api.Utils
         public string Body { get; } = body ?? "";
     }
 
-    /// <summary>Refit configuration for the <see cref="api.Dal.Interface.IApi"/> client (roadmap #32).</summary>
+    /// <summary>Refit configuration for the <see cref="api.Dal.Interface.IApi"/> client.</summary>
     public static class RefitConfig
     {
         public static readonly RefitSettings Settings = new()
         {
-            // Refit's own default ContentSerializer silently adds a global JsonStringEnumConverter,
-            // turning every enum (e.g. RelayFunction, ConditionType) into a camelCase string on the
-            // wire - breaking the DTOs that deliberately stay numeric (see RelayFunction's remarks)
-            // with a cryptic "$.relayFunction JSON value could not be converted" 400 from the API.
-            // JsonSerializerDefaults.Web alone (camelCase, case-insensitive, no enum converter)
-            // matches what ASP.NET Core's [FromBody] binder expects by default; enums that DO need
-            // string form (Firmware.cs/DeviceFirmware.cs/ServerConfig.cs) keep their own explicit
-            // per-property [JsonConverter(typeof(JsonStringEnumConverter))], which still applies.
+            // Refit's default ContentSerializer adds a global JsonStringEnumConverter, which breaks DTOs that deliberately stay numeric - use plain JsonSerializerDefaults.Web instead.
             ContentSerializer = new SystemTextJsonContentSerializer(new JsonSerializerOptions(JsonSerializerDefaults.Web)),
 
-            // Replace Refit's default exception (message is just the status line) with one that
-            // carries the response body, so failures like "email already registered" reach the UI.
+            // Carry the response body (Refit's default exception only has the status line) so failures like "email already registered" reach the UI.
             ExceptionFactory = async response =>
             {
                 if (response.IsSuccessStatusCode)
