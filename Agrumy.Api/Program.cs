@@ -23,23 +23,14 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Roadmap #104: must run before anything touches the static JwtTokenProvider (whose Config.
-// secureKey/jwtIssuer/jwtAudience it populates) - this host's real builder.Configuration, not
-// Config's old self-built ConfigurationBuilder from Directory.GetCurrentDirectory().
+// Must run before anything touches the static JwtTokenProvider, which this populates.
 Config.Init(builder.Configuration);
 
-// Roadmap #101/#104: one AgrumySettings snapshot per process, bound from the real host
-// IConfiguration - see AgrumySettings.Bind for exactly which keys/env vars feed it.
 AgrumySettings settingsForBootCheck = AgrumySettings.Bind(builder.Configuration);
 builder.Services.AddSingleton(Options.Create(settingsForBootCheck));
 
-// Roadmap #30: the bare-metal/standalone install path never asks install.sh anything about the
-// database - appsettings.json legitimately has no ConnectionStrings:DefaultConnection the very
-// first time this boots. Route to the minimal setup wizard instead of the rest of this file (JWT
-// auth, rate limiting, health checks, background workers, ... - every one of them either needs a
-// working DB connection or is pointless without one) until an admin supplies one; see
-// Agrumy.Api/Setup/SetupWizard.cs. A container install's appsettings.json always arrives already
-// populated (docker-compose.yml's environment section), so it never takes this branch.
+// A first boot with no DB connection string routes to the minimal setup wizard instead of
+// the rest of this file, until an admin supplies one - see Agrumy.Api/Setup/SetupWizard.cs.
 if (string.IsNullOrWhiteSpace(settingsForBootCheck.DefaultConnection))
 {
     api.Setup.SetupWizard.ConfigureServices(builder);
@@ -49,10 +40,6 @@ if (string.IsNullOrWhiteSpace(settingsForBootCheck.DefaultConnection))
     return;
 }
 
-// Roadmap #101: real scoped lifetime - one AgrumyDbContext per HTTP request/background-worker
-// tick (AddScoped, matching EfRepository's own scoped registration below), not a new one per
-// repository method call. Provider/connection string come from AgrumySettings, not appsettings
-// directly, so the AGRUMY_DB_PROVIDER env-var override (AgrumySettings.Bind) still applies.
 builder.Services.AddScoped(sp =>
 {
     AgrumySettings settings = sp.GetRequiredService<IOptions<AgrumySettings>>().Value;
@@ -94,9 +81,6 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddScoped<IAuthorizationHandler, DeviceApiKeyHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, DeviceSessionHandler>();
 
-// Roadmap #74: one scoped EfRepository instance, exposed as the full IRepository (controllers)
-// and forwarded to every per-domain facet, so a narrow consumer (DbExceptionFilter,
-// DeviceApiKeyHandler, future background workers) can inject just the interface it needs.
 builder.Services.AddScoped<EfRepository>();
 builder.Services.AddScoped<IRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ISystemRepository>(sp => sp.GetRequiredService<EfRepository>());
@@ -109,12 +93,8 @@ builder.Services.AddScoped<IDeviceUnitRepository>(sp => sp.GetRequiredService<Ef
 builder.Services.AddScoped<ICommandRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IFirmwareRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ISensorDataRepository>(sp => sp.GetRequiredService<EfRepository>());
-// Roadmap #72/#30: in-process by default (same practical behaviour as the old MemoryCache - lost
-// on restart, not shared across instances) - CacheRepository only ever talks to IDistributedCache,
-// so which backend is wired here is the entire scale-out story, no application code change either
-// way. Cache:Redis:ConnectionString (docker-compose.large.yml's Large/Scaled preset sets it via
-// Cache__Redis__ConnectionString) switches to Redis; unset/empty (the Small preset, and every
-// bare-metal install unless an admin opts in) keeps the in-process default.
+
+// Cache:Redis:ConnectionString switches to Redis; unset/empty keeps the in-process default.
 string? redisConnectionString = builder.Configuration["Cache:Redis:ConnectionString"];
 if (string.IsNullOrWhiteSpace(redisConnectionString))
 {
@@ -127,31 +107,26 @@ else
 builder.Services.AddScoped<ICache, CacheRepository>();
 builder.Services.AddScoped<DbExceptionFilter>();
 
-// Alert delivery (roadmap #6). Email is live; the FCM push channel is registered but stays
-// skipped until the Android app registers device tokens - see FcmPushNotificationChannel.
+// FCM push channel is registered but stays inert until the Android app registers device
+// tokens - see FcmPushNotificationChannel.
 builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection(NotificationOptions.SectionName));
 builder.Services.AddScoped<INotificationChannel, EmailNotificationChannel>();
 builder.Services.AddScoped<INotificationChannel, FcmPushNotificationChannel>();
 builder.Services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
 
-// Roadmap #40 (infra) + #6 (offline alert type). Scoped, not singleton - it resolves scoped
-// repositories/dispatcher itself and PeriodicBackgroundService creates a fresh DI scope per tick.
+// Scoped, not singleton: it resolves scoped repositories/dispatcher itself, and
+// PeriodicBackgroundService creates a fresh DI scope per tick.
 builder.Services.AddScoped<OfflineAlertEvaluator>();
 builder.Services.AddHostedService<OfflineAlertBackgroundService>();
 
-// Roadmap #12 (feature) + #40 (pattern): low-battery alert, same scoped/hosted-service shape as
-// OfflineAlertEvaluator/OfflineAlertBackgroundService above.
 builder.Services.AddScoped<LowBatteryAlertEvaluator>();
 builder.Services.AddHostedService<LowBatteryAlertBackgroundService>();
 
-// Roadmap #15 (feature) + #40 (pattern): MariaDB/MySQL-side automatic sensorData retention purge
-// - PostgreSQL/TimescaleDB installs get retention through EfRepository.ApplyRetentionPolicyAsync
-// instead (a native TimescaleDB policy, not a background worker).
+// MariaDB retention runs here; PostgreSQL/TimescaleDB installs use
+// EfRepository.ApplyRetentionPolicyAsync (a native TimescaleDB policy) instead.
 builder.Services.AddScoped<SensorDataRetentionEvaluator>();
 builder.Services.AddHostedService<SensorDataRetentionBackgroundService>();
 
-// Roadmap #11 (feature) + #40 (pattern, with a fixed-cadence twist - see WeatherBackgroundService's
-// own remarks). Typed HttpClient for the OpenWeatherMap forecast call.
 builder.Services.AddHttpClient<IWeatherForecastClient, OpenWeatherMapClient>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(15);
@@ -159,18 +134,12 @@ builder.Services.AddHttpClient<IWeatherForecastClient, OpenWeatherMapClient>(cli
 builder.Services.AddScoped<WeatherEvaluator>();
 builder.Services.AddHostedService<WeatherBackgroundService>();
 
-// Roadmap #34: no background worker - expiry is lazy (CommandQueueService.GetPendingCommandAsync
-// marks a stale row Expired the moment it's next looked at), so this is a plain scoped service,
-// not an IHostedService registration like OfflineAlertEvaluator above.
 builder.Services.AddScoped<CommandQueueService>();
 
-// Roadmap #126: on-demand background jobs (Optimize/Purge Old Data) - singleton queue so it
-// outlives any one request's DI scope, consumed one at a time by BackgroundJobRunner.
+// Singleton so it outlives any one request's DI scope; BackgroundJobRunner consumes it one job at a time.
 builder.Services.AddSingleton<BackgroundJobQueue>();
 builder.Services.AddHostedService<BackgroundJobRunner>();
 
-// Roadmap #94: firmware catalog. One named HttpClient for GitHub/Custom-repository reads and
-// .bin downloads - the default handler follows the 302 a GitHub release asset answers with.
 builder.Services.AddHttpClient(HttpFirmwareFetcher.ClientName, client =>
 {
     client.Timeout = TimeSpan.FromMinutes(5); // a full "pull from GitHub" streams several MB per file
@@ -180,9 +149,8 @@ builder.Services.AddSingleton<IFirmwareFetcher, HttpFirmwareFetcher>();
 builder.Services.AddSingleton<FirmwareStorage>();
 builder.Services.AddScoped<FirmwareCatalogService>();
 
-// Roadmap #143: health check (DB + cache-backend degradation, ties into #119) and per-route
-// request metrics. AgrumyMetrics is a singleton because its ConcurrentDictionary aggregate must
-// span every request/scope, not reset per HTTP request like the AddScoped registrations above.
+// AgrumyMetrics is a singleton because its ConcurrentDictionary aggregate must span every
+// request/scope, unlike the AddScoped registrations above.
 builder.Services.AddSingleton<AgrumyMetrics>();
 builder.Services
     .AddHealthChecks()
@@ -191,16 +159,9 @@ builder.Services
 
 builder.Services.AddControllers(options => options.Filters.AddService<DbExceptionFilter>());
 
-// Roadmap #84: the rate limiter below partitions by Connection.RemoteIpAddress - behind a reverse
-// proxy (roadmap #30) that's always the proxy's own IP, so every real client shares one bucket and
-// rate limiting is effectively disabled. ForwardedHeadersMiddleware rewrites RemoteIpAddress from
-// X-Forwarded-For before the limiter (or anything else) sees it, but ONLY for a request whose
-// immediate peer is in KnownProxies - left unconfigured, ForwardedHeadersOptions' own default
-// trusts loopback only, which is correct for a same-box proxy and, critically, is NOT a wildcard:
-// trusting an arbitrary peer would let any client spoof X-Forwarded-For and both bypass rate
-// limiting and forge its apparent IP everywhere else that reads it. A remote/containerized proxy
-// must list its real address(es) explicitly via Security:KnownProxies (comma-separated) in
-// appsettings.json.
+// KnownProxies must list only real proxy IPs (Security:KnownProxies, comma-separated) -
+// trusting an arbitrary peer would let any client spoof X-Forwarded-For to both bypass
+// rate limiting and forge its apparent IP everywhere else that reads it.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -245,11 +206,8 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 
-// Roadmap #143: structured logging. Plain-text console is fine to read live in Development, but on
-// the deployed instance (systemd/journald, see CLAUDE.md's kestrel-agrumy.service) it's opaque to
-// tooling - one JSON object per line is what `journalctl -o cat | jq` (or any log shipper) actually
-// needs to filter/query. ClearProviders() first so JSON console isn't just added alongside the
-// default plain-text one (CreateBuilder registers Console/Debug/EventSource by default).
+// ClearProviders first, or JSON console just stacks on top of the default plain-text
+// provider CreateBuilder registers.
 builder.Logging.ClearProviders();
 if (builder.Environment.IsDevelopment())
 {
@@ -273,16 +231,12 @@ builder.Logging.AddDebug();
 // HTTPS enforcement is opt-out via Security:EnforceHttps=false (default true), e.g. while firmware is still on http://.
 bool enforceHttps = !bool.TryParse(builder.Configuration["Security:EnforceHttps"], out var eh) || eh;
 
-// HSTS only when enforcing HTTPS and outside Development (see pipeline below).
 builder.Services.AddHsts(options =>
 {
     options.MaxAge = TimeSpan.FromDays(365);
     options.IncludeSubDomains = true;
 });
 
-// Roadmap #144: OpenAPI document generation via the built-in Microsoft.AspNetCore.OpenApi, not
-// Swashbuckle's SwaggerGen (see Agrumy.Api.csproj) - Swashbuckle.AspNetCore.SwaggerUI below still
-// renders a browsable page, pointed at the /openapi/v1.json this produces instead of its own output.
 builder.Services.AddOpenApi("v1", options =>
 {
     options.AddDocumentTransformer((document, context, cancellationToken) =>
@@ -313,16 +267,16 @@ builder.Services.AddOpenApi("v1", options =>
 
 var app = builder.Build();
 
-// Roadmap #69: JwtTokenProvider is static (no DI reach) - hand it a logger once so token
-// rejections land in the normal log pipeline instead of vanishing.
+// JwtTokenProvider is static (no DI reach) - hand it a logger once so token rejections
+// land in the normal log pipeline instead of vanishing.
 JwtTokenProvider.Logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(JwtTokenProvider));
 
-// Must run before anything that reads Connection.RemoteIpAddress or Request.Scheme - the rate
-// limiter (roadmap #84) below, but also UseHttpsRedirection/UseHsts further down.
+// Must run before anything that reads Connection.RemoteIpAddress or Request.Scheme - the
+// rate limiter below, but also UseHttpsRedirection/UseHsts further down.
 app.UseForwardedHeaders();
 
-// Roadmap #144: MapOpenApi() serves the Microsoft.AspNetCore.OpenApi-generated document;
-// UseSwaggerUI just renders it (SwaggerEndpoint below points at that route, not a Swashbuckle one).
+// MapOpenApi() serves the Microsoft.AspNetCore.OpenApi-generated document; UseSwaggerUI
+// just renders it, pointed at that route instead of a Swashbuckle one.
 app.MapOpenApi();
 app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "Agrumy Web API v1"));
 
@@ -338,8 +292,8 @@ if (enforceHttps)
 
 app.UseRouting();
 
-// Roadmap #143: after UseRouting (needs the matched route pattern) but before rate
-// limiting/auth/the endpoint itself, so recorded duration covers the whole request.
+// After UseRouting (needs the matched route pattern) but before rate limiting/auth/the
+// endpoint itself, so recorded duration covers the whole request.
 app.UseMiddleware<RequestMetricsMiddleware>();
 
 app.UseRateLimiter();
@@ -348,14 +302,10 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Roadmap #143. Unauthenticated on purpose - #139's post-restart/deploy probe and any external
-// uptime monitor need to reach this without a JWT; it exposes only up/down + which dependency,
-// nothing sensitive. Default HealthCheckOptions status-code mapping already does what #139 needs:
-// Healthy/Degraded -> 200, Unhealthy -> 503.
+// Unauthenticated on purpose: restart/deploy probes and external uptime monitors need to
+// reach this without a JWT; it exposes only up/down + which dependency, nothing sensitive.
 app.MapHealthChecks("/health", new HealthCheckOptions { ResponseWriter = HealthCheckResponseWriter.WriteResponse });
 
-// Roadmap #143. Global-admin only - per-route request counts/latency are operational detail about
-// the whole server, not something a tenant admin needs or should see.
 app.MapGet("/metrics", (AgrumyMetrics metrics) => Results.Json(metrics.GetSnapshot()))
     .RequireAuthorization(policy => policy.RequireRole(RoleNames.GlobalAdmin));
 
@@ -374,10 +324,6 @@ using (var scope = app.Services.CreateScope())
             await repository.EnsureSchemaAsync();
             startupLogger.LogInformation("Startup DB check: schema verified/provisioned.");
 
-            // ServerConfig:Reload (roadmap #10) - force the DB's hysteresis defaults back to
-            // appsettings.json. Off by default; see AgrumySettings.ServerConfigReload for why.
-            // Nested inside the DB-is-reachable branch so a Reload=true install with the DB down
-            // still falls through to the same failFastOnDbCheck handling below instead of throwing past it.
             if (scope.ServiceProvider.GetRequiredService<IOptions<AgrumySettings>>().Value.ServerConfigReload)
             {
                 await repository.ServerConfigReloadFromAppSettingsAsync(1);

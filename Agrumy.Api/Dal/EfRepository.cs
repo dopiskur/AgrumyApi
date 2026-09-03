@@ -9,27 +9,10 @@ using Npgsql;
 
 namespace api.Dal
 {
-    /// <summary>
-    /// EF Core implementation of <see cref="IRepository"/>. Replaces the Dapper +
-    /// <c>CommandType.StoredProcedure</c> <c>SqlRepository</c> (roadmap #42).
-    ///
-    /// Runs on MySQL/MariaDB (Pomelo) or PostgreSQL (Npgsql), chosen by <c>Database:Provider</c>.
-    /// Every method reproduces the effect of the stored procedure it replaced; the reference for
-    /// that behaviour is the pre-#42 <c>Schema/SchemaScripts.cs</c> (git history). Persistence goes
-    /// through <see cref="Entities"/> row types; results are projected onto the <see cref="api.Models"/>
-    /// DTOs so the interface contract is unchanged.
-    ///
-    /// Roadmap #74: one class, split into partial files mirroring the IRepository facets
-    /// (EfRepository.Users.cs, EfRepository.Devices.cs, ...) - this file holds the connection
-    /// plumbing and the ISystemRepository members.
-    ///
-    /// Roadmap #101: constructor-injected <see cref="AgrumyDbContext"/>, registered scoped
-    /// (Program.cs) - one context per HTTP request/background-worker tick, not a new one per
-    /// method call. Previously every method opened its own via a private static Db() factory,
-    /// which meant EF's change tracking never spanned two repo calls in the same request, real
-    /// connection-pool churn (open/close per method), and tests had to poke process-wide static
-    /// fields (ConnectionStringOverride/ProviderOverride) instead of just constructing an instance.
-    /// </summary>
+    /// <summary>EF Core implementation of <see cref="IRepository"/>, running on MySQL/MariaDB
+    /// (Pomelo) or PostgreSQL (Npgsql) per <c>Database:Provider</c>; split into partial files
+    /// mirroring the IRepository facets (EfRepository.Users.cs, EfRepository.Devices.cs, ...) -
+    /// this file holds the connection plumbing and the ISystemRepository members.</summary>
     internal partial class EfRepository(AgrumyDbContext db, IOptions<AgrumySettings> settingsOptions, ILogger<EfRepository> logger, ICache cache) : IRepository
     {
         private readonly AgrumySettings settings = settingsOptions.Value;
@@ -43,25 +26,10 @@ namespace api.Dal
 
         public async Task EnsureSchemaAsync()
         {
-
-            // Pre-beta: no real data to preserve across schema changes, so we skip migration
-            // history entirely and just create-if-missing from the current model. Empty DB gets
-            // every table from AgrumyDbContext as it stands today; shared DB with tables already
-            // present is a no-op either way (EnsureCreatedAsync also no-ops if the DB isn't empty).
-            // Migrations come back at beta - see roadmap.
             await db.Database.EnsureCreatedAsync();
 
-            // Roadmap #14: PostgreSQL is the "large deployment" tier of the tiered-hybrid decision -
-            // MariaDB/MySQL stays a plain relational table (small-deployment tier, no code path here
-            // at all). No-op on a MySQL/Pomelo context, and no-op (after logging) on a Postgres
-            // context whose server doesn't have the TimescaleDB extension installed.
             await EnsureTimescaleHypertableAsync();
 
-            // #66: EnsureCreatedAsync makes tables, never rows - without the role catalog a fresh
-            // install would have every login fall back to the legacy single-role path forever and
-            // registration's UserRolesSetAsync would silently assign nothing. Insert-if-missing by
-            // name; on a DB migrated via 2026-08-30-rbac-composable-roles.sql these already exist
-            // (with proper RoleScopeIDs, which nothing reads for authorization) so this is a no-op.
             var existingNames = await db.UserRoles.AsNoTracking()
                 .Where(r => r.RoleName != null).Select(r => r.RoleName!).ToListAsync();
             var missing = RoleNames.All.Except(existingNames).ToList();
@@ -76,17 +44,10 @@ namespace api.Dal
             await SeedBootstrapAdminAsync(db);
         }
 
-        /// <summary>Roadmap #14's tiered-hybrid decision: the deployment-size choice IS the provider
-        /// choice, so this runs unconditionally on every Postgres startup rather than needing a
-        /// separate opt-in setting - a self-hosted admin who picked Postgres already picked the
-        /// "large deployment" tier. `sensorData`'s PK is `IDSensorData` alone (see AgrumyDbContext);
-        /// TimescaleDB requires the partitioning column in every unique constraint including the PK,
-        /// so converting to a hypertable means widening it to (IDSensorData, DateCreated) first -
-        /// IDSensorData keeps working as a lookup key (EfRepository.DeviceUnits.cs's "latest reading
-        /// per zone" query), it just stops being unique on its own. Idempotent: skips straight past
-        /// an already-converted table, and if the extension itself isn't installed (dev/self-hosted
-        /// Postgres without TimescaleDB) this logs a warning and leaves sensorData as an ordinary
-        /// table - same as the MariaDB tier, not a startup failure.</summary>
+        /// <summary>TimescaleDB requires the partitioning column in every unique constraint
+        /// including the PK, so converting sensorData to a hypertable means widening its PK from
+        /// IDSensorData alone to (IDSensorData, DateCreated) first. No-op on MySQL/Pomelo, and
+        /// logs-and-skips if the TimescaleDB extension isn't installed.</summary>
         private async Task EnsureTimescaleHypertableAsync()
         {
             if (!db.Database.IsNpgsql())
@@ -105,9 +66,8 @@ namespace api.Dal
                 return;
             }
 
-            // DO block, not two separate ExecuteSqlRawAsync calls: the PK rename and
-            // create_hypertable() must both happen (or neither) exactly once, and the
-            // pg_constraint lookup avoids hardcoding EF's "PK_sensorData" naming-convention output.
+            // One DO block, not two separate calls - the PK rename and create_hypertable() must
+            // both happen (or neither) exactly once.
             const string sql = """
                 DO $$
                 DECLARE
@@ -132,24 +92,14 @@ namespace api.Dal
                 """;
             await db.Database.ExecuteSqlRawAsync(sql);
 
-            // Roadmap #15: apply whatever retention window is currently configured (DB row if one
-            // exists, else the appsettings seed via ServerConfigGetAsync's get-or-create) so a
-            // fresh install with ServerConfig:SensorDataRetentionDays already set in appsettings.json
-            // gets automatic retention from the very first startup, not only after an admin visits
-            // the settings page once.
             await ApplyRetentionPolicyAsync((await ServerConfigGetAsync(1)).SensorDataRetentionDays);
         }
 
-        /// <summary>Roadmap #15, PostgreSQL/TimescaleDB side - MariaDB's equivalent is
-        /// SensorDataRetentionBackgroundService's daily purge. Called both at startup (from
-        /// EnsureTimescaleHypertableAsync above) and on every ServerConfigUpdateAsync/
-        /// ServerConfigReloadFromAppSettingsAsync, since add_retention_policy's interval can only be
-        /// changed by removing the old policy and adding a new one - cheap (a catalog update, not
-        /// data movement) so doing it unconditionally on every save is simpler than diffing against
-        /// the previous value. Null/0 removes any existing policy instead of adding one: an admin
-        /// clearing the field is choosing to keep everything, not "leave whatever was configured
-        /// before". No-op on MySQL/Pomelo, and gracefully logs-and-skips if the TimescaleDB
-        /// extension/hypertable isn't there (same tier-fallback as EnsureTimescaleHypertableAsync).</summary>
+        /// <summary>PostgreSQL/TimescaleDB side of sensorData retention - MariaDB's equivalent is
+        /// SensorDataRetentionBackgroundService's daily purge. add_retention_policy's interval can
+        /// only be changed by removing the old policy and adding a new one, so this runs
+        /// unconditionally on every save; null/0 removes any existing policy rather than adding one.
+        /// No-op on MySQL/Pomelo.</summary>
         private async Task ApplyRetentionPolicyAsync(int? retentionDays)
         {
             if (!db.Database.IsNpgsql())
@@ -175,14 +125,11 @@ namespace api.Dal
             }
         }
 
-        /// <summary>Roadmap #81/#82: EnsureCreatedAsync makes the deviceUnit/deviceUnitZone tables,
-        /// never rows - without the IDDeviceUnit=0/IDDeviceUnitZone=0 sentinel pair, a brand-new
-        /// install's very first device registration would violate device.DeviceUnitID's FK (the
-        /// Shared Device model defaults DeviceUnitID/DeviceUnitZoneID to 0, not null). Global
-        /// (TenantID=null) by design - this is the shared "unassigned" bucket every tenant's
-        /// not-yet-zoned devices point at, not one tenant's real data. Zone before... no, Unit
-        /// before Zone (Zone's DeviceUnitID FK now points at Unit, opposite of the pre-migration
-        /// order - see db/migrations/2026-09-02-deviceunit-zone-containment.sql).</summary>
+        /// <summary>Seeds the IDDeviceUnit=0/IDDeviceUnitZone=0 sentinel pair - without it, a
+        /// brand-new install's first device registration violates device.DeviceUnitID's FK, since
+        /// the Shared Device model defaults DeviceUnitID/DeviceUnitZoneID to 0, not null. Global
+        /// (TenantID=null): the shared "unassigned" bucket every tenant's not-yet-zoned devices
+        /// point at.</summary>
         private static async Task SeedDeviceUnitSentinelsAsync(AgrumyDbContext db)
         {
             if (!await db.DeviceUnits.AnyAsync())
@@ -197,17 +144,10 @@ namespace api.Dal
             }
         }
 
-        /// <summary>Roadmap #91: EnsureCreatedAsync makes the four deviceType* tables, never rows -
-        /// left empty, every device Add/Edit dropdown in Agrumy.Web is blank and the admin can't
-        /// assign a type/service/relay/sensor to anything. Values are the original product's fixed
-        /// catalog (db/agrumyDB-final.sql) verbatim, not invented: AgrumyFirmware's firmware hardcodes
-        /// these same IDs (ControllerController.h's RelayFunctionType enum for deviceTypeRelay,
-        /// DeviceController.cpp's serviceType() switch for deviceTypeService), and Agrumy.Web's
-        /// DeviceController.Edit switches on the literal deviceType IDs 0/1/2/3 - drifting from this
-        /// seed would silently desync the dropdown from what the device/web code actually does with
-        /// the ID. Insert-if-missing per table (independent of each other and of the role catalog
-        /// above) so a partially-migrated DB that already has some of these rows is a no-op for
-        /// that table only.</summary>
+        /// <summary>These IDs must match AgrumyFirmware's ControllerController.h RelayFunctionType
+        /// enum and DeviceController.cpp serviceType() switch, and Agrumy.Web's
+        /// DeviceController.Edit - renumbering desyncs the dropdown from what the device/web code
+        /// actually does with the ID.</summary>
         private static async Task SeedDeviceTypeLookupsAsync(AgrumyDbContext db)
         {
             if (!await db.DeviceTypes.AnyAsync())
@@ -252,10 +192,8 @@ namespace api.Dal
                     new DeviceTypeSensorRow { IDDeviceTypeSensor = 2002, SensorName = "Analog moisture", Moisture = 1 });
             }
 
-            // Roadmap #149: the two kits with a real PlatformIO environment/pinout today
-            // (AgrumyFirmware's kc868-a6/esp32-s3-relay-6ch envs) - both have wired relay hardware.
-            // Any Kit string not in this table (empty string included) falls back to the existing,
-            // admin-controlled DeviceType/DeviceControllerEnabled signal - see DeviceFleetGetAsync.
+            // Any Kit string not in this table falls back to the existing, admin-controlled
+            // DeviceType/DeviceControllerEnabled signal - see DeviceFleetGetAsync.
             if (!await db.DeviceTypeKits.AnyAsync())
             {
                 db.DeviceTypeKits.AddRange(
@@ -266,17 +204,10 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
-        /// <summary>Roadmap #91: the other half of "fresh install has nothing to log in with" -
-        /// EnsureCreatedAsync/the seeding above populate tables and lookups but never an account,
-        /// so a genuinely empty `user` table (only true on the very first run against a brand-new
-        /// database - never on a DB that already has accounts, invent.hr included) gets exactly one
-        /// row: a Global Admin at TenantID=0 with PwdHash/PwdSalt left NULL. That NULL is
-        /// deliberate, not a bug - see UserRow.PwdHash - and is what makes
-        /// Agrumy.Web's first-run "set password" screen (BootstrapAdminPendingAsync/
-        /// BootstrapAdminSetPasswordAsync below) meaningful: there is nothing to authenticate with
-        /// until an operator sets a password through that screen, and once they do the row is
-        /// indistinguishable from any other account. No generic "Global User" row is seeded
-        /// alongside it - that concept was retired for the default schema (roadmap #91 design note).</summary>
+        /// <summary>A genuinely empty user table gets exactly one row: a Global Admin at
+        /// TenantID=0 with PwdHash/PwdSalt left NULL on purpose - see UserRow.PwdHash - so
+        /// Agrumy.Web's first-run "set password" screen (BootstrapAdminSetPasswordAsync below) has
+        /// something to activate.</summary>
         private static async Task SeedBootstrapAdminAsync(AgrumyDbContext db)
         {
             if (await db.Users.AnyAsync())

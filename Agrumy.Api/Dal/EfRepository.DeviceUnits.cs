@@ -5,32 +5,27 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IDeviceUnitRepository members (roadmap #74 pattern, new facet): Unit/Zone CRUD and
-    /// device assignment (roadmap #82), and the hierarchical dashboard aggregation (roadmap #81).</summary>
+    /// <summary>IDeviceUnitRepository members: Unit/Zone CRUD, device assignment, and the
+    /// hierarchical dashboard aggregation.</summary>
     internal partial class EfRepository
     {
-        /// <summary>One device's latest telemetry reading plus its current Unit/Zone, the shape the
-        /// #81 dashboard averages are computed from. A record, not the SensorData DTO, because it
-        /// only carries what aggregation needs - not DeviceID/TenantID/DateCreated. Enabled/Online/
-        /// HasRecentProblemEvent (roadmap #116 rule (4)) ride along on the same per-device query
-        /// rather than a second pass over the same device set.</summary>
+        /// <summary>A record, not the SensorData DTO - carries only what dashboard aggregation needs.</summary>
         private sealed record UnitZoneDeviceSnapshot(
             int? DeviceUnitID, int? DeviceUnitZoneID, bool Enabled, bool Online, bool HasRecentProblemEvent,
             double? Temperature, double? SoilTemperature, double? Humidity, int? Moisture, int? Light,
             int? Co2, int? Tvoc, double? Barometer, double? LiquidPH, int? RainLevel, int? WaterLevel, double? Wind);
 
-        /// <summary>Roadmap #116 rule (4): event types that make a zone/unit Orange (unless it's
-        /// already Red).</summary>
+        /// <summary>Event types that make a zone/unit Orange (unless it's already Red).</summary>
         private static readonly int[] ProblemEventTypeIds =
         [
             (int)DeviceEventType.AuthFailed,
             (int)DeviceEventType.ConfigSyncFailed,
             (int)DeviceEventType.CrashLoopRollback,
             (int)DeviceEventType.OtaFailed,
-            (int)DeviceEventType.Crash, // roadmap #135
+            (int)DeviceEventType.Crash,
         ];
 
-        // ---- Unit CRUD (roadmap #82) -------------------------------------------------
+        // ---- Unit CRUD -------------------------------------------------
 
         public async Task<IList<DeviceUnit>> DeviceUnitsGetAsync(int? tenantID)
         {
@@ -51,11 +46,9 @@ namespace api.Dal
 
         public async Task<DeviceUnit> DeviceUnitAddAsync(DeviceUnit unit)
         {
-            // IDDeviceUnit is ValueGeneratedNever (not a DB AUTO_INCREMENT column) - see
-            // DeviceEntities.cs. That is deliberate: MySQL's default sql_mode treats an explicit 0
-            // on an AUTO_INCREMENT column as "generate a new value", which would silently break the
-            // IDDeviceUnit=0 "Default" sentinel every unassigned device relies on. Manual max+1 is
-            // the trade-off - fine at this project's single-admin-per-tenant, alpha-phase scale.
+            // IDDeviceUnit is ValueGeneratedNever - MySQL's default sql_mode treats an explicit 0
+            // on an AUTO_INCREMENT column as "generate a new value", which would break the
+            // IDDeviceUnit=0 "Default" sentinel every unassigned device relies on.
             int nextId = Math.Max((await db.DeviceUnits.AsNoTracking().Select(u => (int?)u.IDDeviceUnit).MaxAsync() ?? 0) + 1, 1);
             var row = new DeviceUnitRow { IDDeviceUnit = nextId, TenantID = unit.TenantID, DeviceUnitName = unit.DeviceUnitName };
             db.DeviceUnits.Add(row);
@@ -84,13 +77,13 @@ namespace api.Dal
 
             foreach (int zoneId in zoneIds)
             {
-                await DeviceUnitZoneDeleteAsync(zoneId); // unassigns the zone's devices, then deletes the zone row
+                await DeviceUnitZoneDeleteAsync(zoneId);
             }
 
             await db.DeviceUnits.Where(u => u.IDDeviceUnit == idDeviceUnit).ExecuteDeleteAsync();
         }
 
-        // ---- Zone CRUD (roadmap #82) ------------------------------------------------
+        // ---- Zone CRUD ------------------------------------------------
 
         public async Task<IList<DeviceUnitZone>> DeviceUnitZonesGetAsync(int idDeviceUnit)
         {
@@ -117,8 +110,6 @@ namespace api.Dal
                 TenantID = zone.TenantID,
                 DeviceUnitID = zone.DeviceUnitID,
                 DeviceUnitZoneName = zone.DeviceUnitZoneName,
-                // Roadmap #21/#36: seeded from AgrumySettings on creation, same pattern the pre-#21
-                // per-device seeding used - editable per zone from here on.
                 WaterPumpMaxRunSeconds = settings.WaterPumpMaxRunSeconds,
                 WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds,
             };
@@ -141,17 +132,11 @@ namespace api.Dal
             row.WaterPumpCooldownSeconds = zone.WaterPumpCooldownSeconds;
             row.SkipWaterPumpWhenRainPredicted = zone.SkipWaterPumpWhenRainPredicted;
             await db.SaveChangesAsync();
-            // Roadmap #21: safety limits are part of what a device reads from its zone on config
-            // poll (BuildDeviceConfigAsync) - same "config changed, bump so the next poll picks it
-            // up" reasoning as every other config write, DeviceAssignToZoneAsync above included.
             await DeviceUnitZoneConfigVersionBumpAsync(idDeviceUnitZone: row.IDDeviceUnitZone);
         }
 
-        /// <summary>Roadmap #21: every device currently assigned to this zone (in practice at most
-        /// one controller, #82 rule (a), but sensor-only devices in the same zone are bumped too -
-        /// harmless extra poll, simpler than resolving "the" controller specifically) gets its
-        /// ConfigVersion bumped, so the next config poll picks up a zone-level rule/safety-limit
-        /// change. Bulk update, not a fetch-then-loop.</summary>
+        /// <summary>Bumps ConfigVersion for every device in the zone (bulk update, not
+        /// fetch-then-loop) so the next config poll picks up a zone-level rule/safety-limit change.</summary>
         public async Task DeviceUnitZoneConfigVersionBumpAsync(int idDeviceUnitZone)
         {
             await db.Devices.Where(d => d.DeviceUnitZoneID == idDeviceUnitZone)
@@ -170,14 +155,14 @@ namespace api.Dal
                 await DeviceUnassignFromZoneAsync(deviceId);
             }
 
-            // Roadmap #21: app-level cleanup, not a DB-level CASCADE (this codebase's own
-            // convention - see AgrumyDbContext's DeviceUnitZoneRuleRow config, DeleteBehavior.NoAction).
+            // App-level cleanup, not a DB-level CASCADE - see AgrumyDbContext's
+            // DeviceUnitZoneRuleRow config, DeleteBehavior.NoAction.
             await db.DeviceUnitZoneRules.Where(r => r.DeviceUnitZoneID == idDeviceUnitZone).ExecuteDeleteAsync();
 
             await db.DeviceUnitZones.Where(z => z.IDDeviceUnitZone == idDeviceUnitZone).ExecuteDeleteAsync();
         }
 
-        // ---- roadmap #21: zone rules ---------------------------------------------------------
+        // ---- Zone rules ---------------------------------------------------------
 
         public async Task<IList<DeviceUnitZoneRule>> DeviceUnitZoneRulesGetAsync(int idDeviceUnitZone)
         {
@@ -252,7 +237,7 @@ namespace api.Dal
             return rows.Select(ToDto).ToList();
         }
 
-        // ---- Device assignment (roadmap #82) -----------------------------------------
+        // ---- Device assignment -----------------------------------------
 
         public async Task<IList<Device>> DeviceUnassignedGetAsync(int? tenantID, bool controllerCapable)
         {
@@ -281,24 +266,22 @@ namespace api.Dal
 
             device.DeviceUnitID = zone.DeviceUnitID;
             device.DeviceUnitZoneID = zone.IDDeviceUnitZone;
-            // Config-sync (unlike Remove below) - the device learns its new assignment on its next
-            // poll, same bump DeviceUpdateAsync does for every other field change.
+            // Bumped (unlike Unassign below) - the device learns its new assignment on its next poll.
             device.ConfigVersion = (device.ConfigVersion ?? 0) + 1;
             await db.SaveChangesAsync();
         }
 
         public async Task DeviceUnassignFromZoneAsync(int idDevice)
         {
-            // #82 rule (e): pure bookkeeping - no ConfigVersion bump, the device is not notified and
-            // keeps polling/reporting telemetry exactly as before; it just stops counting toward any
-            // zone's aggregation once the change lands.
+            // No ConfigVersion bump - the device is not notified and keeps polling/reporting
+            // telemetry exactly as before, it just stops counting toward any zone's aggregation.
             await db.Devices.Where(d => d.IDDevice == idDevice)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(d => d.DeviceUnitID, 0)
                     .SetProperty(d => d.DeviceUnitZoneID, 0));
         }
 
-        // ---- Dashboard aggregation (roadmap #81) -------------------------------------
+        // ---- Dashboard aggregation -------------------------------------
 
         public async Task<IList<DeviceUnitDashboard>> DeviceUnitDashboardGetAsync(int? tenantID)
         {
@@ -393,11 +376,10 @@ namespace api.Dal
             };
         }
 
-        /// <summary>Latest telemetry per device in <paramref name="devices"/>, following the same
-        /// two-step shape as DeviceFleetGetAsync's Battery subquery (a correlated subquery
-        /// projecting ONE scalar column - portable across MySQL/MariaDB/Postgres, no LATERAL/APPLY
-        /// needed) rather than trying to pull back a whole SensorData row in one correlated
-        /// subquery, which EF cannot translate to a single-column scalar subquery.</summary>
+        /// <summary>Latest telemetry per device in <paramref name="devices"/> - EF cannot translate
+        /// a whole-row correlated subquery, so this pulls the latest SensorData id per device via
+        /// scalar subqueries (portable across MySQL/MariaDB/Postgres, no LATERAL/APPLY) then
+        /// batch-fetches the rows.</summary>
         private async Task<List<UnitZoneDeviceSnapshot>> GetDeviceSnapshotsAsync(IQueryable<DeviceRow> devices)
         {
             DateTime utcNow = DateTime.UtcNow;
@@ -414,8 +396,6 @@ namespace api.Dal
                         .Where(x => x.DeviceID == d.IDDevice)
                         .Select(x => x.LastSeenAt)
                         .FirstOrDefault(),
-                    // Roadmap #116 rule (4): a plain EXISTS-shaped correlated subquery, same
-                    // portability reasoning as the scalar subqueries below (no LATERAL/APPLY).
                     HasRecentProblemEvent = db.EventDevices.AsNoTracking()
                         .Any(e => e.DeviceID == d.IDDevice && e.Date >= problemEventCutoff && ProblemEventTypeIds.Contains(e.EventID)),
                     LatestSensorDataId = db.SensorData.AsNoTracking()
@@ -437,8 +417,8 @@ namespace api.Dal
             {
                 SensorDataRow? s = d.LatestSensorDataId != null && latestById.TryGetValue(d.LatestSensorDataId.Value, out var row) ? row : null;
                 bool enabled = d.Enabled == true;
-                // A disabled device is expected to be silent (same rule as OfflineAlertCandidatesGetAsync,
-                // roadmap #40) - its own offline-ness must not redden a zone/unit nobody expects it to report into.
+                // A disabled device is expected to be silent - its offline-ness must not redden a
+                // zone/unit nobody expects it to report into.
                 bool online = !enabled || DeviceFleetStatus.ComputeOnline(d.LastSeenAt, d.SleepSeconds, utcNow);
                 return new UnitZoneDeviceSnapshot(
                     d.DeviceUnitID, d.DeviceUnitZoneID, enabled, online, d.HasRecentProblemEvent,
@@ -447,14 +427,10 @@ namespace api.Dal
             }).ToList();
         }
 
-        /// <summary>Roadmap #116 rule (4), amended (user report on invent.hr's SecondUnit/Default
-        /// zone): Red beats Orange beats Green. Only ENABLED devices' online state counts toward
-        /// Red (see GetDeviceSnapshotsAsync); a disabled device is always considered "online" for
-        /// that purpose so it can never redden its zone. But a disabled device is not invisible
-        /// either - it visibly shows a red "Offline" badge on its own Fleet/zone row (that badge
-        /// has no Enabled check, roadmap #7/#8), so a zone/unit cube that stayed plain Green while
-        /// containing one read as a silent contradiction. Orange now also covers "at least one
-        /// disabled device in scope", independent of the problem-event check below.</summary>
+        /// <summary>Red beats Orange beats Green. Only ENABLED devices' online state counts toward
+        /// Red; a disabled device can never redden its zone, but it still shows a red "Offline"
+        /// badge on its own Fleet/zone row, so it turns the zone/unit Orange instead of leaving it
+        /// silently Green.</summary>
         private static ZoneStatus ComputeStatus(IReadOnlyCollection<UnitZoneDeviceSnapshot> snapshots)
         {
             if (snapshots.Any(s => s.Enabled && !s.Online))
@@ -468,13 +444,10 @@ namespace api.Dal
             return ZoneStatus.Green;
         }
 
-        /// <summary>Roadmap #116 rule (3): last-24h hourly average per sensor type across every
-        /// device in the given zones - one query per cube (acceptable at typical unit/zone counts;
-        /// revisit if that ever becomes the bottleneck instead of sensorData's own growth, see the
-        /// roadmap's own performance note on this item). Filters sensorData directly by
-        /// DeviceUnitZoneID rather than going through GetDeviceSnapshotsAsync's per-device
-        /// correlated-subquery shape, since a trend needs every reading in the window, not just the
-        /// latest one - ix_sensorData_deviceUnitZone_date (roadmap #116 migration) backs this.</summary>
+        /// <summary>Last-24h hourly average per sensor type across every device in the given zones.
+        /// Filters sensorData directly by DeviceUnitZoneID rather than going through
+        /// GetDeviceSnapshotsAsync's per-device shape, since a trend needs every reading in the
+        /// window, not just the latest one - ix_sensorData_deviceUnitZone_date backs this.</summary>
         private async Task<SensorTrend> BuildTrendAsync(List<int> zoneIds)
         {
             var trend = new SensorTrend();
