@@ -85,6 +85,38 @@ around that one domain, rather than adapting a general-purpose platform's data
 model to fit it. It's a starting point for a narrow, vertical-specific product,
 not a general home-automation hub.
 
+## How Agrumy differs from Mycodo / OpenSprinkler
+
+Mycodo and OpenSprinkler are mature, single-install controllers - point one of
+them at one greenhouse or sprinkler system and they do that job well. Agrumy
+targets a different case: a fleet of installations under one backend. Neither
+is "better" here; they're built for different scale.
+
+- **Multi-tenant with granular RBAC.** Neither Mycodo nor OpenSprinkler has a
+  tenant concept - a single install is a single install. Agrumy's `TenantID`
+  scoping and composable roles (`api.Security.RoleNames`) let one backend host
+  many independent operators, each seeing only their own devices/users/data.
+- **A Unit/Zone hierarchy with a live dashboard.** `GET /api/DeviceUnit/Dashboard`
+  rolls up status across units and zones of devices - neither competitor has a
+  comparable way to organize and view a *fleet*, since they're built around
+  managing one controller/installation at a time.
+- **Fleet-wide commands with server-side fan-out.** `POST /api/DeviceCommand`
+  targets a unit or zone and the server resolves that into the actual set of
+  devices to deliver Reboot/ForceOTA/ForceConfigSync to on their next poll -
+  not something either competitor's single-controller model needs to solve.
+- **Firmware-side native unit tests in CI.** The relay/hysteresis/schedule/
+  safety-limit logic in `AgrumyFirmware` (`test/test_native_*`) runs as native
+  unit tests on every push, independent of real hardware - a level of
+  formalized firmware testing not evident in either competitor's repo.
+- **A configurable firmware distribution source.** Roadmap #94's GitHub/Local/
+  Custom firmware source, with offline-USB-repository support and lazy fetch,
+  has no equivalent in either project.
+
+None of this makes Agrumy a drop-in replacement for either - if you're running
+one greenhouse with off-the-shelf sensors, Mycodo or OpenSprinkler (or Home
+Assistant/ESPHome, see above) is very likely the simpler, more mature choice.
+Agrumy is for when "one greenhouse" becomes "many, under one roof."
+
 ## Quickstart
 
 `appsettings.json` is git-ignored in every project (it holds real secrets). Copy
