@@ -317,6 +317,25 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal("Europe/Zagreb", back.ScheduleTimeZone);
     }
 
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task ServerConfig_SensorDataRetentionDays_UpdateAndGet_RoundTrips(DbProviderKind provider)
+    {
+        // Roadmap #15. On Postgres this also exercises EfRepository.ApplyRetentionPolicyAsync via
+        // ServerConfigUpdateAsync - a TimescaleDB-less test container just logs a warning and
+        // swallows it (same graceful fallback as EnsureTimescaleHypertableAsync), so this round-trip
+        // still passes regardless of whether the extension is installed.
+        Use(provider);
+        int id = new Random().Next(1000, 9_000_000);
+        var config = await _repo.ServerConfigGetAsync(id);
+        Assert.Null(config.SensorDataRetentionDays); // not configured yet - no universal default
+
+        config.SensorDataRetentionDays = 90;
+        await _repo.ServerConfigUpdateAsync(config);
+
+        var back = await _repo.ServerConfigGetAsync(id);
+        Assert.Equal(90, back.SensorDataRetentionDays);
+    }
+
     // ---- refresh tokens -----------------------------------------------------
 
     [SkippableTheory, MemberData(nameof(Providers))]

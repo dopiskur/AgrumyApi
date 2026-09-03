@@ -78,6 +78,11 @@ namespace api
         public string FirmwareGitHubRepository { get; set; } = "dopiskur/AgrumyFirmware";
         public string? FirmwareGitHubToken { get; set; }
 
+        // Roadmap #15: days of sensorData history to keep automatically - same "no universal
+        // default" reasoning as ScheduleTimeZone above (null = admin hasn't opted in yet, data
+        // just accumulates until purged manually via roadmap #126).
+        public int? SensorDataRetentionDays { get; set; }
+
         public static AgrumySettings Bind(IConfiguration configuration) => new()
         {
             DefaultConnection = configuration.GetConnectionString("DefaultConnection"),
@@ -103,6 +108,7 @@ namespace api
             FirmwareLocalPath = configuration.GetSection("Firmware:LocalPath").Value,
             FirmwareGitHubRepository = configuration.GetSection("Firmware:GitHubRepository").Value is { Length: > 0 } repo ? repo : "dopiskur/AgrumyFirmware",
             FirmwareGitHubToken = configuration.GetSection("Firmware:GitHubToken").Value,
+            SensorDataRetentionDays = ParseIntOrNull(configuration, "ServerConfig:SensorDataRetentionDays"),
         };
 
         // IConfiguration stores every value as its literal JSON text (e.g. "20.0"). Parsing that
@@ -121,5 +127,10 @@ namespace api
 
         private static bool ParseBoolOr(IConfiguration configuration, string key, bool fallback) =>
             bool.TryParse(configuration.GetSection(key).Value, out var value) ? value : fallback;
+
+        private static int? ParseIntOrNull(IConfiguration configuration, string key) =>
+            int.TryParse(configuration.GetSection(key).Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+                ? value
+                : null;
     }
 }

@@ -85,6 +85,16 @@ namespace api.Models
         /// relative to the manifest's own location.</summary>
         [Display(Name = "Custom repository manifest URL")]
         public string? FirmwareCustomRepositoryUrl { get; set; }
+
+        // Roadmap #15: days of sensorData history to keep automatically. PostgreSQL/TimescaleDB
+        // installs enforce this through add_retention_policy (EfRepository.ApplyRetentionPolicyAsync,
+        // re-applied on every save so an admin edit here takes effect without a restart); MariaDB/
+        // MySQL installs enforce it through SensorDataRetentionBackgroundService's daily purge
+        // (roadmap #40 pattern) - one shared value, two different mechanisms underneath, same
+        // #14 tiered-hybrid split as everywhere else. Null/0 = no automatic retention (admin
+        // hasn't opted in) - same "no universal default" reasoning as ScheduleTimeZone above.
+        [Display(Name = "Sensor data retention (days)")]
+        public int? SensorDataRetentionDays { get; set; }
     }
 
     /// <summary>The only two fields of <see cref="ServerConfig"/> a pre-login, unauthenticated page

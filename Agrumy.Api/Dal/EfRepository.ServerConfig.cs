@@ -41,6 +41,7 @@ namespace api.Dal
                 ScheduleTimeZone = settings.ScheduleTimeZone,
                 FirmwareSource = (int)FirmwareSource.GitHub,
                 FirmwareGitHubRepository = settings.FirmwareGitHubRepository,
+                SensorDataRetentionDays = settings.SensorDataRetentionDays,
             };
             db.ServerConfigs.Add(generated);
             await db.SaveChangesAsync();
@@ -70,7 +71,14 @@ namespace api.Dal
             row.FirmwareSource = (int)config.FirmwareSource;
             row.FirmwareGitHubRepository = config.FirmwareGitHubRepository;
             row.FirmwareCustomRepositoryUrl = config.FirmwareCustomRepositoryUrl;
+            row.SensorDataRetentionDays = config.SensorDataRetentionDays;
             await db.SaveChangesAsync();
+
+            // Roadmap #15: re-apply on every save (not just at startup) so an admin editing this
+            // field takes effect immediately on Postgres/TimescaleDB - a no-op on MariaDB/MySQL,
+            // whose retention instead comes from SensorDataRetentionBackgroundService reading the
+            // row fresh on its own next daily tick.
+            await ApplyRetentionPolicyAsync(config.SensorDataRetentionDays);
         }
 
         /// <summary>Forces the DB serverConfig row's hysteresis fields back to appsettings.json's
@@ -104,7 +112,9 @@ namespace api.Dal
             row.ActivationResendCooldownMinutes = settings.ActivationResendCooldownMinutes;
             row.AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation;
             row.ScheduleTimeZone = settings.ScheduleTimeZone;
+            row.SensorDataRetentionDays = settings.SensorDataRetentionDays;
             await db.SaveChangesAsync();
+            await ApplyRetentionPolicyAsync(settings.SensorDataRetentionDays);
         }
 
         // Instance, not static: the #94 GitHub-repository fallback below reads the injected settings.
@@ -132,6 +142,7 @@ namespace api.Dal
             // rather than an empty repository nobody can sync from.
             FirmwareGitHubRepository = string.IsNullOrWhiteSpace(r.FirmwareGitHubRepository) ? settings.FirmwareGitHubRepository : r.FirmwareGitHubRepository,
             FirmwareCustomRepositoryUrl = r.FirmwareCustomRepositoryUrl,
+            SensorDataRetentionDays = r.SensorDataRetentionDays,
         };
     }
 }

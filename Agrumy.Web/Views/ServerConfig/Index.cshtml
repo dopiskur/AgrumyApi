@@ -36,6 +36,9 @@
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-firmware" type="button" role="tab">Firmware</button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-retention" type="button" role="tab">Data Retention</button>
+                </li>
             </ul>
             <div class="tab-content border border-top-0 rounded-bottom p-3 mb-3">
                 <div class="tab-pane fade show active" id="tab-hysteresis" role="tabpanel">
@@ -174,47 +177,60 @@
                         <span asp-validation-for="FirmwareCustomRepositoryUrl" class="text-danger"></span>
                     </div>
                 </div>
+
+                <div class="tab-pane fade" id="tab-retention" role="tabpanel">
+                    <p class="text-secondary">
+                        Automatic sensor data retention (roadmap #15). PostgreSQL/TimescaleDB
+                        installs enforce this through a native retention policy (whole chunks
+                        dropped in the background); MariaDB/MySQL installs enforce it through a
+                        daily purge job (roadmap #40 pattern) that deletes rows older than the
+                        cutoff. Not set = no automatic retention - data accumulates until purged
+                        manually below.
+                    </p>
+                    <div class="mb-0">
+                        <label asp-for="SensorDataRetentionDays" class="form-label"></label>
+                        <input asp-for="SensorDataRetentionDays" class="form-control" />
+                        <span asp-validation-for="SensorDataRetentionDays" class="text-danger"></span>
+                    </div>
+
+                    <hr />
+
+                    <h5>Manual Data Maintenance</h5>
+                    <p class="text-secondary">
+                        Applies to sensor telemetry older than the selected threshold, across every
+                        device. <strong>Optimize</strong> downsamples it to 5-minute averages
+                        (outliers excluded) in place - the data stays, just less precise.
+                        <strong>Purge</strong> deletes it completely, with no way to recover it.
+                        Both run in the background - this page does not wait for them to finish
+                        (roadmap #126).
+                    </p>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-auto">
+                            <label class="form-label" for="dataMaintenanceThreshold">Older than</label>
+                            <select id="dataMaintenanceThreshold" class="form-select">
+                                <option value="90">90 days</option>
+                                <option value="180">180 days</option>
+                                <option value="365" selected>365 days</option>
+                                <option value="730">730 days</option>
+                                <option value="1825">5 years</option>
+                                <option value="3650">10 years</option>
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" id="dataMaintenanceOptimize" class="btn btn-outline-primary">Optimize Old Data</button>
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" id="dataMaintenancePurge" class="btn btn-outline-danger">Purge Old Data</button>
+                        </div>
+                    </div>
+                    <div id="dataMaintenanceStatus" class="mt-2"></div>
+                </div>
             </div>
 
             <div class="mb-0">
                 <input type="submit" value="Save" class="btn btn-primary" />
             </div>
         </form>
-    </div>
-</div>
-
-<div class="card mt-3">
-    <div class="card-header">
-        <h3 class="card-title">Data Maintenance</h3>
-    </div>
-    <div class="card-body">
-        <p class="text-secondary">
-            Applies to sensor telemetry older than the selected threshold, across every device.
-            <strong>Optimize</strong> downsamples it to 5-minute averages (outliers excluded) in
-            place - the data stays, just less precise. <strong>Purge</strong> deletes it
-            completely, with no way to recover it. Both run in the background - this page does
-            not wait for them to finish (roadmap #126).
-        </p>
-        <div class="row g-2 align-items-end">
-            <div class="col-auto">
-                <label class="form-label" for="dataMaintenanceThreshold">Older than</label>
-                <select id="dataMaintenanceThreshold" class="form-select">
-                    <option value="90">90 days</option>
-                    <option value="180">180 days</option>
-                    <option value="365" selected>365 days</option>
-                    <option value="730">730 days</option>
-                    <option value="1825">5 years</option>
-                    <option value="3650">10 years</option>
-                </select>
-            </div>
-            <div class="col-auto">
-                <button type="button" id="dataMaintenanceOptimize" class="btn btn-outline-primary">Optimize Old Data</button>
-            </div>
-            <div class="col-auto">
-                <button type="button" id="dataMaintenancePurge" class="btn btn-outline-danger">Purge Old Data</button>
-            </div>
-        </div>
-        <div id="dataMaintenanceStatus" class="mt-2"></div>
     </div>
 </div>
 

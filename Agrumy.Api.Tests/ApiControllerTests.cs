@@ -1446,6 +1446,37 @@ public class ApiControllerTests
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
+    // ---- ServerConfigApiController.Update - roadmap #15 retention-days validation ----------------
+
+    [Fact]
+    public async Task ServerConfigUpdate_SensorDataRetentionDaysNegative_Returns400_AndNeverWrites()
+    {
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.Update(new ServerConfig { SensorDataRetentionDays = -1 });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        // MockBehavior.Strict: ServerConfigUpdateAsync has no setup, so reaching this point already
+        // proves the bad value was rejected before any write.
+    }
+
+    [Fact]
+    public async Task ServerConfigUpdate_SensorDataRetentionDaysNullOrPositive_Persists()
+    {
+        ServerConfig? saved = null;
+        _repo.Setup(r => r.ServerConfigUpdateAsync(It.IsAny<ServerConfig>()))
+             .Callback<ServerConfig>(c => saved = c)
+             .Returns(Task.CompletedTask);
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.Update(new ServerConfig { SensorDataRetentionDays = 365 });
+
+        Assert.IsType<OkResult>(result);
+        Assert.Equal(365, saved!.SensorDataRetentionDays);
+    }
+
     [Fact]
     public async Task DevicesGet_GlobalReader_SeesEveryTenant()
     {

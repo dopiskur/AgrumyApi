@@ -46,7 +46,9 @@ namespace api.Controllers.View
                         ? nameof(ServerConfig.WaterPumpCooldownSeconds)
                         : ex.Body.Contains("WaterPump", StringComparison.OrdinalIgnoreCase)
                             ? nameof(ServerConfig.WaterPumpMaxRunSeconds)
-                            : nameof(ServerConfig.ScheduleTimeZone);
+                            : ex.Body.Contains("retention", StringComparison.OrdinalIgnoreCase)
+                                ? nameof(ServerConfig.SensorDataRetentionDays)
+                                : nameof(ServerConfig.ScheduleTimeZone);
                 ModelState.AddModelError(field, ex.Body);
                 ViewBag.TimeZones = TimeZoneOptions(serverConfig.ScheduleTimeZone);
                 return View(serverConfig);

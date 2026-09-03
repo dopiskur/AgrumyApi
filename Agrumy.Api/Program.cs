@@ -114,6 +114,12 @@ builder.Services.AddHostedService<OfflineAlertBackgroundService>();
 builder.Services.AddScoped<LowBatteryAlertEvaluator>();
 builder.Services.AddHostedService<LowBatteryAlertBackgroundService>();
 
+// Roadmap #15 (feature) + #40 (pattern): MariaDB/MySQL-side automatic sensorData retention purge
+// - PostgreSQL/TimescaleDB installs get retention through EfRepository.ApplyRetentionPolicyAsync
+// instead (a native TimescaleDB policy, not a background worker).
+builder.Services.AddScoped<SensorDataRetentionEvaluator>();
+builder.Services.AddHostedService<SensorDataRetentionBackgroundService>();
+
 // Roadmap #34: no background worker - expiry is lazy (CommandQueueService.GetPendingCommandAsync
 // marks a stale row Expired the moment it's next looked at), so this is a plain scoped service,
 // not an IHostedService registration like OfflineAlertEvaluator above.

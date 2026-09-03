@@ -131,6 +131,48 @@ namespace api.Dal
                 END $$;
                 """;
             await db.Database.ExecuteSqlRawAsync(sql);
+
+            // Roadmap #15: apply whatever retention window is currently configured (DB row if one
+            // exists, else the appsettings seed via ServerConfigGetAsync's get-or-create) so a
+            // fresh install with ServerConfig:SensorDataRetentionDays already set in appsettings.json
+            // gets automatic retention from the very first startup, not only after an admin visits
+            // the settings page once.
+            await ApplyRetentionPolicyAsync((await ServerConfigGetAsync(1)).SensorDataRetentionDays);
+        }
+
+        /// <summary>Roadmap #15, PostgreSQL/TimescaleDB side - MariaDB's equivalent is
+        /// SensorDataRetentionBackgroundService's daily purge. Called both at startup (from
+        /// EnsureTimescaleHypertableAsync above) and on every ServerConfigUpdateAsync/
+        /// ServerConfigReloadFromAppSettingsAsync, since add_retention_policy's interval can only be
+        /// changed by removing the old policy and adding a new one - cheap (a catalog update, not
+        /// data movement) so doing it unconditionally on every save is simpler than diffing against
+        /// the previous value. Null/0 removes any existing policy instead of adding one: an admin
+        /// clearing the field is choosing to keep everything, not "leave whatever was configured
+        /// before". No-op on MySQL/Pomelo, and gracefully logs-and-skips if the TimescaleDB
+        /// extension/hypertable isn't there (same tier-fallback as EnsureTimescaleHypertableAsync).</summary>
+        private async Task ApplyRetentionPolicyAsync(int? retentionDays)
+        {
+            if (!db.Database.IsNpgsql())
+            {
+                return;
+            }
+
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync(
+                    """SELECT remove_retention_policy('"sensorData"'::regclass, if_exists => true);""");
+
+                if (retentionDays is > 0)
+                {
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"""SELECT add_retention_policy('"sensorData"'::regclass, INTERVAL '1 day' * {retentionDays.Value}, if_not_exists => true);""");
+                }
+            }
+            catch (PostgresException ex)
+            {
+                logger.LogWarning(ex,
+                    "Could not apply sensorData retention policy; automatic PostgreSQL retention stays inactive.");
+            }
         }
 
         /// <summary>Roadmap #81/#82: EnsureCreatedAsync makes the deviceUnit/deviceUnitZone tables,

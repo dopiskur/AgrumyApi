@@ -135,5 +135,8 @@ namespace api.Dal.Entities
         public int FirmwareSource { get; set; }
         public string? FirmwareGitHubRepository { get; set; }
         public string? FirmwareCustomRepositoryUrl { get; set; }
+
+        // Roadmap #15 - see api.Models.ServerConfig.SensorDataRetentionDays.
+        public int? SensorDataRetentionDays { get; set; }
     }
 }

@@ -85,6 +85,13 @@ namespace api.Controllers.API
                 return BadRequest($"WaterPump cooldown must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.");
             }
 
+            // Roadmap #15: negative retention is meaningless (there is no "keep future data only");
+            // 0/null are both valid ways to say "no automatic retention".
+            if (config.SensorDataRetentionDays is < 0)
+            {
+                return BadRequest("Sensor data retention days must be 0/empty (disabled) or a positive number.");
+            }
+
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await Repo.ServerConfigUpdateAsync(config);
             return Ok();
