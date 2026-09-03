@@ -32,26 +32,19 @@ namespace api.Controllers.API
             }
         }
 
-        /// <summary>The caller's FIRST role claim - pre-#66 code (checks against literal "admin"/
-        /// "user") keeps working unmodified because JwtTokenProvider.CreateToken always adds the
-        /// legacy alias claim first. New code should prefer <see cref="CallerHasRole"/> or
-        /// <see cref="CallerRoles"/> instead - a caller can hold several roles at once.</summary>
+        /// <summary>The caller's FIRST role claim - legacy code checking against literal "admin"/"user" keeps working because JwtTokenProvider.CreateToken always adds the legacy alias claim first. New code should prefer <see cref="CallerHasRole"/> or <see cref="CallerRoles"/> instead - a caller can hold several roles at once.</summary>
         protected string? CallerRole => (User.Identity as ClaimsIdentity)?.FindFirst(ClaimTypes.Role)?.Value;
 
-        /// <summary>Every role claim on the caller's token (roadmap #66).</summary>
+        /// <summary>Every role claim on the caller's token.</summary>
         protected IEnumerable<string> CallerRoles =>
             (User.Identity as ClaimsIdentity)?.FindAll(ClaimTypes.Role).Select(c => c.Value) ?? Enumerable.Empty<string>();
 
         /// <summary>True if the caller holds this exact role name, among possibly several.</summary>
         protected bool CallerHasRole(string roleName) => CallerRoles.Contains(roleName);
 
-        // ---- Roadmap #66 Phase 2: capability checks -------------------------------------------
-        // Every [Authorize(Roles=...)] attribute is only the coarse gate; these helpers make the
-        // precise decision (which tenant, read vs write, users vs devices). An account the #66
-        // migration missed carries only the legacy "admin"/"user" claim - for those, fall back to
-        // the pre-#66 semantics: tenant-0 admin acted globally (#65), any other admin tenant-wide.
+        // Every [Authorize(Roles=...)] attribute is only the coarse gate; these helpers make the precise decision (which tenant, read vs write, users vs devices). An account the multi-role migration missed carries only the legacy "admin"/"user" claim - for those, fall back to legacy semantics: tenant-0 admin acted globally, any other admin tenant-wide.
 
-        /// <summary>Token carries none of the #66 role names - only the legacy "admin"/"user" claim.</summary>
+        /// <summary>Token carries none of the current role names - only the legacy "admin"/"user" claim.</summary>
         private bool LegacyOnlyToken => !CallerRoles.Any(r => RoleNames.All.Contains(r));
 
         private bool LegacyAdminFallback => LegacyOnlyToken && CallerHasRole(RoleNames.LegacyAdmin);
