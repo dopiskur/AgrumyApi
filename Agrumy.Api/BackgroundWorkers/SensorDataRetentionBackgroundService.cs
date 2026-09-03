@@ -1,8 +1,6 @@
 namespace api.BackgroundWorkers
 {
-    /// <summary>Thin PeriodicBackgroundService wrapper - all the actual logic lives in
-    /// SensorDataRetentionEvaluator (kept separate so it's testable without a running timer), same
-    /// shape as OfflineAlertBackgroundService/LowBatteryAlertBackgroundService.</summary>
+    /// <summary>Thin PeriodicBackgroundService wrapper - the actual logic lives in SensorDataRetentionEvaluator, kept separate for testability.</summary>
     public sealed class SensorDataRetentionBackgroundService(
         IServiceScopeFactory scopeFactory,
         ILogger<SensorDataRetentionBackgroundService> logger)

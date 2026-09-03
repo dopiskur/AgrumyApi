@@ -7,11 +7,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Roadmap #3 (OTA). Exercises the firmware-lookup branch added to
-/// DeviceApiController.BuildDeviceConfigAsync() through the public Register action
-/// (Config takes the same path). No database - IRepository is mocked.
-/// </summary>
+/// <summary>Exercises the firmware-lookup branch in DeviceApiController.BuildDeviceConfigAsync() through the public Register action (Config takes the same path). No database - IRepository is mocked.</summary>
 public class DeviceFirmwareOtaTests
 {
     private readonly Mock<IRepository> _repo = new(MockBehavior.Strict);
@@ -23,11 +19,9 @@ public class DeviceFirmwareOtaTests
              .ReturnsAsync(new User { IDUser = 77, TenantID = device.TenantID, DevicePin = "ABC234", DevicePinExpires = DateTime.UtcNow.AddHours(1) });
         _repo.Setup(r => r.DeviceGetAsync(device.TenantID, null, null, "AABBCCDDEEFF"))
              .ReturnsAsync(device); // IDDevice set => controller skips DeviceAddAsync
-        // Roadmap #39: BuildDeviceConfigAsync always reads ServerConfig now (UtcOffsetSeconds) -
-        // no ScheduleTimeZone configured, so the response's offset is 0/UTC (see UtcOffsetSecondsTests
-        // below for the actual offset-computation behavior).
+        // BuildDeviceConfigAsync always reads ServerConfig (UtcOffsetSeconds); no ScheduleTimeZone configured, so the response's offset is 0/UTC.
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
-        // Roadmap #34: DeviceRegistration now always checks for a pending command before returning.
+        // DeviceRegistration always checks for a pending command before returning.
         _repo.Setup(r => r.GetPendingCommandsAsync(device.IDDevice!.Value)).ReturnsAsync(new List<DeviceCommand>());
 
         var controller = new DeviceApiController(_repo.Object, _cache.Object,
@@ -86,6 +80,7 @@ public class DeviceFirmwareOtaTests
         Assert.Null(cfg.FirmwareVersion);
         Assert.Null(cfg.FirmwareUrl);
         // Strict mock: a call to DeviceFirmwareLatestGetAsync would have thrown.
+
         _repo.Verify(r => r.DeviceFirmwareLatestGetAsync(It.IsAny<int?>()), Times.Never);
     }
 

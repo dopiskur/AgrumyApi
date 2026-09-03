@@ -61,8 +61,7 @@ namespace api.Notifications
             }
         }
 
-        /// <summary>Callers pass a notification with a non-empty recipient email; FromAddress is
-        /// validated by <see cref="IsConfigured"/> on the send path.</summary>
+        /// <summary>Callers pass a notification with a non-empty recipient email; FromAddress is validated by <see cref="IsConfigured"/> on the send path.</summary>
         internal MimeMessage BuildMessage(Notification notification)
         {
             var message = new MimeMessage();

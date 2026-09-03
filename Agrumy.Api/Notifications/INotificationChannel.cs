@@ -1,10 +1,6 @@
 namespace api.Notifications
 {
-    /// <summary>
-    /// One delivery mechanism for an alert (email, push, ...). Registered as
-    /// <c>IEnumerable&lt;INotificationChannel&gt;</c>; <see cref="NotificationDispatcher"/> fans a
-    /// notification out to every channel whose <see cref="IsConfigured"/> is true.
-    /// </summary>
+    /// <summary>One delivery mechanism for an alert (email, push, ...). Registered as <c>IEnumerable&lt;INotificationChannel&gt;</c>; <see cref="NotificationDispatcher"/> fans out to every channel whose <see cref="IsConfigured"/> is true.</summary>
     public interface INotificationChannel
     {
         string Name { get; }

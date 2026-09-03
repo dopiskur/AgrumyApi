@@ -1,7 +1,6 @@
 namespace api.Notifications
 {
-    /// <summary>Fans one notification out to every configured channel. The seam the alert-evaluation
-    /// side of roadmap #6 will call.</summary>
+    /// <summary>Fans one notification out to every configured channel.</summary>
     public interface INotificationDispatcher
     {
         Task<IReadOnlyList<ChannelOutcome>> DispatchAsync(Notification notification, CancellationToken ct = default);

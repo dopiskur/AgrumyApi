@@ -6,12 +6,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Roadmap #15 (MariaDB/MySQL side) + #40 (pattern). Exercises SensorDataRetentionEvaluator
-/// directly - no PeriodicTimer/IHostedService in the way, no real database connection (the
-/// AgrumyDbContext below is never-connected, same technique as ClassifyExceptionTests -
-/// db.Database.IsNpgsql() only reads the provider the context was built with).
-/// </summary>
+/// <summary>Exercises SensorDataRetentionEvaluator directly, no real database connection - the AgrumyDbContext below is never-connected since db.Database.IsNpgsql() only reads the provider the context was built with.</summary>
 public class SensorDataRetentionEvaluatorTests
 {
     private readonly Mock<IServerConfigRepository> _serverConfig = new(MockBehavior.Strict);
@@ -24,8 +19,7 @@ public class SensorDataRetentionEvaluatorTests
     [Fact]
     public async Task Postgres_NoOps_NeverReadsServerConfig()
     {
-        // Strict mocks: ServerConfigGetAsync/PurgeOldSensorDataAsync have no setup, so reaching
-        // this point already proves the Postgres branch returned before touching either.
+        // Strict mocks: ServerConfigGetAsync/PurgeOldSensorDataAsync have no setup, proving the Postgres branch returned before touching either.
         await NewEvaluator(DbProviderKind.Postgres).RunOnceAsync();
     }
 
@@ -37,6 +31,7 @@ public class SensorDataRetentionEvaluatorTests
         await NewEvaluator().RunOnceAsync();
 
         // PurgeOldSensorDataAsync has no setup (Strict) - proves it was never called.
+
     }
 
     [Fact]

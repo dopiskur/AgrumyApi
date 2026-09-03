@@ -13,23 +13,7 @@ using Xunit;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// End-to-end tests for <see cref="EfRepository"/> against a real database, run against every
-/// engine that is configured (roadmap #42 - MySQL/MariaDB in Phase 1, PostgreSQL added in Phase 2).
-/// A test is skipped for an engine whose env var is unset:
-///   <c>AGRUMY_TEST_MYSQL</c>    e.g. server=127.0.0.1;port=33306;database=agrumyapi;user id=root;password=rootpw;
-///   <c>AGRUMY_TEST_POSTGRES</c> e.g. Host=127.0.0.1;Port=55432;Database=agrumyapi;Username=postgres;Password=postgres
-///
-/// Throwaway containers:
-/// <code>
-///   docker run -d --name agrumy-my -e MARIADB_ROOT_PASSWORD=rootpw -p 33306:3306 mariadb:11.4
-///   docker run -d --name agrumy-pg -e POSTGRES_PASSWORD=postgres  -p 55432:5432 postgres:17
-/// </code>
-///
-/// The fixture creates each engine's schema from the model (EnsureCreated, matching the
-/// pre-beta EfRepository.EnsureSchemaAsync) and seeds the reference rows the proc-era inner
-/// joins need; every test uses GUID-unique keys so there is no teardown.
-/// </summary>
+/// <summary>Runs against every real database engine configured via AGRUMY_TEST_MYSQL/AGRUMY_TEST_POSTGRES; skipped when unset.</summary>
 public sealed class RelationalIntegrationFixture
 {
     public sealed record Target(DbProviderKind Provider, string ConnectionString,
@@ -66,8 +50,6 @@ public sealed class RelationalIntegrationFixture
         int regular = db.UserGroups.Where(g => g.GroupName == "users").Select(g => g.IDUserGroup).First();
         int admin = db.UserGroups.Where(g => g.GroupName == "admins").Select(g => g.IDUserGroup).First();
 
-        // Roadmap #66: the composable role catalog - a fresh test DB has none of these, same
-        // reasoning as the admin/user seeding above (EnsureCreated only makes tables, never rows).
         if (!db.UserRoles.Any(r => r.RoleName == RoleNames.TenantReader))
         {
             db.UserRoles.AddRange(RoleNames.All.Select(name => new UserRoleRow { RoleName = name }));
@@ -77,10 +59,7 @@ public sealed class RelationalIntegrationFixture
         int deviceType = db.DeviceTypes.Where(t => t.DeviceTypeName == "greenhouse")
                            .Select(t => (int?)t.IDDeviceType).FirstOrDefault() ?? SeedDeviceType(db);
 
-        // deviceUnit(0)/deviceUnitZone(0) are the "Default"/"Disabled" sentinel rows the production
-        // DB ships (db/agrumyDB-withData.sql); sensorData's non-null DeviceUnitID/DeviceUnitZoneID
-        // default to 0, so with the FK in place these must exist. Unit before zone (roadmap #81/#82:
-        // deviceUnitZone.DeviceUnitID is now the real containment FK, opposite of the old direction).
+        // sensorData's FK defaults DeviceUnitID/DeviceUnitZoneID to 0, so the "Default"/"Disabled" sentinel rows must exist before the FK is enforced.
         if (!db.DeviceUnits.Any())
             db.DeviceUnits.Add(new DeviceUnitRow { IDDeviceUnit = 0, TenantID = null, DeviceUnitName = "Default" });
         db.SaveChanges();
@@ -107,8 +86,7 @@ public sealed class RelationalIntegrationFixture
 
     private static int SeedDeviceType(AgrumyDbContext db)
     {
-        // Roadmap #91: deviceType is now ValueGeneratedNever (IDs 0/1/2/3 are reserved by
-        // Agrumy.Web's hardcoded switch) - pick an ID clearly outside that reserved range.
+        // IDs 0-3 are reserved by Agrumy.Web's hardcoded switch; pick one outside that range.
         var t = new DeviceTypeRow { IDDeviceType = 999, DeviceTypeName = "greenhouse" };
         db.DeviceTypes.Add(t);
         db.SaveChanges();
@@ -126,11 +104,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
     public RelationalIntegrationTests(RelationalIntegrationFixture fx) => _fx = fx;
 
-    // Roadmap #101: _db is this test's own AgrumyDbContext (constructed fresh per Use() call, not
-    // shared/DI-managed), so this class owns disposing it - no more process-wide
-    // EfRepository.ProviderOverride/ConnectionStringOverride statics to reset, which also means
-    // parallel test execution across different provider targets is safe again (the old
-    // [Collection("RepoFactory")] serialization is gone with them).
     public void Dispose() => _db?.Dispose();
 
     /// <summary>One row per configured engine, or a sentinel that makes every test skip.</summary>
@@ -144,20 +117,14 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         return rows.Count > 0 ? rows : new[] { new object[] { (DbProviderKind)255 } };
     }
 
-    // Roadmap #101: callable more than once per test - e.g. to hand a test a FRESH context/repo
-    // partway through, the same way a real second HTTP request would get its own fresh scope
-    // rather than reusing a first request's tracked entities (see
-    // UserIssueActivationTokenAsync_WithinCooldown_ReturnsFalse_ButOffCooldown_ReturnsTrue).
+    // Callable more than once per test to hand it a FRESH context/repo, the same way a new HTTP request gets its own scope.
     private RelationalIntegrationFixture.Target Use(DbProviderKind provider)
     {
         var t = _fx.Targets.FirstOrDefault(x => x.Provider == provider);
         Skip.If(t is null, $"No integration database configured for {provider}.");
         _db?.Dispose();
         _db = new AgrumyDbContext(DbOptionsFactory.Build(t!.Provider, t.ConnectionString));
-        // Roadmap #118: a real cache would make DeviceFleetGetAsync's assertions timing-dependent
-        // (a read right after a write could still see the pre-write cached snapshot) - these tests
-        // are about query/translation correctness against the real engine, not cache behaviour, so
-        // every call here always misses and always executes the real query.
+        // NullCache: these tests verify query/translation correctness against the real engine, not cache behavior.
         _repo = new EfRepository(_db, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance, new NullCache());
         return t;
     }
@@ -216,8 +183,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         return saved;
     }
 
-    // ---- schema -------------------------------------------------------------
-
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task Schema_HasEveryTable(DbProviderKind provider)
     {
@@ -247,14 +212,11 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(await _repo.TestConnectionAsync());
     }
 
-    // roadmap #29: the pre-EF SchemaScripts.cs created tables as latin1. The EF model sets no
-    // charset, so a fresh MySQL/MariaDB database built by EnsureCreatedAsync must come out
-    // utf8mb4 (Pomelo applies an implicit HasCharSet("utf8mb4")). Guards against a regression
-    // that would silently corrupt non-ASCII names. MySQL-only.
+    // EF sets no charset explicitly; Pomelo applies utf8mb4 implicitly - guards against a silent latin1 regression. MySQL-only.
     [SkippableFact]
     public async Task Fresh_MySql_Schema_Is_Utf8mb4_Not_Latin1()
     {
-        var t = Use(DbProviderKind.MySql); // Skip.If when AGRUMY_TEST_MYSQL is unset
+        var t = Use(DbProviderKind.MySql);
         await using var db = _fx.NewContext(t);
 
         var tableCharsets = await db.Database.SqlQueryRaw<string>(
@@ -263,14 +225,11 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.NotEmpty(tableCharsets);
         Assert.All(tableCharsets, cs => Assert.Equal("utf8mb4", cs));
 
-        // Every actual string column, not just the table default - and nothing left on latin1/utf8mb3.
         var columnCharsets = await db.Database.SqlQueryRaw<string>(
             "SELECT DISTINCT CHARACTER_SET_NAME AS Value FROM information_schema.COLUMNS " +
             "WHERE TABLE_SCHEMA = DATABASE() AND CHARACTER_SET_NAME IS NOT NULL").ToListAsync();
         Assert.Equal(new[] { "utf8mb4" }, columnCharsets);
     }
-
-    // ---- tenant / server config -------------------------------------------
 
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task Tenant_Add_Get_GetId(DbProviderKind provider)
@@ -304,7 +263,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task ServerConfig_ScheduleTimeZone_UpdateAndGet_RoundTrips(DbProviderKind provider)
     {
-        // Roadmap #39.
         Use(provider);
         int id = new Random().Next(1000, 9_000_000);
         var config = await _repo.ServerConfigGetAsync(id);
@@ -320,7 +278,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task ServerConfig_WeatherFields_UpdateAndGet_RoundTrips(DbProviderKind provider)
     {
-        // Roadmap #11.
         Use(provider);
         int id = new Random().Next(1000, 9_000_000);
         var config = await _repo.ServerConfigGetAsync(id);
@@ -342,10 +299,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task ServerConfig_WeatherState_OnlySetByNarrowWriter_NotByAdminUpdate(DbProviderKind provider)
     {
-        // Roadmap #11: ServerConfigUpdateAsync (the admin Server Settings form's path) must never
-        // touch WeatherRainPredicted/WeatherCheckedAtUtc - only WeatherEvaluator's
-        // ServerConfigWeatherStateSetAsync does, so a stale form post can never clobber a fresher
-        // forecast reading (same lesson #21's ZoneRename fix established for a different field pair).
+        // ServerConfigUpdateAsync (admin form path) must never touch WeatherRainPredicted/WeatherCheckedAtUtc - only WeatherEvaluator's dedicated writer does.
         Use(provider);
         int id = new Random().Next(1000, 9_000_000);
         var config = await _repo.ServerConfigGetAsync(id);
@@ -359,9 +313,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(afterEvaluator.WeatherRainPredicted);
         Assert.NotNull(afterEvaluator.WeatherCheckedAtUtc);
 
-        // An admin form post (a DTO with the client's stale/default weather-state values) must not
-        // reset what the evaluator just wrote.
-        afterEvaluator.ScheduleTimeZone = "Europe/Zagreb"; // touch an unrelated field, same as a real form submit
+        afterEvaluator.ScheduleTimeZone = "Europe/Zagreb";
         await _repo.ServerConfigUpdateAsync(afterEvaluator);
 
         var afterAdminSave = await _repo.ServerConfigGetAsync(id);
@@ -372,10 +324,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task ServerConfig_SensorDataRetentionDays_UpdateAndGet_RoundTrips(DbProviderKind provider)
     {
-        // Roadmap #15. On Postgres this also exercises EfRepository.ApplyRetentionPolicyAsync via
-        // ServerConfigUpdateAsync - a TimescaleDB-less test container just logs a warning and
-        // swallows it (same graceful fallback as EnsureTimescaleHypertableAsync), so this round-trip
-        // still passes regardless of whether the extension is installed.
+        // On Postgres this also exercises ApplyRetentionPolicyAsync; passes even without the TimescaleDB extension installed (graceful fallback).
         Use(provider);
         int id = new Random().Next(1000, 9_000_000);
         var config = await _repo.ServerConfigGetAsync(id);
@@ -387,8 +336,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var back = await _repo.ServerConfigGetAsync(id);
         Assert.Equal(90, back.SensorDataRetentionDays);
     }
-
-    // ---- refresh tokens -----------------------------------------------------
 
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task RefreshToken_AddAndGet_RoundTrips(DbProviderKind provider)
@@ -437,8 +384,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await _repo.RefreshTokenAddAsync(userId, hash, DateTime.UtcNow.AddDays(30));
         await _repo.RefreshTokenRevokeAsync(hash);
 
-        // Simulates a stolen, already-used token being replayed: rotating it again must not
-        // resurrect it or silently create a usable replacement.
+        // Simulates a replayed, already-revoked token: rotating it again must not resurrect it.
         await _repo.RefreshTokenRotateAsync(hash, U(), DateTime.UtcNow.AddDays(30));
 
         var stillRevoked = await _repo.RefreshTokenGetAsync(hash);
@@ -487,8 +433,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await Assert.ThrowsAsync<DbUpdateException>(
             () => _repo.RefreshTokenAddAsync(userId, hash, DateTime.UtcNow.AddDays(30)));
     }
-
-    // ---- user -------------------------------------------------------------
 
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task User_Add_Then_Get_By_Every_Key_WithGroupJoin(DbProviderKind provider)
@@ -551,17 +495,11 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Null(await _repo.UserSecretGetAsync(null, "missing_" + U() + "@x.com", null));
     }
 
-    /// <summary>Roadmap #91: BootstrapAdminSetPasswordAsync's WHERE PwdHash IS NULL clause is the
-    /// entire "permanently unavailable once set" guarantee - this proves it actually closes:
-    /// pending while a NULL-hash row exists, settable exactly once, false (not just a no-op) on
-    /// a second call once nothing matches anymore. Inserts the NULL-hash row directly (not via
-    /// EnsureSchemaAsync, whose "only when Users is entirely empty" gate the shared fixture DB
-    /// can't satisfy once other tests have added rows) so this is independent of test ordering.</summary>
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task BootstrapAdmin_Pending_SetOnce_ThenPermanentlyUnavailable(DbProviderKind provider)
     {
         var t = Use(provider);
-        var (_, normalUserId, _) = await MakeUser(t); // a real account never counts as "pending"
+        var (_, normalUserId, _) = await MakeUser(t);
 
         string tag = U();
         await using (var db = _fx.NewContext(t))
@@ -584,17 +522,13 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(await _repo.BootstrapAdminSetPasswordAsync(new UserSecret { PwdHash = "boot-h", PwdSalt = "boot-s" }));
         Assert.False(await _repo.BootstrapAdminPendingAsync());
 
-        // Second call: nothing left with PwdHash IS NULL, so this must be false, not another success.
         Assert.False(await _repo.BootstrapAdminSetPasswordAsync(new UserSecret { PwdHash = "again-h", PwdSalt = "again-s" }));
 
-        // The normal account made at the top is untouched by any of this.
         var normalSecret = await _repo.UserSecretGetAsync(normalUserId, null, null);
         Assert.Equal("h", normalSecret!.PwdHash);
     }
 
-    /// <summary>Regression gate for the self-service profile endpoint: UserProfileSetAsync must
-    /// write ONLY FirstName/LastName/TimeZone - if it ever starts touching Enabled/UserGroupID/
-    /// TenantID (or the password), a user could self-escalate through PUT /api/User/Profile.</summary>
+    /// <summary>UserProfileSetAsync must write ONLY FirstName/LastName/TimeZone, never authorization fields.</summary>
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task UserProfileSet_Writes_Only_Profile_Fields(DbProviderKind provider)
     {
@@ -610,7 +544,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal("NewLast", back.LastName);
         Assert.Equal("Europe/Zagreb", back.TimeZone);
 
-        // Everything authorization-bearing stays exactly as MakeUser created it.
         Assert.Equal(tenantId, back.TenantID);
         Assert.Equal(t.RegularGroupId, back.UserGroupID);
         Assert.True(back.Enabled);
@@ -618,7 +551,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.NotNull(secret);
         Assert.Equal("h", secret.PwdHash);
 
-        // Clearing the zone (back to "no preference" = UTC display) round-trips as null.
         Assert.True(await _repo.UserProfileSetAsync(email, "NewFirst", "NewLast", null));
         Assert.Null((await _repo.UserGetAsync(userId, null, null))!.TimeZone);
     }
@@ -640,8 +572,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal("New", back.FirstName);
         Assert.Equal(7, back.TenantID);
         Assert.False(back.Enabled);
-        // Roadmap #70: UserUpdateAsync must never touch the PIN - its lifecycle belongs solely to
-        // UserSetDevicePinAsync, so the MakeUser value survives the update above unchanged.
+        // UserUpdateAsync must never touch the PIN - its lifecycle belongs solely to UserSetDevicePinAsync.
         Assert.Equal("PIN234", back.DevicePin);
     }
 
@@ -657,8 +588,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal("ABC234", issued!.DevicePin);
         Assert.NotNull(issued.DevicePinExpires);
 
-        // Roadmap #70 follow-up: a successful device registration no longer calls this - the PIN
-        // is multi-use within its own expiry. Nulls remain a supported explicit-clear operation.
+        // The PIN is multi-use within its own expiry; null remains a supported explicit-clear operation.
         Assert.True(await _repo.UserSetDevicePinAsync(userId, null, null));
         var cleared = await _repo.UserGetAsync(userId, null, null);
         Assert.Null(cleared!.DevicePin);
@@ -702,8 +632,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Null(await _repo.UserGroupGetAsync(mine.IDUserGroup));
     }
 
-    // ---- device ---------------------------------------------------------
-
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task Device_Add_Creates_Two_Config_Rows_And_Links_Them(DbProviderKind provider)
     {
@@ -719,10 +647,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(d.IDDevice, (await _repo.DeviceGetByDeviceConfigControllerIdAsync(d.DeviceConfigControllerID))!.IDDevice);
     }
 
-    // Roadmap #102: DB-level guard against the DeviceAddAsync/DeviceGetAsync check-then-act race
-    // (two parallel registration requests for the same MAC+tenant both pass the "doesn't exist"
-    // check before either commits) - the second insert must fail at the DB, not silently create a
-    // duplicate row.
+    // DB-level guard against the add/get check-then-act race: the second insert must fail at the DB, not silently create a duplicate row.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceAdd_DuplicateMacAddress_SameTenant_ThrowsConstraintViolation(DbProviderKind provider)
     {
@@ -737,7 +662,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             DeviceTypeServiceID = 1,
             ConfigVersion = 1,
             DeviceName = "dev_" + U(),
-            MacAddress = d1.MacAddress, // same MAC, same tenant - must collide
+            MacAddress = d1.MacAddress,
             ApiId = Guid.NewGuid().ToString(),
             ApiKey = Guid.NewGuid().ToString(),
             ServicePoint = "api.agrumy.com",
@@ -747,8 +672,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(DbFailureKind.ConstraintViolation, _repo.ClassifyException(ex));
     }
 
-    // Same MAC, different tenant is the legitimate "device resold" case (roadmap #102's own
-    // reasoning for why the constraint is composite, not a bare MacAddress unique) - must succeed.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceAdd_SameMacAddress_DifferentTenant_Succeeds(DbProviderKind provider)
     {
@@ -770,7 +693,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             ServicePoint = "api.agrumy.com",
         };
 
-        await _repo.DeviceAddAsync(d2); // must not throw
+        await _repo.DeviceAddAsync(d2);
         var back = await _repo.DeviceGetAsync(tenant2, null, null, d1.MacAddress);
         Assert.NotNull(back);
     }
@@ -787,7 +710,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(d.IDDevice, (await _repo.DeviceGetAsync(tenantId, null, null, d.MacAddress))!.IDDevice);
         Assert.Null(await _repo.DeviceGetAsync(tenantId + 12345, null, d.ApiId, null));
         Assert.Equal(d.IDDevice, (await _repo.DeviceGetByIdAsync(d.IDDevice))!.IDDevice);
-        // DeviceGetByApiIdAsync has no tenant filter (device-comm endpoints have no tenant context).
+        // DeviceGetByApiIdAsync has no tenant filter - device-comm endpoints have no tenant context.
         Assert.Equal(d.IDDevice, (await _repo.DeviceGetByApiIdAsync(d.ApiId))!.IDDevice);
         Assert.Null(await _repo.DeviceGetByApiIdAsync("no-such-api-id-" + U()));
         Assert.Single(await _repo.DevicesGetAsync(tenantId));
@@ -826,8 +749,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         });
         Assert.Equal(v0 + 1, (await _repo.DeviceGetByIdAsync(d.IDDevice))!.ConfigVersion);
 
-        // Roadmap #21: only relay-pin mapping is left on the per-device Controller row - threshold/
-        // schedule moved to the zone (see the DeviceUnitZoneRule* tests further down).
         await _repo.DeviceConfigControllerUpdateAsync(d.IDDevice, new DeviceConfigController
         {
             IDDeviceConfigController = d.DeviceConfigControllerID, RelayEnabled = true, Relay1 = 2,
@@ -842,41 +763,32 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(1, (await _repo.DeviceConfigSensorGetAsync(d.DeviceConfigSensorID))!.SensorTemp);
     }
 
-    // Roadmap #149: DeviceFleetGetAsync.ControllerCapable must be true when EITHER signal says so -
-    // the admin's explicit DeviceType choice (DeviceControllerEnabled) OR a heartbeat-reported Kit
-    // the deviceTypeKit lookup recognizes - and false when neither does, never requiring both.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceFleetGet_ControllerCapable_TrueFromEitherDeviceTypeOrKnownKit(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
 
-        var basicUnknownKit = await MakeDevice(t, tenantId); // DeviceControllerEnabled=true from MakeDevice's own seed - see below
+        var basicUnknownKit = await MakeDevice(t, tenantId);
         var recognizedKit = await MakeDevice(t, tenantId);
 
-        // MakeDevice seeds DeviceControllerEnabled=true (helper default) - flip it off here so this
-        // device's capability can ONLY come from DeviceType, isolating that half of the OR.
+        // Flip DeviceControllerEnabled off (MakeDevice defaults it true) so capability can ONLY come from the DeviceType/Kit signal, isolating each half of the OR.
         basicUnknownKit.DeviceControllerEnabled = false;
         await _repo.DeviceUpdateAsync(basicUnknownKit);
         await _repo.DeviceDiagnosticUpsertAsync(basicUnknownKit.IDDevice!.Value, tenantId,
-            new DeviceConfigPoll { ConfigVersion = 1, Kit = "" }); // unrecognized/empty kit
+            new DeviceConfigPoll { ConfigVersion = 1, Kit = "" });
 
         recognizedKit.DeviceControllerEnabled = false;
         await _repo.DeviceUpdateAsync(recognizedKit);
         await _repo.DeviceDiagnosticUpsertAsync(recognizedKit.IDDevice!.Value, tenantId,
-            new DeviceConfigPoll { ConfigVersion = 1, Kit = "KC868-A6" }); // seeded as ControllerCapable=true
+            new DeviceConfigPoll { ConfigVersion = 1, Kit = "KC868-A6" });
 
         var fleet = await _repo.DeviceFleetGetAsync(tenantId);
         Assert.False(fleet.Single(f => f.IDDevice == basicUnknownKit.IDDevice).ControllerCapable);
         Assert.True(fleet.Single(f => f.IDDevice == recognizedKit.IDDevice).ControllerCapable);
     }
 
-    // Roadmap #78: DeviceConfig*UpdateAsync must resolve the row to write from idDevice's OWN
-    // config-id column, never from the DeviceConfig*.ID* field on the posted payload - the Web
-    // Edit/EditSensor/EditController forms used to render that id as a plain editable input, and
-    // the API layer only checks device ownership of idDevice, not of whatever config id rides
-    // along in the body. This proves device A's sensor/controller config survives untouched even
-    // when the payload's id is tampered to point at device B's row.
+    // DeviceConfig*UpdateAsync must resolve the row to write from idDevice's OWN config-id column, never from the DeviceConfig*.ID* field on the posted payload.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceConfigUpdate_IgnoresTamperedConfigId_NeverWritesAnotherDevicesRow(DbProviderKind provider)
     {
@@ -887,7 +799,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
         await _repo.DeviceConfigSensorUpdateAsync(a.IDDevice, new DeviceConfigSensor
         {
-            IDDeviceConfigSensor = b.DeviceConfigSensorID, // tampered: points at B's row, not A's
+            IDDeviceConfigSensor = b.DeviceConfigSensorID, // tampered: points at B's row
             SensorTemp = 7,
         });
         Assert.Equal(7, (await _repo.DeviceConfigSensorGetAsync(a.DeviceConfigSensorID))!.SensorTemp);
@@ -902,9 +814,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.NotEqual(12, (await _repo.DeviceConfigControllerGetAsync(b.DeviceConfigControllerID))!.Relay1);
     }
 
-    // Roadmap #21: WaterPump safety limits moved from the device to the zone - seeded from
-    // AgrumySettings on zone creation (same rule the pre-#21 per-device seeding used), editable
-    // per zone from here on. See DeviceUnitZoneRule* tests further down for the Rules themselves.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitZone_WaterPumpSafetyLimits_SeededOnCreate_ThenOverridable(DbProviderKind provider)
     {
@@ -927,8 +836,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitZone_SkipWaterPumpWhenRainPredicted_DefaultsFalse_ThenOverridable(DbProviderKind provider)
     {
-        // Roadmap #11: off by default (not every zone waters something rain makes redundant), then
-        // a normal per-zone admin toggle - same shape as the WaterPump safety-limit override above.
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (_, zone) = await MakeUnitAndZone(tenantId);
@@ -942,8 +849,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(updated!.SkipWaterPumpWhenRainPredicted);
     }
 
-    // Roadmap #21: unlike the pre-#21 per-device schedule (a whole-list replace on every save),
-    // rules are individually addressable rows - adding/deleting one must not disturb the others.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitZoneRule_AddAndDelete_AreIndependent_NotWholeListReplace(DbProviderKind provider)
     {
@@ -975,8 +880,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(50400, config!.Start);
     }
 
-    // Roadmap #21: a zone may hold several rules for the SAME function - OR semantics (user
-    // decision), so both must survive and be independently readable, not collapsed into one.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitZoneRule_MultipleRulesSameFunction_BothPersist(DbProviderKind provider)
     {
@@ -1006,9 +909,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Contains(rules, r => r.ConditionType == ConditionType.Interval);
     }
 
-    // Roadmap #21: BuildDeviceConfigAsync-equivalent path - a device assigned to a zone must see
-    // that zone's rules AND safety limits merged onto its DeviceConfigController, while relay-pin
-    // mapping still comes from the device's own row.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitZoneRule_AssignedDevice_ReadsZonesRulesAndSafetyLimits(DbProviderKind provider)
     {
@@ -1032,14 +932,10 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var zoneAfter = await _repo.DeviceUnitZoneGetByIdAsync(zone.IDDeviceUnitZone);
         Assert.Equal(zone.WaterPumpMaxRunSeconds, zoneAfter!.WaterPumpMaxRunSeconds);
 
-        // Confirms the device's own DeviceUnitZoneID now resolves back to this same zone - the
-        // link BuildDeviceConfigAsync follows to merge Rules/safety-limits onto the device's config.
         var deviceAfter = await _repo.DeviceGetByIdAsync(d.IDDevice);
         Assert.Equal(zone.IDDeviceUnitZone, deviceAfter!.DeviceUnitZoneID);
     }
 
-    // Roadmap #21: deleting a zone must not orphan its rules - app-level cleanup (this codebase's
-    // convention, not a DB CASCADE), same as devices being unassigned first.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitZoneDelete_AlsoDeletesItsRules(DbProviderKind provider)
     {
@@ -1066,7 +962,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (tenantId, _, _) = await MakeUser(t);
         var d = await MakeDevice(t, tenantId);
 
-        // A diagnostic row must not block the delete (its FK to device is NoAction, roadmap #7).
+        // FK from diagnostic to device is NoAction, not Cascade - a diagnostic row must not block delete.
         await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice!.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
 
         await _repo.DeviceDeleteAsync(d.IDDevice, tenantId);
@@ -1078,8 +974,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.False(await db.DeviceDiagnostics.AnyAsync(x => x.DeviceID == d.IDDevice));
     }
 
-    // ---- device diagnostics / fleet (roadmap #7 + #8) -----------------------
-
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceDiagnostic_Upsert_Records_Heartbeat_And_Fleet_Reports_It(DbProviderKind provider)
     {
@@ -1087,7 +981,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (tenantId, _, _) = await MakeUser(t);
         var d = await MakeDevice(t, tenantId);
 
-        // Never-seen device still shows on the dashboard, as offline.
         var row = Assert.Single(await _repo.DeviceFleetGetAsync(tenantId), f => f.IDDevice == d.IDDevice);
         Assert.False(row.Online);
         Assert.Null(row.LastSeenAt);
@@ -1105,7 +998,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(153212, row.FreeHeapBytes);
         Assert.Equal("0.1.2", row.FirmwareVersion);
 
-        // A pre-#7 poll (ConfigVersion only) bumps LastSeenAt but keeps the earlier diagnostics.
         DateTime firstSeen = row.LastSeenAt!.Value;
         await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
         row = Assert.Single(await _repo.DeviceFleetGetAsync(tenantId), f => f.IDDevice == d.IDDevice);
@@ -1128,18 +1020,13 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task OfflineAlertCandidates_Reflect_Diagnostics_And_NotifiedAt_RoundTrips(DbProviderKind provider)
     {
-        // Roadmap #40: OfflineAlertCandidatesGetAsync uses two correlated subqueries (LastSeenAt,
-        // OfflineNotifiedAt) and DeviceOfflineNotifiedSetAsync uses ExecuteUpdateAsync - both need
-        // real translation-correctness verification against each provider, not just a mock.
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var d = await MakeDevice(t, tenantId);
-        // MakeDevice leaves Enabled null - OfflineAlertCandidatesGetAsync only considers Enabled ==
-        // true (same "null reads as disabled" convention Fleet.cshtml's badge already uses).
+        // MakeDevice leaves Enabled null; only Enabled == true counts as a candidate (null reads as disabled, same convention Fleet.cshtml uses).
         d.Enabled = true;
         await _repo.DeviceUpdateAsync(d);
 
-        // Never-seen device: still a candidate (enabled), but with null LastSeenAt/OfflineNotifiedAt.
         var candidate = Assert.Single(await _repo.OfflineAlertCandidatesGetAsync(), c => c.IDDevice == d.IDDevice);
         Assert.Equal(tenantId, candidate.TenantID);
         Assert.Null(candidate.LastSeenAt);
@@ -1175,8 +1062,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal("0.2.0", (await _repo.DeviceFirmwareLatestGetAsync(type))!.Version);
         Assert.Null(await _repo.DeviceFirmwareLatestGetAsync(-1));
     }
-
-    // ---- firmware catalog (roadmap #94) + per-device update flags (roadmap #93) -------------
 
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task FirmwareCatalog_Add_ListForBoard_FiltersBySource_And_DeleteBySource_KeepsLegacyRows(DbProviderKind provider)
@@ -1229,7 +1114,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Device back = (await _repo.DeviceGetByIdAsync(d.IDDevice))!;
         Assert.Equal((false, (string?)null), (back.FirmwareUpdate, back.FirmwareTargetVersion));
 
-        // A heartbeat without Board (pre-#94 firmware) must not erase the one already recorded.
+        // A heartbeat without a Board field must not erase one already recorded.
         await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
         Assert.Equal(board, await _repo.DeviceBoardGetAsync(d.IDDevice.Value));
     }
@@ -1262,8 +1147,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Contains(await _repo.DeviceTypeSensorGetAsync(), x => x.IDDeviceTypeSensor == 1);
     }
 
-    // ---- sensor data --------------------------------------------------
-
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task SensorDataPush_Parses_String_Measurements_And_Fills_Missing_Date(DbProviderKind provider)
     {
@@ -1292,7 +1175,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(26.13, rows[0].Temperature);
         Assert.Equal(new DateTime(2026, 8, 29, 9, 50, 0), rows[0].DateCreated);
         Assert.NotNull(rows[1].DateCreated);
-        // UtcNow, matching SensorDataPushAsync's UTC fallback (roadmap #71) — local Now would be ahead of it.
+        // UtcNow, matching the push endpoint's UTC fallback - local Now would be ahead of it.
         Assert.True(rows[1].DateCreated > DateTime.UtcNow.AddMinutes(-5));
     }
 
@@ -1303,7 +1186,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (tenantId, _, _) = await MakeUser(t);
         var d = await MakeDevice(t, tenantId);
 
-        // Every id in the payload is a lie - a different device, tenant, unit and zone.
         var payload = new JsonArray(
             new JsonObject
             {
@@ -1326,8 +1208,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.False(await db.SensorData.AnyAsync(r => r.TenantID == tenantId + 999_999));
     }
 
-    // ---- device unit / zone (roadmap #81 + #82) --------------------------
-
     private async Task<(DeviceUnit Unit, DeviceUnitZone Zone)> MakeUnitAndZone(int? tenantId)
     {
         var unit = await _repo.DeviceUnitAddAsync(new DeviceUnit { TenantID = tenantId, DeviceUnitName = "Unit_" + U() });
@@ -1340,9 +1220,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         return (unit, zone);
     }
 
-    // Roadmap #81/#82: the containment migration flipped the FK (Zone -> Unit, not the old
-    // Unit -> Zone) so one Unit can genuinely hold several Zones - the whole point of the
-    // hierarchical dashboard.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnit_Contains_MultipleZones(DbProviderKind provider)
     {
@@ -1363,8 +1240,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.All(zones, z => Assert.Equal(unit.IDDeviceUnit, z.DeviceUnitID));
     }
 
-    // Roadmap #82: admin-created Units/Zones must not leak across tenants (same standard as every
-    // other #47/#66/#102/#111 tenant-isolation fix) - only the shared IDDeviceUnit=0 sentinel is global.
+    // Only the shared IDDeviceUnit=0 sentinel is global; everything else must stay tenant-scoped.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitsGet_IsTenantScoped(DbProviderKind provider)
     {
@@ -1380,9 +1256,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.DoesNotContain(seenByTenant1, u => u.IDDeviceUnit == 0); // sentinel never listed as a real unit
     }
 
-    // Roadmap #82: assigning writes BOTH DeviceUnitID and DeviceUnitZoneID from the zone's own
-    // record (never trusts a caller-supplied unit id) and bumps ConfigVersion; unassigning resets
-    // both to the 0 sentinel WITHOUT bumping ConfigVersion (rule (e): pure bookkeeping).
+    // Unassigning resets both FKs to the 0 sentinel without bumping ConfigVersion - pure bookkeeping, no device config change.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceAssignToZone_SetsUnitAndZone_AndBumpsConfigVersion_UnassignDoesNot(DbProviderKind provider)
     {
@@ -1407,8 +1281,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(originalConfigVersion + 1, unassigned.ConfigVersion); // unchanged by the unassign
     }
 
-    // Roadmap #82 rule (d): the "Add Controller"/"Add Sensor" picker only offers devices with no
-    // current zone, filtered by the capability the caller is filling.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnassignedGet_ExcludesAlreadyAssigned_FiltersByCapability(DbProviderKind provider)
     {
@@ -1427,8 +1299,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Contains(sensorCandidates, x => x.IDDevice == unassigned.IDDevice);
     }
 
-    // Roadmap #82 rule (a): a zone has at most one controller - the API checks this primitive
-    // before calling DeviceAssignToZoneAsync for a second controller-capable device.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitZoneHasController_TrueOnlyAfterAControllerCapableDeviceIsAssigned(DbProviderKind provider)
     {
@@ -1442,8 +1312,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(await _repo.DeviceUnitZoneHasControllerAsync(zone.IDDeviceUnitZone!.Value));
     }
 
-    // Roadmap #81: the dashboard averages the LATEST reading per device, one number per sensor
-    // type, ignoring types nobody in scope has ever reported (null, not zero).
+    // Averages the LATEST reading per device per sensor type; unreported types are omitted (null, not zero).
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitDashboard_AveragesLatestReadingPerDevice_PerSensorType(DbProviderKind provider)
     {
@@ -1479,8 +1348,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(20.0, zoneDetail.Averages.Temperature);
     }
 
-    // ---- device unit / zone traffic-light status + 24h trend (roadmap #116) ---------
-
     private async Task<Device> MakeEnabledDevice(RelationalIntegrationFixture.Target t, int tenantId)
     {
         var d = new Device
@@ -1495,8 +1362,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         return saved;
     }
 
-    // Roadmap #116 rule (4): an enabled device that has never polled (LastSeenAt null) counts as
-    // offline, same as ComputeOnline already treats a never-seen device on Fleet.
+    // A device that has never polled (LastSeenAt null) counts as offline, same as Fleet's ComputeOnline.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitDashboard_Status_RedWhenEnabledDeviceNeverSeen(DbProviderKind provider)
     {
@@ -1541,8 +1407,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(ZoneStatus.Orange, dashboard.Status);
     }
 
-    // A NoInternet event is deliberately NOT in the #116 rule-(4) problem set (only AuthFailed/
-    // ConfigSyncFailed/CrashLoopRollback/OtaFailed/Crash (#135), plus SafetyLimitTripped once #36 exists).
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitDashboard_Status_NoInternetEvent_DoesNotCountAsProblem(DbProviderKind provider)
     {
@@ -1558,11 +1422,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(ZoneStatus.Green, dashboard.Status);
     }
 
-    // A disabled device is expected to be silent (same rule as OfflineAlertCandidatesGetAsync,
-    // roadmap #40) - it must never redden a zone/unit nobody expects it to report into. But it is
-    // not invisible either (amended after a user report on invent.hr's SecondUnit/Default zone: a
-    // disabled+offline device still shows a red "Offline" badge on its own Fleet/zone row, which
-    // read as a contradiction next to a plain-Green cube) - it now takes the zone/unit to Orange.
+    // A disabled+offline device still shows a red "Offline" badge on its own row but must not redden a zone/unit nobody expects it to report into - it takes the zone/unit to Orange instead.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitDashboard_Status_DisabledOfflineDevice_TurnsOrange_NotRed(DbProviderKind provider)
     {
@@ -1576,11 +1436,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(ZoneStatus.Orange, dashboard.Status);
     }
 
-    // Roadmap #122 diagnosis: the existing #116 rule-(4) tests only cover a device that has NEVER
-    // polled (LastSeenAt null) or one that just polled (fresh). The live bug report is a device
-    // that WAS online and has since gone stale - DeviceDiagnosticUpsertAsync always stamps "now",
-    // so this needs LastSeenAt pushed into the past directly, then Fleet vs. the zone dashboard
-    // compared for the SAME device to see whether they actually disagree.
+    // Covers a device that WAS online and has since gone stale (LastSeenAt pushed into the past directly, since DeviceDiagnosticUpsertAsync always stamps "now") - compares Fleet vs. the zone dashboard for the same device.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitDashboard_Status_RedWhenEnabledDeviceWentStale_MatchesFleet(DbProviderKind provider)
     {
@@ -1610,9 +1466,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(ZoneStatus.Red, zoneSingle!.Status);
     }
 
-    // Roadmap #116 rule (3): a reading with no explicit dateCreated is stamped at the server's
-    // UtcNow (existing SensorDataPushAsync behavior), so it must land in the trend's LAST bucket
-    // (index 23 = the current hour) and nowhere else.
+    // No explicit dateCreated stamps UtcNow, landing in the trend's last bucket (index 23 = current hour).
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitZoneDashboard_Trend_BucketsRecentReadingIntoCurrentHour(DbProviderKind provider)
     {
@@ -1631,7 +1485,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.All(zoneDetail.Trend.Temperature.Take(zoneDetail.Trend.Temperature.Length - 1), Assert.Null);
     }
 
-    // Roadmap #82: deleting a Unit cascades its Zones and unassigns (not deletes) their devices.
+    // Deleting a Unit cascades its Zones and unassigns (not deletes) their devices.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitDelete_CascadesZones_AndUnassignsDevices_WithoutDeletingThem(DbProviderKind provider)
     {
@@ -1650,8 +1504,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(0, stillThere!.DeviceUnitID);
         Assert.Equal(0, stillThere.DeviceUnitZoneID);
     }
-
-    // ---- device events (roadmap #28) ----------------------------------
 
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task EventDevicePush_InsertsWithCallerIdentity(DbProviderKind provider)
@@ -1684,13 +1536,11 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.False(secondImmediate);
         Assert.Single(await _repo.EventDeviceGetAsync(d.IDDevice, tenantId));
 
-        // Push a different event type in between - must never dedupe against an unrelated type.
         bool differentType = await _repo.EventDevicePushAsync(d.IDDevice!.Value, tenantId, DeviceEventType.AuthFailed, "unrelated");
         Assert.True(differentType);
         Assert.Equal(2, (await _repo.EventDeviceGetAsync(d.IDDevice, tenantId)).Count);
 
-        // Backdate the NoInternet row past the default 10-minute dedupe window and confirm the
-        // next push of the same type is no longer suppressed.
+        // Backdate past the default 10-minute dedupe window so the next push isn't suppressed.
         await using (var db = _fx.NewContext(t))
         {
             var row = await db.EventDevices.SingleAsync(e => e.DeviceID == d.IDDevice!.Value && e.EventID == (int)DeviceEventType.NoInternet);
@@ -1718,7 +1568,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Single(forA);
         Assert.Equal("tenant A", forA[0].Message);
 
-        // Same deviceID passed under the WRONG tenant must not leak tenant A's row.
         var wrongTenant = await _repo.EventDeviceGetAsync(deviceA.IDDevice, tenantB);
         Assert.Empty(wrongTenant);
     }
@@ -1730,8 +1579,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (tenantId, _, _) = await MakeUser(t);
         var d = await MakeDevice(t, tenantId);
 
-        // Anchor to mid-minute so the +/- second offsets below can never straddle a minute
-        // boundary (bucket mode 0 groups by minute).
+        // Anchor to mid-minute so the +/- second offsets below can never straddle a minute boundary.
         DateTime n = DateTime.Now;
         var thisMinute = new DateTime(n.Year, n.Month, n.Day, n.Hour, n.Minute, 30);
         var prevMinute = thisMinute.AddMinutes(-1);
@@ -1785,9 +1633,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Empty(await _repo.SensorDataReportGetAsync(tenantId, -1, d.IDDevice, null));
     }
 
-    /// <summary>The exact pipeline Agrumy.Web's SensorData views run (roadmap #71 follow-up):
-    /// UTC rows from the DB, shaped to JSON, then dateCreated localized for display - proves the
-    /// chart payload shifts by the user's zone while a null zone passes UTC through untouched.</summary>
+    /// <summary>DB UTC rows shaped to JSON, then dateCreated localized for display: chart payload shifts by the user's zone, or passes UTC through untouched if null.</summary>
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task SensorDataGet_Then_Localize_Shifts_Chart_Dates_By_User_Zone(DbProviderKind provider)
     {
@@ -1795,7 +1641,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (tenantId, _, _) = await MakeUser(t);
         var d = await MakeDevice(t, tenantId);
 
-        // Mid-minute UTC anchor, same reasoning as the bucketing test above.
         DateTime n = DateTime.UtcNow;
         var utcStamp = new DateTime(n.Year, n.Month, n.Day, n.Hour, n.Minute, 30);
         await using (var db = _fx.NewContext(t))
@@ -1812,7 +1657,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.NotEqual(utcStamp, expectedLocal); // Zagreb is never UTC+0, so the shift must show
         Assert.Contains(expectedLocal.ToString("yyyy-MM-dd HH:mm:ss"), localized);
 
-        // A user with no zone preference keeps the raw UTC payload byte-for-byte.
         Assert.Equal(json, api.Utils.SensorDataTimeLocalizer.LocalizeDates(json, null));
     }
 
@@ -1840,8 +1684,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(left[0].DateCreated > now.AddDays(-2));
     }
 
-    // ---- data maintenance (roadmap #126) -----------------------------------
-
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task OptimizeOldSensorData_Downsamples_5Minute_Bucket_ExcludingOutliers(DbProviderKind provider)
     {
@@ -1861,7 +1703,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
                 new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 21, DateCreated = bucketStart.AddSeconds(70) },
                 new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 19, DateCreated = bucketStart.AddSeconds(130) },
                 new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 20, DateCreated = bucketStart.AddSeconds(190) },
-                // a broken-sensor spike - must be excluded from the bucket's average, not drag it up
                 new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 500, DateCreated = bucketStart.AddSeconds(250) },
                 new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 99, DateCreated = recentTimestamp });
             await db.SaveChangesAsync();
@@ -1876,9 +1717,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(tenantId, optimized.TenantID);
         Assert.Equal(20.0, optimized.Temperature); // (19+20+20+21)/4 - the 500 outlier excluded by IQR
 
-        // Untouched by microsecond precision differences across MySQL/Postgres round-tripping a
-        // DateTime carrying 100ns ticks (same reasoning as RefreshToken_AddAndGet_RoundTrips'
-        // tolerance above) - identified by its distinct Temperature value instead of exact DateCreated.
+        // Identified by its distinct Temperature value, not exact DateCreated - avoids cross-provider microsecond-precision mismatches.
         var untouched = Assert.Single(rows, r => r.Temperature == 99);
         Assert.True(Math.Abs((untouched.DateCreated!.Value - recentTimestamp).TotalSeconds) < 1);
         Assert.Equal(2, rows.Count); // one optimized bucket + the untouched recent row
@@ -1907,8 +1746,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Single(left);
         Assert.True(left[0].DateCreated > now.AddDays(-2));
     }
-
-    // ---- error classification --------------------------------------
 
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task ClassifyException_On_Real_Missing_Table_Is_SchemaMissing(DbProviderKind provider)
@@ -1946,8 +1783,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         }
     }
 
-    // ---- Email activation (roadmap #24/#63) ----------------------------------
-
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task UserActivateAsync_ValidToken_SetsEmailVerifiedAndClearsToken(DbProviderKind provider)
     {
@@ -1962,7 +1797,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(userId, activated!.IDUser);
         Assert.True(activated.EmailVerified);
 
-        // The token must not be redeemable a second time - UserActivateAsync clears it.
         User? secondAttempt = await _repo.UserActivateAsync(tokenHash);
         Assert.Null(secondAttempt);
     }
@@ -2006,8 +1840,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         bool tooSoon = await _repo.UserIssueActivationTokenAsync(userId, "resend1-" + U(), DateTime.UtcNow.AddHours(1), cooldownMinutes: 10);
         Assert.False(tooSoon);
 
-        // Backdate ActivationLastSentAt past the cooldown window directly - no need to actually
-        // wait 10 minutes.
+        // Backdate ActivationLastSentAt past the cooldown window directly instead of waiting 10 minutes.
         await using (var db = _fx.NewContext(t))
         {
             var row = await db.Users.FirstAsync(u => u.IDUser == userId);
@@ -2015,16 +1848,12 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             await db.SaveChangesAsync();
         }
 
-        // Roadmap #101: _repo's context already has this Users row tracked from the two calls
-        // above (change tracking spanning a "request" is the whole point of #101) - re-Use() to
-        // get a fresh context/repo, the same way the NEXT real HTTP request would, so this read
-        // actually re-queries the DB instead of returning the stale tracked instance.
+        // Re-Use() for a fresh, untracked context/repo, the same way a new HTTP request would - otherwise this read would return the stale tracked instance instead of re-querying the DB.
         Use(provider);
         string resend2 = "resend2-" + U();
         bool offCooldown = await _repo.UserIssueActivationTokenAsync(userId, resend2, DateTime.UtcNow.AddHours(1), cooldownMinutes: 10);
         Assert.True(offCooldown);
 
-        // The new token, not the stale one, must be the one that now activates the account.
         Assert.NotNull(await _repo.UserActivateAsync(resend2));
     }
 
@@ -2040,7 +1869,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await _repo.UserAddAsync(admin, new UserSecret { PwdHash = "h", PwdSalt = "s" });
         await _repo.UserAddAsync(regular, new UserSecret { PwdHash = "h", PwdSalt = "s" });
 
-        // A tenant admin elsewhere must never show up for THIS tenant's lookup.
         var (_, _, _) = await MakeUser(t); // creates its own tenant + a regular user, unrelated
         int otherTenantId = await _repo.TenantAddAsync("T_" + U());
         var otherAdmin = new User { TenantID = otherTenantId, UserGroupID = t.AdminGroupId, Email = U() + "@ex.com", Username = "u_" + U(), DevicePin = "PIN2C2" };
@@ -2066,8 +1894,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Contains(all, u => u.IDUser == userIdB);
     }
 
-    // ---- Composable roles (roadmap #66) --------------------------------------
-
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task UserRoleNamesGetAsync_NewUser_IsEmpty(DbProviderKind provider)
     {
@@ -2090,7 +1916,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             new[] { RoleNames.TenantReader, RoleNames.TenantDevice }.OrderBy(x => x),
             (await _repo.UserRoleNamesGetAsync(userId)).OrderBy(x => x));
 
-        // A second call REPLACES, not adds - dropping TenantDevice and adding TenantUser instead.
         await _repo.UserRolesSetAsync(userId, new[] { RoleNames.TenantReader, RoleNames.TenantUser });
         Assert.Equal(
             new[] { RoleNames.TenantReader, RoleNames.TenantUser }.OrderBy(x => x),

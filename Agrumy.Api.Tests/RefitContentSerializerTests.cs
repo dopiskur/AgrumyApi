@@ -5,19 +5,7 @@ using api.Utils;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Regression test for the #21 Zone Rules bug (2026-09-04): Refit's own default
-/// ContentSerializer silently registers a global JsonStringEnumConverter, so any request DTO
-/// enum without its own [JsonConverter] attribute (e.g. RelayFunction, ConditionType,
-/// CommandActionType/CommandTargetType) got serialized as a camelCase string. The API's
-/// [FromBody] binder uses plain ASP.NET Core MVC defaults (no string converter) for those
-/// deliberately-numeric enums, so every such call 400'd with "$.relayFunction JSON value could
-/// not be converted..." the moment a real value (not the enum's 0 default) was sent.
-///
-/// This serializes with the exact <see cref="RefitConfig.Settings"/> Agrumy.Web uses and
-/// deserializes with the same Web-defaults options ContractTests.cs uses to model MVC's
-/// [FromBody] binder, so a regression here fails the same way the live bug did.
-/// </summary>
+/// <summary>Refit's default ContentSerializer silently registers a global JsonStringEnumConverter, so a request DTO enum without its own [JsonConverter] (RelayFunction, ConditionType, CommandActionType/CommandTargetType) serialized as a camelCase string - but the API's [FromBody] binder expects these as plain numeric enums, so every such call 400'd. Serializes with the exact <see cref="RefitConfig.Settings"/> Agrumy.Web uses and deserializes with the same Web-defaults options ContractTests.cs uses, so a regression here fails the same way the live bug did.</summary>
 public class RefitContentSerializerTests
 {
     private static readonly JsonSerializerOptions Mvc = new(JsonSerializerDefaults.Web);

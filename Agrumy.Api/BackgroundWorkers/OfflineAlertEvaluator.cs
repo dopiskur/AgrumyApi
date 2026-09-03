@@ -4,11 +4,7 @@ using api.Notifications;
 
 namespace api.BackgroundWorkers
 {
-    /// <summary>The actual offline-detection/notification logic (roadmap #40 infra + #6 offline
-    /// alert type, pulled forward since every dependency it needs - LastSeenAt via #7/#8,
-    /// NotificationDispatcher via #6 - already exists). Kept separate from
-    /// OfflineAlertBackgroundService so it is directly unit-testable with mocked repositories,
-    /// with no PeriodicTimer/IHostedService plumbing in the way.</summary>
+    /// <summary>Offline-detection/notification logic, kept separate from OfflineAlertBackgroundService so it is directly unit-testable with mocked repositories.</summary>
     public sealed class OfflineAlertEvaluator(IDeviceRepository deviceRepo, IUserRepository userRepo, INotificationDispatcher dispatcher)
     {
         public async Task RunOnceAsync(CancellationToken ct = default)
@@ -20,11 +16,7 @@ namespace api.BackgroundWorkers
             {
                 ct.ThrowIfCancellationRequested();
 
-                // Never-seen devices (fresh registration, not yet through its first config poll)
-                // are NOT "offline" for alerting purposes - ComputeOnline treats a null LastSeenAt
-                // as offline for the Fleet dashboard badge, which is fine for a passive badge, but
-                // would mean every brand-new device fires an "offline" email before it ever had a
-                // chance to connect. Alerting is opt-in to "was reachable, now is not."
+                // Never-seen devices are NOT "offline" for alerting purposes, unlike the Fleet dashboard badge - alerting is opt-in to "was reachable, now is not."
                 if (d.LastSeenAt is null)
                 {
                     continue;
@@ -36,8 +28,7 @@ namespace api.BackgroundWorkers
                 {
                     if (d.OfflineNotifiedAt is not null)
                     {
-                        // Clears the mark so the NEXT offline streak (not this one - it just ended)
-                        // alerts fresh instead of staying silent forever after the first incident.
+                        // Clears the mark so the NEXT offline streak alerts fresh instead of staying silent forever after the first incident.
                         await deviceRepo.DeviceOfflineNotifiedSetAsync(d.IDDevice, null);
                     }
                     continue;
@@ -50,10 +41,7 @@ namespace api.BackgroundWorkers
 
                 string deviceLabel = string.IsNullOrWhiteSpace(d.DeviceName) ? $"Device {d.IDDevice}" : d.DeviceName;
 
-                // Same eventDevice table/timeline as device-pushed events (roadmap #28) - this one
-                // is server-detected, not device-pushed, but an admin reading a device's Events
-                // page should see "went offline" alongside NoInternet/ConfigApplied/etc., not a
-                // second, separate log they'd never think to check.
+                // Same eventDevice table/timeline as device-pushed events - server-detected, not device-pushed, but should appear alongside them on the Events page.
                 await deviceRepo.EventDevicePushAsync(d.IDDevice, d.TenantID, DeviceEventType.Offline,
                     $"No contact since {d.LastSeenAt:u}");
 

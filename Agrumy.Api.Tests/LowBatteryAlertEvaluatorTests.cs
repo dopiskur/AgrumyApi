@@ -6,10 +6,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Roadmap #12 (feature) + #40 (pattern). Exercises LowBatteryAlertEvaluator directly - no
-/// PeriodicTimer/IHostedService in the way, no database (repositories/dispatcher are mocked).
-/// </summary>
+/// <summary>Exercises LowBatteryAlertEvaluator directly - no database, repositories/dispatcher are mocked.</summary>
 public class LowBatteryAlertEvaluatorTests
 {
     private readonly Mock<IDeviceRepository> _devices = new(MockBehavior.Strict);
@@ -28,6 +25,7 @@ public class LowBatteryAlertEvaluatorTests
         _devices.Setup(d => d.LowBatteryAlertCandidatesGetAsync()).ReturnsAsync(candidates);
 
     // Threshold=20, hysteresis=5 (defaults) unless a test overrides it - alert at <=20%, clear at >=25%.
+
     private void SetupServerConfig(double? threshold = 20.0, double? hysteresis = 5.0) =>
         _serverConfig.Setup(s => s.ServerConfigGetAsync(1))
             .ReturnsAsync(new ServerConfig { BatteryLowThreshold = threshold, BatteryLowHysteresis = hysteresis });
@@ -40,8 +38,7 @@ public class LowBatteryAlertEvaluatorTests
 
         await NewEvaluator().RunOnceAsync();
 
-        // Strict mocks: any unexpected call (EventDevicePushAsync, TenantAdminsGetAsync,
-        // DispatchAsync, DeviceLowBatteryNotifiedSetAsync) would throw during RunOnceAsync above.
+        // Strict mocks: any unexpected call (EventDevicePushAsync, TenantAdminsGetAsync, DispatchAsync, DeviceLowBatteryNotifiedSetAsync) would throw during RunOnceAsync above.
     }
 
     [Fact]
@@ -56,14 +53,14 @@ public class LowBatteryAlertEvaluatorTests
     [Fact]
     public async Task Battery_Inside_DeadZone_After_Alert_Does_Not_Clear_The_Mark()
     {
-        // threshold=20, hysteresis=5 -> clears only at >=25. 22 is above threshold but still in
-        // the dead zone - must stay latched, not clear (and not re-fire either).
+        // threshold=20, hysteresis=5 -> clears only at >=25. 22 is above threshold but still in the dead zone - must stay latched, not clear.
         SetupServerConfig();
         SetupCandidates(Candidate(battery: 22, lowBatteryNotifiedAt: DateTime.UtcNow.AddHours(-1)));
 
         await NewEvaluator().RunOnceAsync();
 
         // Strict mock: DeviceLowBatteryNotifiedSetAsync must NOT be called from inside the dead zone.
+
     }
 
     [Fact]
@@ -117,8 +114,7 @@ public class LowBatteryAlertEvaluatorTests
 
         await NewEvaluator().RunOnceAsync();
 
-        // Strict mocks: EventDevicePushAsync/TenantAdminsGetAsync/DispatchAsync would throw if
-        // called - dedup means none of them should be.
+        // Strict mocks: EventDevicePushAsync/TenantAdminsGetAsync/DispatchAsync would throw if called - dedup means none of them should be.
     }
 
     [Fact]

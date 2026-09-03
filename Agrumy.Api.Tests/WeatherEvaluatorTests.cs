@@ -9,12 +9,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Roadmap #11 (feature) + #40 (pattern). Exercises WeatherEvaluator directly - no
-/// PeriodicTimer/IHostedService in the way, no database or real HTTP call (repository/forecast
-/// client are mocked). Strict mocks double as the assertion that an early-return path makes NO
-/// further calls (unconfigured, not due yet, fetch failed).
-/// </summary>
+/// <summary>Exercises WeatherEvaluator directly, no database or real HTTP call. Strict mocks double as the assertion that an early-return path makes NO further calls.</summary>
 public class WeatherEvaluatorTests
 {
     private readonly Mock<IServerConfigRepository> _serverConfig = new(MockBehavior.Strict);
@@ -138,16 +133,13 @@ public class WeatherEvaluatorTests
 
         await NewEvaluator().RunOnceAsync();
 
-        // Strict mock: ServerConfigWeatherStateSetAsync would throw if called - a failed fetch must
-        // not overwrite the last good reading with a guess.
+        // Strict mock: ServerConfigWeatherStateSetAsync would throw if called - a failed fetch must not overwrite the last good reading.
     }
 
     [Fact]
     public async Task Missing_ServerConfig_PollInterval_Falls_Back_To_AgrumySettings_Default()
     {
-        // Roadmap #11: a row created before this feature has WeatherPollIntervalMinutes == null -
-        // must fall back to AgrumySettings.WeatherPollIntervalMinutes (15 here), not treat null as
-        // "always due" or throw.
+        // A row with WeatherPollIntervalMinutes == null must fall back to AgrumySettings.WeatherPollIntervalMinutes, not treat null as "always due" or throw.
         SetupServerConfig(new ServerConfig
         {
             WeatherLocationLat = 45.8,

@@ -18,8 +18,7 @@ namespace api.Notifications
         NotificationRecipient Recipient,
         NotificationSeverity Severity = NotificationSeverity.Warning);
 
-    /// <summary>Outcome of one channel handling one notification. <see cref="Sent"/> false covers both
-    /// "not applicable / not configured" (<see cref="Skipped"/>) and "tried and failed" (<see cref="Failed"/>).</summary>
+    /// <summary>Outcome of one channel handling one notification. <see cref="Sent"/> false covers both "not applicable" (<see cref="Skipped"/>) and "tried and failed" (<see cref="Failed"/>).</summary>
     public sealed record NotificationResult(bool Sent, bool Attempted, string? Detail)
     {
         public static NotificationResult Ok(string? detail = null) => new(true, true, detail);

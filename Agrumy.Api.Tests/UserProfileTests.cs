@@ -13,25 +13,19 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Roadmap #71 follow-up: TimeZoneHelper display conversion (UTC stays the only stored format)
-/// and the self-scoped PUT /api/User/Profile endpoint. No database - IRepository is mocked;
-/// the write-only-profile-columns guarantee is proven against real engines in
-/// <see cref="RelationalIntegrationTests.UserProfileSet_Writes_Only_Profile_Fields"/>.
-/// </summary>
+/// <summary>TimeZoneHelper display conversion (UTC stays the only stored format) and the self-scoped PUT /api/User/Profile endpoint. No database - the write-only-profile-columns guarantee is proven against real engines in <see cref="RelationalIntegrationTests.UserProfileSet_Writes_Only_Profile_Fields"/>.</summary>
 public class UserProfileTests
 {
-    // ---- TimeZoneHelper.ToUserLocalTime ------------------------------------------------
 
     [Theory]
-    // Europe/Zagreb across the DST boundary: +2h in summer (CEST), +1h in winter (CET).
+    // Europe/Zagreb: +2h in summer (CEST), +1h in winter (CET).
     [InlineData("2026-07-15 10:00:00", "2026-07-15 12:00:00")]
     [InlineData("2026-01-15 10:00:00", "2026-01-15 11:00:00")]
-    // Spring-forward 2026-03-29: 00:30 UTC is still CET (+1), 01:30 UTC is already CEST (+2) -
-    // proving the IANA id resolves the transition itself, which a stored fixed offset cannot.
+    // Spring-forward 2026-03-29: 00:30 UTC is still CET (+1), 01:30 UTC is already CEST (+2) - proves the IANA id resolves the transition, which a stored fixed offset cannot.
     [InlineData("2026-03-29 00:30:00", "2026-03-29 01:30:00")]
     [InlineData("2026-03-29 01:30:00", "2026-03-29 03:30:00")]
     // Fall-back 2026-10-25: 00:30 UTC is CEST (+2), 01:30 UTC is CET (+1).
+
     [InlineData("2026-10-25 00:30:00", "2026-10-25 02:30:00")]
     [InlineData("2026-10-25 01:30:00", "2026-10-25 02:30:00")]
     public void ToUserLocalTime_Zagreb_Applies_Correct_DST_Offset(string utc, string expectedLocal)
@@ -59,12 +53,9 @@ public class UserProfileTests
         Assert.Equal(utc, TimeZoneHelper.ToUserLocalTime(utc, zone));
     }
 
-    // ---- TimeZoneHelper.GetUtcOffsetSeconds (roadmap #39) -------------------------------
 
     [Theory]
-    // Europe/Zagreb: +2h (7200s) in summer (CEST), +1h (3600s) in winter (CET) - same DST
-    // boundary as the ToUserLocalTime cases above, proving GetUtcOffsetSeconds resolves the same
-    // transition rather than a fixed offset.
+    // Europe/Zagreb: +2h (7200s) in summer (CEST), +1h (3600s) in winter (CET) - proves GetUtcOffsetSeconds resolves the transition rather than a fixed offset.
     [InlineData("2026-07-15 10:00:00", 7200)]
     [InlineData("2026-01-15 10:00:00", 3600)]
     public void GetUtcOffsetSeconds_Zagreb_Applies_Correct_DST_Offset(string utc, int expectedSeconds)
@@ -82,7 +73,6 @@ public class UserProfileTests
         Assert.Equal(0, TimeZoneHelper.GetUtcOffsetSeconds(DateTime.UtcNow, zone));
     }
 
-    // ---- TimeZoneHelper.TryNormalizeToIana ---------------------------------------------
 
     [Fact]
     public void TryNormalizeToIana_Iana_Id_Passes_Through()
@@ -95,6 +85,7 @@ public class UserProfileTests
     public void TryNormalizeToIana_Windows_Id_Becomes_Iana()
     {
         // Only meaningful where the Windows catalog exists (dev boxes); on Linux the id is unknown.
+
         if (TimeZoneHelper.TryNormalizeToIana("Central European Standard Time", out string iana))
         {
             Assert.DoesNotContain(" ", iana); // IANA ids are Area/Location, never spaced Windows names
@@ -120,7 +111,6 @@ public class UserProfileTests
         Assert.All(options, o => Assert.True(TimeZoneHelper.TryNormalizeToIana(o.Id, out _)));
     }
 
-    // ---- SensorDataTimeLocalizer (chart payload display conversion) --------------------
 
     [Fact]
     public void LocalizeDates_Rewrites_DateCreated_To_User_Zone()
@@ -153,7 +143,6 @@ public class UserProfileTests
         Assert.Equal(json, SensorDataTimeLocalizer.LocalizeDates(json, "Europe/Zagreb"));
     }
 
-    // ---- PUT /api/User/Profile ---------------------------------------------------------
 
     private readonly Mock<IRepository> _repo = new(MockBehavior.Strict);
     private readonly Mock<ICache> _cache = new();
@@ -197,6 +186,7 @@ public class UserProfileTests
         var bad = Assert.IsType<BadRequestObjectResult>(result.Result);
         Assert.Contains("Unknown time zone", bad.Value!.ToString());
         // MockBehavior.Strict: any repo call would already have thrown - verify for clarity.
+
         _repo.Verify(r => r.UserProfileSetAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>()), Times.Never);
     }
 
@@ -219,8 +209,7 @@ public class UserProfileTests
         Assert.IsType<UnauthorizedResult>(result.Result);
     }
 
-    /// <summary>The payload type itself is the containment: if someone ever adds an
-    /// authorization-bearing property to UserProfileUpdate, this fails and forces a conscious look.</summary>
+    /// <summary>The payload type itself is the containment: if someone adds an authorization-bearing property to UserProfileUpdate, this fails and forces a conscious look.</summary>
     [Fact]
     public void UserProfileUpdate_Carries_No_Authorization_Fields()
     {
@@ -228,7 +217,6 @@ public class UserProfileTests
         Assert.Equal(new[] { "FirstName", "LastName", "TimeZone" }.OrderBy(n => n), names.OrderBy(n => n));
     }
 
-    // ---- POST /api/User/DevicePin (roadmap #70) ----------------------------------------
 
     [Fact]
     public async Task DevicePinGenerate_StoresAndReturns_FreshPin_WithExpiry()
@@ -259,7 +247,6 @@ public class UserProfileTests
         _repo.Verify(r => r.UserSetDevicePinAsync(It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<DateTime?>()), Times.Never);
     }
 
-    // ---- POST /api/User/ChangePassword (roadmap #83) -----------------------------------
 
     [Fact]
     public async Task ChangePassword_CorrectOldPassword_ChangesAndReturnsOk()
@@ -294,6 +281,7 @@ public class UserProfileTests
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(401, obj.StatusCode);
         // MockBehavior.Strict: an un-set-up UserSetPasswordAsync call would already have thrown.
+
     }
 
     [Fact]
@@ -307,11 +295,7 @@ public class UserProfileTests
         _repo.Verify(r => r.UserGetAsync(It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>()), Times.Never);
     }
 
-    /// <summary>The bug this closes: previously identity came from a Login field in the body, so an
-    /// unauthenticated caller could use this endpoint as a password-guessing oracle against any
-    /// known email. Now [Authorize] rejects the call before the action even runs; this proves the
-    /// no-identity path the action itself falls back to (defense in depth) also refuses, and never
-    /// touches the repository.</summary>
+    /// <summary>Previously identity came from a Login field in the body, letting an unauthenticated caller use this endpoint as a password-guessing oracle. Proves the action's own no-identity fallback (defense in depth beyond [Authorize]) also refuses, and never touches the repository.</summary>
     [Fact]
     public async Task ChangePassword_NoIdentity_Returns401_And_NeverTouchesRepo()
     {
@@ -321,9 +305,7 @@ public class UserProfileTests
         Assert.IsType<UnauthorizedResult>(result.Result);
     }
 
-    /// <summary>Same reasoning as UserProfileUpdate_Carries_No_Authorization_Fields above: the
-    /// payload type itself is the containment - a reintroduced Login property would be the same
-    /// #83 bug again, so this fails and forces a conscious look.</summary>
+    /// <summary>Same reasoning as UserProfileUpdate_Carries_No_Authorization_Fields: the payload type itself is the containment - a reintroduced Login property would reopen the same bug.</summary>
     [Fact]
     public void UserSetPassword_Carries_No_Login_Field()
     {

@@ -38,12 +38,12 @@ public class AuthenticationProviderTests
         Assert.NotEqual(a, b);
     }
 
-    // ---- device-registration PIN (roadmap #70) -----------------------------------------
 
     [Fact]
     public void GetPin_SixChars_FromUnambiguousAlphabet()
     {
         // 100 samples make an alphabet leak (O/I/0/1 sneaking in) overwhelmingly likely to surface.
+
         for (int i = 0; i < 100; i++)
         {
             string pin = AuthenticationProvider.GetPin();
@@ -111,6 +111,7 @@ public class AuthenticationProviderTests
     public void VerifyHash_StoredHashOfDifferentLength_ReturnsFalse()
     {
         // Exercises the explicit length guard added before FixedTimeEquals.
+
         string salt = AuthenticationProvider.GetSalt();
         string hash = AuthenticationProvider.GetHash("pw", salt);
 
@@ -122,6 +123,7 @@ public class AuthenticationProviderTests
     public void FixedTimeEquals_MatchesEqualBytes_AndRejectsDifferentLengths()
     {
         // Sanity check on the primitive the security fix relies on.
+
         byte[] a = [1, 2, 3, 4];
         byte[] same = [1, 2, 3, 4];
         byte[] diffValue = [1, 2, 3, 9];
@@ -135,8 +137,7 @@ public class AuthenticationProviderTests
 
 public class JwtTokenProviderTests
 {
-    // Config (Agrumy.Shared) reads appsettings.json from the working directory; the test
-    // project ships one, so Config.secureKey / jwtIssuer / jwtAudience resolve.
+    // Config (Agrumy.Shared) reads appsettings.json from the working directory; the test project ships one, so Config.secureKey/jwtIssuer/jwtAudience resolve.
     private const string SigningKey = "unit-test-signing-key-not-a-secret-0123456789ABCDEF";
 
     [Fact]
@@ -152,11 +153,7 @@ public class JwtTokenProviderTests
     [Fact]
     public void ValidateToken_KeyWithNonAsciiCharacter_RoundTrips()
     {
-        // Roadmap #69 regression lock: CreateToken derived key bytes via UTF8 but ValidateToken
-        // via ASCII - any SecureKey character above U+007F silently produced two DIFFERENT keys
-        // ('š' collapses to '?'), so every token failed signature validation with no diagnostic.
-        // Uses the key-parameterized overload because the single-arg ValidateToken is hard-bound
-        // to the (ASCII-only) test appsettings key.
+        // Regression lock: CreateToken derived key bytes via UTF8 but ValidateToken via ASCII - any SecureKey character above U+007F silently produced two DIFFERENT keys ('š' collapses to '?'), failing signature validation with no diagnostic.
         const string nonAsciiKey = "šifra-with-a-non-ascii-char-0123456789ABCDEF";
         string token = JwtTokenProvider.CreateToken(nonAsciiKey, expiration: 5, subject: "alice@example.com", roles: new[] { "admin" }, tenantID: "0");
 
@@ -169,7 +166,7 @@ public class JwtTokenProviderTests
     [Fact]
     public void ValidateToken_MultipleRoles_ReturnsAllOfThem()
     {
-        // Roadmap #66: a caller can hold several roles at once - every one of them must round-trip.
+        // A caller can hold several roles at once - every one of them must round-trip.
         string token = JwtTokenProvider.CreateToken(SigningKey, 5, "alice@example.com", new[] { "admin", "Tenant reader", "Tenant Device" }, "0");
 
         var roles = JwtTokenProvider.ValidateToken(token);
@@ -180,8 +177,7 @@ public class JwtTokenProviderTests
     [Fact]
     public void ValidateToken_RejectsExpiredToken()
     {
-        // Hand-craft a token that already expired (CreateToken can't produce Expires < NotBefore),
-        // signed with the same key ValidateToken uses (Config.secureKey == SigningKey).
+        // Hand-craft a token that already expired (CreateToken can't produce Expires < NotBefore), signed with the same key ValidateToken uses.
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey));
         var descriptor = new SecurityTokenDescriptor
         {
@@ -213,10 +209,7 @@ public class JwtTokenProviderTests
     [Fact]
     public void ValidateToken_RejectsWrongIssuerOrAudience()
     {
-        // Roadmap #48 regression guard: correctly signed with the same key Config.secureKey
-        // validates against, but stamped with an issuer/audience that doesn't match
-        // Config.jwtIssuer/jwtAudience - before the fix ValidateIssuer/ValidateAudience were
-        // false, so this token would have silently passed.
+        // Regression guard: correctly signed with the same key Config.secureKey validates against, but stamped with an issuer/audience that doesn't match Config.jwtIssuer/jwtAudience.
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey));
         var descriptor = new SecurityTokenDescriptor
         {

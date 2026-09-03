@@ -9,8 +9,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Roadmap #94: canned network for FirmwareCatalogService tests - URL -> text (GitHub API
-/// JSON, manifests) and URL -> bytes (.bin assets); an unknown URL throws like a real 404 would.</summary>
+/// <summary>Canned network for FirmwareCatalogService tests - URL -> text (GitHub API JSON, manifests) and URL -> bytes (.bin assets); an unknown URL throws like a real 404 would.</summary>
 internal sealed class FakeFirmwareFetcher : IFirmwareFetcher
 {
     public Dictionary<string, string> Texts { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -38,8 +37,7 @@ internal sealed class FakeFirmwareFetcher : IFirmwareFetcher
 
 internal static class FirmwareTestSupport
 {
-    /// <summary>A FirmwareStorage rooted in a fresh temp directory (absolute path, so the
-    /// IHostEnvironment content root is never consulted).</summary>
+    /// <summary>A FirmwareStorage rooted in a fresh temp directory (absolute path, so the IHostEnvironment content root is never consulted).</summary>
     public static FirmwareStorage NewStorage(out string root)
     {
         root = Path.Combine(Path.GetTempPath(), "agrumy-fw-tests", Guid.NewGuid().ToString("N"));
@@ -47,8 +45,7 @@ internal static class FirmwareTestSupport
         return new FirmwareStorage(settings, new Mock<IHostEnvironment>().Object);
     }
 
-    /// <summary>The same IRepository mock backs every facet the service takes - mirrors how
-    /// ApiControllerTests builds CommandQueueService.</summary>
+    /// <summary>The same IRepository mock backs every facet the service takes.</summary>
     public static FirmwareCatalogService NewCatalog(IRepository repo, IFirmwareFetcher? fetcher = null, FirmwareStorage? storage = null) =>
         new(repo, repo, repo, fetcher ?? new FakeFirmwareFetcher(), storage ?? NewStorage(out _), NullLogger<FirmwareCatalogService>.Instance);
 }

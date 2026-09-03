@@ -6,11 +6,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Roadmap #94/#93. Exercises FirmwareCatalogService with a mocked repository and a canned
-/// IFirmwareFetcher - no database, no network. The Local-repository paths write real files, but
-/// only into a per-test temp directory.
-/// </summary>
+/// <summary>Exercises FirmwareCatalogService with a mocked repository and a canned IFirmwareFetcher - no database, no network. The Local-repository paths write real files, but only into a per-test temp directory.</summary>
 public class FirmwareCatalogServiceTests
 {
     private readonly Mock<IRepository> _repo = new(MockBehavior.Strict);
@@ -19,6 +15,7 @@ public class FirmwareCatalogServiceTests
     private readonly string _root;
 
     // In-memory catalog the mock reads/writes, so multi-step flows (sync then list) behave.
+
     private readonly List<DeviceFirmware> _rows = [];
     private int _nextId = 1;
 
@@ -84,7 +81,6 @@ public class FirmwareCatalogServiceTests
     private static string Sha(string text) =>
         Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(FakeFirmwareFetcher.Bytes(text))).ToLowerInvariant();
 
-    // ---- GitHub source: Refresh --------------------------------------------------------
 
     [Fact]
     public async Task GitHub_Refresh_Maps_Release_Assets_To_Catalog_Rows_With_Manifest_Checksums()
@@ -122,7 +118,6 @@ public class FirmwareCatalogServiceTests
         Assert.Equal("1.10.0", latest!.Version);
     }
 
-    // ---- Local repository: pull from GitHub (roadmap #94-2a) ---------------------------------
 
     [Fact]
     public async Task Local_PullIncremental_Downloads_Only_Missing_Files_And_Verifies_Checksums()
@@ -178,7 +173,6 @@ public class FirmwareCatalogServiceTests
         Assert.Contains(_rows, r => r.Version == "0.4.0" && r.Source == FirmwareSource.GitHub);
     }
 
-    // ---- Local repository: import a server directory (roadmap #94-2b) ----------------------
 
     [Fact]
     public async Task Import_Verifies_Manifest_Checksums_And_Rejects_Off_Convention_Files()
@@ -216,7 +210,6 @@ public class FirmwareCatalogServiceTests
         Assert.Single(result.Warnings);
     }
 
-    // ---- Local repository: manual upload (roadmap #94-2c / #93-c-2) ---------------------------
 
     [Fact]
     public async Task Upload_Rejects_A_File_Name_Outside_The_Convention()
@@ -243,7 +236,6 @@ public class FirmwareCatalogServiceTests
         Assert.Equal(3, only.SizeBytes);
     }
 
-    // ---- Custom source ---------------------------------------------------------------------
 
     [Fact]
     public async Task Custom_Refresh_Resolves_Relative_Manifest_Urls_Against_The_Manifest_Location()
@@ -273,13 +265,13 @@ public class FirmwareCatalogServiceTests
         Assert.Empty(_fetcher.Requested);
     }
 
-    // ---- per-device offer + request (roadmap #93) ---------------------------------------------
 
     [Fact]
     public async Task ResolveOffer_Nothing_When_FirmwareUpdate_Not_Set()
     {
         Assert.Null(await NewService().ResolveOfferAsync(new Device { IDDevice = 1, FirmwareUpdate = false, DeviceTypeID = 3 }, "esp32dev"));
         // Strict mock: no repository call was set up - any lookup would have thrown.
+
     }
 
     [Fact]
@@ -347,7 +339,6 @@ public class FirmwareCatalogServiceTests
         Assert.True(await service.NoteHeartbeatAsync(device, "1.0.0", "esp32dev"));
     }
 
-    // ---- manifest (roadmap #94-C1) --------------------------------------------------------------
 
     [Fact]
     public async Task Manifest_Groups_Visible_Rows_By_Version_Newest_First_Preferring_Local_Per_Board()
@@ -364,7 +355,6 @@ public class FirmwareCatalogServiceTests
         Assert.Equal("local", Assert.Single(manifest.Releases[1].Files).Url);
     }
 
-    // ---- roadmap #41: blank-chip web-installer full image, paired with its OTA sibling -----------
 
     private const string FullImageAssetName = "agrumy-esp32dev-full-v1.1.0.bin";
 
@@ -394,6 +384,7 @@ public class FirmwareCatalogServiceTests
         Assert.Equal(900, dev110.FullImageSizeBytes);
         Assert.StartsWith("https://github.com/", dev110.FullImageUrl);
         // The full-image asset must never become its OWN catalog row.
+
         Assert.DoesNotContain(_rows, r => r.FileName == FullImageAssetName);
     }
 

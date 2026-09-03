@@ -5,22 +5,10 @@ using Json.Schema;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Enforces the firmware &lt;-&gt; API contract in <c>contracts/device-api/*.schema.json</c>.
-///
-/// The schemas were derived from the real behaviour of both code bases (see that folder's
-/// README). These tests serialize the C# models exactly the way ASP.NET Core MVC does
-/// (System.Text.Json Web defaults =&gt; camelCase, nulls kept) and validate the output against
-/// the schemas, so a rename/removal/casing change in <see cref="DeviceConfig"/> and friends -
-/// which the C# compiler happily accepts - fails here instead of on a device in the field.
-///
-/// No database: the response fixtures are constructed the same way
-/// <c>DeviceApiController.BuildDeviceConfigAsync()</c> / <c>ReqAuth()</c> build them.
-/// </summary>
+/// <summary>Enforces the firmware &lt;-&gt; API contract in <c>contracts/device-api/*.schema.json</c>: serializes the C# models exactly the way ASP.NET Core MVC does and validates against the schemas, so a rename/casing change the compiler happily accepts fails here instead of on a device in the field.</summary>
 public class ContractTests
 {
-    // Matches Microsoft.AspNetCore.Mvc's internal default (JsonSerializerDefaults.Web):
-    // camelCase, case-insensitive, NumberHandling.AllowReadingFromString, nulls NOT ignored.
+    // Matches Microsoft.AspNetCore.Mvc's internal default (JsonSerializerDefaults.Web).
     private static readonly JsonSerializerOptions Mvc = new(JsonSerializerDefaults.Web);
 
     private static readonly string SchemaDir =
@@ -55,7 +43,6 @@ public class ContractTests
         }
     }
 
-    // ---- housekeeping ------------------------------------------------------------------
 
     [Fact]
     public void AllSevenSchemaFilesArePresentAndParseAsSchemas()
@@ -74,7 +61,6 @@ public class ContractTests
     [Fact]
     public void RegisterAndConfigResponseSchemasAreIdentical()
     {
-        // They are both the serialized DeviceConfig; the READMEs say to keep them in sync.
         static string Body(string f)
         {
             var n = JsonNode.Parse(File.ReadAllText(Path.Combine(SchemaDir, f)))!.AsObject();
@@ -85,7 +71,6 @@ public class ContractTests
         Assert.Equal(Body("config.response.schema.json"), Body("register.response.schema.json"));
     }
 
-    // ---- responses (server -> firmware) ----------------------------------------------
 
     private static DeviceConfig FullConfig() => new()
     {
@@ -126,8 +111,7 @@ public class ContractTests
     [InlineData("register.response.schema.json")]
     public void DeviceConfig_SensorAndControllerDisabled_NestedAreNull_MatchesResponseSchema(string schema)
     {
-        // BuildDeviceConfigAsync leaves DeviceConfigSensor/Controller null when the *Enabled
-        // flags are false; the live response confirmed the keys are still emitted as null.
+        // BuildDeviceConfigAsync leaves DeviceConfigSensor/Controller null when the *Enabled flags are false; the keys are still emitted as null, not omitted.
         var cfg = FullConfig();
         cfg.DeviceSensorEnabled = false;
         cfg.DeviceControllerEnabled = false;
@@ -142,7 +126,6 @@ public class ContractTests
     [Fact]
     public void DeviceConfig_DefaultInstance_MatchesResponseSchema()
     {
-        // Guards the "every property still serializes under its expected camelCase key" invariant.
         AssertValid("config.response.schema.json", JsonSerializer.Serialize(new DeviceConfig(), Mvc));
     }
 
@@ -151,8 +134,7 @@ public class ContractTests
     [InlineData("register.response.schema.json")]
     public void DeviceConfig_WithZoneRules_MatchesResponseSchema(string schema)
     {
-        // Roadmap #21: exercises all three deviceUnitZoneRule/conditionConfig definitions, not just
-        // the "always empty rules array" default every other test here happens to send.
+        // Exercises all three deviceUnitZoneRule/conditionConfig definitions, not just the "always empty rules array" default every other test here sends.
         var cfg = FullConfig();
         cfg.DeviceConfigController!.Rules =
         [
@@ -183,14 +165,12 @@ public class ContractTests
         AssertValid("authenticate.response.schema.json", JsonSerializer.Serialize(body, Mvc));
     }
 
-    // ---- requests (firmware -> server) ----------------------------------------------
     // Payloads are shaped exactly as the firmware sends them (see AgrumyFirmware/src/Controller).
 
     [Fact]
     public void RegisterRequest_FirmwareShapedPayload_MatchesSchemaAndBinds()
     {
-        // registerDevice(): macAddress/email/devicePin/serviceType, devicePin as a STRING
-        // (6-char alphanumeric since roadmap #70).
+        // registerDevice(): macAddress/email/devicePin/serviceType, devicePin as a 6-char alphanumeric STRING.
         const string payload =
             """{"macAddress":"240AC4040AF8","email":"admin@agrumy.local","devicePin":"AB23CD","serviceType":1}""";
 
@@ -205,8 +185,7 @@ public class ContractTests
     [Fact]
     public void ConfigRequest_FirmwareShapedPayload_MatchesSchemaAndBinds()
     {
-        // apiConfig(): PascalCase keys, ConfigVersion sent as a STRING; the diagnostics fields
-        // (roadmap #7) ride along as JSON numbers/string.
+        // apiConfig(): PascalCase keys, ConfigVersion sent as a STRING; the diagnostics fields ride along as JSON numbers/string.
         const string payload =
             """{"ConfigVersion":"66","Uptime":3661,"Rssi":-67,"FreeHeap":153212,"FirmwareVersion":"0.1.2","Board":"esp32dev","Kit":""}""";
 
@@ -225,7 +204,6 @@ public class ContractTests
     [Fact]
     public void ConfigRequest_KitShapedPayload_MatchesSchemaAndBinds()
     {
-        // roadmap #149: a recognized kit reports its name instead of the empty string.
         const string payload =
             """{"ConfigVersion":"66","Uptime":3661,"Rssi":-67,"FreeHeap":153212,"FirmwareVersion":"0.1.2","Board":"kc868-a6","Kit":"KC868-A6"}""";
 
@@ -239,7 +217,6 @@ public class ContractTests
     [Fact]
     public void AuthenticateRequest_EmptyBody_MatchesSchema()
     {
-        // apiAuthenticate() sends an empty ArduinoJson doc -> "null"; "{}" is also allowed.
         AssertValid("authenticate.request.schema.json", "null");
         AssertValid("authenticate.request.schema.json", "{}");
     }
@@ -247,7 +224,6 @@ public class ContractTests
     [Fact]
     public void SensorDataRequest_FirmwareShapedPayload_MatchesSchema()
     {
-        // buildSensorDataPayload(): an ARRAY; measurements are strings or null.
         const string payload =
             """
             [
