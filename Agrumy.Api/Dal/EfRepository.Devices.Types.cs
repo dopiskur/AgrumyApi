@@ -5,8 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IDeviceRepository members (roadmap #95 split, continuing #74): fixed device-type
-    /// lookup lists.</summary>
+    /// <summary>IDeviceRepository members: fixed device-type lookup lists.</summary>
     internal partial class EfRepository
     {
         public async Task<IList<DeviceType>> DeviceTypeGetAsync()

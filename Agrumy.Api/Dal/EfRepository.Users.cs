@@ -4,12 +4,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IUserRepository core members (roadmap #74 split, further split by roadmap #113):
-    /// user CRUD/lookup/password reset and TenantAdminsGetAsync here; bootstrap admin (roadmap #91)
-    /// in EfRepository.Users.Bootstrap.cs, composable roles (roadmap #66) in
-    /// EfRepository.Users.Roles.cs, email activation (roadmap #24) in
-    /// EfRepository.Users.Activation.cs, tenant CRUD (ITenantRepository) in
-    /// EfRepository.Tenants.cs, and user groups in EfRepository.Users.Groups.cs.</summary>
+    /// <summary>IUserRepository core members: user CRUD/lookup/password reset and
+    /// TenantAdminsGetAsync here; bootstrap admin in EfRepository.Users.Bootstrap.cs, composable
+    /// roles in EfRepository.Users.Roles.cs, email activation in EfRepository.Users.Activation.cs,
+    /// tenant CRUD (ITenantRepository) in EfRepository.Tenants.cs, and user groups in
+    /// EfRepository.Users.Groups.cs.</summary>
     internal partial class EfRepository
     {
         public async Task UserAddAsync(User user, UserSecret userSecret)
@@ -38,14 +37,14 @@ namespace api.Dal
             var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == user.IDUser);
             if (row == null)
             {
-                return; // proc UPDATE ... WHERE IDUser = ? simply affects no rows
+                return;
             }
 
             row.TenantID = user.TenantID ?? 0;
             row.Email = user.Email ?? "";
-            // Roadmap #70: DevicePin deliberately NOT written here - the PIN lifecycle (generate/
-            // expire) lives exclusively in UserSetDevicePinAsync below, so an admin edit can never
-            // resurrect an expired PIN or hand-craft a weak one.
+            // DevicePin deliberately NOT written here - the PIN lifecycle (generate/expire) lives
+            // exclusively in UserSetDevicePinAsync below, so an admin edit can never resurrect an
+            // expired PIN or hand-craft a weak one.
             row.Username = user.Username;
             row.FirstName = user.FirstName;
             row.LastName = user.LastName;
@@ -56,9 +55,9 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
-        /// <summary>Self-service profile write (roadmap #71 follow-up): deliberately touches ONLY the
-        /// three profile columns so the endpoint can never alter Enabled/UserGroupID/TenantID even if
-        /// the controller mis-binds - the column list here IS the authorization boundary.</summary>
+        /// <summary>Self-service profile write: deliberately touches ONLY the three profile columns
+        /// so the endpoint can never alter Enabled/UserGroupID/TenantID even if the controller
+        /// mis-binds - the column list here IS the authorization boundary.</summary>
         public async Task<bool> UserProfileSetAsync(string email, string? firstName, string? lastName, string? timeZone)
         {
             var row = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
@@ -74,10 +73,9 @@ namespace api.Dal
             return true;
         }
 
-        /// <summary>Roadmap #70: the ONLY writer of DevicePin/DevicePinExpires - a value+expiry to
-        /// (re)issue a PIN, nulls to explicitly clear one. A successful device registration does
-        /// NOT call this (the PIN is multi-use within its 24h window, not consumed on first use -
-        /// see the follow-up note on DeviceApiController.DeviceRegistration).</summary>
+        /// <summary>The ONLY writer of DevicePin/DevicePinExpires - a value+expiry to (re)issue a
+        /// PIN, nulls to explicitly clear one. A successful device registration does NOT call this
+        /// (the PIN is multi-use within its 24h window, not consumed on first use).</summary>
         public async Task<bool> UserSetDevicePinAsync(int idUser, string? devicePin, DateTime? expiresAtUtc)
         {
             var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == idUser);
@@ -94,8 +92,7 @@ namespace api.Dal
 
         public async Task<bool> UserDeleteAsync(int? idUser)
         {
-            // Proc guard: IF (idUser > 1) - protects the default admin/user. Callers already
-            // enforce this, but keep it here too.
+            // Protects the default admin/user (id 1). Callers already enforce this, but keep it here too.
             if (idUser is null or <= 1)
             {
                 return false;
@@ -107,8 +104,6 @@ namespace api.Dal
 
         public async Task<User?> UserGetAsync(int? idUser, string? email, string? username)
         {
-
-            // Inner join to userGroup, exactly as the UserGet proc.
             var q = from u in db.Users.AsNoTracking()
                     join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup
                     select new { u, g };
@@ -143,8 +138,8 @@ namespace api.Dal
             return rows.Select(x => ToDto(x.u, x.g)).ToList();
         }
 
-        // Roadmap #65: same query as UsersGetAsync minus the tenant filter - callers (UserApiController)
-        // only reach this after confirming the caller is a TenantID==0 admin.
+        // Same query as UsersGetAsync minus the tenant filter - callers (UserApiController) only
+        // reach this after confirming the caller is a TenantID==0 admin.
         public async Task<IList<User>> UsersGetAllAsync()
         {
             var rows = await (from u in db.Users.AsNoTracking()
@@ -187,8 +182,8 @@ namespace api.Dal
             return rows > 0;
         }
 
-        // Roadmap #63: a tenant can never have zero admins - its creator becomes one at registration
-        // (see UserApiController.UserRegistration) - so this is never empty for a real tenant.
+        // A tenant can never have zero admins - its creator becomes one at registration - so this
+        // is never empty for a real tenant.
         public async Task<IList<User>> TenantAdminsGetAsync(int tenantId)
         {
             var rows = await (from u in db.Users.AsNoTracking()
@@ -199,8 +194,6 @@ namespace api.Dal
             return rows.Select(x => ToDto(x.u, x.g)).ToList();
         }
 
-        // UserGet / UsersGet joined only userGroup (not userRole), so RoleName stays null and
-        // UserRoleID comes from userGroup.
         private static User ToDto(UserRow u, UserGroupRow g) => new()
         {
             IDUser = u.IDUser,

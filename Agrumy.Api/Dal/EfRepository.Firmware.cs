@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IFirmwareRepository members (roadmap #94) - the catalog rows themselves; the
-    /// pre-#94 DeviceFirmwareLatestGetAsync lives in EfRepository.Devices.Firmware.cs.</summary>
+    /// <summary>IFirmwareRepository members - the catalog rows themselves; the legacy
+    /// board-less DeviceFirmwareLatestGetAsync lookup lives in EfRepository.Devices.Firmware.cs.</summary>
     internal partial class EfRepository
     {
         public async Task<IList<DeviceFirmware>> FirmwareListAsync()
@@ -64,8 +64,8 @@ namespace api.Dal
         public async Task<int> FirmwareDeleteBySourceAsync(FirmwareSource source)
         {
             int s = (int)source;
-            // Legacy pre-#94 rows (null Board) are never swept by a source refresh - they were
-            // hand-inserted and nothing here knows how to recreate them.
+            // Legacy hand-inserted rows (null Board) are never swept by a source refresh - nothing
+            // here knows how to recreate them.
             return await db.DeviceFirmwares.Where(f => f.Source == s && f.Board != null).ExecuteDeleteAsync();
         }
 

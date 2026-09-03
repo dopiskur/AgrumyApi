@@ -4,8 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IUserRepository members (roadmap #113 split, continuing #74): the fixed role list
-    /// and composable roles (roadmap #66).</summary>
+    /// <summary>IUserRepository members: the fixed role list and composable roles.</summary>
     internal partial class EfRepository
     {
         public async Task<IList<UserRole>> UserRoleGetAsync()
@@ -14,8 +13,6 @@ namespace api.Dal
                 .Select(r => new UserRole { IDUserRole = r.IDUserRole, RoleName = r.RoleName, RoleScopeID = r.RoleScopeID })
                 .ToListAsync();
         }
-
-        // ---- Composable roles (roadmap #66) ------------------------------------------
 
         public async Task<IReadOnlyList<string>> UserRoleNamesGetAsync(int idUser)
         {

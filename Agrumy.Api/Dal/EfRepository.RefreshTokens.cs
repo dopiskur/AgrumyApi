@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IRefreshTokenRepository members (roadmap #74 split).</summary>
+    /// <summary>IRefreshTokenRepository members.</summary>
     internal partial class EfRepository
     {
         public async Task<int> RefreshTokenAddAsync(int userID, string tokenHash, DateTime expiresAt)
@@ -46,7 +46,7 @@ namespace api.Dal
                 ExpiresAt = newExpiresAt,
                 CreatedAt = DateTime.UtcNow,
             });
-            await db.SaveChangesAsync(); // one transaction: revoke old + insert new
+            await db.SaveChangesAsync();
         }
 
         public async Task RefreshTokenRevokeAsync(string tokenHash)

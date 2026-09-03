@@ -5,8 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IDeviceRepository members (roadmap #95 split, continuing #74): per-device sensor
-    /// and controller config reads/writes.</summary>
+    /// <summary>IDeviceRepository members: per-device sensor and controller config reads/writes.</summary>
     internal partial class EfRepository
     {
         public async Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID)
@@ -44,11 +43,9 @@ namespace api.Dal
                 return;
             }
 
-            // Roadmap #78: resolve the target row from idDevice's OWN DeviceConfigControllerID, not
-            // cfg.IDDeviceConfigController - the caller's ownership was only checked against idDevice
-            // (DeviceApiController.DeviceConfigControllerUpdate), so trusting a client-supplied config
-            // id here would let a tampered id overwrite any other device's (even another tenant's)
-            // controller config.
+            // Resolve from idDevice's OWN DeviceConfigControllerID, not cfg.IDDeviceConfigController -
+            // trusting a client-supplied id would let a tampered value overwrite another device's
+            // (or tenant's) controller config.
             int? ownConfigControllerId = await db.Devices.AsNoTracking()
                 .Where(d => d.IDDevice == idDevice)
                 .Select(d => d.DeviceConfigControllerID)
@@ -58,10 +55,9 @@ namespace api.Dal
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigController == ownConfigControllerId);
             if (row != null)
             {
-                // Roadmap #21: only the relay-pin mapping is left here - threshold/hysteresis/
-                // interval/schedule/#36-safety-limits all moved to the device's assigned
-                // DeviceUnitZone (EfRepository.DeviceUnits.cs's DeviceUnitZoneRule* members), edited
-                // from the Zone page now, not this per-device form.
+                // Only the relay-pin mapping lives here now - threshold/hysteresis/interval/schedule
+                // config moved to the device's assigned DeviceUnitZone (EfRepository.DeviceUnits.cs),
+                // edited from the Zone page instead.
                 row.RelayEnabled = cfg.RelayEnabled;
                 row.Relay1 = cfg.Relay1;
                 row.Relay2 = cfg.Relay2;
@@ -79,7 +75,7 @@ namespace api.Dal
                 deviceRow.ConfigVersion = (deviceRow.ConfigVersion ?? 0) + 1;
             }
 
-            await db.SaveChangesAsync(); // one transaction: config row + ConfigVersion bump
+            await db.SaveChangesAsync();
         }
 
         public async Task DeviceConfigSensorUpdateAsync(int? idDevice, DeviceConfigSensor? cfg)
@@ -89,8 +85,7 @@ namespace api.Dal
                 return;
             }
 
-            // Roadmap #78: same fix as DeviceConfigControllerUpdateAsync above - resolve the row from
-            // idDevice's own DeviceConfigSensorID rather than trusting cfg.IDDeviceConfigSensor.
+            // Same ownership-lookup rule as DeviceConfigControllerUpdateAsync above.
             int? ownConfigSensorId = await db.Devices.AsNoTracking()
                 .Where(d => d.IDDevice == idDevice)
                 .Select(d => d.DeviceConfigSensorID)
@@ -123,7 +118,7 @@ namespace api.Dal
                 deviceRow.ConfigVersion = (deviceRow.ConfigVersion ?? 0) + 1;
             }
 
-            await db.SaveChangesAsync(); // one transaction: config row + ConfigVersion bump
+            await db.SaveChangesAsync();
         }
 
         private static DeviceConfigSensor ToDto(DeviceConfigSensorRow c) => new()
@@ -146,9 +141,8 @@ namespace api.Dal
             SensorWind = c.SensorWind,
         };
 
-        // Roadmap #21: relay-pin mapping only - Rules/WaterPumpMaxRunSeconds/WaterPumpCooldownSeconds
-        // on the DTO are populated by DeviceApiController.BuildDeviceConfigAsync from the device's
-        // assigned zone, not from this row - see DeviceConfigController's own remarks.
+        // Relay-pin mapping only - Rules/WaterPumpMaxRunSeconds/WaterPumpCooldownSeconds on the DTO
+        // are populated by DeviceApiController.BuildDeviceConfigAsync from the assigned zone, not this row.
         private static DeviceConfigController ToDto(DeviceConfigControllerRow c) => new()
         {
             IDDeviceConfigController = c.IDDeviceConfigController,

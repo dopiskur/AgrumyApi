@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>ICommandRepository members (roadmap #34, #74/#95 pattern): raw deviceCommand CRUD.</summary>
+    /// <summary>ICommandRepository members: raw deviceCommand CRUD.</summary>
     internal partial class EfRepository
     {
         public async Task<bool> HasActiveCommandAsync(int deviceId, CommandActionType actionType, DateTime utcNow)
@@ -30,9 +30,7 @@ namespace api.Dal
             };
             db.DeviceCommands.Add(row);
 
-            // Same "config write + version bump in one transaction" shape as
-            // EfRepository.Devices.Config.cs - CommandVersion is deliberately separate from
-            // ConfigVersion (roadmap #34), bumped here and nowhere else.
+            // CommandVersion is deliberately separate from ConfigVersion - bumped here and nowhere else.
             var device = await db.Devices.FirstOrDefaultAsync(d => d.IDDevice == deviceId);
             if (device != null)
             {

@@ -4,9 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>ITenantRepository members (roadmap #113 split, continuing #74) - this facet has
-    /// existed since #74, but its implementation sat in EfRepository.Users.cs until now; the file
-    /// name matches the interface it implements, same as every other facet split.</summary>
+    /// <summary>ITenantRepository members.</summary>
     internal partial class EfRepository
     {
         public async Task<bool> TenantGetAsync(string tenantName)

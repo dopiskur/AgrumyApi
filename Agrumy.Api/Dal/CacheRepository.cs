@@ -6,17 +6,11 @@ using Microsoft.Extensions.Logging;
 
 namespace api.Dal
 {
-    /// <summary>
-    /// Roadmap #72: IDistributedCache instead of the old process-local System.Runtime.Caching.MemoryCache -
-    /// today it's backed by AddDistributedMemoryCache() (Program.cs), so behaviour on a single instance is
-    /// unchanged (still in-process, still lost on restart), but the device apiAuth session this stores is
-    /// what a scale-out deployment needs shared across instances - swapping to a real backend (Redis, SQL
-    /// Server) at that point is a one-line Program.cs change, not a rewrite of this class or its callers.
-    /// </summary>
+    /// <summary>IDistributedCache-backed device apiAuth session cache - still in-process today
+    /// (AddDistributedMemoryCache in Program.cs), but swapping to a real backend like Redis later
+    /// is a one-line Program.cs change, not a rewrite of this class or its callers.</summary>
     internal sealed partial class CacheRepository(IDistributedCache cache, ILogger<CacheRepository> logger) : ICache
     {
-        // Roadmap #109: fallback for a caller that doesn't size its own TTL (SetItemAsync's ttl
-        // param) - kept as the default so a short-poll device's behaviour is unchanged.
         private static readonly TimeSpan DefaultTtl = TimeSpan.FromMinutes(5);
 
         [LoggerMessage(Level = LogLevel.Warning,
@@ -32,12 +26,8 @@ namespace api.Dal
             }
             catch (Exception ex)
             {
-                // Roadmap #119: IDistributedCache is backend-agnostic, so a down/unreachable Redis
-                // (once #30/#72 wire it in) throws whatever its own client library uses (connection
-                // refused, timeout, ...) - caught here as plain Exception rather than a Redis-specific
-                // type so this stays correct regardless of which backend is configured. A device's
-                // apiAuth session isn't durable state (it's re-derived by re-authenticating against the
-                // DB), so a miss here costs one extra auth round-trip, not correctness.
+                // Caught as plain Exception since IDistributedCache is backend-agnostic - a miss here
+                // just costs one extra device auth round-trip, not correctness.
                 LogBackendUnavailable(logger, ex, nameof(GetDeviceCacheAsync), key);
                 return new DeviceCache { apiAuth = null };
             }
@@ -70,8 +60,7 @@ namespace api.Dal
             }
             catch (Exception ex)
             {
-                // Roadmap #118 caller (e.g. the Fleet dashboard query) treats null as "recompute" -
-                // a backend outage becomes a cache-miss recompute instead of a 500.
+                // Caller treats null as "recompute" - a backend outage becomes a cache-miss instead of a 500.
                 LogBackendUnavailable(logger, ex, nameof(GetAsync), key);
                 return null;
             }

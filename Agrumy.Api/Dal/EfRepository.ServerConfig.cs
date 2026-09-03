@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IServerConfigRepository members (roadmap #74 split).</summary>
+    /// <summary>IServerConfigRepository members.</summary>
     internal partial class EfRepository
     {
         public async Task<ServerConfig> ServerConfigGetAsync(int idServerConfig = 1)
@@ -74,20 +74,18 @@ namespace api.Dal
             row.FirmwareGitHubRepository = config.FirmwareGitHubRepository;
             row.FirmwareCustomRepositoryUrl = config.FirmwareCustomRepositoryUrl;
             row.SensorDataRetentionDays = config.SensorDataRetentionDays;
-            // Roadmap #11: WeatherRainPredicted/WeatherCheckedAtUtc are deliberately NOT written
-            // here - they are WeatherEvaluator's computed output, not an admin-editable field (see
-            // ServerConfigWeatherStateSetAsync below), so a form post that doesn't know about them
-            // can never clobber a fresher reading.
+            // WeatherRainPredicted/WeatherCheckedAtUtc deliberately NOT written here - they are
+            // WeatherEvaluator's computed output (see ServerConfigWeatherStateSetAsync below), so a
+            // form post that doesn't know about them can never clobber a fresher reading.
             row.WeatherLocationLat = config.WeatherLocationLat;
             row.WeatherLocationLon = config.WeatherLocationLon;
             row.WeatherPollIntervalMinutes = config.WeatherPollIntervalMinutes;
             row.WeatherRainSkipThreshold = config.WeatherRainSkipThreshold;
             await db.SaveChangesAsync();
 
-            // Roadmap #15: re-apply on every save (not just at startup) so an admin editing this
-            // field takes effect immediately on Postgres/TimescaleDB - a no-op on MariaDB/MySQL,
-            // whose retention instead comes from SensorDataRetentionBackgroundService reading the
-            // row fresh on its own next daily tick.
+            // Re-applied on every save so an admin edit takes effect immediately on Postgres/
+            // TimescaleDB - a no-op on MariaDB/MySQL, whose retention instead comes from
+            // SensorDataRetentionBackgroundService reading the row fresh on its next daily tick.
             await ApplyRetentionPolicyAsync(config.SensorDataRetentionDays);
         }
 
@@ -129,13 +127,9 @@ namespace api.Dal
             await ApplyRetentionPolicyAsync(settings.SensorDataRetentionDays);
         }
 
-        /// <summary>Roadmap #11: the ONLY writer of WeatherRainPredicted/WeatherCheckedAtUtc -
-        /// called exclusively by WeatherEvaluator after a forecast fetch, deliberately narrower than
-        /// ServerConfigUpdateAsync's full-object overwrite so the admin Server Settings form (which
-        /// has no idea what the last forecast said) can never race a fresher reading back to stale.
-        /// Creates the row if a request lands before the first ServerConfigGetAsync ever has (should
-        /// not happen in practice - Program.cs's ServerConfig:Reload/seed path runs first - but keeps
-        /// this method safe to call standalone in a test).</summary>
+        /// <summary>The ONLY writer of WeatherRainPredicted/WeatherCheckedAtUtc - called exclusively
+        /// by WeatherEvaluator, deliberately narrower than ServerConfigUpdateAsync's full-object
+        /// overwrite so the admin Server Settings form can never race a fresher reading back to stale.</summary>
         public async Task ServerConfigWeatherStateSetAsync(bool rainPredicted, DateTime checkedAtUtc, int idServerConfig = 1)
         {
             var row = await db.ServerConfigs.FirstOrDefaultAsync(s => s.IDServerConfig == idServerConfig);

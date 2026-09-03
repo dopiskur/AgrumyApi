@@ -5,18 +5,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IDeviceRepository members (roadmap #74 split, further split by roadmap #95): device
-    /// CRUD - configs live in EfRepository.Devices.Config.cs, fixed type lists in
-    /// EfRepository.Devices.Types.cs, firmware in EfRepository.Devices.Firmware.cs, and
-    /// diagnostics/fleet/events in EfRepository.Devices.Diagnostics.cs.</summary>
+    /// <summary>IDeviceRepository members: device CRUD - configs live in
+    /// EfRepository.Devices.Config.cs, fixed type lists in EfRepository.Devices.Types.cs, firmware
+    /// in EfRepository.Devices.Firmware.cs, and diagnostics/fleet/events in
+    /// EfRepository.Devices.Diagnostics.cs.</summary>
     internal partial class EfRepository
     {
         public async Task DeviceAddAsync(Device device)
         {
             // Read (and possibly auto-generate on a brand-new install) BEFORE the transaction below
             // starts - ServerConfigGetAsync's own SaveChangesAsync (if it seeds a row) auto-commits
-            // on the shared context (roadmap #101) before BeginTransactionAsync opens this method's
-            // own explicit transaction, so the two never nest.
+            // on the shared context before BeginTransactionAsync opens this method's own explicit
+            // transaction, so the two never nest.
             ServerConfig serverConfig = await ServerConfigGetAsync();
 
             await using var tx = await db.Database.BeginTransactionAsync();
@@ -25,13 +25,11 @@ namespace api.Dal
             var controllerCfg = new DeviceConfigControllerRow
             {
                 // Hysteresis starts at the server-wide default; admin can override per device
-                // afterwards under Device -> Controller.
+                // afterwards under Device -> Controller. WaterPump limits below follow the same rule.
                 WaterLevelHysteresis = serverConfig.WaterLevelHysteresis,
                 TemperatureHysteresis = serverConfig.TemperatureHysteresis,
                 HumidityHysteresis = serverConfig.HumidityHysteresis,
                 LightHysteresis = serverConfig.LightHysteresis,
-                // Roadmap #36: same server-wide-default-then-per-device-override rule as the
-                // hysteresis fields above.
                 WaterPumpMaxRunSeconds = serverConfig.WaterPumpMaxRunSeconds,
                 WaterPumpCooldownSeconds = serverConfig.WaterPumpCooldownSeconds,
             };
@@ -132,8 +130,8 @@ namespace api.Dal
             return rows.Select(ToDto).ToList();
         }
 
-        // #66 Phase 2: same query minus the tenant filter - callers (DeviceApiController) only
-        // reach this after CallerReadsDevicesGlobally passed, mirroring UsersGetAllAsync.
+        // Same query minus the tenant filter - callers (DeviceApiController) only reach this after
+        // CallerReadsDevicesGlobally passed, mirroring UsersGetAllAsync.
         public async Task<IList<Device>> DevicesGetAllAsync()
         {
             var rows = await db.Devices.AsNoTracking().ToListAsync();
@@ -159,12 +157,10 @@ namespace api.Dal
                 return;
             }
 
-            // Columns the DeviceUpdate proc touched (note: it did NOT set MacAddress or the
-            // config-id columns). Roadmap #82: DeviceUnitID/DeviceUnitZoneID dropped from this list
-            // too - both are now written exclusively by DeviceAssignToZoneAsync/
-            // DeviceUnassignFromZoneAsync, which keep the pair consistent with each other (derived
-            // from the zone's own DeviceUnitID); this generic update touching just one of them could
-            // silently desync a device's Unit from its Zone.
+            // Does not set MacAddress, the config-id columns, or DeviceUnitID/DeviceUnitZoneID - the
+            // unit/zone pair is written exclusively by DeviceAssignToZoneAsync/
+            // DeviceUnassignFromZoneAsync, which keep it consistent with the zone's own DeviceUnitID;
+            // touching just one of them here could silently desync a device's Unit from its Zone.
             row.TenantID = device.TenantID;
             row.DeviceTypeID = device.DeviceTypeID;
             row.DeviceTypeServiceID = device.DeviceTypeServiceID;
@@ -180,7 +176,7 @@ namespace api.Dal
             row.BatteryEnabled = device.BatteryEnabled;
             row.Enabled = device.Enabled;
             row.Debug = device.Debug;
-            row.ConfigVersion = (device.ConfigVersion ?? 0) + 1; // proc: ConfigVersion = configVersion + 1
+            row.ConfigVersion = (device.ConfigVersion ?? 0) + 1;
             await db.SaveChangesAsync();
         }
 

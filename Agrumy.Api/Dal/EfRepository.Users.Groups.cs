@@ -4,11 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IUserRepository members (roadmap #113 split, continuing #74): user group CRUD.</summary>
+    /// <summary>IUserRepository members: user group CRUD.</summary>
     internal partial class EfRepository
     {
-        // ---- Group ---------------------------------------------------------
-
         public async Task<IList<UserGroup>> UserGroupsGetAsync()
         {
             return await (from g in db.UserGroups.AsNoTracking()
@@ -40,7 +38,7 @@ namespace api.Dal
         {
             if (idUserGroup is null or <= 0)
             {
-                return; // proc guard: IF (idUserGroup > 0)
+                return;
             }
             await db.UserGroups.Where(g => g.IDUserGroup == idUserGroup).ExecuteDeleteAsync();
         }

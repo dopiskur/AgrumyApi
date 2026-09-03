@@ -6,12 +6,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IDeviceRepository members (roadmap #95 split, continuing #74): device diagnostics /
-    /// fleet (roadmap #7 + #8), device events (roadmap #28), and the offline alert background
-    /// worker (roadmap #40).</summary>
+    /// <summary>IDeviceRepository members: device diagnostics/fleet, device events, and the
+    /// offline/low-battery alert background workers.</summary>
     internal partial class EfRepository
     {
-        // ---- Device diagnostics / fleet (roadmap #7 + #8) --------------------------
+        // ---- Device diagnostics / fleet --------------------------
 
         public async Task DeviceDiagnosticUpsertAsync(int deviceID, int tenantID, DeviceConfigPoll poll)
         {
@@ -24,22 +23,19 @@ namespace api.Dal
 
             row.TenantID = tenantID;
             row.LastSeenAt = DateTime.UtcNow; // server clock - device clocks drift and may lack NTP, same rule as EventDevicePushAsync
-            // Keep the last known value when a field is missing (pre-#7 firmware sends only
-            // ConfigVersion) so upgrading the server alone doesn't blank existing diagnostics.
+            // Keep the last known value when a field is missing so upgrading the server alone
+            // doesn't blank existing diagnostics.
             row.UptimeSeconds = poll.Uptime ?? row.UptimeSeconds;
             row.RssiDbm = poll.Rssi ?? row.RssiDbm;
             row.FreeHeapBytes = poll.FreeHeap ?? row.FreeHeapBytes;
             row.FirmwareVersion = poll.FirmwareVersion ?? row.FirmwareVersion;
-            row.Board = poll.Board ?? row.Board; // roadmap #94
-            row.Kit = poll.Kit ?? row.Kit; // roadmap #149
+            row.Board = poll.Board ?? row.Board;
+            row.Kit = poll.Kit ?? row.Kit;
             await db.SaveChangesAsync();
         }
 
-        // Roadmap #118: the Web #90 live-refresh poll (10s, one per open admin tab) was re-running
-        // this whole correlated-subquery-per-device fleet scan on every tick regardless of how many
-        // tabs were open. A short absolute-TTL cache (see ICache.SetAsync) lets any number of
-        // concurrently open tabs share one real DB query per window - does not fix #14's underlying
-        // per-row cost as sensorData grows, only defers when that growth becomes visible.
+        // Short absolute-TTL cache so any number of concurrently open admin tabs share one real
+        // fleet query per window instead of each re-running the full per-device scan.
         private static readonly TimeSpan FleetCacheTtl = TimeSpan.FromSeconds(6);
 
         public async Task<IList<DeviceFleetStatus>> DeviceFleetGetAsync(int? tenantID)
@@ -57,9 +53,9 @@ namespace api.Dal
                 devices = devices.Where(d => d.TenantID == tenantID);
             }
 
-            // Left-join diagnostics (a never-seen device still shows on the dashboard) and pull the
-            // newest telemetry battery as a correlated scalar subquery - translates to a plain
-            // ORDER BY ... LIMIT 1 subselect on both providers, no LATERAL needed (MariaDB lacks it).
+            // Left-join diagnostics (a never-seen device still shows on the dashboard); battery is a
+            // correlated scalar subquery - a plain ORDER BY ... LIMIT 1 on both providers, no LATERAL
+            // needed (MariaDB lacks it).
             var rows = await devices
                 .Select(d => new
                 {
@@ -75,15 +71,13 @@ namespace api.Dal
                 })
                 .ToListAsync();
 
-            // Roadmap #149: one small lookup read for the whole fleet - Kit is only ever a handful
-            // of known strings, cheap to pull entire and check in memory below rather than a
-            // per-device join.
+            // Kit is a small fixed set of strings - cheap to pull entire and check in memory below
+            // rather than a per-device join.
             Dictionary<string, bool> kitCapability = await db.DeviceTypeKits.AsNoTracking()
                 .ToDictionaryAsync(k => k.Kit, k => k.ControllerCapable);
 
-            // Roadmap #93: one catalog read for the whole fleet, newest version per board picked in
-            // memory (semver, not DateAdded) across the visible sources - see
-            // FirmwareCatalogService.VisibleSources for why Local always counts.
+            // One catalog read for the whole fleet, newest version per board picked in memory
+            // (semver, not DateAdded) - see FirmwareCatalogService.VisibleSources for why Local always counts.
             FirmwareSource activeSource = (await ServerConfigGetAsync()).FirmwareSource;
             var visible = new HashSet<int> { (int)activeSource, (int)FirmwareSource.Local };
             var catalog = await db.DeviceFirmwares.AsNoTracking()
@@ -112,9 +106,8 @@ namespace api.Dal
                     FirmwareVersion = r.Diag?.FirmwareVersion,
                     Board = r.Diag?.Board,
                     Kit = r.Diag?.Kit,
-                    // Roadmap #149: admin's explicit DeviceType choice (DeviceControllerEnabled)
-                    // always wins if set - a recognized Kit only ADDS capability, it never takes it
-                    // away from a device the admin already configured as Sensor+Controller.
+                    // Admin's explicit DeviceType choice (DeviceControllerEnabled) always wins if set -
+                    // a recognized Kit only ADDS capability, never takes it away.
                     ControllerCapable = r.Device.DeviceControllerEnabled == true
                         || (r.Diag?.Kit is { Length: > 0 } kit && kitCapability.GetValueOrDefault(kit)),
                     LatestFirmwareVersion = latest,
@@ -132,7 +125,7 @@ namespace api.Dal
             return result;
         }
 
-        // ---- Device events (roadmap #28) -------------------------------------------
+        // ---- Device events -------------------------------------------
 
         public async Task<bool> EventDevicePushAsync(int deviceID, int tenantID, DeviceEventType eventType, string? message)
         {
@@ -170,7 +163,7 @@ namespace api.Dal
             return rows.Select(ToDto).ToList();
         }
 
-        // ---- Offline alert background worker (roadmap #40) --------------------------
+        // ---- Offline alert background worker --------------------------
 
         public async Task<IList<OfflineAlertCandidate>> OfflineAlertCandidatesGetAsync()
         {
@@ -188,20 +181,18 @@ namespace api.Dal
 
         public async Task DeviceOfflineNotifiedSetAsync(int deviceID, DateTime? notifiedAt)
         {
-            // A device with no diagnostic row at all has never polled, so it cannot have just
-            // transitioned to offline (OfflineAlertCandidatesGetAsync's LastSeenAt would be null,
-            // which ComputeOnline already treats as offline-forever) - nothing to set.
+            // A device with no diagnostic row has never polled, so it cannot have just transitioned
+            // to offline - nothing to set.
             await db.DeviceDiagnostics
                 .Where(x => x.DeviceID == deviceID)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.OfflineNotifiedAt, notifiedAt));
         }
 
-        // ---- Low-battery alert background worker (roadmap #12, #40 pattern) --------------
+        // ---- Low-battery alert background worker --------------------------
 
         public async Task<IList<LowBatteryAlertCandidate>> LowBatteryAlertCandidatesGetAsync()
         {
-            // Same correlated-scalar-subquery shape as DeviceFleetGetAsync's Battery column above -
-            // translates to one plain ORDER BY ... LIMIT 1 subselect per device on both providers.
+            // Same correlated-scalar-subquery shape as DeviceFleetGetAsync's Battery column above.
             return await db.Devices.AsNoTracking()
                 .Where(d => d.Enabled == true) // a disabled device is expected to be silent
                 .Select(d => new LowBatteryAlertCandidate(
@@ -219,9 +210,7 @@ namespace api.Dal
 
         public async Task DeviceLowBatteryNotifiedSetAsync(int deviceID, DateTime? notifiedAt)
         {
-            // Same "nothing to set for a device that has never polled" rule as
-            // DeviceOfflineNotifiedSetAsync - a device with no diagnostic row has no battery
-            // telemetry to have been alerted about.
+            // Same "nothing to set for a device that has never polled" rule as DeviceOfflineNotifiedSetAsync.
             await db.DeviceDiagnostics
                 .Where(x => x.DeviceID == deviceID)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.LowBatteryNotifiedAt, notifiedAt));
@@ -231,8 +220,8 @@ namespace api.Dal
         {
             IDEventDevice = e.IDEventDevice,
             DeviceID = e.DeviceID,
-            // Guards against a row written by a future/older enum definition than this build's -
-            // never throws, just surfaces the raw number so it's still visible in the admin list.
+            // Guards against a row written by a future/older enum definition - never throws, just
+            // surfaces the raw number so it's still visible in the admin list.
             EventType = Enum.IsDefined(typeof(DeviceEventType), e.EventID)
                 ? ((DeviceEventType)e.EventID).ToString()
                 : $"Unknown({e.EventID})",

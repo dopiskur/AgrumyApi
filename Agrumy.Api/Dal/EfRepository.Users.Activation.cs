@@ -4,11 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IUserRepository members (roadmap #113 split, continuing #74): email activation
-    /// (roadmap #24) - issuing/reissuing an activation token and redeeming it.</summary>
+    /// <summary>IUserRepository members: email activation - issuing/reissuing an activation token
+    /// and redeeming it.</summary>
     internal partial class EfRepository
     {
-        // ---- Email activation (roadmap #24) -----------------------------------------
 
         public async Task UserSetActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt)
         {
