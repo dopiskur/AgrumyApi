@@ -63,15 +63,18 @@
                 @Html.HiddenFor(m => m.Device!.DeviceUnitID)
                 @Html.HiddenFor(m => m.Device!.DeviceUnitZoneID)
             </div>
+            @* Roadmap #150: read-only, same reasoning as #78's IDDevice/TenantID above - the
+               DeviceUpdate proc these columns predate never set them (EfRepository.Devices.cs
+               comment: "did NOT set MacAddress or the config-id columns"), so an editable input
+               here silently discarded whatever the admin typed. The view was the bug, not the API
+               - fixed here, not by making the API honor a write it was never meant to accept. *@
             <div class="mb-3">
                 <label asp-for="Device.DeviceConfigSensorID" class="form-label"></label>
-                <input asp-for="Device.DeviceConfigSensorID" class="form-control" />
-                <span asp-validation-for="Device.DeviceConfigSensorID" class="text-danger"></span>
+                <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.DeviceConfigSensorID)</p>
             </div>
             <div class="mb-3">
                 <label asp-for="Device.DeviceConfigControllerID" class="form-label"></label>
-                <input asp-for="Device.DeviceConfigControllerID" class="form-control" />
-                <span asp-validation-for="Device.DeviceConfigControllerID" class="text-danger"></span>
+                <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.DeviceConfigControllerID)</p>
             </div>
 
             <div class="mb-3">
@@ -79,10 +82,11 @@
                 <input asp-for="Device.DeviceName" class="form-control" />
                 <span asp-validation-for="Device.DeviceName" class="text-danger"></span>
             </div>
+            @* Roadmap #150: read-only, same reasoning as the config-id fields above - DeviceUpdateAsync
+               never writes MacAddress either. *@
             <div class="mb-3">
                 <label asp-for="Device.MacAddress" class="form-label"></label>
-                <input asp-for="Device.MacAddress" class="form-control" />
-                <span asp-validation-for="Device.MacAddress" class="text-danger"></span>
+                <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.MacAddress)</p>
             </div>
             <div class="mb-3">
                 <label asp-for="Device.ApiId" class="form-label"></label>
