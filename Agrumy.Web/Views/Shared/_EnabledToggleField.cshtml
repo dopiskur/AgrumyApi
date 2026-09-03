@@ -1,7 +1,6 @@
 @model api.ViewModels.EnabledToggleFieldViewModel
 @{
-    // "." isn't valid inside a CSS id selector without escaping - keep ids readable and safe by
-    // flattening the model-bound field name (e.g. "DeviceConfigController.RelayEnabled") to underscores.
+    // "." isn't valid inside a CSS id selector without escaping - flatten to underscores instead.
     var idBase = Model.Name.Replace(".", "_");
 }
 

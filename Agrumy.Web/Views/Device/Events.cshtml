@@ -10,9 +10,6 @@
         <span class="float-end text-secondary small">Times shown in @(ViewBag.DisplayTimeZone ?? "UTC")</span>
     </div>
     <div class="card-body table-responsive p-0">
-        @* Message is left wrappable on purpose - it's free text and can run long, so forcing
-           text-nowrap on it (like the other columns) just made the whole table scroll further
-           sideways on a phone for no benefit (roadmap #22). *@
         <table id="eventsTable" class="table table-hover">
             <thead>
                 <tr>

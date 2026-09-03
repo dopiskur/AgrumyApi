@@ -15,17 +15,11 @@
         </div>
     </div>
     <div class="card-body table-responsive p-0">
-        @* No table-wide text-nowrap (unlike before) - on a phone the two Status badges need to
-           wrap onto a second line instead of forcing the column wider than the badges themselves
-           (roadmap #22, found by actually rendering this at a 390px viewport). *@
         <table id="fleetTable" class="table table-hover">
             <thead>
                 <tr>
                     <th>Device</th>
                     <th>Status</th>
-                    @* Device/Status/Actions are the only columns you need to triage a fleet at a
-                       glance - the rest are drill-down detail, so they collapse below md and only
-                       cost you a horizontal scroll on a phone instead of always taking one (roadmap #22). *@
                     <th class="d-none d-md-table-cell">Last seen</th>
                     <th class="d-none d-md-table-cell">Signal</th>
                     <th class="d-none d-md-table-cell">Uptime</th>

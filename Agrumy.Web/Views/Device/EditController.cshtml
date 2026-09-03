@@ -7,8 +7,6 @@
 
     var relayEnabledToggle = new EnabledToggleFieldViewModel { Name = ControllerField(nameof(cfg.RelayEnabled)), Label = "Relay", Value = cfg.RelayEnabled };
 
-    // Same SelectList source for all 8 relay slots - only the bound property and its current
-    // value differ, so build the (field name, selected value) pairs once and loop below.
     var relaySlots = new (string Name, int? Selected)[]
     {
         (nameof(cfg.Relay1), cfg.Relay1), (nameof(cfg.Relay2), cfg.Relay2),
@@ -23,10 +21,6 @@
         <h3 class="card-title">Edit Controller - @Html.DisplayFor(model => model.Device!.DeviceName)</h3>
     </div>
     <div class="card-body">
-        @* Roadmap #21: threshold/interval/schedule/hysteresis/safety-limit tabs moved to the
-           device's assigned zone (Zone page, only shown there when the zone HAS a controller
-           assigned) - relay-pin mapping below is the only thing left here, a physical/hardware
-           fact about this device, not a rule. *@
         <p class="text-secondary small">
             Automation rules (thresholds, intervals, schedules, WaterPump safety limits) now live on
             this device's assigned zone - see the
@@ -34,10 +28,6 @@
         </p>
         <form asp-action="EditController">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            @* Roadmap #78: identity, not editable data - EfRepository.DeviceConfigControllerUpdateAsync
-               resolves the target row from Device.IDDevice's own DeviceConfigControllerID server-side,
-               it never trusts a posted DeviceConfigController.IDDeviceConfigController value, so only
-               the device id needs to round-trip through the form. *@
             <div class="mb-3">
                 <label asp-for="Device.IDDevice" class="form-label"></label>
                 <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.IDDevice)</p>

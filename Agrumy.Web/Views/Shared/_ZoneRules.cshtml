@@ -10,10 +10,8 @@
         (RelayFunction.WaterPump, "Water pump"),
     ];
 
-    // Roadmap #21: read-only summary line per rule - the actual authoritative shape lives in
-    // ConditionConfig (JSON), this just renders it human-readably. Deserialize with
-    // ConditionConfigJson.Options (case-insensitive/camelCase) - the options-less overload would
-    // fail to bind against the camelCase JSON this same page's Add forms produce.
+    // Deserialize with ConditionConfigJson.Options (case-insensitive/camelCase) - the options-less
+    // overload fails to bind against the camelCase JSON these Add forms produce.
     string Summarize(DeviceUnitZoneRule rule)
     {
         switch (rule.ConditionType)
