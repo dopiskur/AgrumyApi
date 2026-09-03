@@ -19,10 +19,9 @@ namespace api.Controllers.API
         private const int DefaultRoleId = 1;   // "regular user" group on an existing tenant
         private const int AccessTokenMinutes = 120;
         private const int RefreshTokenDays = 30;
-        private const int ActivationTokenValidHours = 24; // roadmap #24
-        private const int MinTenantNameLength = 6;        // roadmap #64
+        private const int ActivationTokenValidHours = 24;
+        private const int MinTenantNameLength = 6;
 
-        // Roadmap #104: constructor-injected IOptions<AgrumySettings>, not the static Config class.
         private readonly AgrumySettings settings = settingsOptions.Value;
         private string? SecureKey => settings.JwtSecureKey;
 
@@ -55,8 +54,6 @@ namespace api.Controllers.API
             bool isNewTenant = !await Repo.TenantGetAsync(value.TenantName!);
             if (isNewTenant)
             {
-                // Roadmap #64: self-service tenant creation is opt-in, and when it's on the name
-                // still needs to be long enough that it wasn't just a typo of an existing one.
                 ServerConfig serverConfig = await Repo.ServerConfigGetAsync(1);
                 if (!serverConfig.AllowSelfServiceTenantCreation)
                 {
@@ -75,7 +72,7 @@ namespace api.Controllers.API
                 FirstName = value.FirstName,
                 LastName = value.LastName,
                 Phone = value.Phone,
-                EmailVerified = false, // roadmap #24 - proven only via GET /api/User/Activate below
+                EmailVerified = false, // proven only via GET /api/User/Activate below
             };
 
             var userSecret = new UserSecret { PwdSalt = AuthenticationProvider.GetSalt() };
@@ -89,21 +86,17 @@ namespace api.Controllers.API
             }
             else
             {
-                // Existing tenant: join as a regular user.
                 user.TenantID = await Repo.TenantGetIdAsync(value.TenantName!);
                 user.UserGroupID = DefaultRoleId;
             }
 
-            // Roadmap #63: TenantID==0 (the shared default tenant) has no owning admin to ask,
-            // same reasoning as a brand-new tenant's own creator above - everyone else joining an
-            // EXISTING, non-zero tenant waits for that tenant's admin to enable them.
+            // TenantID==0 (shared default tenant) has no owning admin to approve joiners, so it
+            // auto-enables like a brand-new tenant's own creator does.
             user.Enabled = isNewTenant || user.TenantID == 0;
 
             await Repo.UserAddAsync(user, userSecret);
 
-            // Roadmap #24: UserAddAsync doesn't hand back the new IDUser, and both the activation
-            // token and the roadmap #66 role assignment below need one - a fresh lookup by the
-            // just-inserted, unique email is simplest.
+            // UserAddAsync doesn't return the new IDUser; re-fetch by the just-inserted unique email.
             User? added = await Repo.UserGetAsync(null, value.Email, null);
             if (added?.IDUser is int idUser)
             {
@@ -111,10 +104,8 @@ namespace api.Controllers.API
                 await Repo.UserSetActivationTokenAsync(idUser, hash, DateTime.UtcNow.AddHours(ActivationTokenValidHours));
                 await SendActivationEmailAsync(user.Email, plaintext);
 
-                // Roadmap #66: the tenant's own creator becomes its admin (nobody else to grant
-                // anything); everyone else starts as a read-only Tenant reader regardless of which
-                // tenant they joined - a Tenant admin composes on additional grants afterwards via
-                // PUT /api/User/UserRoles.
+                // A new tenant's creator starts as its admin; everyone else starts as a read-only
+                // Tenant reader until granted more via PUT /api/User/UserRoles.
                 string startingRole = isNewTenant ? RoleNames.TenantAdmin : RoleNames.TenantReader;
                 await Repo.UserRolesSetAsync(idUser, new[] { startingRole });
             }
@@ -122,8 +113,8 @@ namespace api.Controllers.API
             return Ok(user);
         }
 
-        /// <summary>Roadmap #24: proves the registrant owns the email address on file - the direct
-        /// link a user clicks from their inbox, so it must work unauthenticated.</summary>
+        /// <summary>Proves the registrant owns the email address on file - the direct link a user
+        /// clicks from their inbox, so it must work unauthenticated.</summary>
         [HttpGet("Activate")]
         [AllowAnonymous]
         public async Task<ActionResult> Activate([FromQuery] string? token)
@@ -139,10 +130,8 @@ namespace api.Controllers.API
                 return StatusCode(400, "Activation link is invalid or has expired.");
             }
 
-            // Roadmap #63: TenantID==0 and a brand-new tenant's own creator were already Enabled at
-            // registration above (nobody to ask) - anyone else joining an existing tenant still
-            // needs that tenant's admin to approve them, which only makes sense to ask for now that
-            // the email address is confirmed real.
+            // TenantID==0 and a brand-new tenant's own creator were already Enabled at registration
+            // above; anyone else joining an existing tenant still needs that tenant's admin to approve them.
             if (user.TenantID != 0 && user.Enabled != true)
             {
                 await NotifyTenantAdminsOfPendingApprovalAsync(user);
@@ -151,11 +140,10 @@ namespace api.Controllers.API
             return Ok("Email verified. You can now sign in.");
         }
 
-        /// <summary>Roadmap #24: re-sends the activation email. Rate-limited server-side by
+        /// <summary>Re-sends the activation email. Rate-limited server-side by
         /// ServerConfig.ActivationResendCooldownMinutes (not just the IP-based "login" policy
         /// below) so a forgotten inbox can't be used to spam one address. Always returns the same
-        /// generic message regardless of whether the account exists or is already verified - the
-        /// one endpoint in this controller that must not leak either fact.</summary>
+        /// generic message regardless of whether the account exists or is already verified.</summary>
         [HttpPost("ResendActivation")]
         [AllowAnonymous]
         [EnableRateLimiting("login")]
@@ -188,9 +176,8 @@ namespace api.Controllers.API
                 new NotificationRecipient(Email: email)));
         }
 
-        /// <summary>Roadmap #63: tells every admin of the given tenant that a newly-verified user
-        /// is waiting for approval. Never a no-op silently - a tenant can never have zero admins,
-        /// its creator becomes one at registration (see UserRegistration above).</summary>
+        /// <summary>Tells every admin of the given tenant that a newly-verified user is waiting for
+        /// approval. Never a no-op silently - a tenant can never have zero admins.</summary>
         private async Task NotifyTenantAdminsOfPendingApprovalAsync(User user)
         {
             IList<User> admins = await Repo.TenantAdminsGetAsync(user.TenantID!.Value);
@@ -204,13 +191,11 @@ namespace api.Controllers.API
             }
         }
 
-        /// <summary>Roadmap #66: the full set of role-claim values this user's token should carry -
-        /// their real role set from userUserRole, PLUS a prepended legacy "admin"/"user" alias so
-        /// none of the ~34 pre-#66 [Authorize(Roles=...)]/CallerRole=="admin" checks break (they all
-        /// read the FIRST role claim, see ApiControllerBase.CallerRole). Falls back to the old
-        /// UserGroupID-derived single role if userUserRole has nothing for this user yet (an
-        /// account the migration somehow missed) - never returns an empty list for anyone with a
-        /// resolvable role either way.</summary>
+        /// <summary>The full set of role-claim values this user's token should carry - their real
+        /// role set from userUserRole, PLUS a prepended legacy "admin"/"user" alias so pre-existing
+        /// [Authorize(Roles=...)]/CallerRole=="admin" checks that read only the FIRST role claim
+        /// (see ApiControllerBase.CallerRole) still work. Falls back to the old UserGroupID-derived
+        /// single role if userUserRole has nothing for this user yet.</summary>
         private async Task<IReadOnlyList<string>> ResolveCallerTokenRolesAsync(User user)
         {
             IReadOnlyList<string> roleNames = await Repo.UserRoleNamesGetAsync(user.IDUser!.Value);
@@ -238,10 +223,8 @@ namespace api.Controllers.API
                 return StatusCode(401, "Wrong username or password");
             }
 
-            // Roadmap #68: Enabled/EmailVerified were never actually checked here before - a
-            // disabled or unverified account could log in and use the API regardless of what the
-            // admin UI or "check your inbox" message implied. Checked in this order so the more
-            // specific, actionable reason (verify your email) surfaces before the generic one.
+            // Checked in this order so the more specific, actionable reason (verify your email)
+            // surfaces before the generic "waiting for approval" one.
             if (user.EmailVerified != true)
             {
                 return StatusCode(403, "Email address not verified yet - check your inbox for the activation link.");
@@ -296,9 +279,7 @@ namespace api.Controllers.API
             {
                 return StatusCode(401, "User no longer exists");
             }
-            // Roadmap #68: a refresh must not silently keep a since-disabled/unverified account
-            // logged in forever - same gate as UserLogin, just without the two distinct messages
-            // (this is a machine-to-machine call, not a form the user reads).
+            // A refresh must not silently keep a since-disabled/unverified account logged in.
             if (user.EmailVerified != true || user.Enabled != true)
             {
                 return StatusCode(403, "Account is not active.");
@@ -330,18 +311,15 @@ namespace api.Controllers.API
             return Ok();
         }
 
-        /// <summary>Roadmap #91: lets the anonymous Agrumy.Web login page decide, on every load (not
-        /// just once), whether to show the normal login form or the first-run "set password"
-        /// screen - checked fresh each time rather than cached because this route itself must go
-        /// dark the instant BootstrapSetPassword below succeeds.</summary>
+        /// <summary>Lets the anonymous Agrumy.Web login page decide, on every load, whether to show
+        /// the normal login form or the first-run "set password" screen.</summary>
         [HttpGet("BootstrapPending")]
         [AllowAnonymous]
         public async Task<ActionResult<bool>> BootstrapPending() => Ok(await Repo.BootstrapAdminPendingAsync());
 
-        /// <summary>Roadmap #91: the only way the fresh-install bootstrap Global Admin (seeded with
+        /// <summary>The only way the fresh-install bootstrap Global Admin (seeded with
         /// PwdHash=NULL) gets a real password - see BootstrapAdminSetPasswordAsync for why this can
-        /// never be replayed once it has succeeded. Rate-limited the same as Login/ChangePassword
-        /// even though it is a one-shot per install, since it is still an anonymous endpoint.</summary>
+        /// never be replayed once it has succeeded.</summary>
         [HttpPost("BootstrapSetPassword")]
         [AllowAnonymous]
         [EnableRateLimiting("login")]
@@ -357,10 +335,10 @@ namespace api.Controllers.API
                 : StatusCode(403, "No pending bootstrap admin - a password has already been set.");
         }
 
-        /// <summary>Roadmap #83: identity comes ONLY from the JWT (same pattern as UserProfileSet
-        /// above), not a Login field in the body - previously this took Login from the request and
-        /// had neither [Authorize] nor rate limiting, making it an unauthenticated, unthrottled
-        /// oracle for guessing any known email's password via the 401-vs-403 response split.</summary>
+        /// <summary>Identity comes ONLY from the JWT, not a Login field in the body - this used to
+        /// take Login from the request with neither [Authorize] nor rate limiting, making it an
+        /// unauthenticated, unthrottled oracle for guessing any known email's password via the
+        /// 401-vs-403 response split.</summary>
         [HttpPost("ChangePassword")]
         [Authorize]
         [EnableRateLimiting("login")]
@@ -394,14 +372,10 @@ namespace api.Controllers.API
                 : StatusCode(403, "Password change failed for: " + user.Email);
         }
 
-        // #66 Phase 2 note: the #65-era IsGlobalAdmin property lived here - replaced by
-        // ApiControllerBase's capability helpers (CallerIsGlobalAdmin, CallerManagesUsers, ...),
-        // exactly the planned refactor the roadmap promised when #66 got built.
-
         // ---- read ----------------------------------------------------------------
 
-        /// <summary>#66 Phase 2: opened from admin-only to every authenticated caller - a Tenant
-        /// reader's whole point is being able to SEE their tenant's resources without touching them.</summary>
+        /// <summary>Opened from admin-only to every authenticated caller - a Tenant reader's whole
+        /// point is being able to SEE their tenant's resources without touching them.</summary>
         [HttpGet("All")]
         [Authorize]
         public async Task<ActionResult<IList<User>>> UsersGet() =>
@@ -422,10 +396,9 @@ namespace api.Controllers.API
         }
 
         /// <summary>Self-scoped counterpart to the admin-only UserUpdate: identity comes ONLY from
-        /// the JWT (roadmap #47 pattern), and the payload has no authorization-bearing fields -
-        /// Enabled/UserGroupID/TenantID stay untouchable by construction because
-        /// Repo.UserProfileSetAsync writes nothing but FirstName/LastName/TimeZone. Passwords go
-        /// through the separate ChangePassword flow that proves the old password.</summary>
+        /// the JWT, and the payload has no authorization-bearing fields - Enabled/UserGroupID/
+        /// TenantID stay untouchable by construction because Repo.UserProfileSetAsync writes
+        /// nothing but FirstName/LastName/TimeZone.</summary>
         [HttpPut("Profile")]
         [Authorize]
         public async Task<ActionResult<bool>> UserProfileSet([FromBody] UserProfileUpdate value)
@@ -453,11 +426,9 @@ namespace api.Controllers.API
                 : NotFound();
         }
 
-        /// <summary>Roadmap #70: (re)issues the caller's device-registration PIN (multi-use within
-        /// its 24h window, not consumed on first use) -
-        /// self-scoped like Profile above (identity only from the JWT) because the PIN registers
-        /// devices into the caller's own tenant and is shown to nobody else. POST, not GET: every
-        /// call rotates the PIN, which also serves as the only revocation mechanism.</summary>
+        /// <summary>(Re)issues the caller's device-registration PIN (multi-use within its 24h
+        /// window, not consumed on first use). POST, not GET: every call rotates the PIN, which
+        /// also serves as the only revocation mechanism.</summary>
         [HttpPost("DevicePin")]
         [Authorize]
         public async Task<ActionResult<DevicePinResult>> DevicePinGenerate()
@@ -513,7 +484,7 @@ namespace api.Controllers.API
                 LastName = value.LastName,
                 Phone = value.Phone,
                 Enabled = value.Enabled,
-                EmailVerified = true, // an admin vouching for the address directly bypasses roadmap #24's proof-of-ownership step
+                EmailVerified = true, // an admin vouches for the address directly, bypassing the normal email-proof step
             };
 
             var userSecret = new UserSecret { PwdSalt = AuthenticationProvider.GetSalt() };
@@ -521,9 +492,8 @@ namespace api.Controllers.API
 
             await Repo.UserAddAsync(user, userSecret);
 
-            // Roadmap #66: map the legacy admin/user group choice onto a starting base role - the
-            // admin can layer on Tenant User/Tenant Device (or promote to Global via UserRolesSet)
-            // afterwards, this is just what a brand-new account starts with.
+            // Maps the legacy admin/user group choice onto a starting base role; an admin can layer
+            // on more (or promote to Global via UserRolesSet) afterwards.
             User? added = await Repo.UserGetAsync(null, value.Email, null);
             if (added?.IDUser is int idUser)
             {
@@ -548,9 +518,6 @@ namespace api.Controllers.API
                 return NotFound();
             }
 
-            // #66 Phase 2: one capability check replaces the old isAdmin + tenant-mismatch pair -
-            // the attribute already guarantees a user-manager role, this pins it to the right tenant
-            // (or lets a Global admin/User through for any tenant).
             if (!CallerManagesUsers(user.TenantID))
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
@@ -575,7 +542,7 @@ namespace api.Controllers.API
             if (value.Phone != null) { user.Phone = value.Phone; }
             if (value.UserGroupID != null) { user.UserGroupID = value.UserGroupID; } // attribute already restricts to user-managers
             if (value.Enabled != null) { user.Enabled = value.Enabled; }
-            if (value.TenantID != null && CallerManagesUsersGlobally) { user.TenantID = value.TenantID; } // cross-tenant reassignment stays a Global power (#65/#66)
+            if (value.TenantID != null && CallerManagesUsersGlobally) { user.TenantID = value.TenantID; } // cross-tenant reassignment stays a Global-admin-only power
 
             await Repo.UserUpdateAsync(user);
             return Ok(true);
@@ -608,10 +575,9 @@ namespace api.Controllers.API
         public async Task<ActionResult<IEnumerable<UserRole>>> UserRoleGet() =>
             Ok(await Repo.UserRoleGetAsync());
 
-        // ---- composable roles (roadmap #66) -------------------------------------
+        // ---- composable roles -------------------------------------
 
-        /// <summary>Every role name a Tenant admin may grant - Global-* roles are a Global-admin-only
-        /// power (roadmap #65's TenantID==0 carve-out extended to the new role model).</summary>
+        /// <summary>Every role name a Tenant admin may grant - Global-* roles are a Global-admin-only power.</summary>
         private static readonly string[] TenantScopedGrantableRoles =
         {
             RoleNames.TenantAdmin, RoleNames.TenantReader, RoleNames.TenantUser, RoleNames.TenantDevice,
