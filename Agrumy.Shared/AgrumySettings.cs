@@ -83,6 +83,15 @@ namespace api
         // just accumulates until purged manually via roadmap #126).
         public int? SensorDataRetentionDays { get; set; }
 
+        // Roadmap #11: OpenWeatherMap API key - same "credential lives in appsettings.json, not the
+        // DB" split as Firmware:GitHubToken above (a secret, not an operational admin-tunable value,
+        // so it is never exposed through ServerConfigApiController). Location/poll-interval/
+        // threshold ARE operational and live in api.Models.ServerConfig instead, seeded from the two
+        // defaults below.
+        public string? WeatherApiKey { get; set; }
+        public int WeatherPollIntervalMinutes { get; set; } = 15;
+        public double WeatherRainSkipThreshold { get; set; } = 50.0;
+
         public static AgrumySettings Bind(IConfiguration configuration) => new()
         {
             DefaultConnection = configuration.GetConnectionString("DefaultConnection"),
@@ -109,6 +118,9 @@ namespace api
             FirmwareGitHubRepository = configuration.GetSection("Firmware:GitHubRepository").Value is { Length: > 0 } repo ? repo : "dopiskur/AgrumyFirmware",
             FirmwareGitHubToken = configuration.GetSection("Firmware:GitHubToken").Value,
             SensorDataRetentionDays = ParseIntOrNull(configuration, "ServerConfig:SensorDataRetentionDays"),
+            WeatherApiKey = configuration.GetSection("Weather:ApiKey").Value,
+            WeatherPollIntervalMinutes = ParseIntOr(configuration, "ServerConfig:WeatherPollIntervalMinutes", 15),
+            WeatherRainSkipThreshold = ParseDoubleOr(configuration, "ServerConfig:WeatherRainSkipThreshold", 50.0),
         };
 
         // IConfiguration stores every value as its literal JSON text (e.g. "20.0"). Parsing that

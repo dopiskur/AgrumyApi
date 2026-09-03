@@ -24,6 +24,9 @@ namespace api.Dal.Entities
         // Roadmap #21/#36 - see api.Models.DeviceUnitZone's own copy of these for the full explanation.
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
+
+        // Roadmap #11 - see api.Models.DeviceUnitZone.SkipWaterPumpWhenRainPredicted.
+        public bool SkipWaterPumpWhenRainPredicted { get; set; }
     }
 
     /// <summary>Roadmap #21 - see api.Models.DeviceUnitZoneRule for the full explanation.

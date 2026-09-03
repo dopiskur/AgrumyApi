@@ -8,6 +8,7 @@ using api.Dal.Interface;
 using api.Filters;
 using api.Notifications;
 using api.Security;
+using api.Weather;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -121,6 +122,15 @@ builder.Services.AddHostedService<LowBatteryAlertBackgroundService>();
 // instead (a native TimescaleDB policy, not a background worker).
 builder.Services.AddScoped<SensorDataRetentionEvaluator>();
 builder.Services.AddHostedService<SensorDataRetentionBackgroundService>();
+
+// Roadmap #11 (feature) + #40 (pattern, with a fixed-cadence twist - see WeatherBackgroundService's
+// own remarks). Typed HttpClient for the OpenWeatherMap forecast call.
+builder.Services.AddHttpClient<IWeatherForecastClient, OpenWeatherMapClient>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
+builder.Services.AddScoped<WeatherEvaluator>();
+builder.Services.AddHostedService<WeatherBackgroundService>();
 
 // Roadmap #34: no background worker - expiry is lazy (CommandQueueService.GetPendingCommandAsync
 // marks a stale row Expired the moment it's next looked at), so this is a plain scoped service,

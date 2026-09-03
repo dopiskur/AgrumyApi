@@ -138,5 +138,13 @@ namespace api.Dal.Entities
 
         // Roadmap #15 - see api.Models.ServerConfig.SensorDataRetentionDays.
         public int? SensorDataRetentionDays { get; set; }
+
+        // Roadmap #11 - see api.Models.ServerConfig's own copies of these for the full explanation.
+        public double? WeatherLocationLat { get; set; }
+        public double? WeatherLocationLon { get; set; }
+        public int? WeatherPollIntervalMinutes { get; set; }
+        public double? WeatherRainSkipThreshold { get; set; }
+        public bool WeatherRainPredicted { get; set; }
+        public DateTime? WeatherCheckedAtUtc { get; set; }
     }
 }

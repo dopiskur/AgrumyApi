@@ -33,6 +33,12 @@ namespace api.Models
         // same pattern the pre-#21 per-device seeding used.
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
+
+        // Roadmap #11: per-zone opt-in - not every zone waters something rain makes redundant (an
+        // indoor propagation tray, say), so this is a deliberate admin choice, not a global switch.
+        // Off by default. Combined server-side with ServerConfig.WeatherRainPredicted into
+        // DeviceConfigController.SkipWaterPumpForRain - see that field's remarks.
+        public bool SkipWaterPumpWhenRainPredicted { get; set; }
     }
 
     /// <summary>Roadmap #21: which relay function a <see cref="DeviceUnitZoneRule"/> targets - same

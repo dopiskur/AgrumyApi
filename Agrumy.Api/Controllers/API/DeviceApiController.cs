@@ -382,8 +382,10 @@ namespace api.Controllers.API
             // lookup) rather than cached, so a DST transition or an admin changing
             // ServerConfig.ScheduleTimeZone reaches every device on its very next poll. Sent
             // regardless of DeviceControllerEnabled - harmless for a sensor-only device, and one
-            // fewer conditional for the firmware to reason about.
-            int utcOffsetSeconds = TimeZoneHelper.GetUtcOffsetSeconds(DateTime.UtcNow, (await Repo.ServerConfigGetAsync(1)).ScheduleTimeZone);
+            // fewer conditional for the firmware to reason about. Roadmap #11 reuses this same fetch
+            // for WeatherRainPredicted below instead of a second DB round trip.
+            ServerConfig serverConfig = await Repo.ServerConfigGetAsync(1);
+            int utcOffsetSeconds = TimeZoneHelper.GetUtcOffsetSeconds(DateTime.UtcNow, serverConfig.ScheduleTimeZone);
 
             var deviceConfig = new DeviceConfig
             {
@@ -441,6 +443,11 @@ namespace api.Controllers.API
                     DeviceUnitZone? zone = await Repo.DeviceUnitZoneGetByIdAsync(idZone);
                     controller.WaterPumpMaxRunSeconds = zone?.WaterPumpMaxRunSeconds;
                     controller.WaterPumpCooldownSeconds = zone?.WaterPumpCooldownSeconds;
+                    // Roadmap #11: computed here, not sent as two separate flags - the device does
+                    // not need to know the zone opted in AND separately that rain is forecast, just
+                    // the single AND-NOT gate to apply after its Rules' OR (see
+                    // DeviceConfigController.SkipWaterPumpForRain's remarks).
+                    controller.SkipWaterPumpForRain = zone?.SkipWaterPumpWhenRainPredicted == true && serverConfig.WeatherRainPredicted;
                 }
                 deviceConfig.DeviceConfigController = controller;
             }

@@ -371,7 +371,8 @@
         "relay5",
         "relay6",
         "relay7",
-        "relay8"
+        "relay8",
+        "skipWaterPumpForRain"
       ],
       "properties": {
         "idDeviceConfigController": {
@@ -454,6 +455,10 @@
             "integer",
             "null"
           ]
+        },
+        "skipWaterPumpForRain": {
+          "type": "boolean",
+          "description": "Roadmap #11. Final AND-NOT veto over WaterPump, computed server-side (DeviceApiController.BuildDeviceConfigAsync) from the assigned zone's SkipWaterPumpWhenRainPredicted AND the install-wide ServerConfig.WeatherRainPredicted - applied by AgrumyFirmware's ActuatorController::initController AFTER the OR of all WaterPump rules, same architectural slot as waterPumpMaxRunSeconds/waterPumpCooldownSeconds above."
         }
       }
     },

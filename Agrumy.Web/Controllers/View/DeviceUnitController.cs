@@ -162,15 +162,19 @@ namespace api.Controllers.View
 
         // ---- Automation rules (roadmap #21) --------------------------------------
 
-        /// <summary>Same fetch-then-patch reasoning as ZoneRename above.</summary>
+        /// <summary>Same fetch-then-patch reasoning as ZoneRename above. Roadmap #11's per-zone rain
+        /// opt-in rides along here rather than its own action - same "device-side WaterPump
+        /// override" section of the page as the #36 safety limits, applied at the same post-OR
+        /// architectural point.</summary>
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> SafetyLimitsUpdate(int idDeviceUnitZone, int? waterPumpMaxRunSeconds, int? waterPumpCooldownSeconds)
+        public async Task<ActionResult> SafetyLimitsUpdate(int idDeviceUnitZone, int? waterPumpMaxRunSeconds, int? waterPumpCooldownSeconds, bool skipWaterPumpWhenRainPredicted)
         {
             DeviceUnitZone zone = await api.DeviceUnitZoneGetById(idDeviceUnitZone);
             zone.WaterPumpMaxRunSeconds = waterPumpMaxRunSeconds;
             zone.WaterPumpCooldownSeconds = waterPumpCooldownSeconds;
+            zone.SkipWaterPumpWhenRainPredicted = skipWaterPumpWhenRainPredicted;
             try
             {
                 await api.DeviceUnitZoneUpdate(zone);

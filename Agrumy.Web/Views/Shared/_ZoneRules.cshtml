@@ -147,7 +147,18 @@
                 <label class="form-label small mb-0">Cooldown seconds</label>
                 <input type="number" min="0" name="waterPumpCooldownSeconds" class="form-control form-control-sm" style="width:10rem" value="@Model.Zone.WaterPumpCooldownSeconds" />
             </div>
+            <div class="form-check mb-1">
+                <input type="checkbox" class="form-check-input" id="skipWaterPumpWhenRainPredicted" name="skipWaterPumpWhenRainPredicted" value="true" checked="@Model.Zone.SkipWaterPumpWhenRainPredicted" />
+                <label class="form-check-label small" for="skipWaterPumpWhenRainPredicted">
+                    Skip when rain predicted (roadmap #11)
+                </label>
+            </div>
             <button type="submit" class="btn btn-sm btn-primary">Save</button>
         </form>
+        <p class="text-secondary small mt-1">
+            When checked, this zone's WaterPump also stays off whenever the install-wide forecast
+            (Server Settings &rarr; Weather) predicts rain - a second AND-NOT gate, independent of
+            the safety limits above and applied after all WaterPump rules' OR.
+        </p>
     </div>
 </div>

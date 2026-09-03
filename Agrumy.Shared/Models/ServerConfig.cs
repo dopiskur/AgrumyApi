@@ -95,6 +95,41 @@ namespace api.Models
         // hasn't opted in) - same "no universal default" reasoning as ScheduleTimeZone above.
         [Display(Name = "Sensor data retention (days)")]
         public int? SensorDataRetentionDays { get; set; }
+
+        // Roadmap #11: install-wide location OpenWeatherMap forecasts are pulled for - same "one
+        // zone for the whole install" v1 simplification as ScheduleTimeZone above (no fleet
+        // observed so far spans more than one geographic point). Null = not configured yet,
+        // WeatherBackgroundService stays inert (WeatherEvaluator.RunOnceAsync's early-return) rather
+        // than failing loudly - same "inert until set" precedent as ScheduleTimeZone.
+        [Display(Name = "Latitude")]
+        public double? WeatherLocationLat { get; set; }
+        [Display(Name = "Longitude")]
+        public double? WeatherLocationLon { get; set; }
+
+        // Roadmap #11: admin-editable poll cadence, user decision 2026-09-04 ("konfigurabilno...
+        // moze svakih 15min default" - OpenWeatherMap's free tier allows 1000 calls/day, far more
+        // than hourly would ever use). WeatherBackgroundService itself ticks once a minute (a fixed,
+        // cheap DB read) and only actually calls the API once this many minutes have elapsed since
+        // WeatherCheckedAtUtc - see that field's remarks for why this makes the interval live-
+        // editable without an app restart, unlike PeriodicBackgroundService.Interval elsewhere.
+        [Display(Name = "Forecast poll interval (minutes)")]
+        public int? WeatherPollIntervalMinutes { get; set; }
+
+        // Roadmap #11: rain-probability percentage (OpenWeatherMap's "pop" field, 0-100) at or above
+        // which WeatherEvaluator sets WeatherRainPredicted. User decision 2026-09-04: configurable,
+        // 50% default.
+        [Display(Name = "Rain-skip threshold (%)")]
+        public double? WeatherRainSkipThreshold { get; set; }
+
+        // Roadmap #11: WeatherEvaluator's last computed result - read-only display on the Server
+        // Settings page, NOT settable via ServerConfigApiController.Update (that endpoint never
+        // touches these two; only WeatherEvaluator writes them, through the narrow
+        // ServerConfigWeatherStateSetAsync, so a stale admin form post can never clobber a fresher
+        // reading - same "narrow single-purpose update" lesson #21's ZoneRename fix established).
+        [Display(Name = "Rain predicted")]
+        public bool WeatherRainPredicted { get; set; }
+        [Display(Name = "Forecast last checked")]
+        public DateTime? WeatherCheckedAtUtc { get; set; }
     }
 
     /// <summary>The only two fields of <see cref="ServerConfig"/> a pre-login, unauthenticated page

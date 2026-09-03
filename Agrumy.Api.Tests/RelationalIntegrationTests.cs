@@ -318,6 +318,58 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task ServerConfig_WeatherFields_UpdateAndGet_RoundTrips(DbProviderKind provider)
+    {
+        // Roadmap #11.
+        Use(provider);
+        int id = new Random().Next(1000, 9_000_000);
+        var config = await _repo.ServerConfigGetAsync(id);
+        Assert.Null(config.WeatherLocationLat); // not configured yet - inert until an admin sets a location
+
+        config.WeatherLocationLat = 45.815;
+        config.WeatherLocationLon = 15.982;
+        config.WeatherPollIntervalMinutes = 30;
+        config.WeatherRainSkipThreshold = 70.0;
+        await _repo.ServerConfigUpdateAsync(config);
+
+        var back = await _repo.ServerConfigGetAsync(id);
+        Assert.Equal(45.815, back.WeatherLocationLat);
+        Assert.Equal(15.982, back.WeatherLocationLon);
+        Assert.Equal(30, back.WeatherPollIntervalMinutes);
+        Assert.Equal(70.0, back.WeatherRainSkipThreshold);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task ServerConfig_WeatherState_OnlySetByNarrowWriter_NotByAdminUpdate(DbProviderKind provider)
+    {
+        // Roadmap #11: ServerConfigUpdateAsync (the admin Server Settings form's path) must never
+        // touch WeatherRainPredicted/WeatherCheckedAtUtc - only WeatherEvaluator's
+        // ServerConfigWeatherStateSetAsync does, so a stale form post can never clobber a fresher
+        // forecast reading (same lesson #21's ZoneRename fix established for a different field pair).
+        Use(provider);
+        int id = new Random().Next(1000, 9_000_000);
+        var config = await _repo.ServerConfigGetAsync(id);
+        Assert.False(config.WeatherRainPredicted);
+        Assert.Null(config.WeatherCheckedAtUtc);
+
+        DateTime checkedAt = DateTime.UtcNow;
+        await _repo.ServerConfigWeatherStateSetAsync(true, checkedAt, id);
+
+        var afterEvaluator = await _repo.ServerConfigGetAsync(id);
+        Assert.True(afterEvaluator.WeatherRainPredicted);
+        Assert.NotNull(afterEvaluator.WeatherCheckedAtUtc);
+
+        // An admin form post (a DTO with the client's stale/default weather-state values) must not
+        // reset what the evaluator just wrote.
+        afterEvaluator.ScheduleTimeZone = "Europe/Zagreb"; // touch an unrelated field, same as a real form submit
+        await _repo.ServerConfigUpdateAsync(afterEvaluator);
+
+        var afterAdminSave = await _repo.ServerConfigGetAsync(id);
+        Assert.True(afterAdminSave.WeatherRainPredicted);
+        Assert.NotNull(afterAdminSave.WeatherCheckedAtUtc);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
     public async Task ServerConfig_SensorDataRetentionDays_UpdateAndGet_RoundTrips(DbProviderKind provider)
     {
         // Roadmap #15. On Postgres this also exercises EfRepository.ApplyRetentionPolicyAsync via
@@ -870,6 +922,24 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var overridden = await _repo.DeviceUnitZoneGetByIdAsync(zone.IDDeviceUnitZone);
         Assert.Equal(900, overridden!.WaterPumpMaxRunSeconds);
         Assert.Equal(120, overridden.WaterPumpCooldownSeconds);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitZone_SkipWaterPumpWhenRainPredicted_DefaultsFalse_ThenOverridable(DbProviderKind provider)
+    {
+        // Roadmap #11: off by default (not every zone waters something rain makes redundant), then
+        // a normal per-zone admin toggle - same shape as the WaterPump safety-limit override above.
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (_, zone) = await MakeUnitAndZone(tenantId);
+
+        Assert.False(zone.SkipWaterPumpWhenRainPredicted);
+
+        zone.SkipWaterPumpWhenRainPredicted = true;
+        await _repo.DeviceUnitZoneUpdateAsync(zone);
+
+        var updated = await _repo.DeviceUnitZoneGetByIdAsync(zone.IDDeviceUnitZone);
+        Assert.True(updated!.SkipWaterPumpWhenRainPredicted);
     }
 
     // Roadmap #21: unlike the pre-#21 per-device schedule (a whole-list replace on every save),

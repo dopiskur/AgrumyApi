@@ -42,6 +42,8 @@ namespace api.Dal
                 FirmwareSource = (int)FirmwareSource.GitHub,
                 FirmwareGitHubRepository = settings.FirmwareGitHubRepository,
                 SensorDataRetentionDays = settings.SensorDataRetentionDays,
+                WeatherPollIntervalMinutes = settings.WeatherPollIntervalMinutes,
+                WeatherRainSkipThreshold = settings.WeatherRainSkipThreshold,
             };
             db.ServerConfigs.Add(generated);
             await db.SaveChangesAsync();
@@ -72,6 +74,14 @@ namespace api.Dal
             row.FirmwareGitHubRepository = config.FirmwareGitHubRepository;
             row.FirmwareCustomRepositoryUrl = config.FirmwareCustomRepositoryUrl;
             row.SensorDataRetentionDays = config.SensorDataRetentionDays;
+            // Roadmap #11: WeatherRainPredicted/WeatherCheckedAtUtc are deliberately NOT written
+            // here - they are WeatherEvaluator's computed output, not an admin-editable field (see
+            // ServerConfigWeatherStateSetAsync below), so a form post that doesn't know about them
+            // can never clobber a fresher reading.
+            row.WeatherLocationLat = config.WeatherLocationLat;
+            row.WeatherLocationLon = config.WeatherLocationLon;
+            row.WeatherPollIntervalMinutes = config.WeatherPollIntervalMinutes;
+            row.WeatherRainSkipThreshold = config.WeatherRainSkipThreshold;
             await db.SaveChangesAsync();
 
             // Roadmap #15: re-apply on every save (not just at startup) so an admin editing this
@@ -113,8 +123,29 @@ namespace api.Dal
             row.AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation;
             row.ScheduleTimeZone = settings.ScheduleTimeZone;
             row.SensorDataRetentionDays = settings.SensorDataRetentionDays;
+            row.WeatherPollIntervalMinutes = settings.WeatherPollIntervalMinutes;
+            row.WeatherRainSkipThreshold = settings.WeatherRainSkipThreshold;
             await db.SaveChangesAsync();
             await ApplyRetentionPolicyAsync(settings.SensorDataRetentionDays);
+        }
+
+        /// <summary>Roadmap #11: the ONLY writer of WeatherRainPredicted/WeatherCheckedAtUtc -
+        /// called exclusively by WeatherEvaluator after a forecast fetch, deliberately narrower than
+        /// ServerConfigUpdateAsync's full-object overwrite so the admin Server Settings form (which
+        /// has no idea what the last forecast said) can never race a fresher reading back to stale.
+        /// Creates the row if a request lands before the first ServerConfigGetAsync ever has (should
+        /// not happen in practice - Program.cs's ServerConfig:Reload/seed path runs first - but keeps
+        /// this method safe to call standalone in a test).</summary>
+        public async Task ServerConfigWeatherStateSetAsync(bool rainPredicted, DateTime checkedAtUtc, int idServerConfig = 1)
+        {
+            var row = await db.ServerConfigs.FirstOrDefaultAsync(s => s.IDServerConfig == idServerConfig);
+            if (row == null)
+            {
+                return; // no row yet - nothing meaningful to attach this to, next GetAsync seeds one
+            }
+            row.WeatherRainPredicted = rainPredicted;
+            row.WeatherCheckedAtUtc = checkedAtUtc;
+            await db.SaveChangesAsync();
         }
 
         // Instance, not static: the #94 GitHub-repository fallback below reads the injected settings.
@@ -143,6 +174,14 @@ namespace api.Dal
             FirmwareGitHubRepository = string.IsNullOrWhiteSpace(r.FirmwareGitHubRepository) ? settings.FirmwareGitHubRepository : r.FirmwareGitHubRepository,
             FirmwareCustomRepositoryUrl = r.FirmwareCustomRepositoryUrl,
             SensorDataRetentionDays = r.SensorDataRetentionDays,
+            WeatherLocationLat = r.WeatherLocationLat,
+            WeatherLocationLon = r.WeatherLocationLon,
+            // A row created before #11 has NULL here - same appsettings-seed fallback as
+            // FirmwareGitHubRepository above, rather than surfacing an empty interval/threshold.
+            WeatherPollIntervalMinutes = r.WeatherPollIntervalMinutes ?? settings.WeatherPollIntervalMinutes,
+            WeatherRainSkipThreshold = r.WeatherRainSkipThreshold ?? settings.WeatherRainSkipThreshold,
+            WeatherRainPredicted = r.WeatherRainPredicted,
+            WeatherCheckedAtUtc = r.WeatherCheckedAtUtc,
         };
     }
 }

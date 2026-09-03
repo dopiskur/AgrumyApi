@@ -92,6 +92,30 @@ namespace api.Controllers.API
                 return BadRequest("Sensor data retention days must be 0/empty (disabled) or a positive number.");
             }
 
+            // Roadmap #11: lat/lon are a pair - one set without the other is a config mistake (a
+            // half-set location silently sends WeatherEvaluator queries to (lat, 0) or (0, lon)),
+            // not a valid "not configured yet" state like both-null is.
+            if (config.WeatherLocationLat.HasValue != config.WeatherLocationLon.HasValue)
+            {
+                return BadRequest("Weather latitude and longitude must both be set, or both left empty.");
+            }
+            if (config.WeatherLocationLat is < -90 or > 90)
+            {
+                return BadRequest("Weather latitude must be between -90 and 90.");
+            }
+            if (config.WeatherLocationLon is < -180 or > 180)
+            {
+                return BadRequest("Weather longitude must be between -180 and 180.");
+            }
+            if (config.WeatherPollIntervalMinutes is < 1)
+            {
+                return BadRequest("Weather poll interval must be at least 1 minute.");
+            }
+            if (config.WeatherRainSkipThreshold is < 0 or > 100)
+            {
+                return BadRequest("Weather rain-skip threshold must be between 0 and 100 percent.");
+            }
+
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await Repo.ServerConfigUpdateAsync(config);
             return Ok();

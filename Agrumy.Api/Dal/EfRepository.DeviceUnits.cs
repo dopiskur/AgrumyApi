@@ -139,6 +139,7 @@ namespace api.Dal
             row.DeviceUnitZoneName = zone.DeviceUnitZoneName;
             row.WaterPumpMaxRunSeconds = zone.WaterPumpMaxRunSeconds;
             row.WaterPumpCooldownSeconds = zone.WaterPumpCooldownSeconds;
+            row.SkipWaterPumpWhenRainPredicted = zone.SkipWaterPumpWhenRainPredicted;
             await db.SaveChangesAsync();
             // Roadmap #21: safety limits are part of what a device reads from its zone on config
             // poll (BuildDeviceConfigAsync) - same "config changed, bump so the next poll picks it
@@ -559,6 +560,7 @@ namespace api.Dal
             DeviceUnitZoneName = z.DeviceUnitZoneName,
             WaterPumpMaxRunSeconds = z.WaterPumpMaxRunSeconds,
             WaterPumpCooldownSeconds = z.WaterPumpCooldownSeconds,
+            SkipWaterPumpWhenRainPredicted = z.SkipWaterPumpWhenRainPredicted,
         };
     }
 }

@@ -48,7 +48,16 @@ namespace api.Controllers.View
                             ? nameof(ServerConfig.WaterPumpMaxRunSeconds)
                             : ex.Body.Contains("retention", StringComparison.OrdinalIgnoreCase)
                                 ? nameof(ServerConfig.SensorDataRetentionDays)
-                                : nameof(ServerConfig.ScheduleTimeZone);
+                                // Roadmap #11.
+                                : ex.Body.Contains("latitude", StringComparison.OrdinalIgnoreCase)
+                                    ? nameof(ServerConfig.WeatherLocationLat)
+                                    : ex.Body.Contains("longitude", StringComparison.OrdinalIgnoreCase)
+                                        ? nameof(ServerConfig.WeatherLocationLon)
+                                        : ex.Body.Contains("poll interval", StringComparison.OrdinalIgnoreCase)
+                                            ? nameof(ServerConfig.WeatherPollIntervalMinutes)
+                                            : ex.Body.Contains("rain-skip", StringComparison.OrdinalIgnoreCase)
+                                                ? nameof(ServerConfig.WeatherRainSkipThreshold)
+                                                : nameof(ServerConfig.ScheduleTimeZone);
                 ModelState.AddModelError(field, ex.Body);
                 ViewBag.TimeZones = TimeZoneOptions(serverConfig.ScheduleTimeZone);
                 return View(serverConfig);

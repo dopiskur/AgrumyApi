@@ -278,6 +278,16 @@ namespace api.Models
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
 
+        // Roadmap #11: final AND-NOT veto over WaterPump, computed server-side
+        // (DeviceApiController.BuildDeviceConfigAsync) from DeviceUnitZone.SkipWaterPumpWhenRain
+        // Predicted && ServerConfig.WeatherRainPredicted - same "server computes, firmware just
+        // applies" split UtcOffsetSeconds already uses for ScheduleTimeZone, so the device never
+        // needs its own copy of the zone's opt-in flag or the weather forecast. Not a Rule (see
+        // DeviceUnitZoneRule's remarks: OR-combining rules means a Weather rule could only ever
+        // ADD a reason to turn WaterPump on, never suppress one - this has to sit after the OR,
+        // same architectural slot as WaterPumpMaxRunSeconds/CooldownSeconds above).
+        public bool SkipWaterPumpForRain { get; set; }
+
         // Relay-pin mapping - physical/hardware, stays per-device (roadmap #21 explicit decision).
         public bool? RelayEnabled { get; set; }
         public int? Relay1 { get; set; }

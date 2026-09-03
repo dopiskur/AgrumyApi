@@ -11,5 +11,10 @@ namespace api.Dal.Interface
         /// <summary>Overwrites the DB row's hysteresis fields from appsettings.json (roadmap #10) -
         /// only called at startup when AgrumySettings.ServerConfigReload is true.</summary>
         Task ServerConfigReloadFromAppSettingsAsync(int idServerConfig);
+
+        /// <summary>Roadmap #11: narrow writer for WeatherEvaluator's computed result - see the
+        /// EfRepository implementation's remarks for why this is separate from
+        /// ServerConfigUpdateAsync.</summary>
+        Task ServerConfigWeatherStateSetAsync(bool rainPredicted, DateTime checkedAtUtc, int idServerConfig);
     }
 }
