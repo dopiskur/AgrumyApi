@@ -2,12 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace api.Models
 {
-    /// <summary>Roadmap #94: where the firmware catalog (table deviceFirmware) is populated from
-    /// and, for a device doing OTA (#3), where the .bin actually gets downloaded from. GitHub is the
-    /// zero-config default (public AgrumyFirmware releases); Local means this API hosts the files
-    /// itself (the only path that works air-gapped, and the escape hatch for a self-hosted install
-    /// whose pinned servicePublicKey cert would never validate GitHub's TLS); Custom is an
-    /// operator-run repository serving the same manifest.json format the offline-USB tools write.</summary>
+    /// <summary>Where the firmware catalog is populated from and where a device's OTA .bin is downloaded from: GitHub (public releases, zero-config default), Local (this API hosts the files, the only air-gapped-capable option), or Custom (operator-run repository serving the same manifest.json format).</summary>
     public enum FirmwareSource
     {
         GitHub = 0,
@@ -15,16 +10,12 @@ namespace api.Models
         Custom = 2,
     }
 
-    /// <summary>Roadmap #94-2a: what a "Pull from GitHub"/"Refresh" sync should do with rows the
-    /// catalog already has.</summary>
+    /// <summary>What a "Pull from GitHub"/"Refresh" sync should do with rows the catalog already has.</summary>
     public enum FirmwareSyncMode
     {
-        /// <summary>Re-read the active remote source (GitHub Releases or the Custom manifest) and
-        /// replace that source's catalog rows - nothing is downloaded, rows keep pointing at the
-        /// remote URLs.</summary>
+        /// <summary>Re-read the active remote source and replace that source's catalog rows - nothing is downloaded, rows keep pointing at the remote URLs.</summary>
         Refresh = 0,
-        /// <summary>Local repository: download every release .bin GitHub has that the local store
-        /// does not, keep what is already there.</summary>
+        /// <summary>Local repository: download every release .bin GitHub has that the local store does not, keep what is already there.</summary>
         PullIncremental = 1,
         /// <summary>Local repository: wipe every locally stored file + row first, then pull all.</summary>
         PullFull = 2,
@@ -33,22 +24,17 @@ namespace api.Models
     /// <summary>Body of POST /api/Firmware/Sync.</summary>
     public class FirmwareSyncRequest
     {
-        // See ServerConfig.FirmwareSource for why this is string-on-the-wire.
         [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
         public FirmwareSyncMode Mode { get; set; }
     }
 
-    /// <summary>Body of POST /api/Firmware/Import (roadmap #94-2b): a directory ON THE API SERVER
-    /// (e.g. a mounted USB stick) holding .bin files in the release naming convention, optionally
-    /// with the manifest.json the offline-USB tools write next to them.</summary>
+    /// <summary>Body of POST /api/Firmware/Import: a directory on the API server (e.g. a mounted USB stick) holding .bin files in the release naming convention, optionally with a manifest.json.</summary>
     public class FirmwareImportRequest
     {
         public string? Path { get; set; }
     }
 
-    /// <summary>Body of POST /api/Device/FirmwareUpdate (roadmap #93): Version null = "latest in the
-    /// catalog for this device's board" (one-click update); a specific version = install exactly
-    /// that one (rollback/downgrade, #93-c-3) - it must exist in the catalog for the board.</summary>
+    /// <summary>Body of POST /api/Device/FirmwareUpdate: Version null = latest in the catalog for this device's board (one-click update); a specific version installs exactly that one (rollback/downgrade) and must exist in the catalog for the board.</summary>
     public class DeviceFirmwareUpdateRequest
     {
         public int IdDevice { get; set; }
@@ -64,11 +50,6 @@ namespace api.Models
         public int Removed { get; set; }
         public List<string> Warnings { get; set; } = [];
     }
-
-    // ---- manifest.json: the one contract shared by Custom repositories, the offline-USB import
-    // scanner (#94-2b) and both offline-USB preparation tools (#94-C1 browser button, #94-C2
-    // script), and produced by the AgrumyFirmware release.yml workflow as a release asset. Kept flat
-    // and versioned so a future field never breaks an older importer.
 
     public class FirmwareManifest
     {
@@ -88,22 +69,15 @@ namespace api.Models
 
     public class FirmwareManifestFile
     {
-        /// <summary>PlatformIO environment name the .bin was built for (esp32dev, esp32s3usbotg) -
-        /// the same string the firmware reports as Board in its config-poll heartbeat.</summary>
+        /// <summary>PlatformIO environment name the .bin was built for - the same string the firmware reports as Board in its config-poll heartbeat.</summary>
         public string? Board { get; set; }
         public string? FileName { get; set; }
         public long? SizeBytes { get; set; }
-        /// <summary>Lower-case hex SHA-256 of the .bin - verified on import after a physical USB
-        /// transfer, and by the browser tool after each download.</summary>
+        /// <summary>Lower-case hex SHA-256 of the .bin - verified on import and after each download.</summary>
         public string? Sha256 { get; set; }
-        /// <summary>Absolute download URL, or null when the file sits next to the manifest (USB
-        /// directory layout).</summary>
+        /// <summary>Absolute download URL, or null when the file sits next to the manifest (USB directory layout).</summary>
         public string? Url { get; set; }
-        /// <summary>Roadmap #41: "ota" (default/absent, back-compat with every manifest written
-        /// before this field existed) or "full" - the blank-chip-flashable merged image sibling of
-        /// the "ota" row with the same Board+version. Absent/anything-but-"full" is treated as OTA
-        /// everywhere this is read (api.Firmware.FirmwareCatalogService), so an older Custom
-        /// repository's manifest.json (no such field at all) keeps working unchanged.</summary>
+        /// <summary>"ota" (default/absent) or "full" - the blank-chip-flashable merged image sibling of the "ota" row with the same Board+version. Anything but "full" is treated as OTA.</summary>
         public string? Kind { get; set; }
     }
 }
