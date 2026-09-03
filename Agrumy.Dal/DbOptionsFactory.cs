@@ -5,7 +5,7 @@ namespace api.Dal
     /// <summary>
     /// Builds <see cref="DbContextOptions{AgrumyDbContext}"/> for the selected provider.
     /// Pre-beta: no EF migrations - a fresh database is provisioned with <c>EnsureCreatedAsync()</c>
-    /// straight from the model (roadmap #42).
+    /// straight from the model.
     /// </summary>
     public static class DbOptionsFactory
     {

@@ -4,7 +4,6 @@ namespace api.Dal
     /// Which relational provider the app talks to. Selected by <c>Database:Provider</c> in
     /// appsettings (<c>mysql</c> | <c>mariadb</c> | <c>postgres</c> | <c>postgresql</c>), the
     /// <c>AGRUMY_DB_PROVIDER</c> environment variable, or a <c>--provider</c> arg to the ef tool.
-    /// Roadmap #42 Phase 2.
     /// </summary>
     public enum DbProviderKind
     {

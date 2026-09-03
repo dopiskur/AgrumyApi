@@ -34,10 +34,9 @@ namespace api.Dal.Entities
         public int? UserRoleID { get; set; }
     }
 
-    /// <summary>Roadmap #66: a user can hold several roles at once (e.g. "Tenant reader" +
-    /// "Tenant Device"), so this many-to-many junction is the actual source of truth for
-    /// authorization going forward - UserGroupID/userGroup above stays untouched for backward
-    /// compatibility (still drives the legacy single "admin"/"user" claim) but no longer the
+    /// <summary>A user can hold several roles at once, so this many-to-many junction is the actual
+    /// source of truth for authorization - UserGroupID/userGroup above stays untouched for backward
+    /// compatibility (still drives the legacy single "admin"/"user" claim) but is no longer the
     /// only place a role lives.</summary>
     public class UserUserRoleRow
     {
@@ -51,13 +50,13 @@ namespace api.Dal.Entities
         public int TenantID { get; set; }
         public string Email { get; set; } = "";
         public string? Username { get; set; }
-        // Roadmap #91: null on the fresh-install bootstrap Global Admin seed row only - every
-        // other insert path (UserAddAsync, UserApiController.UserAdd) always supplies a real
-        // hash+salt. AuthenticationProvider.VerifyHash already treats a null hash as "reject",
-        // so nothing can authenticate as this row until BootstrapAdminSetPasswordAsync runs.
+        // Null on the fresh-install bootstrap Global Admin seed row only - every other insert path
+        // always supplies a real hash+salt. AuthenticationProvider.VerifyHash already treats a null
+        // hash as "reject", so nothing can authenticate as this row until
+        // BootstrapAdminSetPasswordAsync runs.
         public string? PwdHash { get; set; }
         public string? PwdSalt { get; set; }
-        // Roadmap #70: 6-char generated code (was a 4-digit int); null = never issued (or explicitly cleared).
+        // 6-char generated code; null = never issued (or explicitly cleared).
         public string? DevicePin { get; set; }
         public DateTime? DevicePinExpires { get; set; }
         public string? FirstName { get; set; }
@@ -68,8 +67,8 @@ namespace api.Dal.Entities
         public DateTime? DateCreated { get; set; }
         public DateTime? DateModified { get; set; }
 
-        // Roadmap #24: email ownership proof, separate from Enabled (roadmap #68 fixed Enabled to
-        // actually gate login; EmailVerified is a second, independent gate on top of it).
+        // Email ownership proof, separate from Enabled - EmailVerified is a second, independent
+        // gate on top of it.
         public bool EmailVerified { get; set; }
         public string? ActivationTokenHash { get; set; }
         public DateTime? ActivationTokenExpiresAt { get; set; }
@@ -77,9 +76,9 @@ namespace api.Dal.Entities
         // Resend-cooldown bookkeeping only - never surfaced on the public User DTO.
         public DateTime? ActivationLastSentAt { get; set; }
 
-        // Roadmap #71 follow-up: IANA zone id (e.g. "Europe/Zagreb"), never a raw UTC offset -
-        // offsets shift with DST, TimeZoneInfo resolves the IANA id correctly year-round.
-        // Null = user never chose one, presented as UTC (see api.Utils.TimeZoneHelper).
+        // IANA zone id (e.g. "Europe/Zagreb"), never a raw UTC offset - offsets shift with DST,
+        // TimeZoneInfo resolves the IANA id correctly year-round. Null = user never chose one,
+        // presented as UTC (see api.Utils.TimeZoneHelper).
         public string? TimeZone { get; set; }
     }
 
@@ -113,33 +112,20 @@ namespace api.Dal.Entities
         public double? HumidityHysteresis { get; set; }
         public double? LightHysteresis { get; set; }
 
-        // Roadmap #12 - see api.Models.ServerConfig.BatteryLowThreshold/BatteryLowHysteresis.
         public double? BatteryLowThreshold { get; set; }
         public double? BatteryLowHysteresis { get; set; }
-
-        // Roadmap #36 - see api.Models.ServerConfig.WaterPumpMaxRunSeconds/WaterPumpCooldownSeconds.
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
-
-        // Roadmap #28 - see api.Models.ServerConfig.EventDedupeMinutes.
         public int? EventDedupeMinutes { get; set; }
-
-        // Roadmap #24/#64 - see api.Models.ServerConfig.
         public int? ActivationResendCooldownMinutes { get; set; }
         public bool AllowSelfServiceTenantCreation { get; set; }
-
-        // Roadmap #39 - see api.Models.ServerConfig.ScheduleTimeZone.
         public string? ScheduleTimeZone { get; set; }
-
-        // Roadmap #94 - see api.Models.ServerConfig.FirmwareSource and friends.
         public int FirmwareSource { get; set; }
         public string? FirmwareGitHubRepository { get; set; }
         public string? FirmwareCustomRepositoryUrl { get; set; }
-
-        // Roadmap #15 - see api.Models.ServerConfig.SensorDataRetentionDays.
         public int? SensorDataRetentionDays { get; set; }
 
-        // Roadmap #11 - see api.Models.ServerConfig's own copies of these for the full explanation.
+        // See api.Models.ServerConfig's own copies of these for the full explanation.
         public double? WeatherLocationLat { get; set; }
         public double? WeatherLocationLon { get; set; }
         public int? WeatherPollIntervalMinutes { get; set; }

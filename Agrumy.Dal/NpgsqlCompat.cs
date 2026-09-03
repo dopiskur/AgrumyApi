@@ -10,7 +10,7 @@ namespace api.Dal
         /// schema stores naive local datetimes everywhere (legacy MySQL <c>datetime</c>), so opt
         /// back into Npgsql's pre-6.0 behaviour: <c>DateTime</c> maps to
         /// <c>timestamp without time zone</c> and any <see cref="System.DateTimeKind"/> is accepted,
-        /// instead of the UTC-only <c>timestamp with time zone</c> default. Roadmap #42 Phase 2.
+        /// instead of the UTC-only <c>timestamp with time zone</c> default.
         /// </summary>
         [ModuleInitializer]
         [SuppressMessage("Usage", "CA2255", Justification = "Deliberate: Agrumy.Dal is a library, but this switch must be set before any Npgsql type mapping runs, and there is no earlier library-safe hook than a module initializer.")]

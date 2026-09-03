@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore;
 namespace api.Dal
 {
     /// <summary>
-    /// EF Core context for the Agrumy database, replacing the Dapper + stored-procedure SqlRepository (roadmap #42).
+    /// EF Core context for the Agrumy database, replacing the old Dapper + stored-procedure SqlRepository.
     ///
-    /// Provider-neutral (Phase 2): MySQL/MariaDB (Pomelo) or PostgreSQL (Npgsql), chosen at runtime by
+    /// Provider-neutral: MySQL/MariaDB (Pomelo) or PostgreSQL (Npgsql), chosen at runtime by
     /// <c>Database:Provider</c>. No vendor-specific <c>HasColumnType</c> - EF maps each CLR type per
     /// provider; only portable <c>HasMaxLength</c> and <c>CURRENT_TIMESTAMP</c> defaults are used.
     ///
@@ -102,7 +102,7 @@ namespace api.Dal
                 e.Property(x => x.IDUser).ValueGeneratedOnAdd();
                 e.Property(x => x.Email).HasMaxLength(100).IsRequired();
                 e.Property(x => x.Username).HasMaxLength(100);
-                // Roadmap #91: nullable now - see UserRow.PwdHash for why.
+                // Nullable - see UserRow.PwdHash for why.
                 e.Property(x => x.PwdSalt).HasMaxLength(128);
                 e.Property(x => x.FirstName).HasMaxLength(100);
                 e.Property(x => x.LastName).HasMaxLength(100);
@@ -140,8 +140,8 @@ namespace api.Dal
                 e.Property(x => x.ServerConfigName).HasMaxLength(100);
                 e.Property(x => x.ConfigKey).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ServerConfigCol).HasColumnName("serverConfigcol").HasMaxLength(45);
-                e.Property(x => x.ScheduleTimeZone).HasMaxLength(64); // same cap as user.TimeZone (roadmap #71)
-                e.Property(x => x.FirmwareGitHubRepository).HasMaxLength(200); // roadmap #94
+                e.Property(x => x.ScheduleTimeZone).HasMaxLength(64); // same cap as user.TimeZone
+                e.Property(x => x.FirmwareGitHubRepository).HasMaxLength(200);
                 e.Property(x => x.FirmwareCustomRepositoryUrl).HasMaxLength(500);
             });
 
@@ -153,8 +153,7 @@ namespace api.Dal
                 e.Property(x => x.DeviceUnitName).HasMaxLength(100);
             });
 
-            // Roadmap #81/#82: real containment FK (Zone -> Unit), replacing the removed backwards
-            // deviceUnit.DeviceUnitZoneID pointer - see db/migrations/2026-09-02-deviceunit-zone-containment.sql.
+            // Real containment FK (Zone -> Unit) - see db/migrations/2026-09-02-deviceunit-zone-containment.sql.
             modelBuilder.Entity<DeviceUnitZoneRow>(e =>
             {
                 e.ToTable("deviceUnitZone");
@@ -164,8 +163,8 @@ namespace api.Dal
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            // Roadmap #21: one rule per row, several rows may share (DeviceUnitZoneID, RelayFunction)
-            // - OR semantics across them, resolved in application code (EfRepository), not here.
+            // One rule per row - several rows may share (DeviceUnitZoneID, RelayFunction); OR
+            // semantics across them are resolved in application code (EfRepository), not here.
             modelBuilder.Entity<DeviceUnitZoneRuleRow>(e =>
             {
                 e.ToTable("deviceUnitZoneRule");
@@ -180,10 +179,8 @@ namespace api.Dal
             {
                 e.ToTable("deviceType");
                 e.HasKey(x => x.IDDeviceType);
-                // Roadmap #91: fixed catalog, not an admin-creatable list (like its three
-                // deviceType* siblings below) - Agrumy.Web.Controllers.View.DeviceController.Edit
-                // switches on the literal IDs 0/1/2/3, so the seed must control them exactly the
-                // same way deviceTypeRelay/Service/Sensor already do.
+                // Fixed catalog, not admin-creatable - DeviceController.Edit switches on the literal
+                // IDs 0/1/2/3, so the seed must control them exactly.
                 e.Property(x => x.IDDeviceType).ValueGeneratedNever();
                 e.Property(x => x.DeviceTypeName).HasMaxLength(100);
             });
@@ -272,19 +269,16 @@ namespace api.Dal
                 e.Property(x => x.IDDevice).ValueGeneratedOnAdd();
                 e.Property(x => x.DeviceName).HasMaxLength(128);
                 e.Property(x => x.MacAddress).HasMaxLength(12);
-                e.Property(x => x.FirmwareTargetVersion).HasMaxLength(20); // roadmap #93, same cap as deviceFirmware.Version
+                e.Property(x => x.FirmwareTargetVersion).HasMaxLength(20); // same cap as deviceFirmware.Version
                 e.Property(x => x.ApiId).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ApiKey).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ServicePoint).HasMaxLength(200);
                 e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.Property(x => x.DateModified).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.HasIndex(x => x.ApiId).IsUnique().HasDatabaseName("ApiID_UNIQUE");
-                // Roadmap #102: composite, not a bare MacAddress unique - a physical device is
-                // legitimately resold across tenants (old tenant keeps its historical row, new
-                // tenant registers a "new" row with the same MAC), but a duplicate register
-                // request within the SAME tenant (double click, firmware retry) must not create
-                // two rows for one device. NULL MacAddress/TenantID rows never collide under this
-                // index on either MySQL or PostgreSQL, so pre-registration rows are unaffected.
+                // Composite, not a bare MacAddress unique - a physical device can be legitimately
+                // resold across tenants; NULL MacAddress/TenantID rows never collide, so
+                // pre-registration rows are unaffected.
                 e.HasIndex(x => new { x.MacAddress, x.TenantID }).IsUnique().HasDatabaseName("MacAddress_TenantID_UNIQUE");
                 // Legacy device FKs (fk_device_*). DeviceUnitZoneID has no FK on device.
                 e.HasOne<DeviceConfigControllerRow>().WithMany().HasForeignKey(x => x.DeviceConfigControllerID).OnDelete(DeleteBehavior.NoAction);
@@ -295,7 +289,6 @@ namespace api.Dal
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            // Roadmap #34.
             modelBuilder.Entity<DeviceCommandRow>(e =>
             {
                 e.ToTable("deviceCommand");
@@ -308,12 +301,12 @@ namespace api.Dal
             modelBuilder.Entity<DeviceDiagnosticRow>(e =>
             {
                 e.ToTable("deviceDiagnostic");
-                // DeviceID is the PK (1:1 with device, roadmap #7) - deliberately NOT ValueGeneratedOnAdd.
+                // DeviceID is the PK (1:1 with device) - deliberately NOT ValueGeneratedOnAdd.
                 e.HasKey(x => x.DeviceID);
                 e.Property(x => x.DeviceID).ValueGeneratedNever();
                 e.Property(x => x.FirmwareVersion).HasMaxLength(20); // same cap as deviceFirmware.Version
                 e.Property(x => x.Board).HasMaxLength(40);
-                e.Property(x => x.Kit).HasMaxLength(64); // roadmap #149, same cap as deviceTypeKit.Kit
+                e.Property(x => x.Kit).HasMaxLength(64); // same cap as deviceTypeKit.Kit
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 
@@ -326,12 +319,12 @@ namespace api.Dal
                 e.Property(x => x.Board).HasMaxLength(40);
                 e.Property(x => x.FileName).HasMaxLength(120);
                 e.Property(x => x.Sha256).HasMaxLength(64);
-                // Roadmap #41: same caps as the OTA columns above - full-image file names are only a
-                // few characters longer (agrumy-{board}-full-v{version}.bin vs -v{version}.bin).
+                // Same caps as the OTA columns above - full-image file names are only a few
+                // characters longer (agrumy-{board}-full-v{version}.bin vs -v{version}.bin).
                 e.Property(x => x.FullImageFileName).HasMaxLength(120);
                 e.Property(x => x.FullImageSha256).HasMaxLength(64);
                 e.Property(x => x.DateAdded).HasDefaultValueSql("CURRENT_TIMESTAMP");
-                // Roadmap #94: the "which .bin for this board" lookups all filter on (Board, Source).
+                // The "which .bin for this board" lookups all filter on (Board, Source).
                 e.HasIndex(x => new { x.Board, x.Source }).HasDatabaseName("ix_deviceFirmware_board_source");
             });
 
@@ -343,8 +336,8 @@ namespace api.Dal
                 // Legacy Battery/Moisture/WaterLevel are tinyint(1); the DTO exposes them as int, so a fresh DB uses int (old tinyint(1) columns still read fine).
                 e.HasIndex(x => new { x.DeviceID, x.TenantID, x.DateCreated })
                  .HasDatabaseName("ix_sensorData_device_tenant_date");
-                // Roadmap #116 rule (3): the 24h trend sparkline query filters directly by zone,
-                // not by device - see db/migrations/2026-09-02-sensordata-deviceunitzone-index.sql.
+                // The 24h trend sparkline query filters directly by zone, not by device - see
+                // db/migrations/2026-09-02-sensordata-deviceunitzone-index.sql.
                 e.HasIndex(x => new { x.DeviceUnitZoneID, x.DateCreated })
                  .HasDatabaseName("ix_sensorData_deviceUnitZone_date");
                 // Legacy fk_sensorData_* (no FK on sensorData.TenantID).
