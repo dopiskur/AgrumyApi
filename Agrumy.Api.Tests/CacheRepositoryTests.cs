@@ -2,6 +2,7 @@ using api.Dal;
 using api.Models;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -19,10 +20,13 @@ public class CacheRepositoryTests
     private static IDistributedCache NewBackingStore() =>
         new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
 
+    private static CacheRepository NewRepository(IDistributedCache cache) =>
+        new(cache, NullLogger<CacheRepository>.Instance);
+
     [Fact]
     public async Task GetDeviceCacheAsync_Miss_ReturnsDefaultInstance_NeverNull()
     {
-        var repo = new CacheRepository(NewBackingStore());
+        var repo = NewRepository(NewBackingStore());
 
         DeviceCache result = await repo.GetDeviceCacheAsync("no-such-key");
 
@@ -33,7 +37,7 @@ public class CacheRepositoryTests
     [Fact]
     public async Task SetItemAsync_Then_GetDeviceCacheAsync_RoundTrips()
     {
-        var repo = new CacheRepository(NewBackingStore());
+        var repo = NewRepository(NewBackingStore());
 
         await repo.SetItemAsync("api-guid", new DeviceCache { apiAuth = "session-token" });
         DeviceCache result = await repo.GetDeviceCacheAsync("api-guid");
@@ -51,8 +55,8 @@ public class CacheRepositoryTests
     public async Task TwoRepositoryInstances_OverSharedBackingStore_SeeEachOthersWrites()
     {
         IDistributedCache sharedStore = NewBackingStore();
-        var writer = new CacheRepository(sharedStore);
-        var reader = new CacheRepository(sharedStore);
+        var writer = NewRepository(sharedStore);
+        var reader = NewRepository(sharedStore);
 
         await writer.SetItemAsync("shared-key", new DeviceCache { apiAuth = "auth-abc" });
         DeviceCache result = await reader.GetDeviceCacheAsync("shared-key");
@@ -63,7 +67,7 @@ public class CacheRepositoryTests
     [Fact]
     public async Task SetItemAsync_Overwrites_ExistingEntry()
     {
-        var repo = new CacheRepository(NewBackingStore());
+        var repo = NewRepository(NewBackingStore());
 
         await repo.SetItemAsync("api-guid", new DeviceCache { apiAuth = "old" });
         await repo.SetItemAsync("api-guid", new DeviceCache { apiAuth = "new" });
@@ -79,7 +83,7 @@ public class CacheRepositoryTests
     [Fact]
     public async Task GetAsync_Miss_ReturnsNull()
     {
-        var repo = new CacheRepository(NewBackingStore());
+        var repo = NewRepository(NewBackingStore());
 
         List<FleetSnapshot>? result = await repo.GetAsync<List<FleetSnapshot>>("fleet:no-such-key");
 
@@ -89,7 +93,7 @@ public class CacheRepositoryTests
     [Fact]
     public async Task SetAsync_Then_GetAsync_RoundTrips()
     {
-        var repo = new CacheRepository(NewBackingStore());
+        var repo = NewRepository(NewBackingStore());
         var snapshot = new List<FleetSnapshot> { new(1, true), new(2, false) };
 
         await repo.SetAsync("fleet:1", snapshot, TimeSpan.FromSeconds(6));
@@ -106,13 +110,72 @@ public class CacheRepositoryTests
     public async Task GetAsync_OverSharedBackingStore_SeesAnotherInstancesSetAsync()
     {
         IDistributedCache sharedStore = NewBackingStore();
-        var writer = new CacheRepository(sharedStore);
-        var reader = new CacheRepository(sharedStore);
+        var writer = NewRepository(sharedStore);
+        var reader = NewRepository(sharedStore);
         var snapshot = new List<FleetSnapshot> { new(7, true) };
 
         await writer.SetAsync("fleet:shared", snapshot, TimeSpan.FromSeconds(6));
         List<FleetSnapshot>? result = await reader.GetAsync<List<FleetSnapshot>>("fleet:shared");
 
         Assert.Equal(snapshot, result);
+    }
+
+    // ---- Roadmap #119: backend outage degrades to miss/no-op instead of throwing -----
+
+    /// <summary>Stands in for a Redis client throwing a connection/timeout exception - CacheRepository
+    /// must not care which backend or which exception type, only that the call failed.</summary>
+    private sealed class ThrowingCache : IDistributedCache
+    {
+        public byte[]? Get(string key) => throw new InvalidOperationException("backend unreachable");
+        public Task<byte[]?> GetAsync(string key, CancellationToken token = default) =>
+            throw new InvalidOperationException("backend unreachable");
+        public void Set(string key, byte[] value, DistributedCacheEntryOptions options) =>
+            throw new InvalidOperationException("backend unreachable");
+        public Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default) =>
+            throw new InvalidOperationException("backend unreachable");
+        public void Refresh(string key) => throw new InvalidOperationException("backend unreachable");
+        public Task RefreshAsync(string key, CancellationToken token = default) =>
+            throw new InvalidOperationException("backend unreachable");
+        public void Remove(string key) => throw new InvalidOperationException("backend unreachable");
+        public Task RemoveAsync(string key, CancellationToken token = default) =>
+            throw new InvalidOperationException("backend unreachable");
+    }
+
+    [Fact]
+    public async Task GetDeviceCacheAsync_BackendThrows_ReturnsMissInsteadOfPropagating()
+    {
+        var repo = NewRepository(new ThrowingCache());
+
+        DeviceCache result = await repo.GetDeviceCacheAsync("api-guid");
+
+        Assert.NotNull(result);
+        Assert.Null(result.apiAuth);
+    }
+
+    [Fact]
+    public async Task SetItemAsync_BackendThrows_CompletesWithoutPropagating()
+    {
+        var repo = NewRepository(new ThrowingCache());
+
+        await repo.SetItemAsync("api-guid", new DeviceCache { apiAuth = "session-token" });
+        // No assert needed beyond "did not throw" - that IS the graceful-degradation contract.
+    }
+
+    [Fact]
+    public async Task GetAsync_BackendThrows_ReturnsNullInsteadOfPropagating()
+    {
+        var repo = NewRepository(new ThrowingCache());
+
+        List<FleetSnapshot>? result = await repo.GetAsync<List<FleetSnapshot>>("fleet:1");
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task SetAsync_BackendThrows_CompletesWithoutPropagating()
+    {
+        var repo = NewRepository(new ThrowingCache());
+
+        await repo.SetAsync("fleet:1", new List<FleetSnapshot> { new(1, true) }, TimeSpan.FromSeconds(6));
     }
 }
