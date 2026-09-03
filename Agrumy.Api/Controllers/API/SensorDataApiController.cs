@@ -23,9 +23,7 @@ namespace api.Controllers.API
         {
             string apiId = HttpContext.DeviceApiId()!;
 
-            // Resolve the device/tenant from the authenticated identity and hand them to the repo,
-            // which writes them onto every row and ignores whatever the payload claims. An
-            // authenticated apiId with no device row must not fall back to trusting the payload.
+            // Device/tenant come from the authenticated identity, never from the payload.
             Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
             if (device is null)
             {
@@ -35,14 +33,10 @@ namespace api.Controllers.API
             await Repo.SensorDataPushAsync(jsonArray, device.IDDevice!.Value, device.TenantID,
                 device.DeviceUnitID, device.DeviceUnitZoneID);
 
-            // Roadmap #106: the device row already in hand is the authoritative ConfigVersion - no
-            // reason to route this through the session cache (which no longer carries it at all).
             return Ok(device.ConfigVersion);
         }
 
-        /// <summary>#66 Phase 2: deleting telemetry is device management, so the gate moved from the
-        /// binary "admin" to the device-manager roles, and the target device's own tenant is resolved
-        /// and checked explicitly (previously a cross-tenant id silently deleted zero rows).</summary>
+        /// <summary>Deleting telemetry is device management, gated to the device-manager roles; the target device's own tenant is resolved and checked explicitly.</summary>
         [HttpDelete]
         [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> Delete(int deviceID, int timeMDMY = 0, int timeRange = 0)

@@ -9,11 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.API
 {
-    /// <summary>Roadmap #82 (Unit/Zone CRUD + device assignment) and #81 (hierarchical dashboard
-    /// aggregation). Ownership checks mirror DeviceApiController.EnsureOwnedDeviceAsync - a
-    /// tenant-scoped caller only sees/writes its own tenant's Units/Zones, a Global
-    /// admin/Device/reader crosses tenants per the same CallerReadsDevicesGlobally/
-    /// CallerManagesDevicesGlobally rules as the rest of the Device domain.</summary>
+    /// <summary>Unit/Zone CRUD, device assignment, and hierarchical dashboard aggregation. Ownership checks mirror DeviceApiController.EnsureOwnedDeviceAsync - a tenant-scoped caller only sees/writes its own tenant's Units/Zones, a Global admin/Device/reader crosses tenants per the same CallerReadsDevicesGlobally/CallerManagesDevicesGlobally rules as the rest of the Device domain.</summary>
     [Route("/api/DeviceUnit")]
     public class DeviceUnitApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
     {
@@ -71,8 +67,7 @@ namespace api.Controllers.API
 
         #region Zone CRUD
 
-        /// <summary>Every Zone within one Unit - ownership is checked on the Unit, not per-zone,
-        /// since a zone always belongs to exactly one unit and cannot be listed without one.</summary>
+        /// <summary>Every Zone within one Unit - ownership is checked on the Unit, not per-zone, since a zone always belongs to exactly one unit.</summary>
         [Authorize]
         [HttpGet("Zone")]
         public async Task<ActionResult<IList<DeviceUnitZone>>> DeviceUnitZonesGet(int? idDeviceUnit)
@@ -85,10 +80,7 @@ namespace api.Controllers.API
             return Ok(await Repo.DeviceUnitZonesGetAsync(unit!.IDDeviceUnit!.Value));
         }
 
-        /// <summary>Roadmap #21: single zone by id - added so a caller that needs to patch ONE
-        /// field (e.g. Web's ZoneRename/SafetyLimitsUpdate) can fetch-then-resubmit the whole
-        /// object, rather than posting a partial DTO that would blank out every field it didn't
-        /// set (DeviceUnitZoneUpdateAsync overwrites unconditionally, it does not merge).</summary>
+        /// <summary>Single zone by id, so a caller that needs to patch one field can fetch-then-resubmit the whole object - DeviceUnitZoneUpdateAsync overwrites unconditionally, it does not merge.</summary>
         [Authorize]
         [HttpGet("ZoneById")]
         public async Task<ActionResult<DeviceUnitZone>> DeviceUnitZoneGetById(int? idDeviceUnitZone)
@@ -120,8 +112,7 @@ namespace api.Controllers.API
                 return error;
             }
 
-            // Roadmap #36 (A)/#21: same "catch human error server-side" layer the old per-device
-            // check used - see api.Utils.SafetyLimitValidation for why the range itself lives there, shared.
+            // Catches human error server-side - see api.Utils.SafetyLimitValidation for the shared range.
             if (!SafetyLimitValidation.IsValid(zone.WaterPumpMaxRunSeconds))
             {
                 return BadRequest($"WaterPump max run time must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.");
@@ -152,7 +143,7 @@ namespace api.Controllers.API
 
         #endregion
 
-        #region Zone Rules (roadmap #21)
+        #region Zone Rules
 
         [Authorize]
         [HttpGet("Zone/Rule")]
@@ -200,13 +191,7 @@ namespace api.Controllers.API
             return true;
         }
 
-        /// <summary>Roadmap #21: shape+bound check per ConditionType, mirroring the pre-#21
-        /// ScheduleWindowError/SafetyLimitError's "catch human error server-side" role - the
-        /// firmware would otherwise just silently treat a malformed rule as inert (see
-        /// AgrumyFirmware's ConfigParser/evaluateRule), a confusing way to discover a typo.
-        /// Threshold's own threshold VALUE is deliberately unbounded (humidity/light/temperature/
-        /// water-level all have different sane ranges depending on the sensor and unit; only
-        /// Hysteresis, a dead-zone width, has a universal "must not be negative" rule).</summary>
+        /// <summary>Shape+bound check per ConditionType - the firmware would otherwise silently treat a malformed rule as inert (AgrumyFirmware's ConfigParser/evaluateRule), a confusing way to discover a typo. Threshold's own value is deliberately unbounded (sane ranges differ per sensor/unit); only Hysteresis has a universal "must not be negative" rule.</summary>
         private static string? RuleConditionConfigError(ConditionType type, JsonNode? config)
         {
             try
@@ -236,10 +221,7 @@ namespace api.Controllers.API
                     case ConditionType.Schedule:
                         var schedule = config.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options)
                             ?? throw new JsonException("missing schedule config");
-                        // Roadmap #39/#115: same bounds the pre-#21 per-slot check used - v1
-                        // deliberately does not support a window crossing local midnight, and
-                        // DaysOfWeek must fit the 7-bit mask AgrumyFirmware's evaluateRule expects
-                        // (bit 0 = Sunday .. bit 6 = Saturday).
+                        // DaysOfWeek must fit the 7-bit mask AgrumyFirmware's evaluateRule expects (bit 0 = Sunday .. bit 6 = Saturday); a window crossing local midnight is not supported.
                         if (schedule.DaysOfWeek < 0 || schedule.DaysOfWeek > 0b1111111)
                         {
                             return "Schedule rule: days of week must be a value from 0 to 127.";
@@ -265,10 +247,9 @@ namespace api.Controllers.API
 
         #endregion
 
-        #region Device assignment (roadmap #82)
+        #region Device assignment
 
-        /// <summary>Devices with no current zone, filtered to controller- or sensor-capable - the
-        /// "Add Controller"/"Add Sensor" picker list (#82 rule (d)).</summary>
+        /// <summary>Devices with no current zone, filtered to controller- or sensor-capable - the "Add Controller"/"Add Sensor" picker list.</summary>
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpGet("Unassigned")]
         public async Task<ActionResult<IList<Device>>> DeviceUnassignedGet(bool controllerCapable) =>
@@ -291,7 +272,7 @@ namespace api.Controllers.API
                 return zoneError;
             }
 
-            // #82 rule (a): a zone has at most one controller (not required, but capped at one).
+            // A zone has at most one controller (not required, but capped at one).
             if (device!.DeviceControllerEnabled == true && await Repo.DeviceUnitZoneHasControllerAsync(body.IDDeviceUnitZone))
             {
                 return Conflict("This zone already has a controller assigned.");
@@ -317,7 +298,7 @@ namespace api.Controllers.API
 
         #endregion
 
-        #region Dashboard (roadmap #81)
+        #region Dashboard
 
         /// <summary>Top-level Unit cubes - read-only, open to any authenticated caller (same
         /// reasoning as DeviceApiController.DeviceFleetGet).</summary>
@@ -385,9 +366,7 @@ namespace api.Controllers.API
             return (zone, null);
         }
 
-        /// <summary>Same shape/logic as DeviceApiController.EnsureOwnedDeviceAsync (duplicated, not
-        /// shared - that one is private to DeviceApiController, matching this codebase's existing
-        /// per-controller convention rather than introducing a new shared base for one caller).</summary>
+        /// <summary>Same shape/logic as DeviceApiController.EnsureOwnedDeviceAsync (duplicated, not shared, per this codebase's existing per-controller convention).</summary>
         private async Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(
             Func<Task<Device?>> lookup, string ownerLabel, bool forWrite)
         {

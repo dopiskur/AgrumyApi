@@ -5,13 +5,11 @@ namespace api.Models
     
     public class SensorData
     {
-        // DEVICE 
         public int? TenantID { get; set; }
         public int? DeviceID { get; set; }
         public int? DeviceUnitID { get; set; }
         public int? DeviceUnitZoneID { get; set; }
 
-        // SENSOR
         public int? Battery { get; set; }
         public double? Temperature { get; set; }
         public double? SoilTemperature { get; set; }
@@ -40,8 +38,7 @@ namespace api.Models
 
     public class TimeRange
     {
-        // Roadmap #78: was [Range(1, 30)], stale against SensorDataController's real 1-1440
-        // (one day of minute-resolution data) cap - fixed to match actual usage.
+        // Must match SensorDataController's actual cap (one day of minute-resolution data).
         [Range(1, 1440)]
         public int? Range { get; set; } = 1;
     }

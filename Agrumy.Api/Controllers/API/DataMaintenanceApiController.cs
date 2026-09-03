@@ -8,20 +8,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Controllers.API
 {
-    /// <summary>Roadmap #126: "Optimize Old Data" / "Purge Old Data" - Global admin only, same rule
-    /// as ServerConfigApiController since this affects every tenant's telemetry. Both actions
-    /// dispatch to BackgroundJobQueue and return 202 immediately rather than holding the HTTP
-    /// request open for however long a large table takes to process.</summary>
+    /// <summary>"Optimize Old Data" / "Purge Old Data" - Global admin only, same rule as ServerConfigApiController since this affects every tenant's telemetry. Both actions dispatch to BackgroundJobQueue and return 202 immediately rather than holding the request open for however long a large table takes to process.</summary>
     [Route("api/DataMaintenance")]
     [Authorize(Roles = "admin")]
     public class DataMaintenanceApiController(
         IRepository repo, ICache cache, AgrumyDbContext db, BackgroundJobQueue jobQueue, ILogger<DataMaintenanceApiController> logger)
         : ApiControllerBase(repo, cache)
     {
-        /// <summary>Lets Agrumy.Web decide whether to show the MariaDB-only "shrink files on disk?"
-        /// follow-up dialog before it asks the admin to confirm a Purge - Postgres/TimescaleDB's
-        /// drop_chunks() always reclaims disk space with no extra step, so there is no question to
-        /// ask on that provider.</summary>
+        /// <summary>Lets Agrumy.Web decide whether to show the MariaDB-only "shrink files on disk?" dialog before confirming a Purge - Postgres/TimescaleDB reclaims disk space automatically.</summary>
         [HttpGet("Provider")]
         public ActionResult<DataMaintenanceProviderInfo> GetProvider()
         {
@@ -73,8 +67,7 @@ namespace api.Controllers.API
             {
                 return BadRequest("Unsupported threshold.");
             }
-            // Enforced here too, not just in the Web form - the API is reachable directly, so the
-            // typed-confirmation gate (roadmap #126, "at least as strict as #92") must hold server-side.
+            // Enforced here too, not just in the Web form - the API is reachable directly.
             if (request.ConfirmationPhrase != DataPurgeRequest.RequiredPhrase)
             {
                 return BadRequest($"Type \"{DataPurgeRequest.RequiredPhrase}\" to confirm this destructive action.");
