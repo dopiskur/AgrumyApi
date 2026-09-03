@@ -3,14 +3,12 @@ using Refit;
 
 namespace api.Dal.Interface
 {
-    /// <summary>
-    /// Declarative client for Agrumy.Api (roadmap #32). Implemented at runtime by Refit
+    /// <summary>Declarative client for Agrumy.Api. Implemented at runtime by Refit
     /// (<c>AddRefitClient&lt;IApi&gt;</c> in Program.cs). The caller's JWT is attached by
     /// <see cref="api.Security.BearerTokenHandler"/>, so no method takes a token parameter.
     /// Nullable query parameters are omitted when null. Non-success responses raise
     /// <see cref="api.Utils.ApiException"/> carrying the response body (see
-    /// <see cref="api.Utils.RefitConfig"/>).
-    /// </summary>
+    /// <see cref="api.Utils.RefitConfig"/>).</summary>
     public interface IApi
     {
         // ---- User ----------------------------------------------------------
@@ -18,14 +16,14 @@ namespace api.Dal.Interface
         [Post("/api/User/Login")]
         Task<UserLoginResult?> UserLogin([Body] UserLogin userLogin);
 
-        /// <summary>Roadmap #91: whether the fresh-install bootstrap Global Admin still has no
-        /// password - LoginController checks this on every anonymous page load to decide whether to
-        /// show the normal login form or the first-run "set password" screen.</summary>
+        /// <summary>Whether the fresh-install bootstrap Global Admin still has no password -
+        /// LoginController checks this on every anonymous page load to decide whether to show the
+        /// normal login form or the first-run "set password" screen.</summary>
         [Get("/api/User/BootstrapPending")]
         Task<bool> BootstrapPending();
 
-        /// <summary>Roadmap #91: the one-shot call that gives the bootstrap Global Admin a real
-        /// password - see api.Models.BootstrapAdminSetPassword for why it takes no login/email.</summary>
+        /// <summary>The one-shot call that gives the bootstrap Global Admin a real password - see
+        /// api.Models.BootstrapAdminSetPassword for why it takes no login/email.</summary>
         [Post("/api/User/BootstrapSetPassword")]
         Task BootstrapSetPassword([Body] BootstrapAdminSetPassword value);
 
@@ -50,7 +48,7 @@ namespace api.Dal.Interface
         Task<IEnumerable<User>> UsersGet();
 
         /// <summary>The caller's own record (self-scoped by the JWT server-side) - profile page
-        /// prefill and the display time zone for UTC-to-local conversion (roadmap #71 follow-up).</summary>
+        /// prefill and the display time zone for UTC-to-local conversion.</summary>
         [Get("/api/User/Self")]
         Task<User> UserGetSelf();
 
@@ -60,20 +58,20 @@ namespace api.Dal.Interface
         Task UserProfileSet([Body] UserProfileUpdate value);
 
         /// <summary>Password-change flow: proves the caller still knows the old password, identity
-        /// otherwise comes from the attached JWT (roadmap #83) - reused by the profile page rather
-        /// than a parallel mechanism.</summary>
+        /// otherwise comes from the attached JWT - reused by the profile page rather than a
+        /// parallel mechanism.</summary>
         [Post("/api/User/ChangePassword")]
         Task ChangePassword([Body] UserSetPassword value);
 
-        /// <summary>Roadmap #70: rotates the caller's device-registration PIN (24h validity,
-        /// multi-use - not consumed by the first successful device registration).</summary>
+        /// <summary>Rotates the caller's device-registration PIN (24h validity, multi-use - not
+        /// consumed by the first successful device registration).</summary>
         [Post("/api/User/DevicePin")]
         Task<DevicePinResult> DevicePinGenerate();
 
         [Get("/api/User/Roles")]
         Task<IEnumerable<UserRole>> UserRoleGet();
 
-        /// <summary>Roadmap #66: the given user's composable role set (a user can hold several).</summary>
+        /// <summary>The given user's composable role set (a user can hold several).</summary>
         [Get("/api/User/UserRoles")]
         Task<List<string>> UserRolesGet(int idUser);
 
@@ -118,17 +116,17 @@ namespace api.Dal.Interface
         [Get("/api/Device/TypeSensor")]
         Task<IEnumerable<DeviceTypeSensor>> DeviceTypeSensorGet();
 
-        // ---- Device events (roadmap #28) -----------------------------------
+        // ---- Device events -----------------------------------
 
         [Get("/api/Device/Events")]
         Task<IList<DeviceEvent>> DeviceEventsGet(int? idDevice);
 
-        // ---- Fleet dashboard (roadmap #8) ----------------------------------
+        // ---- Fleet dashboard ----------------------------------
 
         [Get("/api/Device/Fleet")]
         Task<IList<DeviceFleetStatus>> DeviceFleetGet();
 
-        // ---- Unit/Zone (roadmap #81/#82) -----------------------------------
+        // ---- Unit/Zone -----------------------------------
 
         [Get("/api/DeviceUnit/All")]
         Task<IList<DeviceUnit>> DeviceUnitsGet();
@@ -160,7 +158,7 @@ namespace api.Dal.Interface
         [Get("/api/DeviceUnit/ZoneById")]
         Task<DeviceUnitZone> DeviceUnitZoneGetById(int? idDeviceUnitZone);
 
-        // ---- Zone rules (roadmap #21) ---------------------------------------
+        // ---- Zone rules ---------------------------------------
 
         [Get("/api/DeviceUnit/Zone/Rule")]
         Task<IList<DeviceUnitZoneRule>> DeviceUnitZoneRulesGet(int? idDeviceUnitZone);
@@ -189,12 +187,12 @@ namespace api.Dal.Interface
         [Get("/api/DeviceUnit/Dashboard/Zone")]
         Task<DeviceUnitZoneDashboard> DeviceUnitZoneDashboardGet(int? idDeviceUnitZone);
 
-        // ---- Device commands (roadmap #34) ---------------------------------
+        // ---- Device commands ---------------------------------
 
         [Post("/api/DeviceCommand")]
         Task<IReadOnlyList<int>> DeviceCommandIssue([Body] IssueCommandRequest request);
 
-        // ---- Firmware catalog (roadmap #94) + per-device update (roadmap #93) ----
+        // ---- Firmware catalog + per-device update ----
 
         [Get("/api/Firmware")]
         Task<IList<DeviceFirmware>> FirmwareList(string? board);
@@ -248,7 +246,7 @@ namespace api.Dal.Interface
         [Delete("/api/User/Group")]
         Task UserGroupDelete(int? idUserGroup);
 
-        // ---- Server config (roadmap #10) --------------------------------
+        // ---- Server config --------------------------------
 
         [Get("/api/ServerConfig")]
         Task<ServerConfig> ServerConfigGet();
@@ -256,12 +254,12 @@ namespace api.Dal.Interface
         [Put("/api/ServerConfig")]
         Task ServerConfigUpdate([Body] ServerConfig config);
 
-        /// <summary>Roadmap #64: the one ServerConfig field an anonymous page (Register) is allowed
-        /// to read - whether to show the "create a new tenant" option at all.</summary>
+        /// <summary>The one ServerConfig field an anonymous page (Register) is allowed to read -
+        /// whether to show the "create a new tenant" option at all.</summary>
         [Get("/api/ServerConfig/Public")]
         Task<PublicServerConfig> ServerConfigGetPublic();
 
-        // ---- Data maintenance (roadmap #126) -----------------------------
+        // ---- Data maintenance -----------------------------
 
         /// <summary>Whether the current DB provider is MariaDB/MySQL - decides whether the Purge
         /// confirmation flow needs the extra "shrink files on disk?" dialog at all.</summary>
