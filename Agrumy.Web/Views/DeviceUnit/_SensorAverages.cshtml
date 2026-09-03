@@ -1,9 +1,6 @@
 @model api.ViewModels.SensorSummaryViewModel
 @{
-    // Roadmap #81: one badge per sensor type actually present in scope - types are never mixed or
-    // averaged together, and a type nobody in this unit/zone reports simply doesn't get a badge
-    // (the underlying average is null, not zero - LINQ's nullable Average() already tells the
-    // difference between "no data" and "data averaging to zero").
+    // A type with no data averages to null, not zero - LINQ's nullable Average() already distinguishes the two.
     var averages = Model.Averages;
     var trend = Model.Trend;
     (string Label, string Icon, double? Value, string Unit, double?[]? Trend)[] rows =
@@ -23,11 +20,8 @@
     ];
     var present = rows.Where(r => r.Value != null).ToList();
 
-    // Roadmap #116 rule (3): a plain inline SVG polyline, not a chart library instance - cheap
-    // enough to render dozens of these on one dashboard page (the roadmap's own performance note
-    // on this item warns specifically against instantiating a full ECharts per cube). Min-max
-    // normalized within its own 24 points only, not shared across sparklines - each is read as "is
-    // it trending up/down", not compared in absolute scale to its neighbors.
+    // Min-max normalized within its own points only, not shared across sparklines - each reads as
+    // trend direction, not an absolute-scale comparison to its neighbors.
     static string? SparklinePoints(double?[]? values)
     {
         if (values == null)

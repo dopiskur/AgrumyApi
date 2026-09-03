@@ -38,8 +38,6 @@
         </div>
         @if ((bool)(ViewBag.AllowSelfServiceTenantCreation ?? false))
         {
-            @* Roadmap #64: hidden entirely when self-service tenant creation is off - the model's
-               own default ("default") is submitted for everyone in that case, unchanged. *@
             <div class="mb-3">
                 <label asp-for="TenantName" class="visually-hidden"></label>
                 <div class="input-group">

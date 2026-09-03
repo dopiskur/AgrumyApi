@@ -1,7 +1,5 @@
 @model api.Models.ZoneStatus
 @{
-    // Roadmap #116 rule (4): Red > Orange > Green, pure aggregation - no new state to render here,
-    // just the traffic-light color the server already computed.
     var (css, icon, title) = Model switch
     {
         api.Models.ZoneStatus.Red => ("text-bg-danger", "bi-exclamation-octagon-fill", "A device in scope is offline"),

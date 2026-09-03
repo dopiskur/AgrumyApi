@@ -36,8 +36,6 @@
                     <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-repeat"></i> Refresh catalog from @(source == FirmwareSource.GitHub ? "GitHub" : "custom repository")</button>
                 </form>
             }
-            @* Pulling into the local store is offered in every mode - an admin fills the Local
-               repository BEFORE switching the source to it (roadmap #94-2a). *@
             <form asp-action="Sync" method="post">
                 <input type="hidden" name="mode" value="@FirmwareSyncMode.PullIncremental" />
                 <button type="submit" class="btn btn-outline-primary" title="Download only releases the local store does not have yet"><i class="bi bi-cloud-download"></i> Pull from GitHub (incremental)</button>
@@ -51,7 +49,6 @@
         <hr />
         <div class="row g-3">
             <div class="col-lg-6">
-                @* Roadmap #94-2b: the only fully air-gapped path - a USB stick mounted on the server. *@
                 <h6 class="text-uppercase text-secondary small">Import from a directory on the server</h6>
                 <form asp-action="Import" method="post" class="d-flex gap-2">
                     <input type="text" name="path" class="form-control" placeholder="/media/usb/agrumy-firmware" required />
@@ -60,7 +57,6 @@
                 <div class="form-text">Files must be named <code>agrumy-&lt;board&gt;-v&lt;version&gt;.bin</code>; a <code>manifest.json</code> next to them (written by the offline-repo tools) is used to verify SHA-256 checksums.</div>
             </div>
             <div class="col-lg-6">
-                @* Roadmap #94-2c / #93-c-2: one mechanism for "upload a .bin", not two. *@
                 <h6 class="text-uppercase text-secondary small">Upload a .bin</h6>
                 <form asp-action="Upload" method="post" enctype="multipart/form-data" class="d-flex gap-2">
                     <input type="file" name="file" class="form-control" accept=".bin" required />
@@ -71,9 +67,6 @@
         </div>
 
         <hr />
-        @* Roadmap #41: Web Serial API - Chromium only (Chrome/Edge/Opera), needs HTTPS. The
-           esp-web-install-button element itself detects both and swaps in the "unsupported"/
-           "not-allowed" slot content below, no feature-detection JS needed here. *@
         <h6 class="text-uppercase text-secondary small">Install to a device via USB</h6>
         @if (Model.InstallableBoards.Count == 0)
         {
@@ -81,14 +74,6 @@
         }
         else
         {
-            @* Roadmap #155: dropdown-first, not chip-family auto-grouping (#148, removed) - the
-               admin explicitly picks which physical board they have BEFORE flashing, so there is
-               never ambiguity for esp-web-tools to resolve on its own, no matter how many catalog
-               boards happen to share a chip family. The chip read esp-web-tools still does over Web
-               Serial stays as the SAFETY NET: InstallManifest(board) tags the manifest with that
-               board's own chipFamily, so a connected chip that doesn't match the dropdown pick is
-               refused before flashing (esp-web-tools' own behavior, no bespoke check needed here) -
-               catching a wrong dropdown pick, not just a case the tool couldn't have resolved itself. *@
             <p class="text-secondary small mb-2">Flashes a brand-new, never-programmed board straight from the browser - no PlatformIO, no USB toolchain.</p>
             <div class="d-flex flex-wrap gap-2 align-items-center">
                 <select id="flashBoardSelect" class="form-select" style="width:auto">
@@ -106,7 +91,6 @@
         }
 
         <hr />
-        @* Roadmap #94-C1: File System Access API - Chromium only (Chrome/Edge/Opera), needs HTTPS. *@
         <h6 class="text-uppercase text-secondary small">Prepare an offline USB repository</h6>
         <p class="text-secondary small mb-2">
             Copies every catalog file plus a <code>manifest.json</code> with SHA-256 checksums into a folder you pick (e.g. a USB stick).
@@ -176,26 +160,6 @@
 </div>
 
 @section Scripts {
-    @* Roadmap #41, revised: was a live jsDelivr <script src>, changed after a real report of the
-       button silently failing (both the "unsupported" AND "not-allowed" slot text rendering
-       together, install doing nothing) with no console error - the actual install-button.js source
-       (read directly off jsDelivr while diagnosing) only ever fills ONE of those two slots, so both
-       showing at once meant the module - or its internal "./connect" relative sub-import - never
-       actually executed, i.e. the live CDN request was silently failing for that browser/network
-       (no visible red error either, consistent with an extension/DNS-level block rather than a
-       server or CORS rejection). Note: the earlier version of this comment claimed Meshtastic's own
-       flasher uses this same CDN-hosted library - that was never actually verified and turned out
-       to be wrong: their flasher (github.com/meshtastic/web-flasher) bundles esptool-js directly
-       into its own Nuxt build, no runtime third-party origin at all.
-       Vendored via libman.json instead (matches every other wwwroot/lib/ entry, roadmap #33) -
-       deliberately no "files" list there: esp-web-tools' dist/ has ~90 interlinked ES modules,
-       several under dist/web/ with build-hash filenames (e.g. stub_flasher_32c3-DmSvHQKL.js) that
-       change on every upstream rebuild, so enumerating them by hand would silently break on the
-       next version bump. Omitting "files" mirrors the whole published package instead - some unused
-       extra files (README, .github/, src/) land in wwwroot/lib/esp-web-tools/ too, harmless since
-       nothing references them and the folder is gitignored/restored fresh on every build anyway.
-       Same-origin now, so this is no longer reachable-CDN-dependent at page-load time; pinned to the
-       same exact version as before. *@
     <script type="module" src="~/lib/esp-web-tools/dist/install-button.min.js"></script>
     <script src="~/js/offline-repo.js"></script>
     <script src="~/js/firmware-install-picker.js"></script>

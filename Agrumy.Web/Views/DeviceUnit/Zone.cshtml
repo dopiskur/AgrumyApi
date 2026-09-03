@@ -31,13 +31,8 @@
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">
-            @* Roadmap #122 fix: the badge does NOT live here - this header is outside the
-               #zoneDetails div the live-refresh below replaces, so it would freeze at whatever
-               status the page had on its initial load and silently go stale (confirmed live: a
-               device going offline updated its row in the device table below within one poll,
-               but this header badge stayed green). It now lives in _ZoneDetails.cshtml instead,
-               same place the Index/Zones cube views already keep theirs - both of those refresh
-               correctly because their badge is part of the polled fragment. *@
+            @* Status badge lives in _ZoneDetails.cshtml, not here - this header sits outside the
+               polled #zoneDetails fragment and a badge here would go stale. *@
             @zone.DeviceUnitZoneName
             @if (hasAnyRole(RoleNames.DeviceManagers))
             {
@@ -47,14 +42,10 @@
         @if (hasAnyRole(RoleNames.DeviceManagers))
         {
             <div class="float-end d-flex align-items-center gap-2">
-                @* Roadmap #34: same hasController gate as "Add Controller" below - a zone with
-                   nothing controller-capable assigned has no device on the other end to command. *@
                 @if (hasController)
                 {
                     <partial name="_DeviceCommandButtons" model="new DeviceCommandButtonsViewModel { TargetType = CommandTargetType.Zone, TargetId = zone.IDDeviceUnitZone }" />
                 }
-                @* #82 rule (a)/(b): a zone has at most one controller - the button disappears once
-                   one is assigned; "Add Sensor" stays open for any number of separate sensor nodes. *@
                 @if (!hasController)
                 {
                     <a asp-action="AssignPicker" asp-route-idDeviceUnitZone="@zone.IDDeviceUnitZone" asp-route-controllerCapable="true" class="btn btn-sm btn-outline-primary">
@@ -64,8 +55,6 @@
                 <a asp-action="AssignPicker" asp-route-idDeviceUnitZone="@zone.IDDeviceUnitZone" asp-route-controllerCapable="false" class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-broadcast"></i> Add Sensor
                 </a>
-                @* Roadmap #116 rule (1): available here too, not just on the multi-zone Zones()
-                   list - adding a second zone no longer means leaving the one you're looking at. *@
                 <details class="d-inline-block align-middle">
                     <summary class="btn btn-sm btn-outline-primary" style="cursor:pointer;"><i class="bi bi-plus-lg"></i> Add Zone</summary>
                     <form asp-action="ZoneAdd" method="post" class="d-flex gap-2 mt-2">
@@ -87,10 +76,7 @@
     </div>
 </div>
 
-@* Roadmap #21: automation rules ONLY shown when the zone has a controller-capable device
-   assigned - a zone without one has no device to run them, and the roadmap's explicit decision
-   is to omit the section entirely here, not show it disabled/greyed. Outside the live-refreshed
-   #zoneDetails div on purpose - these are edited via full-page form posts, not polled. *@
+@* Outside #zoneDetails on purpose - edited via full-page form posts, not polled/replaced by live-refresh. *@
 @if (hasController)
 {
     <partial name="_ZoneRules" model="Model" />

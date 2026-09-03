@@ -2,9 +2,7 @@
 @using System.Text.Json.Nodes
 
 @{
-    // Never trust SensorDataJson for direct <script> interpolation: re-serializing through
-    // System.Text.Json escapes HTML-sensitive characters (<, >, &), so Html.Raw below can't
-    // break out of the script block even if a raw API payload slipped through unlocalized.
+    // Re-serializing through System.Text.Json escapes HTML-sensitive chars so Html.Raw below can't break out of the script block.
     var safePayload = "{\"sensorData\":[]}";
     if (!string.IsNullOrWhiteSpace(Model.SensorDataJson))
     {

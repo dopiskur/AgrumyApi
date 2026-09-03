@@ -146,8 +146,7 @@
         }
         <a asp-action="Edit" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Edit</a>
         <a asp-action="EditSensor" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Sensor config</a>
-        @* Roadmap #149: no relay-hardware signal (admin's DeviceType choice AND no recognized Kit) -
-           leave the link out entirely rather than show a control surface that does nothing. *@
+        @* Hidden when there's no relay-hardware signal (DeviceType choice AND no recognized Kit) - avoids a control that does nothing. *@
         @if (ViewBag.ControllerCapable == true)
         {
             <a asp-action="EditController" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Controller config</a>

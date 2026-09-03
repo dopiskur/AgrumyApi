@@ -6,8 +6,6 @@
     var sensorCfg = Model.DeviceConfigSensor!;
     string SensorField(string name) => $"{nameof(Model.DeviceConfigSensor)}.{name}";
 
-    // One entry per dropdown: which DeviceTypeSensor flag it filters on, its current value, and
-    // which tab it belongs to. Collapses what used to be 13 copy-pasted DropDownListFor blocks.
     var sensorSlots = new (string Name, Func<DeviceTypeSensor, int?> SupportsFlag, int? Selected, string Tab)[]
     {
         (nameof(sensorCfg.SensorTemp), s => s.Temperature, sensorCfg.SensorTemp, "Environment"),
@@ -42,10 +40,6 @@
     <div class="card-body">
         <form asp-action="EditSensor">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            @* Roadmap #78: identity, not editable data - EfRepository.DeviceConfigSensorUpdateAsync
-               resolves the target row from Device.IDDevice's own DeviceConfigSensorID server-side,
-               it never trusts a posted DeviceConfigSensor.IDDeviceConfigSensor value, so only the
-               device id needs to round-trip through the form. *@
             <div class="mb-3">
                 <label asp-for="Device.IDDevice" class="form-label"></label>
                 <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.IDDevice)</p>
@@ -73,10 +67,8 @@
                 <div class="tab-pane fade" id="tab-other" role="tabpanel">
                     @foreach (var slot in sensorSlots.Where(s => s.Tab == "Other")) { @await RenderSlot(slot) }
 
-                    @* Roadmap #12: R1/R2 only matter for the VoltageDivider option (deviceTypeSensor
-                       id 2001, "Analog voltage") - MAX17048 (1009) reports state-of-charge directly
-                       and ignores these. Shown/hidden by battery-divider-designer.js based on the
-                       SensorBattery dropdown's current selection, not a separate toggle. *@
+                    @* R1/R2 only apply when Battery = Analog voltage (deviceTypeSensor 2001); MAX17048 (1009)
+                       ignores them. Shown/hidden by battery-divider-designer.js, not a toggle here. *@
                     <div id="battery-divider-fields">
                         <hr />
                         <h6>Voltage divider calibration</h6>
@@ -147,8 +139,6 @@
         // (same convention _SelectField.cshtml's label already relies on).
         string sensorBatterySelectId = SensorField(nameof(sensorCfg.SensorBattery)).Replace(".", "_");
     }
-    @* Roadmap #12: VoltageDivider is deviceTypeSensor id 2001 ("Analog voltage") - the script
-       reads this from a data attribute rather than hardcoding it twice. *@
     <script src="~/js/battery-divider-designer.js"
             data-voltage-divider-id="2001" data-sensor-battery-select-id="@sensorBatterySelectId"></script>
 }
