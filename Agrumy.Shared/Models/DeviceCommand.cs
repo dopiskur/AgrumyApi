@@ -1,10 +1,5 @@
 namespace api.Models
 {
-    /// <summary>Roadmap #34: discrete, stateless, one-shot device actions - deliberately narrow
-    /// scope (see the roadmap's own PROBLEM 1 resolution note: anything with duration/ongoing
-    /// state belongs to #35's manual override, not here). SelfTest was considered in the original
-    /// design note but is excluded from v1 - no device-side concept of a self-test exists yet, and
-    /// the user confirmed to leave it out without further discussion.</summary>
     public enum CommandActionType
     {
         Reboot = 1,
@@ -12,12 +7,7 @@ namespace api.Models
         ForceConfigSync = 3,
     }
 
-    /// <summary>Roadmap #34: real FIFO queue state per command (not a single "last value wins"
-    /// counter - see the roadmap's PROBLEM 2 resolution). Acknowledged is a real, observable state
-    /// (not just an implementation detail) because the device is required to ack BEFORE it
-    /// executes - a command that reads Acknowledged but never reaches Executed means the device
-    /// took the command and then never confirmed the outcome (crashed, lost power, or - for
-    /// Reboot - has nothing further to report).</summary>
+    /// <summary>Device acknowledges before executing, so a command stuck at Acknowledged (never reaching Executed) means it took the command but crashed or lost power before confirming the outcome.</summary>
     public enum CommandStatus
     {
         Pending = 0,
@@ -26,10 +16,7 @@ namespace api.Models
         Expired = 3,
     }
 
-    /// <summary>Roadmap #34: what POST /api/DeviceCommand issues a command AGAINST - a single
-    /// device directly, or resolved server-side to the device(s) implied by a Zone/Unit (see
-    /// CommandQueueService.IssueCommandAsync for the fan-out rules, #82's "one controller per
-    /// zone" invariant is what makes Zone resolve to at most one device).</summary>
+    /// <summary>Target resolved server-side to the device(s) implied by Zone/Unit; see CommandQueueService.IssueCommandAsync.</summary>
     public enum CommandTargetType
     {
         Device = 1,
@@ -45,9 +32,6 @@ namespace api.Models
         public CommandActionType ActionType { get; set; }
     }
 
-    /// <summary>One row from GET-style admin views of the command log (not currently exposed via
-    /// its own endpoint - the Web UI's own issue-confirmation is enough for v1 - but kept as a
-    /// full DTO since api.Dal.EfRepository.Commands.cs already builds it internally).</summary>
     public class DeviceCommand
     {
         public int IDDeviceCommand { get; set; }
@@ -59,10 +43,7 @@ namespace api.Models
         public DateTime? ExecutedAt { get; set; }
     }
 
-    /// <summary>Roadmap #34: the minimal shape ridden along in DeviceConfig (the SAME response the
-    /// device already gets from every Config poll - deliberately not a new endpoint, see
-    /// DeviceApiController.GetConfig) - just enough for the firmware to know what to ack/execute,
-    /// nothing an admin-facing DeviceCommand DTO carries that the device has no use for.</summary>
+    /// <summary>Minimal shape returned inside DeviceConfig during a device's regular config poll — not a separate endpoint.</summary>
     public class PendingCommand
     {
         public int IDDeviceCommand { get; set; }
@@ -70,9 +51,7 @@ namespace api.Models
         public DateTime ExpiresAt { get; set; }
     }
 
-    /// <summary>Body of POST /api/Device/Command/Ack - the device confirms receipt of exactly one
-    /// PendingCommand BEFORE executing it (roadmap #34: must happen before, not after, since a
-    /// Reboot action has no "after" on the same connection to report from).</summary>
+    /// <summary>Body of POST /api/Device/Command/Ack.</summary>
     public class CommandAckRequest
     {
         public int CommandId { get; set; }
