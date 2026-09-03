@@ -796,6 +796,35 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(1, (await _repo.DeviceConfigSensorGetAsync(d.DeviceConfigSensorID))!.SensorTemp);
     }
 
+    // Roadmap #149: DeviceFleetGetAsync.ControllerCapable must be true when EITHER signal says so -
+    // the admin's explicit DeviceType choice (DeviceControllerEnabled) OR a heartbeat-reported Kit
+    // the deviceTypeKit lookup recognizes - and false when neither does, never requiring both.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceFleetGet_ControllerCapable_TrueFromEitherDeviceTypeOrKnownKit(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+
+        var basicUnknownKit = await MakeDevice(t, tenantId); // DeviceControllerEnabled=true from MakeDevice's own seed - see below
+        var recognizedKit = await MakeDevice(t, tenantId);
+
+        // MakeDevice seeds DeviceControllerEnabled=true (helper default) - flip it off here so this
+        // device's capability can ONLY come from DeviceType, isolating that half of the OR.
+        basicUnknownKit.DeviceControllerEnabled = false;
+        await _repo.DeviceUpdateAsync(basicUnknownKit);
+        await _repo.DeviceDiagnosticUpsertAsync(basicUnknownKit.IDDevice!.Value, tenantId,
+            new DeviceConfigPoll { ConfigVersion = 1, Kit = "" }); // unrecognized/empty kit
+
+        recognizedKit.DeviceControllerEnabled = false;
+        await _repo.DeviceUpdateAsync(recognizedKit);
+        await _repo.DeviceDiagnosticUpsertAsync(recognizedKit.IDDevice!.Value, tenantId,
+            new DeviceConfigPoll { ConfigVersion = 1, Kit = "KC868-A6" }); // seeded as ControllerCapable=true
+
+        var fleet = await _repo.DeviceFleetGetAsync(tenantId);
+        Assert.False(fleet.Single(f => f.IDDevice == basicUnknownKit.IDDevice).ControllerCapable);
+        Assert.True(fleet.Single(f => f.IDDevice == recognizedKit.IDDevice).ControllerCapable);
+    }
+
     // Roadmap #78: DeviceConfig*UpdateAsync must resolve the row to write from idDevice's OWN
     // config-id column, never from the DeviceConfig*.ID* field on the posted payload - the Web
     // Edit/EditSensor/EditController forms used to render that id as a plain editable input, and

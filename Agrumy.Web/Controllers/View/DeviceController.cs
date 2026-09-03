@@ -80,6 +80,11 @@ namespace api.Controllers.View
             IList<DeviceFleetStatus> fleet = await api.DeviceFleetGet();
             DeviceFleetStatus? status = fleet.FirstOrDefault(f => f.IDDevice == idDevice);
             ViewBag.FreeHeapBytes = status?.FreeHeapBytes;
+            // Roadmap #149: hide the Controller config link entirely for a device with no known
+            // relay hardware, same "leave it out, don't grey it out" convention as #21's
+            // zone-without-controller decision.
+            ViewBag.ControllerCapable = status?.ControllerCapable ?? true;
+            ViewBag.Kit = status?.Kit;
 
             // Roadmap #93: the firmware card - catalog versions only make sense once the device has
             // reported its board (pre-#94 firmware never does; "latest" still works for it).

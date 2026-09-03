@@ -78,6 +78,11 @@
             <dd class="col-sm-9">
                 @Html.DisplayFor(model => model.DeviceControllerEnabled)
             </dd>
+            @if (ViewBag.Kit is string { Length: > 0 } kit)
+            {
+                <dt class="col-sm-3">Kit</dt>
+                <dd class="col-sm-9">@kit</dd>
+            }
             <dt class="col-sm-3">
                 @Html.DisplayNameFor(model => model.SleepSeconds)
             </dt>
@@ -141,7 +146,12 @@
         }
         <a asp-action="Edit" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Edit</a>
         <a asp-action="EditSensor" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Sensor config</a>
-        <a asp-action="EditController" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Controller config</a>
+        @* Roadmap #149: no relay-hardware signal (admin's DeviceType choice AND no recognized Kit) -
+           leave the link out entirely rather than show a control surface that does nothing. *@
+        @if (ViewBag.ControllerCapable == true)
+        {
+            <a asp-action="EditController" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Controller config</a>
+        }
         <a asp-action="Events" asp-route-idDevice="@Model.IDDevice" class="btn btn-secondary">Events</a>
         <a asp-action="Delete" asp-route-idDevice="@Model.IDDevice" class="btn btn-danger">Delete</a>
         <a asp-action="Fleet" class="btn btn-outline-secondary">Back to List</a>

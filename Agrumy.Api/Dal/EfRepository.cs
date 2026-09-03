@@ -252,6 +252,17 @@ namespace api.Dal
                     new DeviceTypeSensorRow { IDDeviceTypeSensor = 2002, SensorName = "Analog moisture", Moisture = 1 });
             }
 
+            // Roadmap #149: the two kits with a real PlatformIO environment/pinout today
+            // (AgrumyFirmware's kc868-a6/esp32-s3-relay-6ch envs) - both have wired relay hardware.
+            // Any Kit string not in this table (empty string included) falls back to the existing,
+            // admin-controlled DeviceType/DeviceControllerEnabled signal - see DeviceFleetGetAsync.
+            if (!await db.DeviceTypeKits.AnyAsync())
+            {
+                db.DeviceTypeKits.AddRange(
+                    new DeviceTypeKitRow { Kit = "KC868-A6", ControllerCapable = true },
+                    new DeviceTypeKitRow { Kit = "ESP32-S3-Relay-6CH", ControllerCapable = true });
+            }
+
             await db.SaveChangesAsync();
         }
 

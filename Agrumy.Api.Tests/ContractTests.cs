@@ -195,7 +195,7 @@ public class ContractTests
         // apiConfig(): PascalCase keys, ConfigVersion sent as a STRING; the diagnostics fields
         // (roadmap #7) ride along as JSON numbers/string.
         const string payload =
-            """{"ConfigVersion":"66","Uptime":3661,"Rssi":-67,"FreeHeap":153212,"FirmwareVersion":"0.1.2","Board":"esp32dev"}""";
+            """{"ConfigVersion":"66","Uptime":3661,"Rssi":-67,"FreeHeap":153212,"FirmwareVersion":"0.1.2","Board":"esp32dev","Kit":""}""";
 
         AssertValid("config.request.schema.json", payload);
 
@@ -206,6 +206,21 @@ public class ContractTests
         Assert.Equal(153212, bound.FreeHeap);
         Assert.Equal("0.1.2", bound.FirmwareVersion);
         Assert.Equal("esp32dev", bound.Board); // roadmap #94
+        Assert.Equal("", bound.Kit); // roadmap #149 - empty on a generic (non-kit) environment
+    }
+
+    [Fact]
+    public void ConfigRequest_KitShapedPayload_MatchesSchemaAndBinds()
+    {
+        // roadmap #149: a recognized kit reports its name instead of the empty string.
+        const string payload =
+            """{"ConfigVersion":"66","Uptime":3661,"Rssi":-67,"FreeHeap":153212,"FirmwareVersion":"0.1.2","Board":"kc868-a6","Kit":"KC868-A6"}""";
+
+        AssertValid("config.request.schema.json", payload);
+
+        var bound = JsonSerializer.Deserialize<DeviceConfigPoll>(payload, Mvc)!;
+        Assert.Equal("kc868-a6", bound.Board);
+        Assert.Equal("KC868-A6", bound.Kit);
     }
 
     [Fact]

@@ -35,6 +35,7 @@ namespace api.Dal
         public DbSet<DeviceTypeServiceRow> DeviceTypeServices => Set<DeviceTypeServiceRow>();
         public DbSet<DeviceTypeRelayRow> DeviceTypeRelays => Set<DeviceTypeRelayRow>();
         public DbSet<DeviceTypeSensorRow> DeviceTypeSensors => Set<DeviceTypeSensorRow>();
+        public DbSet<DeviceTypeKitRow> DeviceTypeKits => Set<DeviceTypeKitRow>();
         public DbSet<DeviceConfigSensorRow> DeviceConfigSensors => Set<DeviceConfigSensorRow>();
         public DbSet<DeviceConfigControllerRow> DeviceConfigControllers => Set<DeviceConfigControllerRow>();
         public DbSet<DeviceScheduleSlotRow> DeviceScheduleSlots => Set<DeviceScheduleSlotRow>();
@@ -198,6 +199,13 @@ namespace api.Dal
                 e.Property(x => x.SensorName).HasMaxLength(128);
             });
 
+            modelBuilder.Entity<DeviceTypeKitRow>(e =>
+            {
+                e.ToTable("deviceTypeKit");
+                e.HasKey(x => x.Kit);
+                e.Property(x => x.Kit).HasMaxLength(64).ValueGeneratedNever();
+            });
+
             modelBuilder.Entity<DeviceConfigControllerRow>(e =>
             {
                 e.ToTable("deviceConfigController");
@@ -292,6 +300,7 @@ namespace api.Dal
                 e.Property(x => x.DeviceID).ValueGeneratedNever();
                 e.Property(x => x.FirmwareVersion).HasMaxLength(20); // same cap as deviceFirmware.Version
                 e.Property(x => x.Board).HasMaxLength(40);
+                e.Property(x => x.Kit).HasMaxLength(64); // roadmap #149, same cap as deviceTypeKit.Kit
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 

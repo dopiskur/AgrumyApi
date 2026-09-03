@@ -5,7 +5,7 @@
   "description": "Body built by ServiceController::apiConfig(). 'ConfigVersion' - PascalCase, unlike every other firmware payload - is the device's current config version sent as a STRING (String(deviceConfig.configVersion)). Since roadmap #7 the poll doubles as the heartbeat and also carries live diagnostics: 'Uptime' (seconds since boot, from esp_timer_get_time), 'Rssi' (WiFi.RSSI() dBm, negative), 'FreeHeap' (ESP.getFreeHeap() bytes) and 'FirmwareVersion' (the RUNNING image's version string, not the offered OTA one). The server binds the body to api.Models.DeviceConfigPoll via System.Text.Json case-insensitive matching plus NumberHandling.AllowReadingFromString, and upserts the diagnostics into deviceDiagnostic with LastSeenAt = server clock. Credentials travel as HTTP HEADERS: 'apiId' (device GUID) and 'Authorization' (the apiAuth token from /Authenticate).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["ConfigVersion", "Uptime", "Rssi", "FreeHeap", "FirmwareVersion", "Board"],
+  "required": ["ConfigVersion", "Uptime", "Rssi", "FreeHeap", "FirmwareVersion", "Board", "Kit"],
   "properties": {
     "ConfigVersion": {
       "type": ["string", "integer"],
@@ -34,6 +34,11 @@
       "type": "string",
       "maxLength": 40,
       "description": "Roadmap #94: the PlatformIO environment the running image was built for (AGRUMY_BOARD build flag, e.g. \"esp32dev\" or \"esp32s3usbotg\") - selects which release .bin (agrumy-<board>-v<version>.bin) the server offers for OTA. Stored in deviceDiagnostic.Board."
+    },
+    "Kit": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "Roadmap #149: which commercial physical board this image was built for (AGRUMY_KIT build flag, e.g. \"KC868-A6\" or \"ESP32-S3-Relay-6CH\"), separate from Board above - Board picks the OTA binary, Kit is what the server's deviceTypeKit lookup matches against to auto-detect relay-hardware capability. Empty string on every generic chip-target environment (esp32dev/esp32s3usbotg), always present since this field was introduced (unlike Board, no pre-this-feature firmware to special-case). Stored in deviceDiagnostic.Kit."
     }
   },
   "$comment": "Required request headers (contract record only): 'apiId': device ApiId GUID; 'Authorization': apiAuth token from POST /api/Device/Authenticate."

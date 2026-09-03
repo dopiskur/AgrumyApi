@@ -147,6 +147,10 @@ namespace api.Models
         // Roadmap #94: PlatformIO environment the running image was built for (AGRUMY_BOARD build
         // flag) - what selects the right catalog .bin for OTA. Null from a pre-#94 firmware.
         public string? Board { get; set; }
+        // Roadmap #149: which commercial physical board this image was built for (AGRUMY_KIT build
+        // flag, e.g. "KC868-A6") - separate from Board, which only selects the OTA binary. Empty
+        // string on a generic chip-target environment, null from pre-#149 firmware.
+        public string? Kit { get; set; }
     }
 
     /// <summary>One device's row on the fleet dashboard (roadmap #8). Battery comes from the latest
@@ -175,6 +179,14 @@ namespace api.Models
         public string? FirmwareTargetVersion { get; set; }
         public int? Battery { get; set; }
         public bool Online { get; set; }
+        // Roadmap #149: which commercial physical board last reported in the heartbeat (empty =
+        // generic chip-target environment, null = never reported one).
+        public string? Kit { get; set; }
+        // Roadmap #149: true when this device is treated as having real, wired relay hardware -
+        // either the admin already set DeviceType to Sensor+Controller (DeviceControllerEnabled),
+        // OR Kit names a board the deviceTypeKit lookup knows has relays. Drives whether the Web UI
+        // shows the Controller config tab at all (EfRepository.DeviceFleetGetAsync computes this).
+        public bool ControllerCapable { get; set; }
         // Roadmap #116: lets the Web layer filter one shared DeviceFleetGet() response down to a
         // single zone's devices for DeviceUnitController.ZoneDetails, instead of a second endpoint.
         public int? DeviceUnitID { get; set; }

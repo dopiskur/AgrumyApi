@@ -225,6 +225,20 @@ namespace api.Dal.Entities
         public string? FirmwareVersion { get; set; }
         // Roadmap #94 - see api.Models.DeviceConfigPoll.Board.
         public string? Board { get; set; }
+        // Roadmap #149 - see api.Models.DeviceConfigPoll.Kit.
+        public string? Kit { get; set; }
+    }
+
+    /// <summary>Roadmap #149: catalog of recognized commercial kits (physical boards) and whether
+    /// each one is known to have real, wired relay hardware - Kit itself is the key (a build-flag
+    /// string, e.g. "KC868-A6"), not an auto-increment id, since it only ever needs to be looked up
+    /// by the exact string the firmware reports, never joined by a numeric FK elsewhere. Seeded with
+    /// the currently-known kits (EfRepository); no admin UI yet to add more - a new kit needs a code
+    /// change either way (a new PlatformIO environment) before its Kit string could ever appear.</summary>
+    public class DeviceTypeKitRow
+    {
+        public string Kit { get; set; } = "";
+        public bool ControllerCapable { get; set; }
     }
 
     // Roadmap #94 columns (Board/Source/FileName/SizeBytes/Sha256/PublishedAt) - see

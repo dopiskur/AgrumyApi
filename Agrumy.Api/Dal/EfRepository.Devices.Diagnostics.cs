@@ -31,6 +31,7 @@ namespace api.Dal
             row.FreeHeapBytes = poll.FreeHeap ?? row.FreeHeapBytes;
             row.FirmwareVersion = poll.FirmwareVersion ?? row.FirmwareVersion;
             row.Board = poll.Board ?? row.Board; // roadmap #94
+            row.Kit = poll.Kit ?? row.Kit; // roadmap #149
             await db.SaveChangesAsync();
         }
 
@@ -74,6 +75,12 @@ namespace api.Dal
                 })
                 .ToListAsync();
 
+            // Roadmap #149: one small lookup read for the whole fleet - Kit is only ever a handful
+            // of known strings, cheap to pull entire and check in memory below rather than a
+            // per-device join.
+            Dictionary<string, bool> kitCapability = await db.DeviceTypeKits.AsNoTracking()
+                .ToDictionaryAsync(k => k.Kit, k => k.ControllerCapable);
+
             // Roadmap #93: one catalog read for the whole fleet, newest version per board picked in
             // memory (semver, not DateAdded) across the visible sources - see
             // FirmwareCatalogService.VisibleSources for why Local always counts.
@@ -104,6 +111,12 @@ namespace api.Dal
                     FreeHeapBytes = r.Diag?.FreeHeapBytes,
                     FirmwareVersion = r.Diag?.FirmwareVersion,
                     Board = r.Diag?.Board,
+                    Kit = r.Diag?.Kit,
+                    // Roadmap #149: admin's explicit DeviceType choice (DeviceControllerEnabled)
+                    // always wins if set - a recognized Kit only ADDS capability, it never takes it
+                    // away from a device the admin already configured as Sensor+Controller.
+                    ControllerCapable = r.Device.DeviceControllerEnabled == true
+                        || (r.Diag?.Kit is { Length: > 0 } kit && kitCapability.GetValueOrDefault(kit)),
                     LatestFirmwareVersion = latest,
                     FirmwareUpdateAvailable = FirmwareVersion.IsNewer(latest, r.Diag?.FirmwareVersion),
                     FirmwareUpdatePending = r.Device.FirmwareUpdate == true,
