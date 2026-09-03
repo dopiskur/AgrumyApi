@@ -8,13 +8,7 @@ using Xunit;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Roadmap #72: CacheRepository moved from a process-local <c>System.Runtime.Caching.MemoryCache</c>
-/// to <see cref="IDistributedCache"/> so a real distributed backend (Redis, SQL Server) is a DI swap,
-/// not a rewrite. These tests exercise it against <see cref="MemoryDistributedCache"/> - the same
-/// implementation Program.cs wires up today via <c>AddDistributedMemoryCache()</c> - so they cover
-/// the serialization round-trip a real network-backed store would also require.
-/// </summary>
+/// <summary>CacheRepository sits on <see cref="IDistributedCache"/> so a real distributed backend (Redis, SQL Server) is a DI swap, not a rewrite. Exercised here against <see cref="MemoryDistributedCache"/>, covering the same serialization round-trip a network-backed store would require.</summary>
 public class CacheRepositoryTests
 {
     private static IDistributedCache NewBackingStore() =>
@@ -45,12 +39,7 @@ public class CacheRepositoryTests
         Assert.Equal("session-token", result.apiAuth);
     }
 
-    /// <summary>
-    /// The actual point of #72: two CacheRepository instances over the SAME backing store see each
-    /// other's writes - unlike the old `static readonly MemoryCache`, state now lives in whatever
-    /// IDistributedCache is registered, which is exactly what lets a real distributed backend make
-    /// this true across separate application instances, not just separate objects in one process.
-    /// </summary>
+    /// <summary>Two CacheRepository instances over the SAME backing store see each other's writes - state lives in whatever IDistributedCache is registered, which is what lets a real distributed backend make this true across separate application instances.</summary>
     [Fact]
     public async Task TwoRepositoryInstances_OverSharedBackingStore_SeeEachOthersWrites()
     {
@@ -76,7 +65,6 @@ public class CacheRepositoryTests
         Assert.Equal("new", result.apiAuth);
     }
 
-    // ---- Generic GetAsync<T>/SetAsync<T> (roadmap #118) ------------------------------
 
     private sealed record FleetSnapshot(int IDDevice, bool Online);
 
@@ -102,10 +90,7 @@ public class CacheRepositoryTests
         Assert.Equal(snapshot, result);
     }
 
-    /// <summary>Same distributed-visibility guarantee as
-    /// <see cref="TwoRepositoryInstances_OverSharedBackingStore_SeeEachOthersWrites"/> above, for the
-    /// generic path - this is what lets several concurrently open admin tabs (roadmap #90's 10s poll,
-    /// each its own HTTP request/scope) share one real DB query instead of one each.</summary>
+    /// <summary>Same distributed-visibility guarantee as <see cref="TwoRepositoryInstances_OverSharedBackingStore_SeeEachOthersWrites"/>, for the generic path - lets several concurrently open admin tabs share one real DB query instead of one each.</summary>
     [Fact]
     public async Task GetAsync_OverSharedBackingStore_SeesAnotherInstancesSetAsync()
     {
@@ -120,10 +105,8 @@ public class CacheRepositoryTests
         Assert.Equal(snapshot, result);
     }
 
-    // ---- Roadmap #119: backend outage degrades to miss/no-op instead of throwing -----
 
-    /// <summary>Stands in for a Redis client throwing a connection/timeout exception - CacheRepository
-    /// must not care which backend or which exception type, only that the call failed.</summary>
+    /// <summary>Stands in for a Redis client throwing a connection/timeout exception - CacheRepository must not care which backend or exception type, only that the call failed.</summary>
     private sealed class ThrowingCache : IDistributedCache
     {
         public byte[]? Get(string key) => throw new InvalidOperationException("backend unreachable");
@@ -159,6 +142,7 @@ public class CacheRepositoryTests
 
         await repo.SetItemAsync("api-guid", new DeviceCache { apiAuth = "session-token" });
         // No assert needed beyond "did not throw" - that IS the graceful-degradation contract.
+
     }
 
     [Fact]

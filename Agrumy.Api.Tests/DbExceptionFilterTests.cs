@@ -12,12 +12,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// The global filter that replaced the per-action try/catch blocks: a unique-constraint hit becomes
-/// a 409 business message (roadmap #99 - this used to be a hardcoded 500, an oversight relative to
-/// the general path's own 409 for every other constraint violation), everything else goes through
-/// IRepository.ClassifyException -> 503/500/409.
-/// </summary>
+/// <summary>The global filter that replaced per-action try/catch blocks: a unique-constraint hit becomes a 409 business message, everything else goes through IRepository.ClassifyException -> 503/500/409.</summary>
 public class DbExceptionFilterTests
 {
     private static ExceptionContext Context(Exception ex)
@@ -94,8 +89,7 @@ public class DbExceptionFilterTests
     [Fact]
     public void UniqueEmailViolation_Becomes409BusinessMessage()
     {
-        // Roadmap #99: was a hardcoded 500 - a client can't distinguish "you already registered
-        // this email" (409, actionable) from a real server error (500) without this fix.
+        // Without this a client can't distinguish "you already registered this email" (409, actionable) from a real server error (500).
         var ctx = Context(new Exception("outer",
             new Exception("Duplicate entry 'a@b.com' for key 'user.email_UNIQUE'")));
         Filter().OnException(ctx);

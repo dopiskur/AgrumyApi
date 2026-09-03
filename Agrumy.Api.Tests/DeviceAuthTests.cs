@@ -9,13 +9,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Roadmap #105: drives DeviceApiKeyHandler/DeviceSessionHandler through every rejection path
-/// (missing header / unknown device / bad key / expired-session) plus the success path, end to
-/// end through the real LoggerMessage delegates - proves they compile and run without throwing,
-/// and locks in the pre-existing 401-on-failure/succeed-on-match authorization behaviour, which
-/// had no test coverage before this fix.
-/// </summary>
+/// <summary>Drives DeviceApiKeyHandler/DeviceSessionHandler through every rejection path (missing header/unknown device/bad key/expired-session) plus the success path, end to end through the real LoggerMessage delegates.</summary>
 public class DeviceAuthTests
 {
     private static AuthorizationHandlerContext NewContext(IAuthorizationRequirement requirement, HttpContext http) =>
@@ -30,7 +24,6 @@ public class DeviceAuthTests
         return http;
     }
 
-    // ---- DeviceApiKeyHandler ----
 
     [Fact]
     public async Task ApiKey_MissingHeader_Fails()
@@ -86,7 +79,6 @@ public class DeviceAuthTests
         Assert.Equal("dev1", http.DeviceApiId());
     }
 
-    // ---- DeviceSessionHandler ----
 
     [Fact]
     public async Task Session_MissingHeader_Fails()

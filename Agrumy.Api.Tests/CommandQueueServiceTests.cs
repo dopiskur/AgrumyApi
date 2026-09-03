@@ -5,11 +5,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>
-/// Roadmap #34. Exercises CommandQueueService directly - no HTTP/controller plumbing, no database
-/// (ICommandRepository/IDeviceRepository/IDeviceUnitRepository are mocked, same convention as
-/// OfflineAlertEvaluatorTests for roadmap #40).
-/// </summary>
+/// <summary>Exercises CommandQueueService directly - no HTTP/controller plumbing, no database (repositories are mocked).</summary>
 public class CommandQueueServiceTests
 {
     private readonly Mock<ICommandRepository> _commands = new(MockBehavior.Strict);
@@ -20,7 +16,6 @@ public class CommandQueueServiceTests
 
     private static Device ControllerDevice(int id) => new() { IDDevice = id, DeviceControllerEnabled = true };
 
-    // ---- IssueCommandAsync: target resolution / fan-out --------------------
 
     [Fact]
     public async Task Device_Target_Not_Found_Returns_TargetNotFound()
@@ -36,7 +31,7 @@ public class CommandQueueServiceTests
     [Fact]
     public async Task Zone_With_No_Controller_Returns_TargetNotFound()
     {
-        // #82 invariant: a zone has at most one controller - null means genuinely none, not "not looked up yet".
+        // A zone has at most one controller - null means genuinely none, not "not looked up yet".
         _units.Setup(u => u.DeviceUnitZoneGetControllerAsync(10)).ReturnsAsync((Device?)null);
 
         var result = await NewService().IssueCommandAsync(CommandTargetType.Zone, 10, CommandActionType.Reboot);
@@ -85,7 +80,6 @@ public class CommandQueueServiceTests
         Assert.Equal([1, 2], result.CreatedCommandIds);
     }
 
-    // ---- IssueCommandAsync: dedup ------------------------------------------
 
     [Fact]
     public async Task Device_With_Active_Command_Of_Same_ActionType_Is_Deduplicated()
@@ -103,9 +97,7 @@ public class CommandQueueServiceTests
     [Fact]
     public async Task Unit_FanOut_One_Zone_Already_Pending_Is_Skipped_Not_The_Whole_Batch()
     {
-        // Roadmap #34's own example: a Unit with three controllers, one of which already has an
-        // active command of this ActionType - that one is skipped, the other two still get created,
-        // and the overall outcome is still Success (not AllDuplicates, not an error).
+        // A Unit with three controllers, one already holding an active command of this ActionType: that one is skipped, the other two still get created, outcome is still Success (not AllDuplicates).
         _units.Setup(u => u.DeviceUnitGetControllersAsync(7))
             .ReturnsAsync(new List<Device> { ControllerDevice(500), ControllerDevice(501), ControllerDevice(502) });
         _commands.Setup(c => c.HasActiveCommandAsync(500, CommandActionType.Reboot, It.IsAny<DateTime>())).ReturnsAsync(true);
@@ -134,7 +126,6 @@ public class CommandQueueServiceTests
         Assert.Empty(result.CreatedCommandIds);
     }
 
-    // ---- GetPendingCommandAsync: FIFO + lazy expiry -------------------------
 
     [Fact]
     public async Task GetPendingCommand_Returns_Oldest_Pending_Command()
@@ -177,16 +168,14 @@ public class CommandQueueServiceTests
         Assert.Null(pending);
     }
 
-    /// <summary>Two poll cycles: the first poll's ack+execute must not disturb the second, still-
-    /// Pending command sitting behind it in the same queue - proves FIFO holds across cycles, not
-    /// just within a single GetPendingCommandAsync call.</summary>
+    /// <summary>Two poll cycles: the first poll's ack+execute must not disturb the second, still-Pending command behind it - proves FIFO holds across cycles.</summary>
     [Fact]
     public async Task Two_Commands_Are_Acked_And_Executed_In_FIFO_Order_Across_Two_Poll_Cycles()
     {
         var first = new DeviceCommand { IDDeviceCommand = 1, DeviceID = 500, ActionType = CommandActionType.Reboot, Status = CommandStatus.Pending, ExpiresAt = DateTime.UtcNow.AddMinutes(30) };
         var second = new DeviceCommand { IDDeviceCommand = 2, DeviceID = 500, ActionType = CommandActionType.ForceOTA, Status = CommandStatus.Pending, ExpiresAt = DateTime.UtcNow.AddMinutes(30) };
 
-        // ---- poll cycle 1: device sees, acks, and executes the first command ----
+        // poll cycle 1: device sees, acks, and executes the first command
         _commands.Setup(c => c.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand> { first, second });
         var service = NewService();
         PendingCommand? poll1 = await service.GetPendingCommandAsync(500);
@@ -199,8 +188,7 @@ public class CommandQueueServiceTests
         _commands.Setup(c => c.SetCommandStatusAsync(1, CommandStatus.Executed, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
         await service.MarkExecutedAsync(1);
 
-        // ---- poll cycle 2: the first command is now Executed and gone from the pending list, the
-        // second (previously behind it) surfaces next ----
+        // poll cycle 2: the first command is now Executed and gone from the pending list, the second surfaces next
         _commands.Setup(c => c.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand> { second });
         PendingCommand? poll2 = await service.GetPendingCommandAsync(500);
         Assert.Equal(2, poll2!.IDDeviceCommand);
@@ -209,7 +197,6 @@ public class CommandQueueServiceTests
         _commands.Verify(c => c.SetCommandStatusAsync(1, CommandStatus.Executed, It.IsAny<DateTime>()), Times.Once);
     }
 
-    // ---- AcknowledgeCommandAsync / MarkExecutedAsync: state-transition guards ----
 
     [Fact]
     public async Task Acknowledge_Ignores_A_Command_That_Is_No_Longer_Pending()
@@ -233,8 +220,7 @@ public class CommandQueueServiceTests
     [Fact]
     public async Task MarkExecuted_Accepts_Pending_Directly_Covering_Reboot_With_No_Prior_Ack()
     {
-        // Reboot has nothing to ack-then-execute on the same connection - MarkExecutedAsync must
-        // accept a straight Pending -> Executed transition, not require Acknowledged first.
+        // Reboot has nothing to ack-then-execute on the same connection - MarkExecutedAsync must accept a straight Pending -> Executed transition.
         _commands.Setup(c => c.GetCommandByIdAsync(1))
             .ReturnsAsync(new DeviceCommand { IDDeviceCommand = 1, Status = CommandStatus.Pending });
         _commands.Setup(c => c.SetCommandStatusAsync(1, CommandStatus.Executed, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
