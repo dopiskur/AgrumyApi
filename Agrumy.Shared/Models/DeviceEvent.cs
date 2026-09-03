@@ -37,6 +37,14 @@ namespace api.Models
         // on the SAME EventDedupeMinutes collapsing every other device-pushed event type already
         // gets (a mode that keeps requesting ON during cooldown would otherwise push this every tick).
         SafetyLimitTripped = 12,
+        // Roadmap #135: device-pushed on the boot right after a firmware crash (panic/watchdog/
+        // brownout) - see AgrumyFirmware's DeviceController::consumeCrashSummary. Message carries a
+        // compact "task=... pc=0x... cause=N vaddr=0x... bt=0x...,0x...,..." summary read from the
+        // ESP-IDF core dump the panic handler already writes to the coredump partition by default
+        // (CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH); this event is the pointer to it, not the dump
+        // itself - full symbolication of those addresses still needs firmware.elf + addr2line for
+        // the exact version reported, offline.
+        Crash = 13,
     }
 
     /// <summary>Body of POST /api/Device/Event. Deliberately carries no device/tenant identity field -

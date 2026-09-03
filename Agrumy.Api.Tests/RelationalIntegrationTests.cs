@@ -1369,7 +1369,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     // A NoInternet event is deliberately NOT in the #116 rule-(4) problem set (only AuthFailed/
-    // ConfigSyncFailed/CrashLoopRollback/OtaFailed, plus SafetyLimitTripped once #36 exists).
+    // ConfigSyncFailed/CrashLoopRollback/OtaFailed/Crash (#135), plus SafetyLimitTripped once #36 exists).
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitDashboard_Status_NoInternetEvent_DoesNotCountAsProblem(DbProviderKind provider)
     {

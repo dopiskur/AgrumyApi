@@ -20,15 +20,14 @@ namespace api.Dal
             int? Co2, int? Tvoc, double? Barometer, double? LiquidPH, int? RainLevel, int? WaterLevel, double? Wind);
 
         /// <summary>Roadmap #116 rule (4): event types that make a zone/unit Orange (unless it's
-        /// already Red). SafetyLimitTripped (roadmap #36, not built yet) belongs in this list too
-        /// once it exists - DeviceEventType has no such member today, so it can't be referenced yet;
-        /// adding it here is the ONLY change #36 needs to make on this side.</summary>
+        /// already Red).</summary>
         private static readonly int[] ProblemEventTypeIds =
         [
             (int)DeviceEventType.AuthFailed,
             (int)DeviceEventType.ConfigSyncFailed,
             (int)DeviceEventType.CrashLoopRollback,
             (int)DeviceEventType.OtaFailed,
+            (int)DeviceEventType.Crash, // roadmap #135
         ];
 
         // ---- Unit CRUD (roadmap #82) -------------------------------------------------
