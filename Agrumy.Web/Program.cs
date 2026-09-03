@@ -133,6 +133,27 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
 }
 
+// Roadmap #41 (revised, vendored esp-web-tools): its published dist/ uses extensionless relative
+// ES-module imports (e.g. `import { connect } from "./connect"`, no ".js") throughout - this is
+// how the package ships upstream, not a build artifact of this repo's LibMan restore. It works
+// live from jsDelivr because that CDN's edge resolves bare npm-package paths to their real file
+// (Node-require-style), but a browser requesting an ES module import always fetches the EXACT
+// literal specifier as a URL, so a plain static-file server 404s on "/lib/esp-web-tools/dist/
+// connect". Patching the vendored .js files directly is not an option - libman.json restores this
+// gitignored folder fresh on every build, silently discarding any hand edit. Narrowly scoped to
+// this one vendored path (not a general extensionless-URL rewrite) to keep the blast radius small.
+app.Use(async (context, next) =>
+{
+    PathString requestPath = context.Request.Path;
+    if (requestPath.StartsWithSegments("/lib/esp-web-tools", out _) &&
+        string.IsNullOrEmpty(Path.GetExtension(requestPath.Value)) &&
+        File.Exists(Path.Combine(app.Environment.WebRootPath, requestPath.Value!.TrimStart('/') + ".js")))
+    {
+        context.Request.Path = requestPath + ".js";
+    }
+    await next();
+});
+
 app.MapStaticAssets();
 
 app.UseRouting();

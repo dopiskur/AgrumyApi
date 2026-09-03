@@ -62,6 +62,11 @@
       "library": "datatables.net-bs5@3.0.2",
       "destination": "wwwroot/lib/adminlte/plugins/datatables-bs5/",
       "files": [ "dataTables.bootstrap5.min.css", "dataTables.bootstrap5.min.js" ]
+    },
+    {
+      "provider": "jsdelivr",
+      "library": "esp-web-tools@10.4.0",
+      "destination": "wwwroot/lib/esp-web-tools/"
     }
   ]
 }

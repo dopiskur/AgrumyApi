@@ -176,14 +176,27 @@
 </div>
 
 @section Scripts {
-    @* Roadmap #41: loaded straight from jsDelivr, not vendored via libman.json like the rest of
-       wwwroot/lib/ - esp-web-tools ships as ~150 small ES modules with relative imports between
-       them (lit + esptool-js dependencies included), so mirroring the exact file set through
-       LibMan's explicit per-file list would be fragile against any upstream restructuring; a CDN
-       reference resolves those relative imports against jsDelivr itself, which is how ESPHome/WLED/
-       Meshtastic's own flasher pages use this exact library too. Pinned to an exact version, same
-       discipline as every NuGet package in this repo. *@
-    <script type="module" src="https://cdn.jsdelivr.net/npm/esp-web-tools@10.4.0/dist/install-button.min.js"></script>
+    @* Roadmap #41, revised: was a live jsDelivr <script src>, changed after a real report of the
+       button silently failing (both the "unsupported" AND "not-allowed" slot text rendering
+       together, install doing nothing) with no console error - the actual install-button.js source
+       (read directly off jsDelivr while diagnosing) only ever fills ONE of those two slots, so both
+       showing at once meant the module - or its internal "./connect" relative sub-import - never
+       actually executed, i.e. the live CDN request was silently failing for that browser/network
+       (no visible red error either, consistent with an extension/DNS-level block rather than a
+       server or CORS rejection). Note: the earlier version of this comment claimed Meshtastic's own
+       flasher uses this same CDN-hosted library - that was never actually verified and turned out
+       to be wrong: their flasher (github.com/meshtastic/web-flasher) bundles esptool-js directly
+       into its own Nuxt build, no runtime third-party origin at all.
+       Vendored via libman.json instead (matches every other wwwroot/lib/ entry, roadmap #33) -
+       deliberately no "files" list there: esp-web-tools' dist/ has ~90 interlinked ES modules,
+       several under dist/web/ with build-hash filenames (e.g. stub_flasher_32c3-DmSvHQKL.js) that
+       change on every upstream rebuild, so enumerating them by hand would silently break on the
+       next version bump. Omitting "files" mirrors the whole published package instead - some unused
+       extra files (README, .github/, src/) land in wwwroot/lib/esp-web-tools/ too, harmless since
+       nothing references them and the folder is gitignored/restored fresh on every build anyway.
+       Same-origin now, so this is no longer reachable-CDN-dependent at page-load time; pinned to the
+       same exact version as before. *@
+    <script type="module" src="~/lib/esp-web-tools/dist/install-button.min.js"></script>
     <script src="~/js/offline-repo.js"></script>
     <script src="~/js/firmware-install-picker.js"></script>
 }
