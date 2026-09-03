@@ -2,8 +2,8 @@ using api.Models;
 
 namespace api.Dal.Interface
 {
-    /// <summary>Refresh-token facet (roadmap #74). Tokens are opaque, single-use, rotated on every
-    /// redemption. Only a SHA-256 hash of the token ever reaches the DB or these method signatures.</summary>
+    /// <summary>Refresh-token facet. Tokens are opaque, single-use, rotated on every redemption.
+    /// Only a SHA-256 hash of the token ever reaches the DB or these method signatures.</summary>
     public interface IRefreshTokenRepository
     {
         Task<int> RefreshTokenAddAsync(int userID, string tokenHash, DateTime expiresAt);

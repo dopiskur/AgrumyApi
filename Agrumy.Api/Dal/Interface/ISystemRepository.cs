@@ -1,7 +1,7 @@
 namespace api.Dal.Interface
 {
-    /// <summary>Startup/health facet of the data layer (roadmap #74) - the only part
-    /// infrastructure like DbExceptionFilter and the startup DB check needs.</summary>
+    /// <summary>Startup/health facet of the data layer - the only part infrastructure like
+    /// DbExceptionFilter and the startup DB check needs.</summary>
     public interface ISystemRepository
     {
         /// <summary>Opens and immediately closes a database connection. Returns true if the connection could be opened.</summary>

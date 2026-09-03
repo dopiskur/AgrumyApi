@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 
 namespace api.Dal.Interface
 {
-    /// <summary>Telemetry facet of the data layer (roadmap #74).</summary>
+    /// <summary>Telemetry facet of the data layer.</summary>
     public interface ISensorDataRepository
     {
         /// <summary>
@@ -16,15 +16,13 @@ namespace api.Dal.Interface
         Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? tenantID, int? getData, int? deviceID, int? sensorDataReportID);
         Task SensorDataDeleteAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY);
 
-        /// <summary>Roadmap #126 "Optimize Old Data": downsamples every row older than cutoffUtc,
-        /// per device, into one 5-minute-bucket average-without-outliers row, replacing the raw
-        /// rows in place in the same sensorData table. Plain LINQ/EF throughout - identical on
-        /// MariaDB and PostgreSQL, no TimescaleDB-specific SQL.</summary>
+        /// <summary>Downsamples every row older than cutoffUtc, per device, into one 5-minute-bucket
+        /// average-without-outliers row, replacing the raw rows in place. Plain LINQ/EF throughout -
+        /// identical on MariaDB and PostgreSQL, no TimescaleDB-specific SQL.</summary>
         Task OptimizeOldSensorDataAsync(DateTime cutoffUtc, CancellationToken ct);
 
-        /// <summary>Roadmap #126 "Purge Old Data": deletes rows older than cutoffUtc outright -
-        /// nothing survives, not even an aggregate. Uses drop_chunks() on a TimescaleDB hypertable
-        /// (whole-chunk delete, space returned to the OS immediately) or a plain DELETE otherwise;
+        /// <summary>Deletes rows older than cutoffUtc outright - nothing survives, not even an
+        /// aggregate. Uses drop_chunks() on a TimescaleDB hypertable or a plain DELETE otherwise;
         /// shrinkAfterPurge additionally runs OPTIMIZE TABLE on MariaDB/MySQL, whose DELETE never
         /// shrinks the underlying .ibd file on its own.</summary>
         Task PurgeOldSensorDataAsync(DateTime cutoffUtc, bool shrinkAfterPurge, CancellationToken ct);

@@ -7,8 +7,8 @@ using Npgsql;
 
 namespace api.Dal
 {
-    /// <summary>ISensorDataRepository members (roadmap #74 split), plus the JSON value coercion
-    /// helpers only the telemetry push uses (firmware sends measurements as strings or null).</summary>
+    /// <summary>ISensorDataRepository members, plus the JSON value coercion helpers only the
+    /// telemetry push uses (firmware sends measurements as strings or null).</summary>
     internal partial class EfRepository
     {
         public async Task SensorDataPushAsync(JsonArray jsonArray, int deviceID, int tenantID, int? deviceUnitID, int? deviceUnitZoneID)
@@ -24,9 +24,9 @@ namespace api.Dal
                 DateTime? dc = ReadDateTime(o, "dateCreated");
                 rows.Add(new SensorDataRow
                 {
-                    // Identity is server-authoritative: it comes from the authenticated device, not
-                    // the payload. The deviceID/tenantID/deviceUnitID/deviceUnitZoneID keys in each
-                    // JSON row are deliberately ignored.
+                    // Identity is server-authoritative (from the authenticated device) - the
+                    // deviceID/tenantID/deviceUnitID/deviceUnitZoneID keys in the JSON payload are
+                    // deliberately ignored.
                     DeviceID = deviceID,
                     TenantID = tenantID,
                     DeviceUnitID = deviceUnitID ?? 0,
@@ -44,8 +44,7 @@ namespace api.Dal
                     RainLevel = ReadInt(o, "rainLevel"),
                     WaterLevel = ReadInt(o, "waterLevel"),
                     Wind = ReadInt(o, "wind"),
-                    // Replaces the sensorData_SetDateTimeOnNull trigger: a missing/blank timestamp
-                    // becomes "now". UTC, not local: device timestamps are UTC (roadmap #71).
+                    // A missing/blank timestamp becomes "now" (UTC - device timestamps are UTC).
                     DateCreated = dc ?? DateTime.UtcNow,
                 });
             }
@@ -63,10 +62,10 @@ namespace api.Dal
         {
             if (timeMDMY is not (0 or 1 or 2 or 3) || timeRange == null)
             {
-                return ""; // proc: ELSE branch / NULL interval -> SQL NULL -> read as ""
+                return "";
             }
 
-            // UTC so the cutoff compares against UTC DateCreated without a DST-sized skew (roadmap #71).
+            // UTC so the cutoff compares against UTC DateCreated without a DST-sized skew.
             DateTime now = DateTime.UtcNow;
             DateTime cutoff = timeMDMY switch
             {
@@ -87,8 +86,6 @@ namespace api.Dal
 
             if (json.Length > 0 && buildReport > 0)
             {
-                // The proc hard-coded deviceID 1000038 here - a bug: every saved report was
-                // attributed to one device. Save it against the device the report is actually for.
                 db.SensorDataReports.Add(new SensorDataReportRow
                 {
                     DeviceID = deviceID,
@@ -133,17 +130,17 @@ namespace api.Dal
                               }).ToListAsync();
             }
 
-            return new List<SensorDataReport>(); // proc CASE has no matching WHEN and no ELSE
+            return new List<SensorDataReport>();
         }
 
         public async Task SensorDataDeleteAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY)
         {
             if (timeMDMY is not (0 or 1 or 2 or 3) || timeRange == null)
             {
-                return; // proc CASE has no ELSE
+                return;
             }
 
-            // UTC so the delete cutoff compares against UTC DateCreated (roadmap #71).
+            // UTC so the delete cutoff compares against UTC DateCreated.
             DateTime now = DateTime.UtcNow;
             DateTime cutoff = timeMDMY switch
             {
@@ -162,10 +159,9 @@ namespace api.Dal
 
         public async Task OptimizeOldSensorDataAsync(DateTime cutoffUtc, CancellationToken ct)
         {
-            // Per-device, not one giant query across the whole table - keeps each transaction's
-            // row count (and the in-memory row list below) bounded to one device's history, and a
-            // failure partway through leaves every device processed so far genuinely optimized
-            // rather than rolling back the entire run.
+            // Per-device, not one giant query - bounds each transaction's row count and lets a
+            // failure partway through leave already-processed devices genuinely optimized instead
+            // of rolling back the entire run.
             List<int> deviceIds = await db.SensorData.AsNoTracking()
                 .Where(r => r.DateCreated < cutoffUtc)
                 .Select(r => r.DeviceID)
@@ -191,9 +187,8 @@ namespace api.Dal
                     .Select(bucket => BuildOptimizedRow(deviceId, bucket.Key, bucket.ToList()))
                     .ToList();
 
-                // Delete-then-insert in one transaction: a crash between the two would otherwise
-                // either duplicate data (insert without delete) or silently lose the bucket
-                // (delete without insert).
+                // Delete-then-insert in one transaction - a crash between the two would otherwise
+                // duplicate or silently lose the bucket.
                 await using var transaction = await db.Database.BeginTransactionAsync(ct);
                 await db.SensorData
                     .Where(r => r.DeviceID == deviceId && r.DateCreated < cutoffUtc)
@@ -217,18 +212,16 @@ namespace api.Dal
                 }
                 catch (PostgresException)
                 {
-                    // TimescaleDB extension not installed - #14's graceful-fallback tier, sensorData
-                    // is a plain table here (same as MariaDB, minus the OPTIMIZE-TABLE shrink step).
+                    // TimescaleDB extension not installed - sensorData is a plain table here (like
+                    // MariaDB, minus the OPTIMIZE-TABLE shrink step below).
                     isHypertable = false;
                 }
 
                 if (isHypertable)
                 {
-                    // drop_chunks deletes whole chunk files, not row-by-row - space is returned to
-                    // the OS immediately, unlike a plain DELETE (see the MariaDB branch below for
-                    // why that path needs an extra shrink step and this one never does). Embedded
-                    // double-quotes in the regclass literal, same reasoning as EnsureTimescaleHypertableAsync:
-                    // an unquoted cast lowercases the mixed-case table name and misses it.
+                    // drop_chunks deletes whole chunk files (space returned immediately, unlike
+                    // DELETE below) - the embedded double-quotes in the regclass literal keep the
+                    // cast from lowercasing this mixed-case table name.
                     await db.Database.ExecuteSqlInterpolatedAsync(
                         $"""SELECT drop_chunks('"sensorData"'::regclass, older_than => {cutoffUtc});""", ct);
                     return;
@@ -241,11 +234,9 @@ namespace api.Dal
             await db.SensorData.Where(r => r.DateCreated < cutoffUtc).ExecuteDeleteAsync(ct);
             if (shrinkAfterPurge)
             {
-                // InnoDB never shrinks its .ibd file on a plain DELETE (the freed space is only
-                // reused internally) - OPTIMIZE TABLE is the full, locking rebuild that actually
-                // returns it to the OS. Caller (DataMaintenanceApiController) only sets this true
-                // after the admin explicitly opted in on a dedicated dialog, since this can take a
-                // long time on a large table.
+                // InnoDB never shrinks its .ibd file on a plain DELETE - OPTIMIZE TABLE is the
+                // locking rebuild that actually returns space to the OS; only run when the admin
+                // explicitly opts in since it can take a long time on a large table.
                 await db.Database.ExecuteSqlRawAsync("OPTIMIZE TABLE `sensorData`;", ct);
             }
         }
@@ -254,8 +245,7 @@ namespace api.Dal
             new(timestamp.Ticks - (timestamp.Ticks % OptimizeBucketSize.Ticks), DateTimeKind.Utc);
 
         /// <summary>One replacement row for a 5-minute bucket: TenantID/DeviceUnitID/DeviceUnitZoneID
-        /// come from the bucket's most recent raw row (a mid-bucket unit/zone reassignment is rare
-        /// and the newer value is the more useful one to keep), every sensor column is the
+        /// come from the bucket's most recent raw row, every sensor column is the
         /// average-without-outliers of whatever raw values that bucket has (nulls excluded).</summary>
         private static SensorDataRow BuildOptimizedRow(int deviceId, DateTime bucketStart, List<SensorDataRow> rows)
         {
@@ -283,10 +273,8 @@ namespace api.Dal
             };
         }
 
-        /// <summary>Classic IQR outlier rule (exclude anything outside 1.5x the interquartile range),
-        /// falling back to a plain average when there are too few points (under 4) to identify
-        /// outliers meaningfully, or when every value gets flagged (a degenerate all-equal-but-one
-        /// bucket would otherwise average zero points).</summary>
+        /// <summary>IQR outlier rule (exclude anything outside 1.5x the interquartile range), falling
+        /// back to a plain average under 4 points or when every value gets flagged as an outlier.</summary>
         private static double? TrimmedMean(IEnumerable<double?> source)
         {
             List<double> values = source.Where(v => v.HasValue).Select(v => v!.Value).OrderBy(v => v).ToList();

@@ -4,10 +4,9 @@ using api.Dal.Entities;
 namespace api.Dal
 {
     /// <summary>
-    /// Pure port of the <c>SensorDataReportBuilder</c> proc's shaping step (roadmap #42): time-bucket
-    /// grouping and JSON assembly only; the caller (<see cref="EfRepository.SensorDataGetAsync"/>) does
-    /// the row filter. <c>timeMDMY</c> buckets: 0 =&gt; minute, 1 =&gt; hour, 2/3 =&gt; day. One row per
-    /// bucket, pinned to "latest by DateCreated" (the proc relied on an arbitrary <c>GROUP BY</c> row).
+    /// Time-bucket grouping and JSON assembly only; the caller (<see cref="EfRepository.SensorDataGetAsync"/>)
+    /// does the row filter. <c>timeMDMY</c> buckets: 0 =&gt; minute, 1 =&gt; hour, 2/3 =&gt; day. One row
+    /// per bucket, pinned to "latest by DateCreated".
     /// </summary>
     internal static class SensorReportShaper
     {
