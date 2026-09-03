@@ -15,9 +15,10 @@ namespace api.Utils
             // Roadmap #149: same chip family as esp32dev/esp32s3usbotg respectively (different
             // physical board, same MCU) - deliberately NOT yet in release.yml's build matrix
             // (unverified on real hardware), so these never actually appear in the catalog today.
-            // Listed here anyway so FirmwareController's chip-family grouping (roadmap #148) treats
-            // them correctly the moment they do: a family with more than one catalog board falls
-            // back to manual per-board buttons instead of guessing.
+            // Listed here anyway so InstallManifest(board) (roadmap #155) can tag their manifest with
+            // the right chipFamily the moment they do - that's what lets esp-web-tools' own
+            // chip-vs-manifest mismatch check catch an admin who picked the wrong board from the
+            // dropdown, same as it already does for esp32dev/esp32s3usbotg.
             ["kc868-a6"] = "ESP32",
             ["esp32-s3-relay-6ch"] = "ESP32-S3",
         };

@@ -8,14 +8,10 @@ namespace api.ViewModels
     {
         public required ServerConfig Config { get; init; }
         public required IList<DeviceFirmware> Catalog { get; init; }
-        // Roadmap #148: the web-flasher board list (roadmap #41) split by whether esp-web-tools can
-        // safely auto-select it. AutoDetectBuilds are the boards whose chip family (EspChipFamily)
-        // maps to exactly this one catalog entry - safe to fold into one combined manifest/button.
-        // ManualBuilds are everything else (an unrecognized chip family, or one shared with another
-        // catalog board) - kept as individual per-board buttons since chip family alone cannot tell
-        // two same-family physical boards apart.
-        public required IList<DeviceFirmware> AutoDetectBuilds { get; init; }
-        public required IList<DeviceFirmware> ManualBuilds { get; init; }
+        // Roadmap #41/#155: one full-image build per board with a blank-chip image, for the web
+        // flasher's board dropdown - the admin always picks explicitly (roadmap #155 dropped #148's
+        // chip-family auto-grouping in favor of this), so no chip-family split is needed here.
+        public required IList<DeviceFirmware> InstallableBoards { get; init; }
     }
 
     /// <summary>Roadmap #93: the per-device firmware card on Device Details - what's running, what
