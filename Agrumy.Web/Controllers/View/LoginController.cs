@@ -85,7 +85,7 @@ namespace api.Controllers.View
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), props);
 
-            return RedirectToAction("Fleet", "Device");
+            return RedirectToAction("Index", "DeviceUnit");
         }
 
         public async Task<ActionResult> Logout()
