@@ -5,10 +5,9 @@
     var userUpdate = Model.UserUpdate!;
     string UserField(string name) => $"{nameof(Model.UserUpdate)}.{name}";
 
-    var userGroupItems = new SelectList(Model.UserGroups, nameof(UserGroup.IDUserGroup), nameof(UserGroup.GroupName), userUpdate.UserGroupID);
-    // UserUpdate.UserGroupID carries [Display(Name = "Role")] - use the real display name, not the raw property name.
-    var userGroupSelect = new SelectFieldViewModel { Name = UserField(nameof(userUpdate.UserGroupID)), Label = Html.DisplayNameFor(m => m.UserUpdate!.UserGroupID), Items = userGroupItems };
     var enabledToggle = new EnabledToggleFieldViewModel { Name = UserField(nameof(userUpdate.Enabled)), Label = "Account", Value = userUpdate.Enabled };
+    bool viewerIsAdmin = User.IsInRole(RoleNames.GlobalAdmin) || User.IsInRole(RoleNames.TenantAdmin) || User.IsInRole(RoleNames.LegacyAdmin);
+    List<string> assignedRoles = userUpdate.RoleNames ?? new();
 }
 
 <div class="card">
@@ -61,7 +60,24 @@
                 <span asp-validation-for="UserUpdate.Phone" class="text-danger"></span>
             </div>
 
-            <partial name="_SelectField" model="userGroupSelect" />
+            <div class="mb-3">
+                <label class="form-label">Roles</label>
+                @if (viewerIsAdmin)
+                {
+                    @foreach (var role in RoleNames.All)
+                    {
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="@UserField(nameof(userUpdate.RoleNames))" value="@role"
+                                   id="role_@role.Replace(" ", "_")" checked="@assignedRoles.Contains(role)" />
+                            <label class="form-check-label" for="role_@role.Replace(" ", "_")">@role</label>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="form-text">@string.Join(", ", assignedRoles) (contact an admin to change roles)</p>
+                }
+            </div>
             <partial name="_EnabledToggleField" model="enabledToggle" />
 
             <div class="mb-0">

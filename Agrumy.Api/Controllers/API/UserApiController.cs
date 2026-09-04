@@ -495,10 +495,15 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
+            (List<string>? roleNames, ActionResult? error) = ResolveGrantedRoles(value.RoleNames);
+            if (error != null)
+            {
+                return error;
+            }
+
             var user = new User
             {
                 TenantID = CallerTenantId, // payload's TenantID is ignored - admins only create in their own tenant
-                UserGroupID = value.UserGroupID,
                 Email = value.Email,
                 Username = value.Username,
                 FirstName = value.FirstName,
@@ -513,18 +518,31 @@ namespace api.Controllers.API
 
             await Repo.UserAddAsync(user, userSecret);
 
-            // Maps the legacy admin/user group choice onto a starting base role; an admin can layer
-            // on more (or promote to Global via UserRolesSet) afterwards.
             User? added = await Repo.UserGetAsync(null, value.Email, null);
             if (added?.IDUser is int idUser)
             {
-                string startingRole = value.UserGroupID == 0
-                    ? (CallerIsGlobalAdmin ? RoleNames.GlobalAdmin : RoleNames.TenantAdmin)
-                    : RoleNames.TenantReader;
-                await Repo.UserRolesSetAsync(idUser, new[] { startingRole });
+                await Repo.UserRolesSetAsync(idUser, roleNames!);
             }
 
             return Ok("User created successfully: " + user.Email);
+        }
+
+        /// <summary>Requested roles are honored only for an admin caller (never a non-admin UserManager, even via a forged body) and only within UserRolesSet's own allowed set - same privilege boundary, shared by UserAdd.</summary>
+        private (List<string>? roleNames, ActionResult? error) ResolveGrantedRoles(IEnumerable<string>? requested)
+        {
+            bool callerIsAdmin = CallerIsGlobalAdmin || CallerHasRole(RoleNames.TenantAdmin) || CallerHasRole(RoleNames.LegacyAdmin);
+            List<string> wanted = requested?.ToList() ?? new();
+
+            if (!callerIsAdmin || wanted.Count == 0)
+            {
+                return (new List<string> { RoleNames.TenantReader }, null); // safe default, never elevated
+            }
+
+            HashSet<string> allowed = CallerIsGlobalAdmin ? RoleNames.All.ToHashSet() : TenantScopedGrantableRoles.ToHashSet();
+            string? disallowed = wanted.FirstOrDefault(r => !allowed.Contains(r));
+            return disallowed != null
+                ? (null, StatusCode(403, $"Not allowed to assign role \"{disallowed}\"."))
+                : (wanted, null);
         }
 
         [HttpPut]
@@ -561,11 +579,24 @@ namespace api.Controllers.API
             if (value.FirstName != null) { user.FirstName = value.FirstName; }
             if (value.LastName != null) { user.LastName = value.LastName; }
             if (value.Phone != null) { user.Phone = value.Phone; }
-            if (value.UserGroupID != null) { user.UserGroupID = value.UserGroupID; } // attribute already restricts to user-managers
             if (value.Enabled != null) { user.Enabled = value.Enabled; }
             if (value.TenantID != null && CallerManagesUsersGlobally) { user.TenantID = value.TenantID; } // cross-tenant reassignment stays a Global-admin-only power
 
             await Repo.UserUpdateAsync(user);
+
+            // Non-admin callers can't touch roles at all - silently ignored, same guard as TenantID above.
+            bool callerIsAdmin = CallerIsGlobalAdmin || CallerHasRole(RoleNames.TenantAdmin) || CallerHasRole(RoleNames.LegacyAdmin);
+            if (value.RoleNames != null && callerIsAdmin)
+            {
+                HashSet<string> allowed = CallerIsGlobalAdmin ? RoleNames.All.ToHashSet() : TenantScopedGrantableRoles.ToHashSet();
+                string? disallowed = value.RoleNames.FirstOrDefault(r => !allowed.Contains(r));
+                if (disallowed != null)
+                {
+                    return StatusCode(403, $"Not allowed to assign role \"{disallowed}\".");
+                }
+                await Repo.UserRolesSetAsync(user.IDUser!.Value, value.RoleNames);
+            }
+
             return Ok(true);
         }
 

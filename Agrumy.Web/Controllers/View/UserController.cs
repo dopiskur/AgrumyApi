@@ -16,8 +16,7 @@ namespace api.Controllers.View
         public async Task<ActionResult> Details(int? idUser) =>
             View(await api.UserGet(idUser));
 
-        public async Task<ActionResult> Create() =>
-            View(new UserView { UserGroups = await api.UserGroupsGet() });
+        public ActionResult Create() => View(new UserView());
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -25,7 +24,6 @@ namespace api.Controllers.View
         {
             if (!ModelState.IsValid)
             {
-                userView.UserGroups = await api.UserGroupsGet();
                 return View(userView);
             }
 
@@ -36,6 +34,7 @@ namespace api.Controllers.View
         public async Task<ActionResult> Edit(int? idUser)
         {
             var user = await api.UserGet(idUser);
+            var assignedRoles = await api.UserRolesGet(idUser!.Value);
             return View(new UserView
             {
                 UserUpdate = new UserUpdate
@@ -47,10 +46,9 @@ namespace api.Controllers.View
                     FirstName = user.FirstName,
                     LastName = user.LastName,
                     Phone = user.Phone,
-                    UserGroupID = user.UserGroupID,
+                    RoleNames = assignedRoles.ToList(),
                     Enabled = user.Enabled ?? false,
                 },
-                UserGroups = await api.UserGroupsGet(),
             });
         }
 
@@ -60,7 +58,6 @@ namespace api.Controllers.View
         {
             if (!ModelState.IsValid)
             {
-                userView.UserGroups = await api.UserGroupsGet();
                 return View(userView);
             }
 

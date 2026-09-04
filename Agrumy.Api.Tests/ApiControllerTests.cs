@@ -766,7 +766,7 @@ public class ApiControllerTests
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 24);
-        var value = new UserAdd { TenantID = 999, Email = "x@test.local", Username = "x", Password = "pw", UserGroupID = 1, Enabled = true };
+        var value = new UserAdd { TenantID = 999, Email = "x@test.local", Username = "x", Password = "pw", Enabled = true };
         var result = await controller.UserAdd(value);
 
         Assert.IsType<OkObjectResult>(result.Result);
@@ -775,7 +775,7 @@ public class ApiControllerTests
     }
 
     [Fact]
-    public async Task UserAdd_AdminGroup_TenantAdmin_SeedsTenantAdminRole()
+    public async Task UserAdd_AdminRequestsTenantAdmin_Applied()
     {
         _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>())).Returns(Task.CompletedTask);
         _repo.Setup(r => r.UserGetAsync(null, "boss@test.local", null)).ReturnsAsync(new User { IDUser = 100, Email = "boss@test.local" });
@@ -786,14 +786,14 @@ public class ApiControllerTests
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 24); // NOT tenant 0 - a regular Tenant admin, not Global admin
-        var value = new UserAdd { Email = "boss@test.local", Username = "boss", Password = "pw", UserGroupID = 0, Enabled = true };
+        var value = new UserAdd { Email = "boss@test.local", Username = "boss", Password = "pw", RoleNames = new() { RoleNames.TenantAdmin }, Enabled = true };
         await controller.UserAdd(value);
 
         Assert.Equal(new[] { RoleNames.TenantAdmin }, seededRoles);
     }
 
     [Fact]
-    public async Task UserAdd_AdminGroup_CallerIsGlobalAdmin_SeedsGlobalAdminRole()
+    public async Task UserAdd_GlobalAdminRequestsGlobalAdmin_Applied()
     {
         _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>())).Returns(Task.CompletedTask);
         _repo.Setup(r => r.UserGetAsync(null, "boss@test.local", null)).ReturnsAsync(new User { IDUser = 101, Email = "boss@test.local" });
@@ -804,14 +804,14 @@ public class ApiControllerTests
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 0); // Global admin
-        var value = new UserAdd { Email = "boss@test.local", Username = "boss", Password = "pw", UserGroupID = 0, Enabled = true };
+        var value = new UserAdd { Email = "boss@test.local", Username = "boss", Password = "pw", RoleNames = new() { RoleNames.GlobalAdmin }, Enabled = true };
         await controller.UserAdd(value);
 
         Assert.Equal(new[] { RoleNames.GlobalAdmin }, seededRoles);
     }
 
     [Fact]
-    public async Task UserAdd_RegularGroup_SeedsTenantReaderRole()
+    public async Task UserAdd_AdminRequestsNoRoles_DefaultsToTenantReader()
     {
         _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>())).Returns(Task.CompletedTask);
         _repo.Setup(r => r.UserGetAsync(null, "newbie@test.local", null)).ReturnsAsync(new User { IDUser = 102, Email = "newbie@test.local" });
@@ -822,10 +822,45 @@ public class ApiControllerTests
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 24);
-        var value = new UserAdd { Email = "newbie@test.local", Username = "newbie", Password = "pw", UserGroupID = 1, Enabled = true };
+        var value = new UserAdd { Email = "newbie@test.local", Username = "newbie", Password = "pw", Enabled = true };
         await controller.UserAdd(value);
 
         Assert.Equal(new[] { RoleNames.TenantReader }, seededRoles);
+    }
+
+    /// <summary>roadmap #204: a non-admin UserManager (Tenant User) can create accounts but must
+    /// never be able to grant roles, even by forging a RoleNames list in the request body - the
+    /// requested TenantAdmin must be silently dropped in favor of the safe default.</summary>
+    [Fact]
+    public async Task UserAdd_NonAdminCaller_RequestedRolesIgnored_DefaultsToTenantReader()
+    {
+        _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.UserGetAsync(null, "sneaky@test.local", null)).ReturnsAsync(new User { IDUser = 103, Email = "sneaky@test.local" });
+        List<string>? seededRoles = null;
+        _repo.Setup(r => r.UserRolesSetAsync(103, It.IsAny<IEnumerable<string>>()))
+             .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
+             .Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCallerRoles(controller, 24, "user", RoleNames.TenantReader, RoleNames.TenantUser); // UserManagers-eligible, not an admin
+        var value = new UserAdd { Email = "sneaky@test.local", Username = "sneaky", Password = "pw", RoleNames = new() { RoleNames.TenantAdmin }, Enabled = true };
+        await controller.UserAdd(value);
+
+        Assert.Equal(new[] { RoleNames.TenantReader }, seededRoles);
+    }
+
+    /// <summary>A Tenant admin may only grant Tenant-scoped roles - requesting a Global role must 403.</summary>
+    [Fact]
+    public async Task UserAdd_TenantAdminRequestsGlobalRole_Returns403()
+    {
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 24); // Tenant admin, not Global
+        var value = new UserAdd { Email = "x@test.local", Username = "x", Password = "pw", RoleNames = new() { RoleNames.GlobalAdmin }, Enabled = true };
+
+        var result = await controller.UserAdd(value);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        // Strict mock: UserAddAsync was never set up - a disallowed role must reject before writing anything.
     }
 
     [Fact]
@@ -1431,6 +1466,52 @@ public class ApiControllerTests
 
         Assert.IsType<OkObjectResult>(result.Result);
         _repo.Verify(r => r.UserUpdateAsync(It.IsAny<User>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UserUpdate_AdminChangesRoles_Applied()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local" });
+        _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+        List<string>? seededRoles = null;
+        _repo.Setup(r => r.UserRolesSetAsync(50, It.IsAny<IEnumerable<string>>()))
+             .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
+             .Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 1); // Tenant admin
+        var result = await controller.UserUpdate(new UserUpdate { IDUser = 50, RoleNames = new() { RoleNames.TenantUser, RoleNames.TenantDevice } });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(new[] { RoleNames.TenantUser, RoleNames.TenantDevice }, seededRoles);
+    }
+
+    /// <summary>roadmap #204: a non-admin caller's RoleNames must be silently ignored, not applied -
+    /// same guard as UserAdd. Strict mock: UserRolesSetAsync was never set up.</summary>
+    [Fact]
+    public async Task UserUpdate_NonAdminCaller_RequestedRolesIgnored()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local" });
+        _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.TenantUser); // UserManagers-eligible, not an admin
+        var result = await controller.UserUpdate(new UserUpdate { IDUser = 50, RoleNames = new() { RoleNames.TenantAdmin } });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task UserUpdate_TenantAdminRequestsGlobalRole_Returns403()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local" });
+        _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 1); // Tenant admin, not Global
+        var result = await controller.UserUpdate(new UserUpdate { IDUser = 50, RoleNames = new() { RoleNames.GlobalDevice } });
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
     }
 
     [Fact]
