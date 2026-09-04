@@ -1382,6 +1382,34 @@ public class ApiControllerTests
     }
 
     [Fact]
+    public async Task ServerConfigUpdate_ProblemEventExpiryHoursNotInFixedSet_Returns400_AndNeverWrites()
+    {
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.Update(new ServerConfig { ProblemEventExpiryHours = 3 });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        // MockBehavior.Strict: ServerConfigUpdateAsync has no setup, proving the bad value was rejected before any write.
+    }
+
+    [Fact]
+    public async Task ServerConfigUpdate_ProblemEventExpiryHoursInFixedSet_Persists()
+    {
+        ServerConfig? saved = null;
+        _repo.Setup(r => r.ServerConfigUpdateAsync(It.IsAny<ServerConfig>()))
+             .Callback<ServerConfig>(c => saved = c)
+             .Returns(Task.CompletedTask);
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.Update(new ServerConfig { ProblemEventExpiryHours = 6 });
+
+        Assert.IsType<OkResult>(result);
+        Assert.Equal(6, saved!.ProblemEventExpiryHours);
+    }
+
+    [Fact]
     public async Task DevicesGet_GlobalReader_SeesEveryTenant()
     {
         // Strict mock: an un-set-up DevicesGetAsync(3) call would throw, proving the all-tenants path was taken.
@@ -1463,6 +1491,45 @@ public class ApiControllerTests
 
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(403, obj.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeviceEventAcknowledge_TenantDevice_PassesOwnTenantId_NotNull()
+    {
+        _repo.Setup(r => r.EventDeviceAcknowledgeAsync(9, 2)).ReturnsAsync(true);
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 2, "user", RoleNames.TenantDevice);
+        var result = await controller.DeviceEventAcknowledge(9);
+
+        Assert.True(result.Value);
+        // Strict mock: a call with tenantID null (the global-caller path) would not match this setup.
+        _repo.Verify(r => r.EventDeviceAcknowledgeAsync(9, 2), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeviceEventAcknowledge_GlobalDevice_PassesNullTenantId()
+    {
+        _repo.Setup(r => r.EventDeviceAcknowledgeAsync(9, null)).ReturnsAsync(true);
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 0, "admin", RoleNames.GlobalDevice);
+        var result = await controller.DeviceEventAcknowledge(9);
+
+        Assert.True(result.Value);
+        _repo.Verify(r => r.EventDeviceAcknowledgeAsync(9, null), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeviceEventAcknowledge_NoMatchingRow_Returns404()
+    {
+        _repo.Setup(r => r.EventDeviceAcknowledgeAsync(9, 2)).ReturnsAsync(false);
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 2, "user", RoleNames.TenantDevice);
+        var result = await controller.DeviceEventAcknowledge(9);
+
+        Assert.IsType<NotFoundResult>(result.Result);
     }
 
     [Fact]

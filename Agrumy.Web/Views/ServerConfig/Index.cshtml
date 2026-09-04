@@ -131,10 +131,34 @@
                         A device repeating the identical event (e.g. "NoInternet") within this many
                         minutes of its last one is ignored, not stored.
                     </p>
-                    <div class="mb-0">
+                    <div class="mb-3">
                         <label asp-for="EventDedupeMinutes" class="form-label"></label>
                         <input asp-for="EventDedupeMinutes" class="form-control" />
                         <span asp-validation-for="EventDedupeMinutes" class="text-danger"></span>
+                    </div>
+
+                    <hr />
+                    <h6 class="fw-semibold">Non-critical problem alerts</h6>
+                    <p class="text-secondary">
+                        Crash/auth/sync/OTA-failure events turn a Unit/Zone Orange (the badge lists
+                        them, with an Acknowledge button per alert) without affecting relay control.
+                        An un-acknowledged alert clears itself once it's older than the expiry below;
+                        acknowledging it clears it immediately.
+                    </p>
+                    <div class="mb-3 form-check">
+                        <input asp-for="ProblemEventAlertsEnabled" class="form-check-input" />
+                        <label asp-for="ProblemEventAlertsEnabled" class="form-check-label"></label>
+                    </div>
+                    <div class="mb-0" style="max-width:12rem">
+                        <label asp-for="ProblemEventExpiryHours" class="form-label"></label>
+                        <select asp-for="ProblemEventExpiryHours" class="form-select">
+                            <option value="1">1 hour</option>
+                            <option value="6">6 hours</option>
+                            <option value="12">12 hours</option>
+                            <option value="24">24 hours</option>
+                            <option value="48">48 hours</option>
+                        </select>
+                        <span asp-validation-for="ProblemEventExpiryHours" class="text-danger"></span>
                     </div>
                 </div>
 

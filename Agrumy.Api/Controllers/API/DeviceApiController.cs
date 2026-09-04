@@ -128,7 +128,11 @@ namespace api.Controllers.API
         public async Task<ActionResult<bool>> DeviceEventAcknowledge(int idEventDevice)
         {
             bool updated = await Repo.EventDeviceAcknowledgeAsync(idEventDevice, CallerManagesDevicesGlobally ? null : CallerTenantId);
-            return updated ? Ok(true) : NotFound();
+            if (!updated)
+            {
+                return NotFound();
+            }
+            return true;
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]

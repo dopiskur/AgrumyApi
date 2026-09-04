@@ -232,5 +232,16 @@ namespace api.Controllers.View
             await api.DeviceUnassign(idDevice);
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
         }
+
+        // returnUrl comes from _ZoneStatusBadge's own request path (Units index, Zones list, or a
+        // single Zone page) - same pattern as _FleetRows' FirmwareUpdate form.
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> AcknowledgeAlert(int idEventDevice, string returnUrl)
+        {
+            await api.DeviceEventAcknowledge(idEventDevice);
+            return LocalRedirect(returnUrl);
+        }
     }
 }

@@ -1400,6 +1400,115 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
         var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
         Assert.Equal(ZoneStatus.Orange, dashboard.Status);
+        var alert = Assert.Single(dashboard.ProblemAlerts);
+        Assert.Equal("AuthFailed", alert.EventType);
+        Assert.Equal(d.IDDevice, alert.DeviceID);
+    }
+
+    // Acknowledging the only problem event must clear Orange immediately, without waiting for the expiry window.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitDashboard_Status_GreenAfterAcknowledgingOnlyProblemEvent(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d = await MakeEnabledDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
+        await _repo.EventDevicePushAsync(d.IDDevice.Value, tenantId, DeviceEventType.AuthFailed, "test");
+
+        int idEventDevice = Assert.Single(await _repo.EventDeviceGetAsync(d.IDDevice, tenantId)).IDEventDevice!.Value;
+        Assert.True(await _repo.EventDeviceAcknowledgeAsync(idEventDevice, tenantId));
+
+        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        Assert.Equal(ZoneStatus.Green, dashboard.Status);
+        Assert.Empty(dashboard.ProblemAlerts);
+    }
+
+    // A foreign tenant's event id must match zero rows - same ownership-lens rule as every other Device sub-resource write.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitDashboard_Status_AcknowledgeWrongTenant_IsNoOp(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d = await MakeEnabledDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
+        await _repo.EventDevicePushAsync(d.IDDevice.Value, tenantId, DeviceEventType.AuthFailed, "test");
+        int idEventDevice = Assert.Single(await _repo.EventDeviceGetAsync(d.IDDevice, tenantId)).IDEventDevice!.Value;
+
+        Assert.False(await _repo.EventDeviceAcknowledgeAsync(idEventDevice, tenantId + 999));
+
+        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        Assert.Equal(ZoneStatus.Orange, dashboard.Status);
+    }
+
+    // The whole feature can be switched off - DeviceUnitDashboardGetAsync reads the default (id=1)
+    // ServerConfig row, so this flips it for the test and restores it in finally to avoid leaking
+    // state into any other test that runs against the same row.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitDashboard_Status_GreenWhenProblemAlertsDisabled(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d = await MakeEnabledDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
+        await _repo.EventDevicePushAsync(d.IDDevice.Value, tenantId, DeviceEventType.AuthFailed, "test");
+
+        ServerConfig original = await _repo.ServerConfigGetAsync();
+        try
+        {
+            original.ProblemEventAlertsEnabled = false;
+            await _repo.ServerConfigUpdateAsync(original);
+
+            var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+            Assert.Equal(ZoneStatus.Green, dashboard.Status);
+            Assert.Empty(dashboard.ProblemAlerts);
+        }
+        finally
+        {
+            original.ProblemEventAlertsEnabled = true;
+            await _repo.ServerConfigUpdateAsync(original);
+        }
+    }
+
+    // ProblemEventExpiryHours is configurable - an event older than the configured window stops
+    // counting even though it would still be inside the default 24h.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceUnitDashboard_Status_GreenWhenProblemEventOlderThanConfiguredExpiry(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+        var d = await MakeEnabledDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
+        await _repo.EventDevicePushAsync(d.IDDevice.Value, tenantId, DeviceEventType.AuthFailed, "test");
+
+        await using (var db = _fx.NewContext(t))
+        {
+            var ev = await db.EventDevices.FirstAsync(e => e.DeviceID == d.IDDevice.Value);
+            ev.Date = DateTime.UtcNow.AddHours(-2);
+            await db.SaveChangesAsync();
+        }
+
+        ServerConfig original = await _repo.ServerConfigGetAsync();
+        try
+        {
+            original.ProblemEventExpiryHours = 1;
+            await _repo.ServerConfigUpdateAsync(original);
+
+            var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+            Assert.Equal(ZoneStatus.Green, dashboard.Status);
+        }
+        finally
+        {
+            original.ProblemEventExpiryHours = 24;
+            await _repo.ServerConfigUpdateAsync(original);
+        }
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]

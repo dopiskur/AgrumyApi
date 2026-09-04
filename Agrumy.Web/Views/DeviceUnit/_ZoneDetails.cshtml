@@ -1,6 +1,6 @@
 @model api.ViewModels.ZoneViewModel
 @* Status badge lives here, inside the polled fragment - see Zone.cshtml's header comment for why it can't move there. *@
-<p class="mb-2">Status: <partial name="_ZoneStatusBadge" model="Model.Dashboard.Status" /></p>
+<p class="mb-2">Status: <partial name="_ZoneStatusBadge" model="(Model.Dashboard.Status, Model.Dashboard.ProblemAlerts)" /></p>
 <h6 class="text-uppercase text-secondary small mb-2">Sensor averages (last 24h trend)</h6>
 <partial name="_SensorAverages" model="new api.ViewModels.SensorSummaryViewModel { Averages = Model.Dashboard.Averages, Trend = Model.Dashboard.Trend }" />
 

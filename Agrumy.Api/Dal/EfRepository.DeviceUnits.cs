@@ -462,13 +462,16 @@ namespace api.Dal
             }
 
             DateTime cutoff = DateTime.UtcNow.AddHours(-problemEventExpiryHours);
-            return await devices
+            // OrderByDescending must run before the final Select - EF cannot translate ordering by a
+            // member of a record it just constructed inside the join's own result selector.
+            var rows = await devices
                 .Join(
                     db.EventDevices.AsNoTracking().Where(e => e.AcknowledgedAt == null && e.Date >= cutoff && ProblemEventTypeIds.Contains(e.EventID)),
                     d => d.IDDevice, e => e.DeviceID,
-                    (d, e) => new UnitZoneProblemAlertRow(d.DeviceUnitID, d.DeviceUnitZoneID, e.IDEventDevice, d.IDDevice, d.DeviceName, e.EventID, e.Date, e.Message))
+                    (d, e) => new { d.DeviceUnitID, d.DeviceUnitZoneID, e.IDEventDevice, d.IDDevice, d.DeviceName, e.EventID, e.Date, e.Message })
                 .OrderByDescending(a => a.Date)
                 .ToListAsync();
+            return rows.Select(a => new UnitZoneProblemAlertRow(a.DeviceUnitID, a.DeviceUnitZoneID, a.IDEventDevice, a.IDDevice, a.DeviceName, a.EventID, a.Date, a.Message)).ToList();
         }
 
         private static UnitZoneProblemAlert ToDtoAlert(UnitZoneProblemAlertRow a) => new()

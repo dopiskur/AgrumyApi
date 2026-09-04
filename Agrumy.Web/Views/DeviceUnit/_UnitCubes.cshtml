@@ -11,7 +11,7 @@
         <a asp-action="Zones" asp-route-idDeviceUnit="@u.IDDeviceUnit" class="text-decoration-none text-reset">
             <div class="small-box text-bg-primary h-100">
                 <div class="inner">
-                    <h3 class="fs-4">@u.DeviceUnitName <partial name="_ZoneStatusBadge" model="u.Status" /></h3>
+                    <h3 class="fs-4">@u.DeviceUnitName <partial name="_ZoneStatusBadge" model="(u.Status, u.ProblemAlerts)" /></h3>
                     <p class="mb-2">@u.ZoneCount zone@(u.ZoneCount == 1 ? "" : "s") &middot; @u.DeviceCount device@(u.DeviceCount == 1 ? "" : "s")</p>
                     <partial name="_SensorAverages" model="new SensorSummaryViewModel { Averages = u.Averages, Trend = u.Trend }" />
                 </div>

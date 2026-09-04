@@ -1,10 +1,60 @@
-@model api.Models.ZoneStatus
+@model (ZoneStatus Status, IList<UnitZoneProblemAlert> ProblemAlerts)
 @{
-    var (css, icon, title) = Model switch
+    var (css, icon, title) = Model.Status switch
     {
-        api.Models.ZoneStatus.Red => ("text-bg-danger", "bi-exclamation-octagon-fill", "A device in scope is offline"),
-        api.Models.ZoneStatus.Orange => ("text-bg-warning", "bi-exclamation-triangle-fill", "A device in scope had a problem in the last 24h, or is disabled"),
+        ZoneStatus.Red => ("text-bg-danger", "bi-exclamation-octagon-fill", "A device in scope is offline"),
+        ZoneStatus.Orange => ("text-bg-warning", "bi-exclamation-triangle-fill", "A device in scope had a problem, or is disabled - click for details"),
         _ => ("text-bg-success", "bi-check-circle-fill", "No known issues"),
     };
+    bool canAcknowledge = RoleNames.DeviceManagers.Split(',').Any(User.IsInRole);
 }
-<span class="badge @css" title="@title"><i class="bi @icon"></i></span>
+@if (Model.Status != ZoneStatus.Orange)
+{
+    <span class="badge @css" title="@title"><i class="bi @icon"></i></span>
+}
+else
+{
+    @* Orange is the only status with anything to acknowledge - Red (offline) and Green carry no alert list. *@
+    <div class="dropdown d-inline-block">
+        <button type="button" class="badge @css border-0" data-bs-toggle="dropdown" aria-expanded="false" title="@title">
+            <i class="bi @icon"></i>
+        </button>
+        <ul class="dropdown-menu p-0 shadow-sm" style="min-width: 22rem;">
+            <li><h6 class="dropdown-header">Non-critical alerts</h6></li>
+            @if (Model.ProblemAlerts.Count == 0)
+            {
+                <li><span class="dropdown-item-text text-secondary small">A device in scope is disabled - not an active alert.</span></li>
+            }
+            else
+            {
+                foreach (var alert in Model.ProblemAlerts)
+                {
+                    <li>
+                        <div class="dropdown-item d-flex justify-content-between align-items-start gap-2">
+                            <span class="small">
+                                <strong>@alert.EventType</strong> &middot; @alert.DeviceName<br />
+                                <span class="text-secondary">@alert.Date?.ToString("u")</span>
+                                @if (!string.IsNullOrWhiteSpace(alert.Message))
+                                {
+                                    <br />
+
+                                    <span class="text-secondary">@alert.Message</span>
+                                }
+                            </span>
+                            @if (canAcknowledge)
+                            {
+                                <form asp-controller="DeviceUnit" asp-action="AcknowledgeAlert" method="post" class="flex-shrink-0">
+                                    <input type="hidden" name="idEventDevice" value="@alert.IDEventDevice" />
+                                    <input type="hidden" name="returnUrl" value="@Context.Request.Path" />
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Acknowledge">
+                                        <i class="bi bi-check-lg"></i>
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </li>
+                }
+            }
+        </ul>
+    </div>
+}
