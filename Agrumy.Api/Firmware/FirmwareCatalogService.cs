@@ -24,8 +24,7 @@ namespace api.Firmware
         // Manifest/GitHub JSON: camelCase on our side, snake_case attributes on GitHub's records.
         private static readonly JsonSerializerOptions ManifestJson = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
-        // 50 pages * 100/page = 5000 releases - generous headroom over any repository this project
-        // will realistically have, just there so a misbehaving API can't spin FetchGitHubReleasesAsync forever.
+        // 50 pages * 100/page = 5000 releases - bounds FetchGitHubReleasesAsync's worst case.
         private const int MaxReleasePages = 50;
 
         /// <summary>Which catalog rows a device may be offered: the ACTIVE source's rows, plus
@@ -567,10 +566,7 @@ namespace api.Firmware
         internal async Task<IReadOnlyList<RemoteFile>> FetchGitHubReleasesAsync(string repository, CancellationToken cancellationToken)
         {
             var releases = new List<GitHubRelease>();
-            // A single ?per_page=100 request used to silently drop every release past the first
-            // page. GitHub returns a page short of per_page (often empty) once past the last one -
-            // no Link-header parsing needed, just keep incrementing page= until that happens.
-            // MaxReleasePages bounds the worst case rather than trusting the API to always behave.
+            // Page until a page comes back short of 100 - GitHub's own signal that it was the last one.
             for (int page = 1; page <= MaxReleasePages; page++)
             {
                 string json = await fetcher.GetStringAsync($"https://api.github.com/repos/{repository}/releases?per_page=100&page={page}", gitHubApi: true, cancellationToken);

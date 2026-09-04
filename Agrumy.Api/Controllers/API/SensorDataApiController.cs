@@ -11,10 +11,7 @@ namespace api.Controllers.API
     [Route("/api/SensorData")]
     public class SensorDataController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
     {
-        // Same ~10-years-of-history ceiling regardless of unit - generous for any real dashboard use,
-        // but bounds SensorDataGetAsync's unbounded ToListAsync() and keeps the DateTime.AddXxx call
-        // there well clear of its MinValue/MaxValue range (an extreme timeRange used to throw an
-        // uncaught ArgumentOutOfRangeException there instead of failing cleanly here).
+        // Bounds SensorDataGetAsync's unbounded ToListAsync() and keeps DateTime.AddXxx clear of overflow.
         private static bool IsWithinMaxTimeRange(int? timeMDMY, int timeRange) => timeMDMY switch
         {
             0 => timeRange <= 527040, // minutes, ~1 year
@@ -37,10 +34,7 @@ namespace api.Controllers.API
             return Ok(await Repo.SensorDataGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, deviceID, timeRange, timeMDMY, buildReport));
         }
 
-        // A real device batch (RAM spills at SENSOR_BUFFER_SPILL_BYTES=8192, ~416 bytes/record) is
-        // on the order of 20-30 readings - generous headroom over that, but still bounds the
-        // RAM/EF change-tracker cost a compromised or buggy device could otherwise inflict by
-        // sending an arbitrarily large array.
+        // A real device batch is ~20-30 readings (RAM spills at 8192 bytes) - generous headroom.
         private const int MaxSensorDataBatchSize = 1000;
 
         [HttpPost]
