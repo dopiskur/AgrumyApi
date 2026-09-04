@@ -232,6 +232,13 @@
                         server-side (<code>Weather:ApiKey</code>) - the location/interval/threshold
                         below are inert until both that key AND a location are set.
                     </p>
+                    <div class="mb-2">
+                        <button type="button" id="weatherUseMyLocation" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-geo-alt"></i> My Location
+                        </button>
+                        <span id="weatherLocationStatus" class="text-secondary small ms-2"></span>
+                    </div>
+                    <div id="weatherLocationMap" class="mb-3 rounded border" style="height:320px"></div>
                     <div class="row g-3 mb-3">
                         <div class="col-sm-6">
                             <label asp-for="WeatherLocationLat" class="form-label"></label>
@@ -243,6 +250,7 @@
                             <input asp-for="WeatherLocationLon" class="form-control" placeholder="e.g. 15.982" />
                             <span asp-validation-for="WeatherLocationLon" class="text-danger"></span>
                         </div>
+                        <div class="form-text">Click the map, drag the marker, use "My Location", or type coordinates directly - all four stay in sync.</div>
                     </div>
                     <div class="mb-3">
                         <label asp-for="WeatherPollIntervalMinutes" class="form-label"></label>
@@ -321,6 +329,12 @@
     </div>
 </div>
 
+@section Styles {
+    <link rel="stylesheet" href="~/lib/leaflet/leaflet.css" />
+}
+
 @section Scripts {
     <script src="~/js/data-maintenance.js"></script>
+    <script src="~/lib/leaflet/leaflet.js"></script>
+    <script src="~/js/weather-location.js"></script>
 }

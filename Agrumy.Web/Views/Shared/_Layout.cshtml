@@ -42,6 +42,7 @@
     <link rel="stylesheet" href="~/lib/adminlte/bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/lib/adminlte/dist/css/adminlte.min.css" />
     <link rel="stylesheet" href="~/lib/adminlte/plugins/datatables-bs5/dataTables.bootstrap5.min.css" />
+    @await RenderSectionAsync("Styles", required: false)
 </head>
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
     <div class="app-wrapper">

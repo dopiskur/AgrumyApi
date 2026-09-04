@@ -67,6 +67,11 @@
       "provider": "jsdelivr",
       "library": "esp-web-tools@10.4.0",
       "destination": "wwwroot/lib/esp-web-tools/"
+    },
+    {
+      "library": "leaflet@1.9.4",
+      "destination": "wwwroot/lib/leaflet/",
+      "files": [ "leaflet.css", "leaflet.js", "images/marker-icon.png", "images/marker-icon-2x.png", "images/marker-shadow.png" ]
     }
   ]
 }
