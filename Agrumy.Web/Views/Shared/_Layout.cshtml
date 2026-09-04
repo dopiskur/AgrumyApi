@@ -121,6 +121,12 @@
                                 <p>Fleet</p>
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a asp-area="" asp-controller="Reporting" asp-action="Index" class="nav-link @navActive("Reporting")">
+                                <i class="nav-icon bi bi-file-earmark-bar-graph"></i>
+                                <p>Reporting</p>
+                            </a>
+                        </li>
                         @if (hasAnyRole(RoleNames.UserManagers))
                         {
                             <li class="nav-item">

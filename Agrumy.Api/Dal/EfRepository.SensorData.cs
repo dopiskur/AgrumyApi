@@ -102,12 +102,13 @@ namespace api.Dal
         public async Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? tenantID, int? getData, int? deviceID, int? reportID)
         {
 
-            // Same null-means-no-filter reasoning as SensorDataGetAsync above.
             if (getData == 0)
             {
+                // deviceID null lists every report in scope (the Reporting page) instead of one device's own (the per-device Report tab) - tenantID keeps its usual null-means-no-filter meaning.
                 return await (from r in db.SensorDataReports.AsNoTracking()
                               join d in db.Devices.AsNoTracking() on r.DeviceID equals d.IDDevice
-                              where r.DeviceID == deviceID && (tenantID == null || d.TenantID == tenantID)
+                              where (deviceID == null || r.DeviceID == deviceID) && (tenantID == null || d.TenantID == tenantID)
+                              orderby r.DateGenerated descending
                               select new SensorDataReport
                               {
                                   IDSensorDataReport = r.IDSensorDataReport,

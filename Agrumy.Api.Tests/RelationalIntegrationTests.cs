@@ -1621,6 +1621,11 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal("r1", one.ReportName);
         Assert.Null(one.SensorData);
 
+        // deviceID null lists every report in the tenant (the Reporting page), not just this one device.
+        var everyReport = await _repo.SensorDataReportGetAsync(tenantId, 0, null, null);
+        Assert.Contains(everyReport, r => r.IDSensorDataReport == one.IDSensorDataReport);
+        Assert.Empty(await _repo.SensorDataReportGetAsync(tenantId + 999, 0, null, null));
+
         var full = await _repo.SensorDataReportGetAsync(tenantId, 1, null, one.IDSensorDataReport);
         Assert.Equal("{\"sensorData\":[]}", Assert.Single(full).SensorData);
 
