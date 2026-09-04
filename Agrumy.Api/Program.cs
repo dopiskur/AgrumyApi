@@ -67,7 +67,9 @@ builder.Services
             ValidateAudience = true,
             ValidIssuer = jwtIssuer,
             ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(Key)
+            IssuerSigningKey = new SymmetricSecurityKey(Key),
+            // Matches JwtTokenProvider.ValidateToken's explicit choice - same expiry boundary enforced by both validators.
+            ClockSkew = TimeSpan.Zero
         };
     });
 
