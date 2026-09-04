@@ -17,11 +17,22 @@ namespace api.Controllers.API
             // Was always tenant-scoped even for a Global reader, unlike DevicesGet/DeviceFleetGet.
             Ok(await Repo.SensorDataGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, deviceID, timeRange, timeMDMY, buildReport));
 
+        // A real device batch (RAM spills at SENSOR_BUFFER_SPILL_BYTES=8192, ~416 bytes/record) is
+        // on the order of 20-30 readings - generous headroom over that, but still bounds the
+        // RAM/EF change-tracker cost a compromised or buggy device could otherwise inflict by
+        // sending an arbitrarily large array.
+        private const int MaxSensorDataBatchSize = 1000;
+
         [HttpPost]
         [EnableRateLimiting("device-data")]
         [Authorize(Policy = DeviceAuth.SessionPolicy)]
         public async Task<ActionResult<int?>> Post([FromBody] JsonArray jsonArray)
         {
+            if (jsonArray.Count > MaxSensorDataBatchSize)
+            {
+                return BadRequest($"Batch too large: {jsonArray.Count} readings, max {MaxSensorDataBatchSize} per request.");
+            }
+
             string apiId = HttpContext.DeviceApiId()!;
 
             // Device/tenant come from the authenticated identity, never from the payload.

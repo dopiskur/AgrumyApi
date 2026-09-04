@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json.Nodes;
 using api;
 using api.Commands;
 using api.Controllers.API;
@@ -1483,6 +1484,50 @@ public class ApiControllerTests
         SetCaller(controller, "admin", 0); // single legacy claim, no #66 roles on the token
 
         Assert.IsType<OkObjectResult>((await controller.Get()).Result);
+    }
+
+    /// <summary>roadmap #187: a batch over the cap must be rejected before DeviceGetByApiIdAsync or
+    /// SensorDataPushAsync ever run - strict mocks (neither set up) prove nothing downstream was touched.</summary>
+    [Fact]
+    public async Task SensorDataPost_BatchOverLimit_Returns400_NeverTouchesRepo()
+    {
+        var controller = NewSensorDataController();
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        controller.HttpContext.Items[DeviceAuth.ApiIdItemKey] = "api-guid";
+
+        var jsonArray = new JsonArray();
+        for (int i = 0; i < 1001; i++)
+        {
+            jsonArray.Add(new JsonObject());
+        }
+
+        var result = await controller.Post(jsonArray);
+
+        Assert.Equal(400, Assert.IsType<BadRequestObjectResult>(result.Result).StatusCode);
+    }
+
+    [Fact]
+    public async Task SensorDataPost_BatchAtLimit_Succeeds()
+    {
+        var controller = NewSensorDataController();
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        controller.HttpContext.Items[DeviceAuth.ApiIdItemKey] = "api-guid";
+
+        _repo.Setup(r => r.DeviceGetByApiIdAsync("api-guid"))
+             .ReturnsAsync(new Device { IDDevice = 500, TenantID = 3, ConfigVersion = 66 });
+        _repo.Setup(r => r.SensorDataPushAsync(It.IsAny<JsonArray>(), 500, 3, It.IsAny<int?>(), It.IsAny<int?>()))
+             .Returns(Task.CompletedTask);
+
+        var jsonArray = new JsonArray();
+        for (int i = 0; i < 1000; i++)
+        {
+            jsonArray.Add(new JsonObject());
+        }
+
+        var result = await controller.Post(jsonArray);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        _repo.Verify(r => r.SensorDataPushAsync(It.IsAny<JsonArray>(), 500, 3, It.IsAny<int?>(), It.IsAny<int?>()), Times.Once);
     }
 
     [Fact]
