@@ -1486,6 +1486,32 @@ public class ApiControllerTests
         Assert.IsType<OkObjectResult>((await controller.Get()).Result);
     }
 
+    /// <summary>roadmap #188: an extreme timeRange used to reach now.AddYears(-timeRange) unvalidated,
+    /// throwing an uncaught ArgumentOutOfRangeException (ugly 500) instead of a clean 400. Strict
+    /// mock (SensorDataGetAsync never set up) proves the repo is never even reached.</summary>
+    [Fact]
+    public async Task SensorDataGet_TimeRangeExceedsMaxForUnit_Returns400_NeverTouchesRepo()
+    {
+        var controller = NewSensorDataController();
+        SetCallerRoles(controller, 4, "user", RoleNames.TenantReader);
+
+        var result = await controller.Get(deviceID: 7, timeRange: 50, timeMDMY: 3); // 50 years - way past the 10-year cap
+
+        Assert.Equal(400, Assert.IsType<BadRequestObjectResult>(result.Result).StatusCode);
+    }
+
+    [Fact]
+    public async Task SensorDataGet_TimeRangeWithinMaxForUnit_Succeeds()
+    {
+        var controller = NewSensorDataController();
+        SetCallerRoles(controller, 4, "user", RoleNames.TenantReader);
+        _repo.Setup(r => r.SensorDataGetAsync(4, 7, 10, 3, 0)).ReturnsAsync("[]"); // 10 years - at the cap
+
+        var result = await controller.Get(deviceID: 7, timeRange: 10, timeMDMY: 3);
+
+        Assert.Equal("[]", Assert.IsType<OkObjectResult>(result.Result).Value);
+    }
+
     /// <summary>roadmap #187: a batch over the cap must be rejected before DeviceGetByApiIdAsync or
     /// SensorDataPushAsync ever run - strict mocks (neither set up) prove nothing downstream was touched.</summary>
     [Fact]

@@ -11,11 +11,31 @@ namespace api.Controllers.API
     [Route("/api/SensorData")]
     public class SensorDataController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
     {
+        // Same ~10-years-of-history ceiling regardless of unit - generous for any real dashboard use,
+        // but bounds SensorDataGetAsync's unbounded ToListAsync() and keeps the DateTime.AddXxx call
+        // there well clear of its MinValue/MaxValue range (an extreme timeRange used to throw an
+        // uncaught ArgumentOutOfRangeException there instead of failing cleanly here).
+        private static bool IsWithinMaxTimeRange(int? timeMDMY, int timeRange) => timeMDMY switch
+        {
+            0 => timeRange <= 527040, // minutes, ~1 year
+            1 => timeRange <= 3660,   // days, ~10 years
+            2 => timeRange <= 120,    // months, ~10 years
+            3 => timeRange <= 10,     // years
+            _ => true,                // an invalid timeMDMY is handled downstream by SensorDataGetAsync's own check
+        };
+
         [HttpGet]
         [Authorize]
-        public async Task<ActionResult<string>> Get(int? deviceID, int? timeRange = 60, int? timeMDMY = 0, int? buildReport = 0) =>
+        public async Task<ActionResult<string>> Get(int? deviceID, int? timeRange = 60, int? timeMDMY = 0, int? buildReport = 0)
+        {
+            if (timeRange is int range && !IsWithinMaxTimeRange(timeMDMY, range))
+            {
+                return BadRequest($"timeRange {range} exceeds the maximum allowed for this unit.");
+            }
+
             // Was always tenant-scoped even for a Global reader, unlike DevicesGet/DeviceFleetGet.
-            Ok(await Repo.SensorDataGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, deviceID, timeRange, timeMDMY, buildReport));
+            return Ok(await Repo.SensorDataGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, deviceID, timeRange, timeMDMY, buildReport));
+        }
 
         // A real device batch (RAM spills at SENSOR_BUFFER_SPILL_BYTES=8192, ~416 bytes/record) is
         // on the order of 20-30 readings - generous headroom over that, but still bounds the
