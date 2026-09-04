@@ -42,6 +42,8 @@ namespace api.Dal.Entities
         public int EventID { get; set; }
         public DateTime? Date { get; set; }
         public string? Message { get; set; }
+        // Set once an admin dismisses this alert - stops it counting toward Unit/Zone Orange status even inside the expiry window.
+        public DateTime? AcknowledgedAt { get; set; }
     }
 
     public class EventServiceRow

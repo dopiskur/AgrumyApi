@@ -97,6 +97,7 @@ builder.Services.AddScoped<ICommandRepository>(sp => sp.GetRequiredService<EfRep
 builder.Services.AddScoped<IFirmwareRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ISensorDataRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IAuditLogRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<IRelayRepository>(sp => sp.GetRequiredService<EfRepository>());
 
 // Cache:Redis:ConnectionString switches to Redis; unset/empty keeps the in-process default.
 string? redisConnectionString = builder.Configuration["Cache:Redis:ConnectionString"];
@@ -149,6 +150,7 @@ builder.Services.AddScoped<WeatherEvaluator>();
 builder.Services.AddHostedService<WeatherBackgroundService>();
 
 builder.Services.AddScoped<CommandQueueService>();
+builder.Services.AddScoped<api.Devices.DeviceConfigBuilder>();
 
 // Singleton so it outlives any one request's DI scope; BackgroundJobRunner consumes it one job at a time.
 builder.Services.AddSingleton<BackgroundJobQueue>();

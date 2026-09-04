@@ -91,6 +91,11 @@ namespace api.Dal.Interface
         /// another tenant simply matches zero rows rather than leaking another tenant's events.</summary>
         Task<IList<DeviceEvent>> EventDeviceGetAsync(int? deviceID, int? tenantID, int limit = 100);
 
+        /// <summary>Marks one event acknowledged so it stops counting toward Unit/Zone Orange status,
+        /// scoped by tenantID the same way EventDeviceGetAsync is (null only for a Global caller) -
+        /// returns false rather than throwing when the id doesn't match (wrong tenant or already gone).</summary>
+        Task<bool> EventDeviceAcknowledgeAsync(int idEventDevice, int? tenantID);
+
         // Offline alert background worker
 
         /// <summary>Every enabled device, across every tenant - the worker is not tenant-scoped,

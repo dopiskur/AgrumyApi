@@ -156,6 +156,18 @@ namespace api.Models
         public double?[] Wind { get; set; } = new double?[HourBuckets];
     }
 
+    /// <summary>One non-critical problem alert in scope for a Unit/Zone's Orange status - shown in
+    /// _ZoneStatusBadge's dropdown, dismissable via DeviceApiController.DeviceEventAcknowledge.</summary>
+    public class UnitZoneProblemAlert
+    {
+        public int IDEventDevice { get; set; }
+        public int DeviceID { get; set; }
+        public string? DeviceName { get; set; }
+        public string? EventType { get; set; }
+        public DateTime? Date { get; set; }
+        public string? Message { get; set; }
+    }
+
     /// <summary>One Unit cube on the top-level dashboard - name plus a roll-up over every sensor in
     /// every zone of this unit.</summary>
     public class DeviceUnitDashboard
@@ -167,6 +179,7 @@ namespace api.Models
         public SensorAverages Averages { get; set; } = new();
         public ZoneStatus Status { get; set; }
         public SensorTrend Trend { get; set; } = new();
+        public IList<UnitZoneProblemAlert> ProblemAlerts { get; set; } = new List<UnitZoneProblemAlert>();
     }
 
     /// <summary>One Zone cube inside a Unit's drill-down - same shape as DeviceUnitDashboard,
@@ -183,6 +196,7 @@ namespace api.Models
         public IList<Device> Devices { get; set; } = new List<Device>();
         public ZoneStatus Status { get; set; }
         public SensorTrend Trend { get; set; } = new();
+        public IList<UnitZoneProblemAlert> ProblemAlerts { get; set; } = new List<UnitZoneProblemAlert>();
     }
 
     /// <summary>Body of the Add Controller/Add Sensor action - assigns one already-unassigned

@@ -31,6 +31,15 @@ namespace api.Models
         public string? DeviceName { get; set; }
         [HiddenInput(DisplayValue = true)]
         public string? MacAddress { get; set; }
+        // True only for an Agrumy.Relay instance - it registers through this same
+        // Device row/ApiId/ApiKey mechanism, just flagged so RelayApiController.Batch can tell a
+        // relay's own credential apart from an ordinary sensor device's.
+        [HiddenInput(DisplayValue = true)]
+        public bool IsRelay { get; set; }
+        // Null for every non-relay device. Set once at registration (DeviceRegistration.RelayProfile
+        // below) - not editable afterward, since Profile A/B imply a different physical setup.
+        [HiddenInput(DisplayValue = true)]
+        public RelayProfile? RelayProfile { get; set; }
         // The device's actual bearer credential - never serialized out; BuildDeviceConfigAsync reads it directly in C# instead.
         [JsonIgnore]
         public string? ApiId { get; set; }
@@ -77,6 +86,12 @@ namespace api.Models
         public string? ServicePoint { get; set; } = "api.agrumy.com";
         public int? ServiceType { get; set; } = 1;
 
+        // Agrumy.Relay sends these on its own first registration so the resulting
+        // device row comes back with IsRelay/RelayProfile already set - null/false for every
+        // ordinary AgrumyFirmware device, which never populates them. Only consulted when the
+        // MacAddress is genuinely new; re-registering an existing row never changes its profile.
+        public bool IsRelay { get; set; }
+        public RelayProfile? RelayProfile { get; set; }
     }
 
     public class DeviceConfig()

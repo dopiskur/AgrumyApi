@@ -129,5 +129,14 @@ namespace api.Dal.Entities
         public double? WeatherRainSkipThreshold { get; set; }
         public bool WeatherRainPredicted { get; set; }
         public DateTime? WeatherCheckedAtUtc { get; set; }
+
+        // See api.Models.ServerConfig's own copies of these for the full explanation.
+        public bool RelayEnabled { get; set; }
+        public int RelayMode { get; set; }
+        public int RelayWaitWindowSeconds { get; set; } = 30;
+
+        // See api.Models.ServerConfig's own copies of these for the full explanation.
+        public bool ProblemEventAlertsEnabled { get; set; } = true;
+        public int ProblemEventExpiryHours { get; set; } = 24;
     }
 }

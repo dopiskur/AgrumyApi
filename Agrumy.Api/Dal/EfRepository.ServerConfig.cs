@@ -47,6 +47,9 @@ namespace api.Dal
                 SensorDataRetentionDays = settings.SensorDataRetentionDays,
                 WeatherPollIntervalMinutes = settings.WeatherPollIntervalMinutes,
                 WeatherRainSkipThreshold = settings.WeatherRainSkipThreshold,
+                RelayWaitWindowSeconds = 30,
+                ProblemEventAlertsEnabled = true,
+                ProblemEventExpiryHours = 24,
             };
             db.ServerConfigs.Add(generated);
             await db.SaveChangesAsync();
@@ -88,6 +91,11 @@ namespace api.Dal
             row.WeatherLocationLon = config.WeatherLocationLon;
             row.WeatherPollIntervalMinutes = config.WeatherPollIntervalMinutes;
             row.WeatherRainSkipThreshold = config.WeatherRainSkipThreshold;
+            row.RelayEnabled = config.RelayEnabled;
+            row.RelayMode = (int)config.RelayMode;
+            row.RelayWaitWindowSeconds = config.RelayWaitWindowSeconds;
+            row.ProblemEventAlertsEnabled = config.ProblemEventAlertsEnabled;
+            row.ProblemEventExpiryHours = config.ProblemEventExpiryHours;
             await db.SaveChangesAsync();
 
             // Re-applied on every save so an admin edit takes effect immediately on Postgres/
@@ -205,6 +213,15 @@ namespace api.Dal
             WeatherRainSkipThreshold = r.WeatherRainSkipThreshold ?? settings.WeatherRainSkipThreshold,
             WeatherRainPredicted = r.WeatherRainPredicted,
             WeatherCheckedAtUtc = r.WeatherCheckedAtUtc,
+            RelayEnabled = r.RelayEnabled,
+            RelayMode = (RelayMode)r.RelayMode,
+            // A row created before this field existed has 0 here, which happens to already equal a sane default
+            // (10-300 clamp keeps 0 out of reach otherwise) - not worth a settings.* fallback.
+            RelayWaitWindowSeconds = r.RelayWaitWindowSeconds == 0 ? 30 : r.RelayWaitWindowSeconds,
+            ProblemEventAlertsEnabled = r.ProblemEventAlertsEnabled,
+            // A row created before this field existed has 0 here (column default backfills real rows
+            // to 24, but the in-memory generated-default path above always sets it explicitly too).
+            ProblemEventExpiryHours = r.ProblemEventExpiryHours == 0 ? 24 : r.ProblemEventExpiryHours,
         };
     }
 }

@@ -38,5 +38,6 @@ namespace api.Models
         public string? EventType { get; set; }
         public string? Message { get; set; }
         public DateTime? CreatedAt { get; set; }
+        public DateTime? AcknowledgedAt { get; set; }
     }
 }

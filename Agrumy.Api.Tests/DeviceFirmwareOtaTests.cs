@@ -24,8 +24,10 @@ public class DeviceFirmwareOtaTests
         // DeviceRegistration always checks for a pending command before returning.
         _repo.Setup(r => r.GetPendingCommandsAsync(device.IDDevice!.Value)).ReturnsAsync(new List<DeviceCommand>());
 
+        var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
         var controller = new DeviceApiController(_repo.Object, _cache.Object,
-            new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), FirmwareTestSupport.NewCatalog(_repo.Object));
+            new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), catalog,
+            new api.Devices.DeviceConfigBuilder(_repo.Object, catalog));
         var result = controller.DeviceRegistration(new DeviceRegistration
         {
             Email = "owner@example.com",

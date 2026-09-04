@@ -1,0 +1,27 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AgrumyService": {
+    "BaseUrl": "https://api.agrumy.com",
+    "Email": "owner@example.com",
+    "DevicePin": "ABC234"
+  },
+  "Relay": {
+    "MacAddress": "RELAY-CHANGE-ME",
+    "Profile": "WiFiRepeater",
+    "RegistrationFilePath": "relay-registration.json",
+    "LocalPort": 5080
+  },
+  "ChirpStack": {
+    "MqttHost": "localhost",
+    "MqttPort": 1883,
+    "MqttUsername": "",
+    "MqttPassword": "",
+    "ApplicationId": "",
+    "MappingRefreshSeconds": 60
+  }
+}

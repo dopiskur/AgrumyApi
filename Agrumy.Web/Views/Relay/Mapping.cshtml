@@ -1,0 +1,81 @@
+@model api.ViewModels.RelayMappingViewModel
+
+@{
+    ViewData["Title"] = "Relay Devices - " + Model.Relay.DeviceName + " DevEUI Mapping";
+}
+
+<div class="card mb-3">
+    <div class="card-header">
+        <h3 class="card-title">@Model.Relay.DeviceName &mdash; DevEUI Mapping</h3>
+        <div class="card-tools">
+            <a asp-action="Index" class="btn btn-sm btn-secondary">Back to Relay Devices</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <p class="text-secondary">
+            Maps a LoRaWAN end-device's DevEUI to the Agrumy device whose ApiId/ApiKey this relay
+            should use when it sees an uplink from that DevEUI (roadmap #147). Only meaningful
+            while this relay's profile is LoRaGateway.
+        </p>
+        @if (!Model.Mappings.Any())
+        {
+            <p class="text-secondary fst-italic">No DevEUI mapped yet.</p>
+        }
+        else
+        {
+            <div class="table-responsive p-0 mb-3">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>DevEUI</th>
+                            <th>Device</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+@foreach (var m in Model.Mappings)
+{
+                        <tr>
+                            <td class="font-monospace">@m.DevEUI</td>
+                            <td>@m.DeviceName <span class="text-secondary small">(@m.DeviceApiId)</span></td>
+                            <td>
+                                <form asp-action="MappingDelete" method="post" class="d-inline">
+                                    <input type="hidden" name="idRelayDeviceMapping" value="@m.IDRelayDeviceMapping" />
+                                    <input type="hidden" name="idRelayDevice" value="@Model.Relay.IDDevice" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove mapping" aria-label="Remove mapping">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+}
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <hr />
+        <h6 class="fw-semibold">Add mapping</h6>
+        <form asp-action="MappingAdd" method="post" class="row g-2 align-items-end">
+            <input type="hidden" name="idRelayDevice" value="@Model.Relay.IDDevice" />
+            <div class="col-sm-4">
+                <label class="form-label" for="devEUI">DevEUI</label>
+                <input type="text" id="devEUI" name="devEUI" class="form-control font-monospace" maxlength="16"
+                       placeholder="16 hex chars" pattern="[0-9A-Fa-f]{16}" required />
+            </div>
+            <div class="col-sm-5">
+                <label class="form-label" for="idDevice">Device</label>
+                <select id="idDevice" name="idDevice" class="form-select" required>
+                    <option value="">Select a device...</option>
+@foreach (var d in Model.AvailableDevices)
+{
+                    <option value="@d.IDDevice">@d.DeviceName (@d.ApiId)</option>
+}
+                </select>
+            </div>
+            <div class="col-sm-3">
+                <button type="submit" class="btn btn-primary w-100">Add</button>
+            </div>
+        </form>
+    </div>
+</div>

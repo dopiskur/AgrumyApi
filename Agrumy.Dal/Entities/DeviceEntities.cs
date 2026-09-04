@@ -200,6 +200,22 @@ namespace api.Dal.Entities
         public int CommandVersion { get; set; }
         public DateTime? DateCreated { get; set; }
         public DateTime? DateModified { get; set; }
+
+        // See api.Models.Device's own copies of these for the full explanation.
+        public bool IsRelay { get; set; }
+        public int? RelayProfile { get; set; }
+    }
+
+    /// <summary>One LoRaWAN end-device's DevEUI mapped to the Agrumy device (by
+    /// ApiId/ApiKey) a RelayProfile.LoRaGateway relay should act on behalf of for that DevEUI's
+    /// uplinks - only ever populated for a relay whose own profile is LoRaGateway.</summary>
+    public class RelayDeviceMappingRow
+    {
+        public int IDRelayDeviceMapping { get; set; }
+        public int IDRelayDevice { get; set; }
+        public string DevEUI { get; set; } = "";
+        public int IDDevice { get; set; }
+        public DateTime? DateCreated { get; set; }
     }
 
     /// <summary>One discrete, one-shot device action - see api.Models.CommandStatus for why

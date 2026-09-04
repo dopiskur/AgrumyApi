@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git remote *)",
+      "Bash(git branch *)",
+      "Bash(ls *)",
+      "Bash(find *)",
+      "Bash(cat *)",
+      "Bash(dotnet build *)",
+      "Bash(dotnet test *)",
+      "Bash(pio run *)",
+      "Bash(pio test *)",
+      "Bash(~/.platformio/penv/Scripts/pio.exe *)",
+      "Bash(python *)",
+      "Bash(docker ps *)",
+      "PowerShell(git status *)",
+      "PowerShell(git log *)",
+      "PowerShell(git diff *)",
+      "PowerShell(git show *)",
+      "PowerShell(git remote *)",
+      "PowerShell(git branch *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(dotnet build *)",
+      "PowerShell(dotnet test *)",
+      "PowerShell(pio run *)",
+      "PowerShell(pio test *)",
+      "PowerShell(python *)",
+      "PowerShell(docker ps *)"
+    ]
+  }
+}

@@ -42,6 +42,7 @@ namespace api.Dal
         public DbSet<DeviceFirmwareRow> DeviceFirmwares => Set<DeviceFirmwareRow>();
         public DbSet<DeviceDiagnosticRow> DeviceDiagnostics => Set<DeviceDiagnosticRow>();
         public DbSet<DeviceCommandRow> DeviceCommands => Set<DeviceCommandRow>();
+        public DbSet<RelayDeviceMappingRow> RelayDeviceMappings => Set<RelayDeviceMappingRow>();
 
         public DbSet<SensorDataRow> SensorData => Set<SensorDataRow>();
         public DbSet<SensorDataReportRow> SensorDataReports => Set<SensorDataReportRow>();
@@ -258,7 +259,9 @@ namespace api.Dal
                 e.HasKey(x => x.IDDevice);
                 e.Property(x => x.IDDevice).ValueGeneratedOnAdd();
                 e.Property(x => x.DeviceName).HasMaxLength(128);
-                e.Property(x => x.MacAddress).HasMaxLength(12);
+                // AgrumyFirmware always sends exactly 12 (hex, no separators) - the wider cap is
+                // for Agrumy.Relay, whose MacAddress is a free-form uniqueness key, not a real MAC.
+                e.Property(x => x.MacAddress).HasMaxLength(64);
                 e.Property(x => x.FirmwareTargetVersion).HasMaxLength(20); // same cap as deviceFirmware.Version
                 e.Property(x => x.ApiId).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ApiKey).HasMaxLength(128).IsRequired();
@@ -277,6 +280,21 @@ namespace api.Dal
                 e.HasOne<DeviceTypeServiceRow>().WithMany().HasForeignKey(x => x.DeviceTypeServiceID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<TenantRow>().WithMany().HasForeignKey(x => x.TenantID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
+            });
+
+            modelBuilder.Entity<RelayDeviceMappingRow>(e =>
+            {
+                e.ToTable("relayDeviceMapping");
+                e.HasKey(x => x.IDRelayDeviceMapping);
+                e.Property(x => x.IDRelayDeviceMapping).ValueGeneratedOnAdd();
+                e.Property(x => x.DevEUI).HasMaxLength(16).IsRequired();
+                e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                // One relay never maps the same DevEUI twice; the same end-device COULD in
+                // principle sit under two relays (roaming/overlap), so this is not also unique on
+                // IDDevice alone.
+                e.HasIndex(x => new { x.IDRelayDevice, x.DevEUI }).IsUnique().HasDatabaseName("ux_relayDeviceMapping_relay_deveui");
+                e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.IDRelayDevice).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.IDDevice).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<DeviceCommandRow>(e =>

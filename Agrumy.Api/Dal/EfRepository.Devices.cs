@@ -56,6 +56,8 @@ namespace api.Dal
                 BatteryEnabled = device.BatteryEnabled,
                 Enabled = device.Enabled,
                 ConfigVersion = device.ConfigVersion,
+                IsRelay = device.IsRelay,
+                RelayProfile = (int?)device.RelayProfile,
             });
             await db.SaveChangesAsync();
             await tx.CommitAsync();
@@ -210,6 +212,8 @@ namespace api.Dal
             CommandVersion = d.CommandVersion,
             DateCreated = d.DateCreated,
             DateModified = d.DateModified,
+            IsRelay = d.IsRelay,
+            RelayProfile = d.RelayProfile is int p ? (RelayProfile)p : null,
         };
     }
 }

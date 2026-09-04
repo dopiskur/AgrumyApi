@@ -121,10 +121,27 @@ namespace api.Dal.Interface
         [Get("/api/Device/Events")]
         Task<IList<DeviceEvent>> DeviceEventsGet(int? idDevice);
 
+        [Put("/api/Device/Event/{idEventDevice}/Acknowledge")]
+        Task DeviceEventAcknowledge(int idEventDevice);
+
         // ---- Fleet dashboard ----------------------------------
 
         [Get("/api/Device/Fleet")]
         Task<IList<DeviceFleetStatus>> DeviceFleetGet();
+
+        // ---- Relay ------------------------------------------
+
+        [Get("/api/Relay/All")]
+        Task<IList<Device>> RelaysGetAll();
+
+        [Get("/api/Relay/DeviceMapping/All")]
+        Task<IList<RelayDeviceMapping>> RelayDeviceMappingGetAll(int idRelayDevice);
+
+        [Post("/api/Relay/DeviceMapping")]
+        Task RelayDeviceMappingAdd([Body] RelayDeviceMapping value);
+
+        [Delete("/api/Relay/DeviceMapping")]
+        Task RelayDeviceMappingDelete(int idRelayDeviceMapping, int idRelayDevice);
 
         // ---- Unit/Zone -----------------------------------
 

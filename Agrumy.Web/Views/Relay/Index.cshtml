@@ -1,0 +1,60 @@
+@model api.ViewModels.RelayListViewModel
+
+@{
+    ViewData["Title"] = "Relay Devices";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Relay Devices</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-secondary">
+            Roadmap #147: an Agrumy.Relay instance registers through the same PIN flow as any
+            other device (Fleet page) - it shows up here once it does, flagged
+            <code>IsRelay</code>. Use <a asp-controller="ServerConfig" asp-action="Index">Server
+            Settings &rarr; Relay</a> to turn support on/off and set the batching mode.
+        </p>
+        @if (!Model.Relays.Any())
+        {
+            <p class="text-secondary fst-italic">No relay has registered yet.</p>
+        }
+        else
+        {
+            <div class="table-responsive p-0">
+                <table id="relaysTable" class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Profile</th>
+                            <th>ApiId</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+@foreach (var relay in Model.Relays)
+{
+                        <tr>
+                            <td>@relay.DeviceName</td>
+                            <td>@(relay.RelayProfile?.ToString() ?? "-")</td>
+                            <td class="text-secondary small">@relay.ApiId</td>
+                            <td>
+                                @if (relay.RelayProfile == api.Models.RelayProfile.LoRaGateway)
+                                {
+                                    <a asp-action="Mapping" asp-route-idRelayDevice="@relay.IDDevice" class="btn btn-sm btn-primary">
+                                        DevEUI Mapping
+                                    </a>
+                                }
+                            </td>
+                        </tr>
+}
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_DataTableScripts" model="@("relaysTable")" />
+}

@@ -298,7 +298,9 @@ namespace api.Dal
             {
                 scopedDevices = scopedDevices.Where(d => d.TenantID == tenantID);
             }
-            var snapshots = await GetDeviceSnapshotsAsync(scopedDevices);
+            (int expiryHours, bool alertsEnabled) = await ProblemEventSettingsAsync();
+            var snapshots = await GetDeviceSnapshotsAsync(scopedDevices, expiryHours, alertsEnabled);
+            var alerts = await GetProblemAlertsAsync(scopedDevices, expiryHours, alertsEnabled);
 
             var zonesByUnit = (await db.DeviceUnitZones.AsNoTracking()
                 .Where(z => z.IDDeviceUnitZone != 0)
@@ -321,6 +323,7 @@ namespace api.Dal
                     Averages = Average(scoped),
                     Status = ComputeStatus(scoped),
                     Trend = await BuildTrendAsync(zoneIds),
+                    ProblemAlerts = alerts.Where(a => a.DeviceUnitID == u.IDDeviceUnit).Select(ToDtoAlert).ToList(),
                 });
             }
             return result;
@@ -332,7 +335,10 @@ namespace api.Dal
                 .Where(z => z.DeviceUnitID == idDeviceUnit && z.IDDeviceUnitZone != 0)
                 .ToListAsync();
 
-            var snapshots = await GetDeviceSnapshotsAsync(db.Devices.AsNoTracking().Where(d => d.DeviceUnitID == idDeviceUnit));
+            IQueryable<DeviceRow> scopedDevices = db.Devices.AsNoTracking().Where(d => d.DeviceUnitID == idDeviceUnit);
+            (int expiryHours, bool alertsEnabled) = await ProblemEventSettingsAsync();
+            var snapshots = await GetDeviceSnapshotsAsync(scopedDevices, expiryHours, alertsEnabled);
+            var alerts = await GetProblemAlertsAsync(scopedDevices, expiryHours, alertsEnabled);
 
             var result = new List<DeviceUnitZoneDashboard>();
             foreach (var z in zoneRows)
@@ -347,6 +353,7 @@ namespace api.Dal
                     Averages = Average(scoped),
                     Status = ComputeStatus(scoped),
                     Trend = await BuildTrendAsync([z.IDDeviceUnitZone]),
+                    ProblemAlerts = alerts.Where(a => a.DeviceUnitZoneID == z.IDDeviceUnitZone).Select(ToDtoAlert).ToList(),
                 });
             }
             return result;
@@ -361,7 +368,10 @@ namespace api.Dal
             }
 
             var deviceRows = await db.Devices.AsNoTracking().Where(d => d.DeviceUnitZoneID == idDeviceUnitZone).ToListAsync();
-            var snapshots = await GetDeviceSnapshotsAsync(db.Devices.AsNoTracking().Where(d => d.DeviceUnitZoneID == idDeviceUnitZone));
+            IQueryable<DeviceRow> scopedDevices = db.Devices.AsNoTracking().Where(d => d.DeviceUnitZoneID == idDeviceUnitZone);
+            (int expiryHours, bool alertsEnabled) = await ProblemEventSettingsAsync();
+            var snapshots = await GetDeviceSnapshotsAsync(scopedDevices, expiryHours, alertsEnabled);
+            var alerts = await GetProblemAlertsAsync(scopedDevices, expiryHours, alertsEnabled);
 
             return new DeviceUnitZoneDashboard
             {
@@ -373,17 +383,26 @@ namespace api.Dal
                 Devices = deviceRows.Select(ToDto).ToList(),
                 Status = ComputeStatus(snapshots),
                 Trend = await BuildTrendAsync([idDeviceUnitZone]),
+                ProblemAlerts = alerts.Select(ToDtoAlert).ToList(),
             };
+        }
+
+        /// <summary>Single ServerConfig read shared by every dashboard aggregation call this request needs it in.</summary>
+        private async Task<(int ExpiryHours, bool AlertsEnabled)> ProblemEventSettingsAsync()
+        {
+            ServerConfig config = await ServerConfigGetAsync();
+            int expiryHours = config.ProblemEventExpiryHours > 0 ? config.ProblemEventExpiryHours : 24;
+            return (expiryHours, config.ProblemEventAlertsEnabled);
         }
 
         /// <summary>Latest telemetry per device in <paramref name="devices"/> - EF cannot translate
         /// a whole-row correlated subquery, so this pulls the latest SensorData id per device via
         /// scalar subqueries (portable across MySQL/MariaDB/Postgres, no LATERAL/APPLY) then
         /// batch-fetches the rows.</summary>
-        private async Task<List<UnitZoneDeviceSnapshot>> GetDeviceSnapshotsAsync(IQueryable<DeviceRow> devices)
+        private async Task<List<UnitZoneDeviceSnapshot>> GetDeviceSnapshotsAsync(IQueryable<DeviceRow> devices, int problemEventExpiryHours, bool problemEventAlertsEnabled)
         {
             DateTime utcNow = DateTime.UtcNow;
-            DateTime problemEventCutoff = utcNow.AddHours(-24);
+            DateTime problemEventCutoff = utcNow.AddHours(-problemEventExpiryHours);
 
             var deviceLatestIds = await devices
                 .Select(d => new
@@ -396,8 +415,8 @@ namespace api.Dal
                         .Where(x => x.DeviceID == d.IDDevice)
                         .Select(x => x.LastSeenAt)
                         .FirstOrDefault(),
-                    HasRecentProblemEvent = db.EventDevices.AsNoTracking()
-                        .Any(e => e.DeviceID == d.IDDevice && e.Date >= problemEventCutoff && ProblemEventTypeIds.Contains(e.EventID)),
+                    HasRecentProblemEvent = problemEventAlertsEnabled && db.EventDevices.AsNoTracking()
+                        .Any(e => e.DeviceID == d.IDDevice && e.AcknowledgedAt == null && e.Date >= problemEventCutoff && ProblemEventTypeIds.Contains(e.EventID)),
                     LatestSensorDataId = db.SensorData.AsNoTracking()
                         .Where(s => s.DeviceID == d.IDDevice)
                         .OrderByDescending(s => s.DateCreated)
@@ -426,6 +445,41 @@ namespace api.Dal
                     s?.Co2, s?.Tvoc, s?.Barometer, s?.LiquidPH, s?.RainLevel, s?.WaterLevel, s?.Wind);
             }).ToList();
         }
+
+        /// <summary>Not just the age-out'able carrier for JOIN projection - lets the alert list group
+        /// by unit/zone without a second round trip to look either up from DeviceID.</summary>
+        private sealed record UnitZoneProblemAlertRow(int? DeviceUnitID, int? DeviceUnitZoneID, int IDEventDevice, int DeviceID, string? DeviceName, int EventID, DateTime? Date, string? Message);
+
+        /// <summary>Every un-acknowledged problem event still inside the expiry window, for devices
+        /// in <paramref name="devices"/> - the same predicate GetDeviceSnapshotsAsync's
+        /// HasRecentProblemEvent uses, just returning the actual rows instead of a bool so the
+        /// dashboard can show what triggered Orange, not just that something did.</summary>
+        private async Task<List<UnitZoneProblemAlertRow>> GetProblemAlertsAsync(IQueryable<DeviceRow> devices, int problemEventExpiryHours, bool problemEventAlertsEnabled)
+        {
+            if (!problemEventAlertsEnabled)
+            {
+                return [];
+            }
+
+            DateTime cutoff = DateTime.UtcNow.AddHours(-problemEventExpiryHours);
+            return await devices
+                .Join(
+                    db.EventDevices.AsNoTracking().Where(e => e.AcknowledgedAt == null && e.Date >= cutoff && ProblemEventTypeIds.Contains(e.EventID)),
+                    d => d.IDDevice, e => e.DeviceID,
+                    (d, e) => new UnitZoneProblemAlertRow(d.DeviceUnitID, d.DeviceUnitZoneID, e.IDEventDevice, d.IDDevice, d.DeviceName, e.EventID, e.Date, e.Message))
+                .OrderByDescending(a => a.Date)
+                .ToListAsync();
+        }
+
+        private static UnitZoneProblemAlert ToDtoAlert(UnitZoneProblemAlertRow a) => new()
+        {
+            IDEventDevice = a.IDEventDevice,
+            DeviceID = a.DeviceID,
+            DeviceName = a.DeviceName,
+            EventType = Enum.IsDefined(typeof(DeviceEventType), a.EventID) ? ((DeviceEventType)a.EventID).ToString() : $"Unknown({a.EventID})",
+            Date = a.Date,
+            Message = a.Message,
+        };
 
         /// <summary>Red beats Orange beats Green. Only ENABLED devices' online state counts toward
         /// Red; a disabled device can never redden its zone, but it still shows a red "Offline"

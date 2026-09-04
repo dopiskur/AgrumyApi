@@ -113,6 +113,23 @@ namespace api.Controllers.API
                 return BadRequest("Firmware auto-refresh interval must be 0/empty (disabled) or a positive number of hours.");
             }
 
+            // Matches the 10s/5min bounds the Relay design settled on (short enough
+            // a LoRa device's own retry loop stays reasonable, long enough to actually batch).
+            if (config.RelayWaitWindowSeconds is < 10 or > 300)
+            {
+                return BadRequest("Relay wait window must be between 10 and 300 seconds.");
+            }
+            if (!Enum.IsDefined(config.RelayMode))
+            {
+                return BadRequest("Unknown relay mode: " + config.RelayMode);
+            }
+
+            // Fixed dropdown on the Server Settings page - anything else means a stale/tampered form post.
+            if (config.ProblemEventExpiryHours is not (1 or 6 or 12 or 24 or 48))
+            {
+                return BadRequest("Problem alert expiry must be one of 1, 6, 12, 24, or 48 hours.");
+            }
+
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await Repo.ServerConfigUpdateAsync(config);
             return Ok();

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>api.Relay</RootNamespace>
+    <AssemblyName>Agrumy.Relay</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Remove="appsettings.json" />
+    <None Include="appsettings.json" Condition="Exists('appsettings.json')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- DTOs only (api.Models.RelayBatchEntry/RelayBatchResponse/DeviceRegistration/...) and the
+         SF-interval helper - deliberately NOT Agrumy.Dal/Agrumy.Api, same "talks to Agrumy.Api only
+         over HTTP, no direct DB access" rule Agrumy.Web already follows (see repo README). -->
+    <ProjectReference Include="..\Agrumy.Shared\Agrumy.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Profile B (LoRaGateway): ChirpStack's own recommended integration path is MQTT - see
+         ChirpStack/ChirpStackUplinkService.cs. Untested against a real broker/gateway - see its
+         class remarks. -->
+    <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
+  </ItemGroup>
+
+</Project>

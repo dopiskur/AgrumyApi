@@ -37,6 +37,17 @@ namespace api.Models
         // is ignored server-side rather than stored.
         public int? EventDedupeMinutes { get; set; }
 
+        // Gates whether non-critical device problem events (crash/auth/sync/OTA failures) turn a
+        // Unit/Zone Orange at all - see api.Dal.EfRepository.ComputeStatus. On by default.
+        [Display(Name = "Alert on non-critical device problems")]
+        public bool ProblemEventAlertsEnabled { get; set; } = true;
+
+        // How long an un-acknowledged problem event keeps a Unit/Zone Orange - clamped to
+        // {1,6,12,24,48} by ServerConfigApiController.Update. Acknowledging an alert clears it
+        // immediately regardless of this window - see DeviceApiController.DeviceEventAcknowledge.
+        [Display(Name = "Problem alert expiry (hours)")]
+        public int ProblemEventExpiryHours { get; set; } = 24;
+
         // Minimum minutes between "resend activation email" requests for the same user - default 10.
         public int? ActivationResendCooldownMinutes { get; set; }
 
@@ -123,6 +134,20 @@ namespace api.Models
         public bool WeatherRainPredicted { get; set; }
         [Display(Name = "Forecast last checked")]
         public DateTime? WeatherCheckedAtUtc { get; set; }
+
+        // Gates the Relay Devices admin page (see _Layout.cshtml, same pattern as
+        // TenantManagementEnabled) and whether RelayApiController accepts Batch calls at all.
+        [Display(Name = "Enable Agrumy.Relay support")]
+        public bool RelayEnabled { get; set; }
+
+        [Display(Name = "Relay mode")]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
+        public RelayMode RelayMode { get; set; }
+
+        // Aggregated mode only - see RelayBatchResponse's remarks. Clamped 10-300 by
+        // ServerConfigApiController.Update, same pattern as MaxRulesPerZone's clamp.
+        [Display(Name = "Aggregated wait window (seconds)")]
+        public int RelayWaitWindowSeconds { get; set; } = 30;
     }
 
     /// <summary>The only field of <see cref="ServerConfig"/> a pre-login, unauthenticated page is

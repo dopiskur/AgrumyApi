@@ -26,8 +26,13 @@ public class ApiControllerTests
     private static readonly IOptions<AgrumySettings> TestSettings = Options.Create(AgrumySettings.Bind(TestConfig.Configuration));
 
     // CommandQueueService is a plain sealed class (not mocked); IRepository already implements all three interfaces it needs, so one mock backs all three constructor params.
-    private DeviceApiController NewDeviceController() => new(_repo.Object, _cache.Object,
-        new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), FirmwareTestSupport.NewCatalog(_repo.Object));
+    private DeviceApiController NewDeviceController()
+    {
+        var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
+        return new(_repo.Object, _cache.Object,
+            new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), catalog,
+            new api.Devices.DeviceConfigBuilder(_repo.Object, catalog));
+    }
     private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _notifications.Object, TestSettings);
 
     /// <summary>Gives a bare (non-DI-constructed) controller the JWT claims an [Authorize] action reads via HttpContext.User.</summary>

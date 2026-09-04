@@ -1,9 +1,9 @@
 using api.Commands;
 using api.Dal.Interface;
+using api.Devices;
 using api.Firmware;
 using api.Models;
 using api.Security;
-using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace api.Controllers.API
 {
     [Route("/api/Device")]
-    public class DeviceApiController(IRepository repo, ICache cache, CommandQueueService commandQueue, FirmwareCatalogService firmwareCatalog) : ApiControllerBase(repo, cache)
+    public class DeviceApiController(IRepository repo, ICache cache, CommandQueueService commandQueue, FirmwareCatalogService firmwareCatalog, DeviceConfigBuilder configBuilder) : ApiControllerBase(repo, cache)
     {
         #region websvc api
 
@@ -118,6 +118,17 @@ namespace api.Controllers.API
             // The device's own tenant (== the caller's for a tenant-scoped caller; the ensure call
             // above already authorized a cross-tenant global reader).
             return Ok(await Repo.EventDeviceGetAsync(device!.IDDevice, device.TenantID));
+        }
+
+        /// <summary>Dismisses one non-critical problem alert (see api.Dal.EfRepository.ComputeStatus)
+        /// so it stops keeping its device's Unit/Zone Orange - the event row itself stays for history,
+        /// only its EventDeviceRow.AcknowledgedAt is set.</summary>
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPut("Event/{idEventDevice}/Acknowledge")]
+        public async Task<ActionResult<bool>> DeviceEventAcknowledge(int idEventDevice)
+        {
+            bool updated = await Repo.EventDeviceAcknowledgeAsync(idEventDevice, CallerManagesDevicesGlobally ? null : CallerTenantId);
+            return updated ? Ok(true) : NotFound();
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -227,7 +238,7 @@ namespace api.Controllers.API
                 return Ok(); // device is up to date and nothing is queued for it - do nothing
             }
 
-            return Ok(await BuildDeviceConfigAsync(device, pendingCommand, value.Board));
+            return Ok(await configBuilder.BuildAsync(device, pendingCommand, value.Board));
         }
 
         /// <summary>Arms an OTA for one device - Version null = latest catalog build for its board
@@ -343,6 +354,10 @@ namespace api.Controllers.API
                     ServicePoint = value.ServicePoint,
                     DeviceSensorEnabled = false,
                     DeviceControllerEnabled = false,
+                    // Only Agrumy.Relay's own registration ever sets these - normal
+                    // AgrumyFirmware devices leave both null/false, matching the DTO's defaults.
+                    IsRelay = value.IsRelay,
+                    RelayProfile = value.RelayProfile,
                 });
 
                 device = await Repo.DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
@@ -360,78 +375,7 @@ namespace api.Controllers.API
             // legitimately still be queued.
             PendingCommand? pendingCommand = await commandQueue.GetPendingCommandAsync(device.IDDevice!.Value);
             // Register carries no Board - null falls back to the legacy per-type lookup.
-            return Ok(await BuildDeviceConfigAsync(device, pendingCommand, board: null));
-        }
-
-        private async Task<DeviceConfig> BuildDeviceConfigAsync(Device device, PendingCommand? pendingCommand, string? board)
-        {
-            // Computed fresh on every Config/Register response rather than cached, so a DST
-            // transition or an admin changing ServerConfig.ScheduleTimeZone reaches every device on
-            // its very next poll. This same fetch is reused for WeatherRainPredicted below.
-            ServerConfig serverConfig = await Repo.ServerConfigGetAsync(1);
-            int utcOffsetSeconds = TimeZoneHelper.GetUtcOffsetSeconds(DateTime.UtcNow, serverConfig.ScheduleTimeZone);
-
-            var deviceConfig = new DeviceConfig
-            {
-                ConfigVersion = device.ConfigVersion,
-                TenantID = device.TenantID,
-                deviceID = device.IDDevice,
-                DeviceUnitID = device.DeviceUnitID,
-                DeviceUnitZoneID = device.DeviceUnitZoneID,
-                ApiId = device.ApiId,
-                ApiKey = device.ApiKey,
-                ServicePoint = device.ServicePoint,
-                DeviceTypeServiceID = device.DeviceTypeServiceID,
-                ServicePublicKey = device.ServicePublicKey,
-                UtcOffsetSeconds = utcOffsetSeconds,
-                DeviceSensorEnabled = device.DeviceSensorEnabled,
-                DeviceControllerEnabled = device.DeviceControllerEnabled,
-                BatteryEnabled = device.BatteryEnabled,
-                Debug = device.Debug,
-                Reboot = device.Reboot,
-                Reset = device.Reset,
-                FirmwareUpdate = device.FirmwareUpdate,
-                Enabled = device.Enabled,
-                CommandVersion = device.CommandVersion,
-                PendingCommand = pendingCommand,
-            };
-
-            // The firmware does a version comparison of its own, so an offer being present on every
-            // Config sync is fine - harmless on Register too, since a freshly-created device has
-            // FirmwareUpdate == null and ResolveOfferAsync returns null for that.
-            DeviceFirmware? firmware = await firmwareCatalog.ResolveOfferAsync(device, board);
-            if (firmware != null)
-            {
-                deviceConfig.FirmwareVersion = firmware.Version;
-                deviceConfig.FirmwareUrl = firmware.Url;
-                deviceConfig.FirmwareSha256 = firmware.Sha256;
-            }
-
-            if (deviceConfig.DeviceSensorEnabled == true)
-            {
-                deviceConfig.DeviceConfigSensor = await Repo.DeviceConfigSensorGetAsync(device.DeviceConfigSensorID);
-            }
-            if (deviceConfig.DeviceControllerEnabled == true)
-            {
-                // Relay-pin mapping still comes from the device's own row, but Rules and safety
-                // limits come from whichever zone the device is assigned to - merged into the SAME
-                // DeviceConfigController object the firmware already expects. No zone assigned
-                // means an empty Rules list, so every relay function simply stays off.
-                DeviceConfigController? controller = await Repo.DeviceConfigControllerGetAsync(device.DeviceConfigControllerID);
-                if (controller != null && device.DeviceUnitZoneID is int idZone and not 0)
-                {
-                    controller.Rules = await Repo.DeviceUnitZoneRulesGetAsync(idZone);
-                    DeviceUnitZone? zone = await Repo.DeviceUnitZoneGetByIdAsync(idZone);
-                    controller.WaterPumpMaxRunSeconds = zone?.WaterPumpMaxRunSeconds;
-                    controller.WaterPumpCooldownSeconds = zone?.WaterPumpCooldownSeconds;
-                    // Computed here as a single AND-NOT gate, not sent as two separate flags - see
-                    // DeviceConfigController.SkipWaterPumpForRain's remarks.
-                    controller.SkipWaterPumpForRain = zone?.SkipWaterPumpWhenRainPredicted == true && serverConfig.WeatherRainPredicted;
-                }
-                deviceConfig.DeviceConfigController = controller;
-            }
-
-            return deviceConfig;
+            return Ok(await configBuilder.BuildAsync(device, pendingCommand, board: null));
         }
 
         [HttpPost("Authenticate")]

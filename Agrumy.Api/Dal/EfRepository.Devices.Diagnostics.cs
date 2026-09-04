@@ -163,6 +163,20 @@ namespace api.Dal
             return rows.Select(ToDto).ToList();
         }
 
+        public async Task<bool> EventDeviceAcknowledgeAsync(int idEventDevice, int? tenantID)
+        {
+            // tenantID is the same value used to authorize the call (null only for a Global caller) -
+            // applied straight to the update's WHERE clause, so a foreign tenant's event id can never
+            // be acknowledged even if the id itself is guessable.
+            IQueryable<EventDeviceRow> q = db.EventDevices.Where(e => e.IDEventDevice == idEventDevice);
+            if (tenantID != null)
+            {
+                q = q.Where(e => e.TenantID == tenantID);
+            }
+            int updated = await q.ExecuteUpdateAsync(s => s.SetProperty(e => e.AcknowledgedAt, DateTime.UtcNow));
+            return updated > 0;
+        }
+
         // ---- Offline alert background worker --------------------------
 
         public async Task<IList<OfflineAlertCandidate>> OfflineAlertCandidatesGetAsync()
