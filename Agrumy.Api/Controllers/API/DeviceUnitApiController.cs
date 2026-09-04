@@ -13,6 +13,12 @@ namespace api.Controllers.API
     [Route("/api/DeviceUnit")]
     public class DeviceUnitApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
     {
+        // Roadmap #194: must match AgrumyFirmware's DeviceModel.h MAX_RULES exactly - a device
+        // receives one zone's whole rule set in a fixed-size array with no dynamic growth on-device
+        // (ConfigParser.cpp silently drops anything past this), so the server has to reject an
+        // over-cap add rather than let the firmware quietly lose rules an admin thinks are active.
+        private const int MaxRulesPerZone = 32;
+
         #region Unit CRUD
 
         [Authorize]
@@ -169,6 +175,11 @@ namespace api.Controllers.API
             if (RuleConditionConfigError(rule.ConditionType, rule.ConditionConfig) is string configError)
             {
                 return BadRequest(configError);
+            }
+            int existingRuleCount = (await Repo.DeviceUnitZoneRulesGetAsync(rule.DeviceUnitZoneID)).Count;
+            if (existingRuleCount >= MaxRulesPerZone)
+            {
+                return BadRequest($"This zone already has {existingRuleCount} rules, the maximum the device firmware can hold ({MaxRulesPerZone}). Remove one before adding another.");
             }
             return Ok(await Repo.DeviceUnitZoneRuleAddAsync(rule));
         }
