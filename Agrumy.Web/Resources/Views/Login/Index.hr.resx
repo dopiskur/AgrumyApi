@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Sign in to start your session" xml:space="preserve"><value>Prijavite se za početak sesije</value></data>
+  <data name="Email or username" xml:space="preserve"><value>Email ili korisničko ime</value></data>
+  <data name="Password" xml:space="preserve"><value>Lozinka</value></data>
+  <data name="Login" xml:space="preserve"><value>Prijava</value></data>
+  <data name="Register a new membership" xml:space="preserve"><value>Registrirajte novi korisnički račun</value></data>
+</root>

@@ -1,4 +1,5 @@
 @inject api.Dal.Interface.IApi Api
+@inject Microsoft.AspNetCore.Mvc.Localization.IViewLocalizer Localizer
 @{
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
     Func<string, string> navActive = c => string.Equals(c, currentController, StringComparison.OrdinalIgnoreCase) ? "active" : "";
@@ -63,6 +64,9 @@
                 </ul>
 
                 <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item me-2">
+                        <partial name="_LanguageSwitcher" />
+                    </li>
                     @if (!string.IsNullOrEmpty(currentUserEmail))
                     {
                         <li class="nav-item dropdown me-2">
@@ -72,7 +76,7 @@
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="user-menu">
                                 <li>
                                     <a class="dropdown-item" asp-controller="Profile" asp-action="Index">
-                                        <i class="bi bi-person-gear me-2"></i>My Profile
+                                        <i class="bi bi-person-gear me-2"></i>@Localizer["My Profile"]
                                     </a>
                                 </li>
                             </ul>
@@ -118,19 +122,19 @@
                         <li class="nav-item">
                             <a asp-area="" asp-controller="DeviceUnit" asp-action="Index" class="nav-link @navActive("DeviceUnit")">
                                 <i class="nav-icon bi bi-house-door"></i>
-                                <p>Dashboard</p>
+                                <p>@Localizer["Dashboard"]</p>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a asp-area="" asp-controller="Device" asp-action="Fleet" class="nav-link @navActive("Device")">
                                 <i class="nav-icon bi bi-broadcast"></i>
-                                <p>Fleet</p>
+                                <p>@Localizer["Fleet"]</p>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a asp-area="" asp-controller="Reporting" asp-action="Index" class="nav-link @navActive("Reporting")">
                                 <i class="nav-icon bi bi-file-earmark-bar-graph"></i>
-                                <p>Reporting</p>
+                                <p>@Localizer["Reporting"]</p>
                             </a>
                         </li>
                         @if (hasAnyRole(RoleNames.UserManagers))
@@ -138,7 +142,7 @@
                             <li class="nav-item">
                                 <a asp-area="" asp-controller="User" asp-action="Index" class="nav-link @navActive("User")">
                                     <i class="nav-icon bi bi-people"></i>
-                                    <p>Users</p>
+                                    <p>@Localizer["Users"]</p>
                                 </a>
                             </li>
                         }
@@ -147,7 +151,7 @@
                             <li class="nav-item">
                                 <a asp-area="" asp-controller="AuditLog" asp-action="Index" class="nav-link @navActive("AuditLog")">
                                     <i class="nav-icon bi bi-clock-history"></i>
-                                    <p>Audit Log</p>
+                                    <p>@Localizer["Audit Log"]</p>
                                 </a>
                             </li>
                         }
@@ -156,13 +160,13 @@
                             <li class="nav-item">
                                 <a asp-area="" asp-controller="Firmware" asp-action="Index" class="nav-link @navActive("Firmware")">
                                     <i class="nav-icon bi bi-cpu"></i>
-                                    <p>Firmware</p>
+                                    <p>@Localizer["Firmware"]</p>
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a asp-area="" asp-controller="ServerConfig" asp-action="Index" class="nav-link @navActive("ServerConfig")">
                                     <i class="nav-icon bi bi-sliders"></i>
-                                    <p>Server Settings</p>
+                                    <p>@Localizer["Server Settings"]</p>
                                 </a>
                             </li>
                             @if (tenantManagementEnabled)
@@ -170,7 +174,7 @@
                                 <li class="nav-item">
                                     <a asp-area="" asp-controller="Tenant" asp-action="Index" class="nav-link @navActive("Tenant")">
                                         <i class="nav-icon bi bi-buildings"></i>
-                                        <p>Tenants</p>
+                                        <p>@Localizer["Tenants"]</p>
                                     </a>
                                 </li>
                             }
@@ -179,7 +183,7 @@
                                 <li class="nav-item">
                                     <a asp-area="" asp-controller="Relay" asp-action="Index" class="nav-link @navActive("Relay")">
                                         <i class="nav-icon bi bi-router"></i>
-                                        <p>Relay Devices</p>
+                                        <p>@Localizer["Relay Devices"]</p>
                                     </a>
                                 </li>
                             }
@@ -187,7 +191,7 @@
                         <li class="nav-item mt-2 border-top border-secondary border-opacity-25 pt-2">
                             <a asp-area="" asp-controller="Login" asp-action="Logout" class="nav-link">
                                 <i class="nav-icon bi bi-box-arrow-right"></i>
-                                <p>Logout</p>
+                                <p>@Localizer["Logout"]</p>
                             </a>
                         </li>
                     </ul>
@@ -204,7 +208,7 @@
                         <div class="col-sm-6">
                             <nav aria-label="breadcrumb">
                                 <ol class="breadcrumb float-sm-end">
-                                    <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+                                    <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">@Localizer["Home"]</a></li>
                                     <li class="breadcrumb-item active" aria-current="page">@ViewData["Title"]</li>
                                 </ol>
                             </nav>
@@ -219,7 +223,7 @@
             </div>
         </main>
         <footer class="app-footer">
-            <strong>&copy; 2024-2026 <a asp-controller="Home" asp-action="Privacy" class="text-decoration-none">Agrumy</a>.</strong> All rights reserved.
+            <strong>&copy; 2024-2026 <a asp-controller="Home" asp-action="Privacy" class="text-decoration-none">Agrumy</a>.</strong> @Localizer["All rights reserved."]
         </footer>
     </div>
 

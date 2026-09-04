@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Home" xml:space="preserve"><value>Početna</value></data>
+  <data name="Dashboard" xml:space="preserve"><value>Nadzorna ploča</value></data>
+  <data name="Fleet" xml:space="preserve"><value>Uređaji</value></data>
+  <data name="Reporting" xml:space="preserve"><value>Izvještaji</value></data>
+  <data name="Users" xml:space="preserve"><value>Korisnici</value></data>
+  <data name="Audit Log" xml:space="preserve"><value>Zapisnik promjena</value></data>
+  <data name="Firmware" xml:space="preserve"><value>Firmver</value></data>
+  <data name="Server Settings" xml:space="preserve"><value>Postavke servera</value></data>
+  <data name="Tenants" xml:space="preserve"><value>Tenanti</value></data>
+  <data name="Relay Devices" xml:space="preserve"><value>Relay uređaji</value></data>
+  <data name="Logout" xml:space="preserve"><value>Odjava</value></data>
+  <data name="My Profile" xml:space="preserve"><value>Moj profil</value></data>
+  <data name="All rights reserved." xml:space="preserve"><value>Sva prava pridržana.</value></data>
+</root>

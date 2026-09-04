@@ -1,0 +1,12 @@
+@using Microsoft.AspNetCore.Localization
+@{
+    var currentUiCulture = Context.Features.Get<IRequestCultureFeature>()?.RequestCulture.UICulture.TwoLetterISOLanguageName ?? api.Utils.SupportedCultures.Default;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+}
+<form asp-controller="Language" asp-action="Set" method="post" class="d-inline">
+    <input type="hidden" name="returnUrl" value="@returnUrl" />
+    <select name="culture" class="form-select form-select-sm d-inline-block w-auto" onchange="this.form.submit()" aria-label="Language">
+        <option value="en" selected="@(currentUiCulture == "en")">English</option>
+        <option value="hr" selected="@(currentUiCulture == "hr")">Hrvatski</option>
+    </select>
+</form>

@@ -6,6 +6,8 @@ using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Localization;
+using Microsoft.Extensions.Options;
 using Refit;
 
 // Pinned invariant so a host OS locale with "," as decimal separator doesn't silently
@@ -24,8 +26,20 @@ if (string.IsNullOrEmpty(apiServiceUrl))
     throw new InvalidOperationException("WebView:ApiService is missing in configuration.");
 
 // ApiAuthExceptionFilter turns a 401 from Agrumy.Api (expired stored JWT) into a re-login.
-builder.Services.AddControllersWithViews(o => o.Filters.Add<ApiAuthExceptionFilter>());
+builder.Services.AddControllersWithViews(o => o.Filters.Add<ApiAuthExceptionFilter>())
+    .AddViewLocalization()
+    .AddDataAnnotationsLocalization();
 builder.Services.AddHttpContextAccessor(); // BearerTokenHandler + _Layout read the current user
+
+builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    // Culture (number/date formatting) stays Invariant per the pin above; only UICulture follows the visitor's language pick.
+    options.SupportedCultures = [CultureInfo.InvariantCulture];
+    options.SupportedUICultures = SupportedCultures.All.Select(c => new CultureInfo(c)).ToArray();
+    options.DefaultRequestCulture = new RequestCulture(CultureInfo.InvariantCulture, new CultureInfo(SupportedCultures.Default));
+    options.RequestCultureProviders = [new CookieRequestCultureProvider()];
+});
 
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -114,6 +128,8 @@ app.Use(async (context, next) =>
 });
 
 app.UseMiddleware<SecurityHeadersMiddleware>();
+
+app.UseRequestLocalization(app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value);
 
 app.MapStaticAssets();
 
