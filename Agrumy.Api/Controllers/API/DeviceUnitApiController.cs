@@ -13,10 +13,7 @@ namespace api.Controllers.API
     [Route("/api/DeviceUnit")]
     public class DeviceUnitApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
     {
-        // Roadmap #194: must match AgrumyFirmware's DeviceModel.h MAX_RULES exactly - a device
-        // receives one zone's whole rule set in a fixed-size array with no dynamic growth on-device
-        // (ConfigParser.cpp silently drops anything past this), so the server has to reject an
-        // over-cap add rather than let the firmware quietly lose rules an admin thinks are active.
+        // Must match AgrumyFirmware DeviceModel.h's MAX_RULES - past this, the firmware silently drops extra rules.
         private const int MaxRulesPerZone = 32;
 
         #region Unit CRUD

@@ -392,9 +392,7 @@ namespace api.Controllers.API
         public async Task<ActionResult<IList<User>>> UsersGet()
         {
             IList<User> users = CallerReadsUsersGlobally ? await Repo.UsersGetAllAsync() : await Repo.UsersGetAsync(CallerTenantId);
-            // Roadmap #192: DevicePin is a live, reusable device-registration credential, not a
-            // regular profile field - only its owner should ever see it (GetUserSelf), not every
-            // authenticated tenant member who can browse this list.
+            // DevicePin is a live credential, not a profile field - only its owner (GetUserSelf) should see it, not this list.
             foreach (User user in users)
             {
                 user.DevicePin = null;
@@ -488,8 +486,7 @@ namespace api.Controllers.API
                 return StatusCode(403, "Target user belongs to a different tenant");
             }
 
-            // Roadmap #192: same reasoning as UsersGet - this is not the caller looking up
-            // themselves (that's GetUserSelf), so their live device-registration PIN stays hidden.
+            // Same reasoning as UsersGet - not the caller viewing themselves, so their live DevicePin stays hidden.
             user.DevicePin = null;
             user.DevicePinExpires = null;
             return Ok(user);

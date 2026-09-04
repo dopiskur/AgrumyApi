@@ -27,10 +27,7 @@ namespace api.Dal.Interface
         /// scratch, a full Local rebuild wipes before re-pulling. Returns how many went.</summary>
         Task<int> FirmwareDeleteBySourceAsync(FirmwareSource source);
 
-        /// <summary>Roadmap #184: atomic delete-then-repopulate for one source - the caller has
-        /// already fetched/validated every row up front, so the only remaining failure window is a
-        /// DB error partway through, which this rolls back instead of leaving the source's catalog
-        /// partially repopulated or fully empty. Returns how many old rows were removed.</summary>
+        /// <summary>Atomic delete-then-repopulate for one source, rolled back on any mid-transaction failure. Returns how many old rows were removed.</summary>
         Task<int> FirmwareReplaceSourceRowsAsync(FirmwareSource source, IReadOnlyList<DeviceFirmware> rows);
 
         /// <summary>Arms (update=true, optional pinned version) or clears (update=false, null) the

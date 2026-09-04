@@ -14,8 +14,7 @@ namespace api.Controllers.API
         [HttpGet]
         [Authorize]
         public async Task<ActionResult<string>> Get(int? deviceID, int? timeRange = 60, int? timeMDMY = 0, int? buildReport = 0) =>
-            // Roadmap #183: was always tenant-scoped even for a Global reader/admin, unlike every
-            // other Device-domain list (DevicesGet, DeviceFleetGet, DeviceUnit dashboards).
+            // Was always tenant-scoped even for a Global reader, unlike DevicesGet/DeviceFleetGet.
             Ok(await Repo.SensorDataGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, deviceID, timeRange, timeMDMY, buildReport));
 
         [HttpPost]
@@ -60,7 +59,7 @@ namespace api.Controllers.API
         [HttpGet("Report")]
         [Authorize]
         public async Task<ActionResult<IEnumerable<SensorDataReport>>> ReportGet(int? getData, int? idDevice, int? iDSensorDataReport) =>
-            // Roadmap #183: same fix as Get above.
+            // Same fix as Get above.
             Ok(await Repo.SensorDataReportGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, getData, idDevice, iDSensorDataReport));
     }
 }

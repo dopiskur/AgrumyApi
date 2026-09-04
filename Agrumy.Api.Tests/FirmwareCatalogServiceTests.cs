@@ -33,8 +33,7 @@ public class FirmwareCatalogServiceTests
              .Returns((int id) => { _rows.RemoveAll(x => x.IDDeviceFirmware == id); return Task.CompletedTask; });
         _repo.Setup(r => r.FirmwareDeleteBySourceAsync(It.IsAny<FirmwareSource>()))
              .ReturnsAsync((FirmwareSource s) => _rows.RemoveAll(x => x.Source == s && x.Board != null));
-        // Roadmap #184: mirrors the real EfRepository.FirmwareReplaceSourceRowsAsync - remove then add,
-        // just not inside an actual transaction since this is an in-memory fake, not a real DB.
+        // Mirrors the real EfRepository.FirmwareReplaceSourceRowsAsync's remove-then-add, minus the actual transaction.
         _repo.Setup(r => r.FirmwareReplaceSourceRowsAsync(It.IsAny<FirmwareSource>(), It.IsAny<IReadOnlyList<DeviceFirmware>>()))
              .ReturnsAsync((FirmwareSource s, IReadOnlyList<DeviceFirmware> rows) =>
              {

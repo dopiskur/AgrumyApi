@@ -174,9 +174,7 @@ namespace api.Firmware
             var result = new FirmwareSyncResult();
             if (mode == FirmwareSyncMode.PullFull)
             {
-                // Roadmap #185: FullImageFileName (#41's blank-chip image) is a sibling file on the
-                // same row, not a separate row of its own - dropping only FileName here orphaned it
-                // on disk forever whenever a full re-pull replaced that board+version.
+                // FullImageFileName is a sibling file on the same row - dropping only FileName orphaned it on disk.
                 foreach (var row in (await firmwareRepo.FirmwareListAsync()).Where(r => r.Source == FirmwareSource.Local && r.FileName != null))
                 {
                     storage.Delete(row.FileName!);
@@ -265,10 +263,7 @@ namespace api.Firmware
 
         private async Task<FirmwareSyncResult> ReplaceSourceRowsAsync(FirmwareSource source, IReadOnlyList<RemoteFile> remoteFiles)
         {
-            // Roadmap #184: remoteFiles is already a fully-fetched, materialized list by the time we
-            // get here (the caller finished talking to GitHub/the Custom manifest before calling this),
-            // so the only remaining failure window was a DB error mid-loop - closed by making the
-            // delete + every insert one atomic transaction instead of one commit per repo call.
+            // remoteFiles is already fully fetched/validated, so the only remaining risk was a DB error mid-loop - now one transaction.
             List<DeviceFirmware> rows = remoteFiles.Select(remote => new DeviceFirmware
             {
                 Board = remote.Board,
@@ -448,9 +443,7 @@ namespace api.Firmware
             {
                 return false;
             }
-            // Roadmap #185: FullImageFileName (#41's blank-chip image) is a sibling file on the same
-            // row, not tracked by any other row - dropping only FileName here left it orphaned on
-            // disk forever, since the DB row that named it is gone right after this.
+            // FullImageFileName is a sibling file on the same row - dropping only FileName left it orphaned on disk.
             if (row.Source == FirmwareSource.Local)
             {
                 if (row.FileName != null)
