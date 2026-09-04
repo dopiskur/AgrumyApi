@@ -80,14 +80,17 @@
                             <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-repeat"></i> Refresh catalog from @(source == FirmwareSource.GitHub ? "GitHub" : "custom repository")</button>
                         </form>
                     }
-                    <form asp-action="Sync" method="post">
-                        <input type="hidden" name="mode" value="@FirmwareSyncMode.PullIncremental" />
-                        <button type="submit" class="btn btn-outline-primary" title="Download only releases the local store does not have yet"><i class="bi bi-cloud-download"></i> Pull from GitHub (incremental)</button>
-                    </form>
-                    <form asp-action="Sync" method="post" onsubmit="return confirm('Delete every locally stored firmware file and download all releases again?');">
-                        <input type="hidden" name="mode" value="@FirmwareSyncMode.PullFull" />
-                        <button type="submit" class="btn btn-outline-primary" title="Wipe the local store first, then download every release"><i class="bi bi-cloud-download-fill"></i> Pull from GitHub (full rebuild)</button>
-                    </form>
+                    @if (source == FirmwareSource.Local)
+                    {
+                        <form asp-action="Sync" method="post">
+                            <input type="hidden" name="mode" value="@FirmwareSyncMode.PullIncremental" />
+                            <button type="submit" class="btn btn-outline-primary" title="Download only releases the local store does not have yet"><i class="bi bi-cloud-download"></i> Pull from GitHub (incremental)</button>
+                        </form>
+                        <form asp-action="Sync" method="post" onsubmit="return confirm('Delete every locally stored firmware file and download all releases again?');">
+                            <input type="hidden" name="mode" value="@FirmwareSyncMode.PullFull" />
+                            <button type="submit" class="btn btn-outline-primary" title="Wipe the local store first, then download every release"><i class="bi bi-cloud-download-fill"></i> Pull from GitHub (full rebuild)</button>
+                        </form>
+                    }
                 </div>
             </div>
 
