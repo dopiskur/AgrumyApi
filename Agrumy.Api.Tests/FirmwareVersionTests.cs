@@ -40,6 +40,17 @@ public class FirmwareVersionTests
         Assert.False(FirmwareVersion.IsNewer("1.2.0-rc1", "1.2.0"));
     }
 
+    /// <summary>A dev board flashed straight from a commit past the last tag (firmware_version.py's
+    /// `git describe --tags --dirty` fallback) must NOT look older than that tag - it is actually
+    /// ahead of it, unlike a true pre-release such as "-rc1" above.</summary>
+    [Fact]
+    public void GitDescribeCommitSuffix_Sorts_After_The_Tag_It_Is_Built_From()
+    {
+        Assert.False(FirmwareVersion.IsNewer("0.2.1", "0.2.1-1-g35b2dde"));
+        Assert.False(FirmwareVersion.IsNewer("0.2.1", "0.2.1-12-gabc1234-dirty"));
+        Assert.True(FirmwareVersion.IsNewer("0.2.1-1-g35b2dde", "0.2.1"));
+    }
+
     [Fact]
     public void Unparseable_Running_Version_Counts_As_Older_Than_Any_Release()
     {

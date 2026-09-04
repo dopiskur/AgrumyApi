@@ -12,6 +12,12 @@ namespace api.Firmware
         [GeneratedRegex(@"^v?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(?:-(?<pre>[0-9A-Za-z][0-9A-Za-z.-]*))?$")]
         private static partial Regex VersionRegex();
 
+        /// <summary>`git describe --tags --dirty`'s own suffix format (firmware_version.py's fallback
+        /// for a non-release build) - N commits past the tag, optionally dirty. Despite living after a
+        /// "-" like a semver pre-release, it means the opposite: commits AFTER the tag, not before it.</summary>
+        [GeneratedRegex(@"^\d+-g[0-9a-f]+(-dirty)?$")]
+        private static partial Regex GitDescribeCommitSuffixRegex();
+
         /// <summary>agrumy-{board}-full-v{version}.bin - the blank-chip web-installer image (bootloader + partition table + boot_app0 + the OTA app, merged to one file flashable at offset 0). The "full-" marker sits BEFORE "v", not appended after the version: FileNameRegex's pre-release group already accepts an arbitrary "-something" tail on the version, so a suffix-after-version convention would silently parse as a version like "1.2.3-full" instead of being rejected.</summary>
         [GeneratedRegex(@"^agrumy-(?<board>[a-z0-9]+)-full-v(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?)\.bin$")]
         private static partial Regex FullImageFileNameRegex();
@@ -65,10 +71,12 @@ namespace api.Firmware
             if (c != 0) { return c; }
             c = Patch.CompareTo(other.Patch);
             if (c != 0) { return c; }
-            // Semver rule: a pre-release sorts BEFORE the same release ("1.2.0-rc1" < "1.2.0").
+            // Semver rule: a pre-release sorts BEFORE the same release ("1.2.0-rc1" < "1.2.0") - EXCEPT
+            // a git-describe commit-count suffix ("1.2.0-3-gabc1234"), which sorts AFTER it instead,
+            // since it means 3 commits past the 1.2.0 tag, not a preview build leading up to it.
             if (PreRelease == null && other.PreRelease == null) { return 0; }
-            if (PreRelease == null) { return 1; }
-            if (other.PreRelease == null) { return -1; }
+            if (PreRelease == null) { return GitDescribeCommitSuffixRegex().IsMatch(other.PreRelease!) ? -1 : 1; }
+            if (other.PreRelease == null) { return GitDescribeCommitSuffixRegex().IsMatch(PreRelease!) ? 1 : -1; }
             return string.CompareOrdinal(PreRelease, other.PreRelease);
         }
 
