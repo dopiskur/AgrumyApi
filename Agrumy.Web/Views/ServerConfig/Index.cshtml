@@ -71,6 +71,19 @@
                         <input asp-for="LightHysteresis" class="form-control" />
                         <span asp-validation-for="LightHysteresis" class="text-danger"></span>
                     </div>
+
+                    <hr />
+                    <h6 class="fw-semibold">Zone Rules</h6>
+                    <p class="text-secondary small">
+                        Max automation rules a zone can hold (Zone &rarr; Automation rules). Hard ceiling
+                        is 32 regardless of this value - past that the device firmware silently drops
+                        extra rules.
+                    </p>
+                    <div class="mb-0">
+                        <label asp-for="MaxRulesPerZone" class="form-label"></label>
+                        <input asp-for="MaxRulesPerZone" class="form-control" style="width:10rem" />
+                        <span asp-validation-for="MaxRulesPerZone" class="text-danger"></span>
+                    </div>
                 </div>
 
                 <div class="tab-pane fade" id="tab-safety-limits" role="tabpanel">

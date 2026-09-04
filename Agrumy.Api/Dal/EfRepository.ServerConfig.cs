@@ -37,6 +37,7 @@ namespace api.Dal
                 WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds,
                 EventDedupeMinutes = settings.EventDedupeMinutes,
                 ActivationResendCooldownMinutes = settings.ActivationResendCooldownMinutes,
+                MaxRulesPerZone = settings.MaxRulesPerZone,
                 AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation,
                 ScheduleTimeZone = settings.ScheduleTimeZone,
                 FirmwareSource = (int)FirmwareSource.GitHub,
@@ -68,6 +69,7 @@ namespace api.Dal
             row.WaterPumpCooldownSeconds = config.WaterPumpCooldownSeconds;
             row.EventDedupeMinutes = config.EventDedupeMinutes;
             row.ActivationResendCooldownMinutes = config.ActivationResendCooldownMinutes;
+            row.MaxRulesPerZone = config.MaxRulesPerZone;
             row.AllowSelfServiceTenantCreation = config.AllowSelfServiceTenantCreation;
             row.ScheduleTimeZone = config.ScheduleTimeZone;
             row.FirmwareSource = (int)config.FirmwareSource;
@@ -118,6 +120,7 @@ namespace api.Dal
             row.WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds;
             row.EventDedupeMinutes = settings.EventDedupeMinutes;
             row.ActivationResendCooldownMinutes = settings.ActivationResendCooldownMinutes;
+            row.MaxRulesPerZone = settings.MaxRulesPerZone;
             row.AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation;
             row.ScheduleTimeZone = settings.ScheduleTimeZone;
             row.SensorDataRetentionDays = settings.SensorDataRetentionDays;
@@ -160,6 +163,7 @@ namespace api.Dal
             WaterPumpCooldownSeconds = r.WaterPumpCooldownSeconds,
             EventDedupeMinutes = r.EventDedupeMinutes,
             ActivationResendCooldownMinutes = r.ActivationResendCooldownMinutes,
+            MaxRulesPerZone = r.MaxRulesPerZone ?? settings.MaxRulesPerZone,
             AllowSelfServiceTenantCreation = r.AllowSelfServiceTenantCreation,
             ScheduleTimeZone = r.ScheduleTimeZone,
             FirmwareSource = (FirmwareSource)r.FirmwareSource,

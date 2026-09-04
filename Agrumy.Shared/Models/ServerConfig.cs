@@ -40,6 +40,9 @@ namespace api.Models
         // Minimum minutes between "resend activation email" requests for the same user - default 10.
         public int? ActivationResendCooldownMinutes { get; set; }
 
+        // Default 10, hard ceiling 32 (AgrumyFirmware DeviceModel.h's MAX_RULES) - see ServerConfigApiController.Update for the enforced bound.
+        public int? MaxRulesPerZone { get; set; }
+
         // When true, UserRegistration is allowed to create a brand new tenant for a name it doesn't
         // recognize instead of rejecting the registration. Non-nullable: bool? here would make
         // asp-for render a text box instead of a checkbox.

@@ -6,15 +6,18 @@ using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace api.Controllers.API
 {
     /// <summary>Unit/Zone CRUD, device assignment, and hierarchical dashboard aggregation. Ownership checks mirror DeviceApiController.EnsureOwnedDeviceAsync - a tenant-scoped caller only sees/writes its own tenant's Units/Zones, a Global admin/Device/reader crosses tenants per the same CallerReadsDevicesGlobally/CallerManagesDevicesGlobally rules as the rest of the Device domain.</summary>
     [Route("/api/DeviceUnit")]
-    public class DeviceUnitApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
+    public class DeviceUnitApiController(IRepository repo, ICache cache, IOptions<AgrumySettings> settingsOptions) : ApiControllerBase(repo, cache)
     {
-        // Must match AgrumyFirmware DeviceModel.h's MAX_RULES - past this, the firmware silently drops extra rules.
-        private const int MaxRulesPerZone = 32;
+        private readonly AgrumySettings settings = settingsOptions.Value;
+
+        // Absolute ceiling - must match AgrumyFirmware DeviceModel.h's MAX_RULES, enforced independently of ServerConfig.MaxRulesPerZone in case a row predates that validation.
+        private const int HardMaxRulesPerZone = 32;
 
         #region Unit CRUD
 
@@ -173,10 +176,12 @@ namespace api.Controllers.API
             {
                 return BadRequest(configError);
             }
+            int configuredMax = (await Repo.ServerConfigGetAsync(1)).MaxRulesPerZone ?? settings.MaxRulesPerZone;
+            int effectiveMax = Math.Min(configuredMax, HardMaxRulesPerZone);
             int existingRuleCount = (await Repo.DeviceUnitZoneRulesGetAsync(rule.DeviceUnitZoneID)).Count;
-            if (existingRuleCount >= MaxRulesPerZone)
+            if (existingRuleCount >= effectiveMax)
             {
-                return BadRequest($"This zone already has {existingRuleCount} rules, the maximum the device firmware can hold ({MaxRulesPerZone}). Remove one before adding another.");
+                return BadRequest($"This zone already has {existingRuleCount} rules, the configured maximum ({effectiveMax}). Remove one before adding another.");
             }
             return Ok(await Repo.DeviceUnitZoneRuleAddAsync(rule));
         }

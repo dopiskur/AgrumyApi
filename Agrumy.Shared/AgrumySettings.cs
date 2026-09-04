@@ -51,6 +51,9 @@ namespace api
         // How long a user must wait between "resend activation email" requests.
         public int ActivationResendCooldownMinutes { get; set; } = 10;
 
+        // Hard ceiling is 32 (AgrumyFirmware DeviceModel.h's MAX_RULES), enforced in ServerConfigApiController.Update - this is only the default.
+        public int MaxRulesPerZone { get; set; } = 10;
+
         // Off by default - UserRegistration rejects an unknown tenant name instead of silently
         // creating one until an admin opts in.
         public bool AllowSelfServiceTenantCreation { get; set; }
@@ -100,6 +103,7 @@ namespace api
             WaterPumpCooldownSeconds = ParseIntOr(configuration, "ServerConfig:WaterPumpCooldownSeconds", 300),
             EventDedupeMinutes = ParseIntOr(configuration, "ServerConfig:EventDedupeMinutes", 10),
             ActivationResendCooldownMinutes = ParseIntOr(configuration, "ServerConfig:ActivationResendCooldownMinutes", 10),
+            MaxRulesPerZone = ParseIntOr(configuration, "ServerConfig:MaxRulesPerZone", 10),
             AllowSelfServiceTenantCreation = ParseBoolOr(configuration, "ServerConfig:AllowSelfServiceTenantCreation", false),
             ScheduleTimeZone = configuration.GetSection("ServerConfig:ScheduleTimeZone").Value,
             FirmwareLocalPath = configuration.GetSection("Firmware:LocalPath").Value,

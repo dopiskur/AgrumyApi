@@ -63,6 +63,8 @@
     "EventDedupeMinutes": 10,
     "// ActivationResendCooldownMinutes": "Minimum minutes between 'resend activation email' requests for the same user.",
     "ActivationResendCooldownMinutes": 10,
+    "// MaxRulesPerZone": "Max rules a zone can hold. Hard ceiling is 32 (AgrumyFirmware's MAX_RULES) - ServerConfigApiController.Update rejects anything above it regardless of this default.",
+    "MaxRulesPerZone": 10,
     "// AllowSelfServiceTenantCreation": "False (default) rejects a registration for an unknown tenant name; true lets it create that tenant (min. 6-character name) and make the registrant its admin.",
     "AllowSelfServiceTenantCreation": false
   },

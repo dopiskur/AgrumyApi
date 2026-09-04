@@ -121,6 +121,7 @@ namespace api.Dal.Entities
         public int? WaterPumpCooldownSeconds { get; set; }
         public int? EventDedupeMinutes { get; set; }
         public int? ActivationResendCooldownMinutes { get; set; }
+        public int? MaxRulesPerZone { get; set; }
         public bool AllowSelfServiceTenantCreation { get; set; }
         public string? ScheduleTimeZone { get; set; }
         public int FirmwareSource { get; set; }

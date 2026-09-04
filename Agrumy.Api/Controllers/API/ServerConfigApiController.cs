@@ -73,6 +73,12 @@ namespace api.Controllers.API
                 return BadRequest($"WaterPump cooldown must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.");
             }
 
+            // Hard ceiling matches AgrumyFirmware DeviceModel.h's MAX_RULES - above it the firmware silently drops extra rules.
+            if (config.MaxRulesPerZone is < 1 or > 32)
+            {
+                return BadRequest("Max rules per zone must be between 1 and 32.");
+            }
+
             // Negative retention is meaningless; 0/null are both valid ways to say "no automatic retention".
             if (config.SensorDataRetentionDays is < 0)
             {
