@@ -76,6 +76,7 @@ namespace api.Controllers.API
 
         /// <summary>The browser "Build offline repo" tool reads every catalog file through here (same-origin via Agrumy.Web's proxy) instead of hitting GitHub directly - a release asset's redirect target does not answer cross-origin fetches from a page.</summary>
         [Authorize(Roles = RoleNames.DeviceManagers)]
+        [EnableRateLimiting("device-data")]
         [HttpGet("Fetch")]
         public async Task<ActionResult> Fetch(string fileName, CancellationToken cancellationToken)
         {
