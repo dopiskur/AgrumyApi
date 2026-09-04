@@ -18,7 +18,7 @@ namespace api.Controllers.API
         public async Task<ActionResult<IList<DeviceFirmware>>> List(string? board) =>
             Ok(string.IsNullOrWhiteSpace(board) ? await catalog.ListAsync() : await catalog.ListForBoardAsync(board));
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.GlobalAdmin)]
         [HttpPost("Sync")]
         public async Task<ActionResult<FirmwareSyncResult>> Sync([FromBody] FirmwareSyncRequest request, CancellationToken cancellationToken)
         {
@@ -29,7 +29,7 @@ namespace api.Controllers.API
             return Ok(await catalog.SyncAsync(request.Mode, PublicBaseUrl, cancellationToken));
         }
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.GlobalAdmin)]
         [HttpPost("Import")]
         public async Task<ActionResult<FirmwareSyncResult>> Import([FromBody] FirmwareImportRequest request, CancellationToken cancellationToken)
         {
@@ -41,7 +41,7 @@ namespace api.Controllers.API
         }
 
         /// <summary>Multipart upload of one release-convention .bin. 4 MB is well above any ESP32 app partition (esp32dev's is 1.28 MB), so a wrong file is rejected before it is even read.</summary>
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.GlobalAdmin)]
         [HttpPost("Upload")]
         [RequestSizeLimit(4 * 1024 * 1024)]
         public async Task<ActionResult<DeviceFirmware>> Upload(IFormFile file, CancellationToken cancellationToken)
@@ -59,7 +59,7 @@ namespace api.Controllers.API
             return error != null ? BadRequest(error) : Ok(firmware);
         }
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.GlobalAdmin)]
         [HttpDelete]
         public async Task<ActionResult> Delete(int idDeviceFirmware)
         {
