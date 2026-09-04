@@ -11,7 +11,7 @@ namespace api.Dal
     /// EfRepository.Devices.Diagnostics.cs.</summary>
     internal partial class EfRepository
     {
-        public async Task DeviceAddAsync(Device device)
+        public async Task<Device> DeviceAddAsync(Device device)
         {
             // Read (and possibly auto-generate on a brand-new install) BEFORE the transaction below
             // starts - ServerConfigGetAsync's own SaveChangesAsync (if it seeds a row) auto-commits
@@ -37,7 +37,7 @@ namespace api.Dal
             db.DeviceConfigControllers.Add(controllerCfg);
             await db.SaveChangesAsync();
 
-            db.Devices.Add(new DeviceRow
+            var row = new DeviceRow
             {
                 TenantID = device.TenantID,
                 DeviceTypeID = device.DeviceTypeID,
@@ -58,9 +58,13 @@ namespace api.Dal
                 ConfigVersion = device.ConfigVersion,
                 IsRelay = device.IsRelay,
                 RelayProfile = (int?)device.RelayProfile,
-            });
+            };
+            db.Devices.Add(row);
             await db.SaveChangesAsync();
             await tx.CommitAsync();
+
+            // row.IDDevice is populated by SaveChangesAsync above - no need for a caller round-trip Get.
+            return ToDto(row);
         }
 
         public async Task DeviceDeleteAsync(int? idDevice, int? tenantID)

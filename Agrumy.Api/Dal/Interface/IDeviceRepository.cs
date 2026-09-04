@@ -27,7 +27,8 @@ namespace api.Dal.Interface
     /// (OTA), the fixed type lists, and device events.</summary>
     public interface IDeviceRepository
     {
-        Task DeviceAddAsync(Device device);
+        /// <summary>Returns the created device (with its generated IDDevice) directly - callers don't need a follow-up DeviceGetAsync.</summary>
+        Task<Device> DeviceAddAsync(Device device);
 
         Task DeviceDeleteAsync(int? idDevice, int? tenantID);
 

@@ -347,7 +347,7 @@ namespace api.Controllers.API
             Device? device = await Repo.DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
             if (device is null)
             {
-                await Repo.DeviceAddAsync(new Device
+                device = await Repo.DeviceAddAsync(new Device
                 {
                     ConfigVersion = 1,
                     TenantID = user.TenantID ?? 0,
@@ -363,12 +363,6 @@ namespace api.Controllers.API
                     IsRelay = value.IsRelay,
                     RelayProfile = value.RelayProfile,
                 });
-
-                device = await Repo.DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
-                if (device is null)
-                {
-                    return StatusCode(500, "Device registration did not persist.");
-                }
             }
 
             // The PIN is deliberately NOT consumed here - it stays valid for repeated registrations

@@ -642,6 +642,34 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(d.IDDevice, (await _repo.DeviceGetByDeviceConfigControllerIdAsync(d.DeviceConfigControllerID))!.IDDevice);
     }
 
+    // Callers (DeviceRegistration) must not need a follow-up DeviceGetAsync round-trip - the created row's own IDDevice comes back directly.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceAdd_ReturnsCreatedDevice_WithGeneratedId_NoFollowUpGetNeeded(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = new Device
+        {
+            TenantID = tenantId,
+            DeviceTypeID = t.DeviceTypeId,
+            DeviceTypeServiceID = 1,
+            ConfigVersion = 1,
+            DeviceName = "dev_" + U(),
+            MacAddress = U(),
+            ApiId = Guid.NewGuid().ToString(),
+            ApiKey = Guid.NewGuid().ToString(),
+            ServicePoint = "api.agrumy.com",
+        };
+
+        Device created = await _repo.DeviceAddAsync(d);
+
+        Assert.True(created.IDDevice > 0);
+        Assert.Equal(d.MacAddress, created.MacAddress);
+        Assert.Equal(d.ApiId, created.ApiId);
+        Assert.NotNull(created.DeviceConfigSensorID);
+        Assert.NotNull(created.DeviceConfigControllerID);
+    }
+
     // DB-level guard against the add/get check-then-act race: the second insert must fail at the DB, not silently create a duplicate row.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceAdd_DuplicateMacAddress_SameTenant_ThrowsConstraintViolation(DbProviderKind provider)
