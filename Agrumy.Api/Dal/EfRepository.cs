@@ -41,6 +41,7 @@ namespace api.Dal
 
             await SeedDeviceTypeLookupsAsync(db);
             await SeedDeviceUnitSentinelsAsync(db);
+            await SeedDefaultTenantAsync(db);
             string? bootstrapSecret = await SeedBootstrapAdminAsync(db);
             if (bootstrapSecret != null)
             {
@@ -147,6 +148,44 @@ namespace api.Dal
                 db.DeviceUnitZones.Add(new DeviceUnitZoneRow { IDDeviceUnitZone = 0, TenantID = null, DeviceUnitID = 0, DeviceUnitZoneName = "Disabled" });
                 await db.SaveChangesAsync();
             }
+        }
+
+        /// <summary>TenantID=0 is the "shared default tenant" sentinel value every bootstrap
+        /// Global Admin and self-service TenantID==0 joiner already relies on (see README) - but
+        /// unlike DeviceUnitRow/DeviceUnitZoneRow above, tenant.IDTenant stays ValueGeneratedOnAdd
+        /// (real tenants DO need auto-increment), so a normal db.Tenants.Add with IDTenant=0 gets
+        /// silently ignored by EF's own value generation. Raw SQL is required either way; MySQL/
+        /// MariaDB additionally treats a literal 0 in an AUTO_INCREMENT column as "generate one"
+        /// unless NO_AUTO_VALUE_ON_ZERO is set for the session - confirmed empirically, this is
+        /// not documented behavior anyone would reasonably guess. Without this row,
+        /// DeviceApiController.DeviceRegistration fails on FK_device_tenant_TenantID for every
+        /// device a TenantID=0 user (i.e. the bootstrap admin) registers.</summary>
+        private static async Task SeedDefaultTenantAsync(AgrumyDbContext db)
+        {
+            if (await db.Tenants.AsNoTracking().AnyAsync(t => t.IDTenant == 0))
+            {
+                return;
+            }
+
+            // Both statements MUST run on the same physical connection - each bare
+            // ExecuteSqlRawAsync call may otherwise open/close its own pooled connection, in which
+            // case the SET SESSION below never reaches the connection the INSERT actually runs on
+            // (confirmed empirically: without this transaction, MySQL silently reassigned the
+            // "literal 0" insert to the next auto-increment value instead).
+            await using var tx = await db.Database.BeginTransactionAsync();
+            if (db.Database.IsMySql())
+            {
+                await db.Database.ExecuteSqlRawAsync("SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode, ',NO_AUTO_VALUE_ON_ZERO'))");
+                await db.Database.ExecuteSqlRawAsync("INSERT INTO tenant (IDTenant, TenantName) VALUES (0, 'Default')");
+            }
+            else
+            {
+                // Npgsql created the columns as case-sensitive quoted identifiers (`IDTenant`, not
+                // `idtenant`) - unquoted here would fold to lowercase and miss the real column,
+                // same reason every other EF-mapped PascalCase column needs quoting on Postgres.
+                await db.Database.ExecuteSqlRawAsync("INSERT INTO tenant (\"IDTenant\", \"TenantName\") VALUES (0, 'Default')");
+            }
+            await tx.CommitAsync();
         }
 
         /// <summary>These IDs must match AgrumyFirmware's ControllerController.h RelayFunctionType
