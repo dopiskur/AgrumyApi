@@ -22,7 +22,6 @@ namespace api.Dal
         public DbSet<TenantRow> Tenants => Set<TenantRow>();
         public DbSet<UserRow> Users => Set<UserRow>();
         public DbSet<RefreshTokenRow> RefreshTokens => Set<RefreshTokenRow>();
-        public DbSet<UserGroupRow> UserGroups => Set<UserGroupRow>();
         public DbSet<UserRoleRow> UserRoles => Set<UserRoleRow>();
         public DbSet<UserRoleScopeRow> UserRoleScopes => Set<UserRoleScopeRow>();
         public DbSet<UserUserRoleRow> UserUserRoles => Set<UserUserRoleRow>();
@@ -86,15 +85,6 @@ namespace api.Dal
                 e.HasOne<UserRoleRow>().WithMany().HasForeignKey(x => x.UserRoleID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            modelBuilder.Entity<UserGroupRow>(e =>
-            {
-                e.ToTable("userGroup");
-                e.HasKey(x => x.IDUserGroup);
-                e.Property(x => x.IDUserGroup).ValueGeneratedOnAdd();
-                e.Property(x => x.GroupName).HasMaxLength(128);
-                e.HasOne<UserRoleRow>().WithMany().HasForeignKey(x => x.UserRoleID).OnDelete(DeleteBehavior.NoAction);
-            });
-
             modelBuilder.Entity<UserRow>(e =>
             {
                 e.ToTable("user");
@@ -115,8 +105,6 @@ namespace api.Dal
                 e.HasIndex(x => x.Email).IsUnique().HasDatabaseName("email_UNIQUE");
                 e.HasIndex(x => x.Username).IsUnique().HasDatabaseName("Username_UNIQUE");
                 e.HasIndex(x => x.ActivationTokenHash).IsUnique().HasDatabaseName("ActivationTokenHash_UNIQUE");
-                // user.TenantID has no FK in the legacy schema - only UserGroupID does.
-                e.HasOne<UserGroupRow>().WithMany().HasForeignKey(x => x.UserGroupID).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<RefreshTokenRow>(e =>

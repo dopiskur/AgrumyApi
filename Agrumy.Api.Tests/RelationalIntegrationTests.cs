@@ -16,8 +16,7 @@ namespace Agrumy.Api.Tests;
 /// <summary>Runs against every real database engine configured via AGRUMY_TEST_MYSQL/AGRUMY_TEST_POSTGRES; skipped when unset.</summary>
 public sealed class RelationalIntegrationFixture
 {
-    public sealed record Target(DbProviderKind Provider, string ConnectionString,
-        int RegularGroupId, int AdminGroupId, int DeviceTypeId);
+    public sealed record Target(DbProviderKind Provider, string ConnectionString, int DeviceTypeId);
 
     private readonly Dictionary<DbProviderKind, Target> _targets = new();
     public IReadOnlyCollection<Target> Targets => _targets.Values;
@@ -34,21 +33,6 @@ public sealed class RelationalIntegrationFixture
 
         using var db = new AgrumyDbContext(DbOptionsFactory.Build(provider, conn));
         db.Database.EnsureCreated();
-
-        if (!db.UserRoles.Any())
-        {
-            var rAdmin = new UserRoleRow { RoleName = "admin" };
-            var rUser = new UserRoleRow { RoleName = "user" };
-            db.UserRoles.AddRange(rAdmin, rUser);
-            db.SaveChanges();
-            db.UserGroups.AddRange(
-                new UserGroupRow { GroupName = "users", UserRoleID = rUser.IDUserRole },
-                new UserGroupRow { GroupName = "admins", UserRoleID = rAdmin.IDUserRole });
-            db.SaveChanges();
-        }
-
-        int regular = db.UserGroups.Where(g => g.GroupName == "users").Select(g => g.IDUserGroup).First();
-        int admin = db.UserGroups.Where(g => g.GroupName == "admins").Select(g => g.IDUserGroup).First();
 
         if (!db.UserRoles.Any(r => r.RoleName == RoleNames.TenantReader))
         {
@@ -81,7 +65,7 @@ public sealed class RelationalIntegrationFixture
                 new DeviceTypeSensorRow { IDDeviceTypeSensor = 1, SensorName = "dht22" });
         db.SaveChanges();
 
-        _targets[provider] = new Target(provider, conn, regular, admin, deviceType);
+        _targets[provider] = new Target(provider, conn, deviceType);
     }
 
     private static int SeedDeviceType(AgrumyDbContext db)
@@ -146,7 +130,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var user = new User
         {
             TenantID = tenantId,
-            UserGroupID = t.RegularGroupId,
             Email = tag + "@ex.com",
             Username = "u_" + tag,
             FirstName = "F",
@@ -466,7 +449,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task User_Add_Then_Get_By_Every_Key_WithGroupJoin(DbProviderKind provider)
+    public async Task User_Add_Then_Get_By_Every_Key(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, userId, email) = await MakeUser(t);
@@ -481,8 +464,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(userId, byEmail.IDUser);
         Assert.Equal(userId, byName.IDUser);
         Assert.Equal(tenantId, byId.TenantID);
-        Assert.Equal("users", byId.GroupName);
-        Assert.NotNull(byId.UserRoleID);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -583,7 +564,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal("Europe/Zagreb", back.TimeZone);
 
         Assert.Equal(tenantId, back.TenantID);
-        Assert.Equal(t.RegularGroupId, back.UserGroupID);
         Assert.True(back.Enabled);
         var secret = await _repo.UserSecretGetAsync(userId, null, null);
         Assert.NotNull(secret);
@@ -602,7 +582,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await _repo.UserUpdateAsync(new User
         {
             IDUser = userId, TenantID = 7, Email = "upd_" + U() + "@x.com", Username = "n_" + U(),
-            FirstName = "New", LastName = "Name", Phone = "999", UserGroupID = t.RegularGroupId, Enabled = false, DevicePin = "HACKED",
+            FirstName = "New", LastName = "Name", Phone = "999", Enabled = false, DevicePin = "HACKED",
         });
 
         var back = await _repo.UserGetAsync(userId, null, null);
@@ -645,29 +625,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.False(await _repo.UserDeleteAsync(null));
         Assert.True(await _repo.UserDeleteAsync(userId));
         Assert.Null(await _repo.UserGetAsync(userId, null, null));
-    }
-
-    [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task UserRole_And_UserGroup_CRUD_WithRoleJoin(DbProviderKind provider)
-    {
-        var t = Use(provider);
-        var roles = await _repo.UserRoleGetAsync();
-        Assert.Contains(roles, r => r.RoleName == "admin");
-
-        string gname = "G_" + U();
-        await _repo.UserGroupAddAsync(new UserGroup { GroupName = gname, UserRoleID = roles.First(r => r.RoleName == "admin").IDUserRole });
-
-        var all = await _repo.UserGroupsGetAsync();
-        var mine = Assert.Single(all, g => g.GroupName == gname);
-        Assert.Equal("admin", mine.RoleName);
-
-        var one = await _repo.UserGroupGetAsync(mine.IDUserGroup);
-        Assert.NotNull(one);
-        Assert.Equal("admin", one.RoleName);
-
-        await _repo.UserGroupDeleteAsync(0);
-        await _repo.UserGroupDeleteAsync(mine.IDUserGroup);
-        Assert.Null(await _repo.UserGroupGetAsync(mine.IDUserGroup));
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -1902,15 +1859,19 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         string tag = U();
         int tenantId = await _repo.TenantAddAsync("T_" + tag);
 
-        var admin = new User { TenantID = tenantId, UserGroupID = t.AdminGroupId, Email = tag + "-admin@ex.com", Username = "admin_" + tag, DevicePin = "PIN2A2" };
-        var regular = new User { TenantID = tenantId, UserGroupID = t.RegularGroupId, Email = tag + "-user@ex.com", Username = "user_" + tag, DevicePin = "PIN2B2" };
+        var admin = new User { TenantID = tenantId, Email = tag + "-admin@ex.com", Username = "admin_" + tag, DevicePin = "PIN2A2" };
+        var regular = new User { TenantID = tenantId, Email = tag + "-user@ex.com", Username = "user_" + tag, DevicePin = "PIN2B2" };
         await _repo.UserAddAsync(admin, new UserSecret { PwdHash = "h", PwdSalt = "s" });
         await _repo.UserAddAsync(regular, new UserSecret { PwdHash = "h", PwdSalt = "s" });
+        var adminBack = await _repo.UserGetAsync(null, admin.Email, null);
+        await _repo.UserRolesSetAsync(adminBack!.IDUser!.Value, new[] { RoleNames.TenantAdmin });
 
         var (_, _, _) = await MakeUser(t); // creates its own tenant + a regular user, unrelated
         int otherTenantId = await _repo.TenantAddAsync("T_" + U());
-        var otherAdmin = new User { TenantID = otherTenantId, UserGroupID = t.AdminGroupId, Email = U() + "@ex.com", Username = "u_" + U(), DevicePin = "PIN2C2" };
+        var otherAdmin = new User { TenantID = otherTenantId, Email = U() + "@ex.com", Username = "u_" + U(), DevicePin = "PIN2C2" };
         await _repo.UserAddAsync(otherAdmin, new UserSecret { PwdHash = "h", PwdSalt = "s" });
+        var otherAdminBack = await _repo.UserGetAsync(null, otherAdmin.Email, null);
+        await _repo.UserRolesSetAsync(otherAdminBack!.IDUser!.Value, new[] { RoleNames.TenantAdmin });
 
         IList<User> admins = await _repo.TenantAdminsGetAsync(tenantId);
 

@@ -45,8 +45,8 @@ namespace api.Dal.Interface
 
         Task<IList<UserRole>> UserRoleGetAsync();
 
-        // A user can hold several roles at once - the userUserRole junction table is the source of
-        // truth for this set, independent of the legacy single UserGroupID/userGroup.
+        // A user can hold several roles at once - the userUserRole junction table is the sole
+        // source of truth for this set.
 
         /// <summary>Every role name currently assigned to this user via userUserRole. Empty (never
         /// null) for a user nobody has migrated/assigned yet.</summary>
@@ -76,14 +76,5 @@ namespace api.Dal.Interface
         /// <summary>Every admin-role user in the given tenant - used to notify a tenant's admins.
         /// Never empty for a real tenant: its creator always becomes its first admin.</summary>
         Task<IList<User>> TenantAdminsGetAsync(int tenantId);
-
-        // Group (legacy role mapping)
-
-        Task<IList<UserGroup>> UserGroupsGetAsync();
-
-        /// <summary>The group matched by id, or null if none matches.</summary>
-        Task<UserGroup?> UserGroupGetAsync(int? idUserGroup);
-        Task UserGroupDeleteAsync(int? idUserGroup);
-        Task UserGroupAddAsync(UserGroup userGroup);
     }
 }

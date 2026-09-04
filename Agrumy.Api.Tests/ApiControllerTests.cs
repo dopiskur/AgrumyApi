@@ -333,6 +333,10 @@ public class ApiControllerTests
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { AllowSelfServiceTenantCreation = true });
         _repo.Setup(r => r.TenantAddAsync("AcmeCorp")).ReturnsAsync(42);
         StubActivationPlumbing("owner@acme.local", 1);
+        List<string>? seededRoles = null;
+        _repo.Setup(r => r.UserRolesSetAsync(1, It.IsAny<IEnumerable<string>>()))
+             .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
+             .Returns(Task.CompletedTask);
 
         User? capturedUser = null;
         _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>()))
@@ -346,7 +350,7 @@ public class ApiControllerTests
         Assert.IsType<OkObjectResult>(result.Result);
         Assert.NotNull(capturedUser);
         Assert.Equal(42, capturedUser!.TenantID);
-        Assert.Equal(0, capturedUser.UserGroupID); // admin on a brand new tenant
+        Assert.Equal(new[] { RoleNames.TenantAdmin }, seededRoles); // admin on a brand new tenant
         Assert.True(capturedUser.Enabled);          // nobody else exists yet to approve them
         Assert.False(capturedUser.EmailVerified);   // still needs to click the activation link
     }
@@ -386,6 +390,10 @@ public class ApiControllerTests
         _repo.Setup(r => r.TenantGetAsync("Acme")).ReturnsAsync(true);
         _repo.Setup(r => r.TenantGetIdAsync("Acme")).ReturnsAsync(42);
         StubActivationPlumbing("member@acme.local", 2);
+        List<string>? seededRoles = null;
+        _repo.Setup(r => r.UserRolesSetAsync(2, It.IsAny<IEnumerable<string>>()))
+             .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
+             .Returns(Task.CompletedTask);
 
         User? capturedUser = null;
         _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>()))
@@ -399,7 +407,7 @@ public class ApiControllerTests
         Assert.IsType<OkObjectResult>(result.Result);
         Assert.NotNull(capturedUser);
         Assert.Equal(42, capturedUser!.TenantID); // joins the existing tenant, no new one created
-        Assert.Equal(1, capturedUser.UserGroupID); // regular user, not admin
+        Assert.Equal(new[] { RoleNames.TenantReader }, seededRoles); // regular user, not admin
         Assert.False(capturedUser.Enabled);        // waits for that tenant's admin to enable them
     }
 
@@ -433,10 +441,9 @@ public class ApiControllerTests
         string hash = AuthenticationProvider.GetHash(password, salt);
 
         _repo.Setup(r => r.UserGetAsync(null, "alice@example.com", null))
-             .ReturnsAsync(new User { IDUser = 5, Email = "alice@example.com", UserRoleID = 1, TenantID = 0, EmailVerified = true, Enabled = true });
+             .ReturnsAsync(new User { IDUser = 5, Email = "alice@example.com", TenantID = 0, EmailVerified = true, Enabled = true });
         _repo.Setup(r => r.UserSecretGetAsync(null, "alice@example.com", null))
              .ReturnsAsync(new UserSecret { PwdHash = hash, PwdSalt = salt });
-        // A non-empty role set here means UserRoleGetAsync()'s legacy-fallback path is never exercised.
         _repo.Setup(r => r.UserRoleNamesGetAsync(5)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         _repo.Setup(r => r.RefreshTokenAddAsync(5, It.IsAny<string>(), It.IsAny<DateTime>())).ReturnsAsync(1);
 
@@ -460,7 +467,7 @@ public class ApiControllerTests
         string hashForRealPassword = AuthenticationProvider.GetHash("the-real-password", salt);
 
         _repo.Setup(r => r.UserGetAsync(null, "bob@example.com", null))
-             .ReturnsAsync(new User { IDUser = 6, Email = "bob@example.com", UserRoleID = 1, TenantID = 0 });
+             .ReturnsAsync(new User { IDUser = 6, Email = "bob@example.com", TenantID = 0 });
         _repo.Setup(r => r.UserSecretGetAsync(null, "bob@example.com", null))
              .ReturnsAsync(new UserSecret { PwdHash = hashForRealPassword, PwdSalt = salt });
 
@@ -494,7 +501,7 @@ public class ApiControllerTests
         string hash = AuthenticationProvider.GetHash(password, salt);
 
         _repo.Setup(r => r.UserGetAsync(null, "pending@example.com", null))
-             .ReturnsAsync(new User { IDUser = 7, Email = "pending@example.com", UserRoleID = 1, TenantID = 0, EmailVerified = false, Enabled = true });
+             .ReturnsAsync(new User { IDUser = 7, Email = "pending@example.com", TenantID = 0, EmailVerified = false, Enabled = true });
         _repo.Setup(r => r.UserSecretGetAsync(null, "pending@example.com", null))
              .ReturnsAsync(new UserSecret { PwdHash = hash, PwdSalt = salt });
 
@@ -514,7 +521,7 @@ public class ApiControllerTests
         string hash = AuthenticationProvider.GetHash(password, salt);
 
         _repo.Setup(r => r.UserGetAsync(null, "waiting@example.com", null))
-             .ReturnsAsync(new User { IDUser = 8, Email = "waiting@example.com", UserRoleID = 1, TenantID = 1, EmailVerified = true, Enabled = false });
+             .ReturnsAsync(new User { IDUser = 8, Email = "waiting@example.com", TenantID = 1, EmailVerified = true, Enabled = false });
         _repo.Setup(r => r.UserSecretGetAsync(null, "waiting@example.com", null))
              .ReturnsAsync(new UserSecret { PwdHash = hash, PwdSalt = salt });
 
@@ -581,11 +588,8 @@ public class ApiControllerTests
         _repo.Setup(r => r.RefreshTokenGetAsync(hash)).ReturnsAsync(
             new RefreshTokenInfo { UserID = 5, ExpiresAt = DateTime.UtcNow.AddDays(10), RevokedAt = null });
         _repo.Setup(r => r.UserGetAsync(5, null, null))
-             .ReturnsAsync(new User { IDUser = 5, Email = "alice@example.com", UserRoleID = 1, TenantID = 0, EmailVerified = true, Enabled = true });
-        // Empty userUserRole set exercises the legacy UserGroupID-derived fallback in ResolveCallerTokenRolesAsync, covering an account the migration missed.
-        _repo.Setup(r => r.UserRoleNamesGetAsync(5)).ReturnsAsync(new List<string>());
-        _repo.Setup(r => r.UserRoleGetAsync())
-             .ReturnsAsync(new List<UserRole> { new() { IDUserRole = 1, RoleName = "user" } });
+             .ReturnsAsync(new User { IDUser = 5, Email = "alice@example.com", TenantID = 0, EmailVerified = true, Enabled = true });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(5)).ReturnsAsync(new List<string> { RoleNames.GlobalAdmin });
         _repo.Setup(r => r.RefreshTokenRotateAsync(5, hash, It.IsAny<string>(), It.IsAny<DateTime>()))
              .ReturnsAsync(true);
 
@@ -598,8 +602,27 @@ public class ApiControllerTests
         Assert.False(string.IsNullOrEmpty(login.Token));
         Assert.False(string.IsNullOrEmpty(login.RefreshToken));
         Assert.NotEqual(presented, login.RefreshToken); // rotated, not reissued
-        Assert.Equal(new[] { "user" }, JwtTokenProvider.ValidateToken(login.Token!));
+        Assert.Equal(new[] { RoleNames.LegacyAdmin, RoleNames.GlobalAdmin }, JwtTokenProvider.ValidateToken(login.Token!));
         _repo.Verify(r => r.RefreshTokenRotateAsync(5, hash, It.IsAny<string>(), It.IsAny<DateTime>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RefreshToken_UserHasNoRoles_Returns500()
+    {
+        const string presented = "stale-but-valid-refresh-token-2";
+        string hash = HashRefreshToken(presented);
+
+        _repo.Setup(r => r.RefreshTokenGetAsync(hash)).ReturnsAsync(
+            new RefreshTokenInfo { UserID = 6, ExpiresAt = DateTime.UtcNow.AddDays(10), RevokedAt = null });
+        _repo.Setup(r => r.UserGetAsync(6, null, null))
+             .ReturnsAsync(new User { IDUser = 6, Email = "bob@example.com", TenantID = 0, EmailVerified = true, Enabled = true });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(6)).ReturnsAsync(new List<string>());
+
+        var controller = NewUserController();
+        var result = await controller.RefreshToken(new RefreshTokenRequest { RefreshToken = presented });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(500, obj.StatusCode);
     }
 
     /// <summary>RefreshTokenRotateAsync returning false (lost the rotate race) must be treated the same as detected reuse - all sessions revoked, 401.</summary>
@@ -612,10 +635,8 @@ public class ApiControllerTests
         _repo.Setup(r => r.RefreshTokenGetAsync(hash)).ReturnsAsync(
             new RefreshTokenInfo { UserID = 7, ExpiresAt = DateTime.UtcNow.AddDays(10), RevokedAt = null });
         _repo.Setup(r => r.UserGetAsync(7, null, null))
-             .ReturnsAsync(new User { IDUser = 7, Email = "raced@example.com", UserRoleID = 1, TenantID = 0, EmailVerified = true, Enabled = true });
-        _repo.Setup(r => r.UserRoleNamesGetAsync(7)).ReturnsAsync(new List<string>());
-        _repo.Setup(r => r.UserRoleGetAsync())
-             .ReturnsAsync(new List<UserRole> { new() { IDUserRole = 1, RoleName = "user" } });
+             .ReturnsAsync(new User { IDUser = 7, Email = "raced@example.com", TenantID = 0, EmailVerified = true, Enabled = true });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(7)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         _repo.Setup(r => r.RefreshTokenRotateAsync(7, hash, It.IsAny<string>(), It.IsAny<DateTime>()))
              .ReturnsAsync(false);
         _repo.Setup(r => r.RefreshTokenRevokeAllForUserAsync(7)).Returns(Task.CompletedTask);
@@ -681,7 +702,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.RefreshTokenGetAsync(hash)).ReturnsAsync(
             new RefreshTokenInfo { UserID = 11, ExpiresAt = DateTime.UtcNow.AddDays(10), RevokedAt = null });
         _repo.Setup(r => r.UserGetAsync(11, null, null))
-             .ReturnsAsync(new User { IDUser = 11, Email = "disabled@example.com", UserRoleID = 1, TenantID = 1, EmailVerified = true, Enabled = false });
+             .ReturnsAsync(new User { IDUser = 11, Email = "disabled@example.com", TenantID = 1, EmailVerified = true, Enabled = false });
 
         var controller = NewUserController();
         var result = await controller.RefreshToken(new RefreshTokenRequest { RefreshToken = "still-technically-valid" });
@@ -724,18 +745,6 @@ public class ApiControllerTests
         var controller = NewUserController();
         SetCaller(controller, "admin", 1);
         var result = await controller.UserGet(999);
-
-        Assert.IsType<NotFoundResult>(result.Result);
-    }
-
-    [Fact]
-    public async Task UserGroupGet_UnknownId_Returns404()
-    {
-        _repo.Setup(r => r.UserGroupGetAsync(999)).ReturnsAsync((UserGroup?)null);
-
-        var controller = NewUserController();
-        SetCaller(controller, "admin", 1);
-        var result = await controller.UserGroupGet(999);
 
         Assert.IsType<NotFoundResult>(result.Result);
     }
@@ -880,7 +889,7 @@ public class ApiControllerTests
     [Fact]
     public async Task UserUpdate_DifferentTenant_Returns403_EvenForEmailOnlyChange()
     {
-        // Regression guard: the tenant check must fire for any change, not only Enabled/UserGroupID.
+        // Regression guard: the tenant check must fire for any change, not only Enabled.
         _repo.Setup(r => r.UserGetAsync(50, null, null))
              .ReturnsAsync(new User { IDUser = 50, TenantID = 99, Email = "target@test.local" });
 
@@ -1706,8 +1715,6 @@ public class RoleGateAuthorizationTests
     {
         // A Tenant User must not be able to hand themselves Tenant admin - see UserRolesSet.
         Assert.Equal(RoleNames.Admins, RolesOn(typeof(UserApiController), "UserRolesSet"));
-        Assert.Equal(RoleNames.Admins, RolesOn(typeof(UserApiController), "UserGroupAdd"));
-        Assert.Equal(RoleNames.Admins, RolesOn(typeof(UserApiController), "UserGroupDelete"));
         Assert.DoesNotContain(RoleNames.TenantUser, RoleNames.Admins);
         Assert.DoesNotContain(RoleNames.GlobalUser, RoleNames.Admins);
     }

@@ -129,15 +129,6 @@
                                 </a>
                             </li>
                         }
-                        @if (hasAnyRole(RoleNames.Admins))
-                        {
-                            <li class="nav-item">
-                                <a asp-area="" asp-controller="Group" asp-action="Index" class="nav-link @navActive("Group")">
-                                    <i class="nav-icon bi bi-diagram-3"></i>
-                                    <p>Groups</p>
-                                </a>
-                            </li>
-                        }
                         @if (User.IsInRole(RoleNames.GlobalAdmin))
                         {
                             <li class="nav-item">

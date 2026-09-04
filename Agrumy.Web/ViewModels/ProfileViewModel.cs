@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace api.ViewModels
 {
-    // Deliberately NOT UserView/UserUpdate, which carry admin-only fields (Enabled/UserGroupID/TenantID) this page must never post.
+    // Deliberately NOT UserView/UserUpdate, which carry admin-only fields (Enabled/TenantID) this page must never post.
     public class ProfileViewModel
     {
         public string? Email { get; set; }

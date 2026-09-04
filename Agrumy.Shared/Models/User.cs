@@ -19,10 +19,6 @@ namespace api.Models
         public string? LastName { get; set; }
         public string? Phone { get; set; }
 
-        public int? UserGroupID { get; set; }
-        [Display(Name = "Role")]
-        public int? UserRoleID { get; set; }
-        public string? GroupName { get; set; }
         public bool? Enabled { get; set; } // MySQL TINYINT(1) is needed for boolean
         public DateTime? DateCreated { get; set; }
         public DateTime? DateModified { get; set; }
@@ -136,7 +132,7 @@ namespace api.Models
         public string? SetupSecret { get; set; }
     }
 
-    /// <summary>Body of PUT /api/User/Profile - the only fields a user may change on their own account (identity comes from the JWT, never from here). Deliberately has no Enabled/UserGroupID/TenantID so self-service can never touch authorization.</summary>
+    /// <summary>Body of PUT /api/User/Profile - the only fields a user may change on their own account (identity comes from the JWT, never from here). Deliberately has no Enabled/TenantID so self-service can never touch authorization.</summary>
     public class UserProfileUpdate
     {
         public string? FirstName { get; set; }
@@ -159,16 +155,6 @@ namespace api.Models
         public string? Login { get; set; }
     }
 
-
-    public class UserGroup
-    {
-        [Display(Name = "User Group")]
-        public int? IDUserGroup { get; set; }
-        public string? GroupName { get; set; }
-        public int? UserRoleID { get; set; }
-        public string? RoleName { get; set; }
-
-    }
 
 
 

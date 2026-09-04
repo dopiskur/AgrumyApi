@@ -52,8 +52,7 @@ namespace api.Dal
             row.ActivationTokenExpiresAt = null;
             await db.SaveChangesAsync();
 
-            UserGroupRow? group = await db.UserGroups.AsNoTracking().FirstOrDefaultAsync(g => g.IDUserGroup == row.UserGroupID);
-            return group is null ? null : ToDto(row, group);
+            return ToDto(row);
         }
     }
 }

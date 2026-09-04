@@ -16,7 +16,6 @@ namespace api.Controllers.API
     public class UserApiController(IRepository repo, ICache cache, INotificationDispatcher notifications, IOptions<AgrumySettings> settingsOptions)
         : ApiControllerBase(repo, cache)
     {
-        private const int DefaultRoleId = 1;   // "regular user" group on an existing tenant
         private const int AccessTokenMinutes = 120;
         private const int RefreshTokenDays = 30;
         private const int ActivationTokenValidHours = 24;
@@ -82,12 +81,10 @@ namespace api.Controllers.API
             {
                 // Brand-new tenant: the registrant becomes its admin - nobody else exists yet to approve them.
                 user.TenantID = await Repo.TenantAddAsync(value.TenantName!);
-                user.UserGroupID = 0;
             }
             else
             {
                 user.TenantID = await Repo.TenantGetIdAsync(value.TenantName!);
-                user.UserGroupID = DefaultRoleId;
             }
 
             // TenantID==0 (shared default tenant) has no owning admin to approve joiners, so it
@@ -194,16 +191,14 @@ namespace api.Controllers.API
         /// <summary>The full set of role-claim values this user's token should carry - their real
         /// role set from userUserRole, PLUS a prepended legacy "admin"/"user" alias so pre-existing
         /// [Authorize(Roles=...)]/CallerRole=="admin" checks that read only the FIRST role claim
-        /// (see ApiControllerBase.CallerRole) still work. Falls back to the old UserGroupID-derived
-        /// single role if userUserRole has nothing for this user yet.</summary>
+        /// (see ApiControllerBase.CallerRole) still work. Empty (no login possible) if userUserRole
+        /// has nothing for this user - every account is confirmed to already have a row.</summary>
         private async Task<IReadOnlyList<string>> ResolveCallerTokenRolesAsync(User user)
         {
             IReadOnlyList<string> roleNames = await Repo.UserRoleNamesGetAsync(user.IDUser!.Value);
             if (roleNames.Count == 0)
             {
-                IList<UserRole> groupRoles = await Repo.UserRoleGetAsync();
-                UserRole? legacyRole = groupRoles.FirstOrDefault(m => m.IDUserRole == user.UserRoleID);
-                return legacyRole?.RoleName == null ? Array.Empty<string>() : new[] { legacyRole.RoleName };
+                return Array.Empty<string>();
             }
 
             string legacyAlias = RoleNames.ImpliesLegacyAdmin(roleNames) ? RoleNames.LegacyAdmin : RoleNames.LegacyUser;
@@ -411,9 +406,9 @@ namespace api.Controllers.API
         }
 
         /// <summary>Self-scoped counterpart to the admin-only UserUpdate: identity comes ONLY from
-        /// the JWT, and the payload has no authorization-bearing fields - Enabled/UserGroupID/
-        /// TenantID stay untouchable by construction because Repo.UserProfileSetAsync writes
-        /// nothing but FirstName/LastName/TimeZone.</summary>
+        /// the JWT, and the payload has no authorization-bearing fields - Enabled/TenantID stay
+        /// untouchable by construction because Repo.UserProfileSetAsync writes nothing but
+        /// FirstName/LastName/TimeZone.</summary>
         [HttpPut("Profile")]
         [Authorize]
         public async Task<ActionResult<bool>> UserProfileSet([FromBody] UserProfileUpdate value)
@@ -679,39 +674,5 @@ namespace api.Controllers.API
             return Ok();
         }
 
-        // ---- groups ----------------------------------------------------------
-
-        // Group READS open to user-managers (the Web user Create/Edit forms need the dropdown);
-        // group WRITES stay admin-only - groups still drive the legacy role mapping, so editing
-        // them is privilege management, same reasoning as UserRolesSet above.
-
-        [HttpGet("Group/All")]
-        [Authorize(Roles = RoleNames.UserManagers)]
-        public async Task<ActionResult<IEnumerable<UserGroup>>> UserGroupsGet() =>
-            Ok(await Repo.UserGroupsGetAsync());
-
-        [HttpGet("Group")]
-        [Authorize(Roles = RoleNames.UserManagers)]
-        public async Task<ActionResult<UserGroup>> UserGroupGet(int? idUserGroup)
-        {
-            UserGroup? group = await Repo.UserGroupGetAsync(idUserGroup);
-            return group is null ? NotFound() : Ok(group);
-        }
-
-        [HttpPost("Group")]
-        [Authorize(Roles = RoleNames.Admins)]
-        public async Task<ActionResult<bool>> UserGroupAdd(UserGroup userGroup)
-        {
-            await Repo.UserGroupAddAsync(userGroup);
-            return true;
-        }
-
-        [HttpDelete("Group")]
-        [Authorize(Roles = RoleNames.Admins)]
-        public async Task<ActionResult<bool>> UserGroupDelete(int? idUserGroup)
-        {
-            await Repo.UserGroupDeleteAsync(idUserGroup);
-            return true;
-        }
     }
 }

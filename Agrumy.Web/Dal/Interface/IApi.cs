@@ -232,20 +232,6 @@ namespace api.Dal.Interface
         [Get("/api/SensorData/Report")]
         Task<IEnumerable<SensorDataReport>> SensorDataReportGet(int? idDevice, int? iDSensorDataReport, int? getData);
 
-        // ---- Group ------------------------------------------------------
-
-        [Get("/api/User/Group/All")]
-        Task<IEnumerable<UserGroup>> UserGroupsGet();
-
-        [Get("/api/User/Group")]
-        Task<UserGroup> UserGroupGet(int idUserGroup);
-
-        [Post("/api/User/Group")]
-        Task UserGroupAdd([Body] UserGroup userGroup);
-
-        [Delete("/api/User/Group")]
-        Task UserGroupDelete(int? idUserGroup);
-
         // ---- Tenant -------------------------------------------------------
 
         [Get("/api/Tenant/All")]

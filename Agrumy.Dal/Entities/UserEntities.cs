@@ -27,17 +27,8 @@ namespace api.Dal.Entities
         public int? RoleScopeID { get; set; }
     }
 
-    public class UserGroupRow
-    {
-        public int IDUserGroup { get; set; }
-        public string? GroupName { get; set; }
-        public int? UserRoleID { get; set; }
-    }
-
-    /// <summary>A user can hold several roles at once, so this many-to-many junction is the actual
-    /// source of truth for authorization - UserGroupID/userGroup above stays untouched for backward
-    /// compatibility (still drives the legacy single "admin"/"user" claim) but is no longer the
-    /// only place a role lives.</summary>
+    /// <summary>A user can hold several roles at once - this many-to-many junction is the sole
+    /// source of truth for authorization (the legacy single-group model was removed by #206).</summary>
     public class UserUserRoleRow
     {
         public int UserID { get; set; }
@@ -65,7 +56,6 @@ namespace api.Dal.Entities
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public string? Phone { get; set; }
-        public int? UserGroupID { get; set; }
         public bool? Enabled { get; set; }
         public DateTime? DateCreated { get; set; }
         public DateTime? DateModified { get; set; }
