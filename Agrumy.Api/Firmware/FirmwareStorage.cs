@@ -40,19 +40,32 @@ namespace api.Firmware
             string tmpPath = finalPath + ".tmp";
             long size;
             string sha;
-            await using (var file = new FileStream(tmpPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            try
             {
-                using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-                byte[] buffer = new byte[81920];
-                int read;
-                size = 0;
-                while ((read = await content.ReadAsync(buffer, cancellationToken)) > 0)
+                await using (var file = new FileStream(tmpPath, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
-                    await file.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                    hasher.AppendData(buffer, 0, read);
-                    size += read;
+                    using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                    byte[] buffer = new byte[81920];
+                    int read;
+                    size = 0;
+                    while ((read = await content.ReadAsync(buffer, cancellationToken)) > 0)
+                    {
+                        await file.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                        hasher.AppendData(buffer, 0, read);
+                        size += read;
+                    }
+                    sha = Convert.ToHexString(hasher.GetHashAndReset()).ToLowerInvariant();
                 }
-                sha = Convert.ToHexString(hasher.GetHashAndReset()).ToLowerInvariant();
+            }
+            catch
+            {
+                // Roadmap #189: IOException/disk-full/cancellation mid-write used to leave the
+                // .tmp file stranded forever (the next SaveAsync of the same fileName overwrites
+                // it via FileMode.Create, so it wasn't unbounded, but a version that's never
+                // re-uploaded left dead weight on disk indefinitely). Best-effort cleanup, in its
+                // own try/catch so a delete failure never masks the real exception below.
+                try { File.Delete(tmpPath); } catch { /* best-effort */ }
+                throw;
             }
             File.Move(tmpPath, finalPath, overwrite: true);
             return (size, sha);
