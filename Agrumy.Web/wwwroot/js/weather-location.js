@@ -1,6 +1,5 @@
 // Four synchronized ways to set WeatherLocationLat/Lon: click the map, drag the marker, "My
-// Location" (browser Geolocation), or type coordinates directly - see roadmap #210, the missing
-// piece #11's own note flagged ("stays inert until a location is set").
+// Location" (browser Geolocation), or type coordinates directly.
 document.addEventListener('DOMContentLoaded', function () {
     const mapEl = document.getElementById('weatherLocationMap');
     const latInput = document.getElementById('WeatherLocationLat');

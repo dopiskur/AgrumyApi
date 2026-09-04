@@ -295,6 +295,8 @@ if (enforceHttps)
     app.UseHttpsRedirection();
 }
 
+app.UseMiddleware<SecurityHeadersMiddleware>();
+
 app.UseRouting();
 
 // After UseRouting (needs the matched route pattern) but before rate limiting/auth/the
