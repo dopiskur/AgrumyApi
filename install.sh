@@ -9,7 +9,7 @@
 #     before the containers ever start (roadmap #30's explicit container-vs-bare-metal split).
 #   - Bare-metal/standalone: downloads the latest release.yml tarballs (self-contained linux-x64,
 #     no .NET runtime needed on the target), installs them as systemd services
-#     (deploy/Agrumy.Api.service.template, deploy/Agrumy.Web.service.template) behind nginx or Apache
+#     (deploy/agrumy-api.service.template, deploy/agrumy-web.service.template) behind nginx or Apache
 #     (deploy/nginx.conf.template / apache.conf.template) with a certbot TLS cert. This path
 #     deliberately asks NOTHING about the database - Agrumy.Api boots straight into a minimal
 #     setup wizard (Agrumy.Api/Setup/SetupWizard.cs) the first time appsettings.json has no
@@ -285,7 +285,7 @@ JSON
 }
 
 install_systemd_unit() {
-  # $1 = template name (e.g. Agrumy.Api.service.template), $2 = install dir, $3 = service user
+  # $1 = template name (e.g. agrumy-api.service.template), $2 = install dir, $3 = service user
   local template="$1" install_dir="$2" service_user="$3"
   local unit_name="${template%.template}"
   local tmp
@@ -359,11 +359,11 @@ install_baremetal() {
   write_appsettings_api "$api_dir" "$jwt_secret" "$issuer" "$SERVICE_USER"
   write_appsettings_web "$web_dir" "$jwt_secret" "$issuer" "https://${API_DOMAIN}" "$keys_dir" "$SERVICE_USER"
 
-  install_systemd_unit "Agrumy.Api.service.template" "$api_dir" "$SERVICE_USER"
-  install_systemd_unit "Agrumy.Web.service.template" "$web_dir" "$SERVICE_USER"
+  install_systemd_unit "agrumy-api.service.template" "$api_dir" "$SERVICE_USER"
+  install_systemd_unit "agrumy-web.service.template" "$web_dir" "$SERVICE_USER"
   as_root systemctl daemon-reload
-  as_root systemctl enable --now Agrumy.Api.service
-  as_root systemctl enable --now Agrumy.Web.service
+  as_root systemctl enable --now agrumy-api.service
+  as_root systemctl enable --now agrumy-web.service
 
   if [ "$PROXY_CHOICE" = "a" ]; then
     install_reverse_proxy apache "$API_DOMAIN" "$ADMIN_DOMAIN"

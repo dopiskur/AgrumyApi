@@ -1,6 +1,6 @@
 [Unit]
 Description=Agrumy.Web (Kestrel)
-After=network.target Agrumy.Api.service
+After=network.target agrumy-api.service
 
 [Service]
 Type=simple

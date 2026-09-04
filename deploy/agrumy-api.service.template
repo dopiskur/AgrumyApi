@@ -1,4 +1,4 @@
-# Installed by install.sh as /etc/systemd/system/Agrumy.Api.service. Deliberately does NOT set
+# Installed by install.sh as /etc/systemd/system/agrumy-api.service. Deliberately does NOT set
 # ASPNETCORE_URLS - install.sh always writes an explicit "Urls" key into appsettings.json instead.
 
 [Unit]
