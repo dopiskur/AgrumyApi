@@ -57,7 +57,7 @@ public class FirmwareCatalogServiceTests
             FirmwareCustomRepositoryUrl = customUrl,
         });
 
-    private const string GitHubReleasesUrl = "https://api.github.com/repos/dopiskur/AgrumyFirmware/releases?per_page=100";
+    private const string GitHubReleasesUrl = "https://api.github.com/repos/dopiskur/AgrumyFirmware/releases?per_page=100&page=1";
 
     /// <summary>Two releases (v1.1.0, v1.0.0), each with both boards + a manifest asset, plus a draft
     /// that must be ignored and a stray asset name that must be skipped.</summary>
@@ -114,6 +114,40 @@ public class FirmwareCatalogServiceTests
         Assert.StartsWith("https://github.com/", dev110.Url);            // no download in GitHub mode
         Assert.Null(Assert.Single(_rows, r => r.Version == "1.0.0").Sha256); // that release shipped no manifest
         Assert.False(Directory.Exists(_root) && Directory.EnumerateFiles(_root).Any());
+    }
+
+    /// <summary>roadmap #186: a single ?per_page=100 request used to silently drop every release
+    /// past the first page. A full 100-item first page must trigger a second request; a release
+    /// that only exists on that second page must still make it into the catalog.</summary>
+    [Fact]
+    public async Task GitHub_Refresh_Paginates_Past_The_First_100_Releases()
+    {
+        SetSource(FirmwareSource.GitHub);
+        static string Asset(string tag, string name) => $"https://github.com/dopiskur/AgrumyFirmware/releases/download/{tag}/{name}";
+
+        // Page 1: exactly 100 releases, none carrying any assets - just enough to prove the count
+        // check ("== 100 -> fetch page 2") without needing 100 real asset blocks.
+        var page1Releases = Enumerable.Range(1, 100)
+            .Select(i => $$"""{"tag_name":"v0.0.{{i}}","draft":false,"prerelease":false,"published_at":"2026-01-01T00:00:00Z","assets":[]}""");
+        _fetcher.Texts["https://api.github.com/repos/dopiskur/AgrumyFirmware/releases?per_page=100&page=1"] =
+            "[" + string.Join(",", page1Releases) + "]";
+
+        // Page 2: one release with a real asset - only reachable if pagination actually continues.
+        _fetcher.Texts["https://api.github.com/repos/dopiskur/AgrumyFirmware/releases?per_page=100&page=2"] = $$"""
+            [
+              {"tag_name":"v2.0.0","draft":false,"prerelease":false,"published_at":"2026-09-01T10:00:00Z","assets":[
+                 {"name":"agrumy-esp32dev-v2.0.0.bin","browser_download_url":"{{Asset("v2.0.0", "agrumy-esp32dev-v2.0.0.bin")}}","size":100}]}
+            ]
+            """;
+        _fetcher.Binaries[Asset("v2.0.0", "agrumy-esp32dev-v2.0.0.bin")] = FakeFirmwareFetcher.Bytes("bin-esp32dev-2.0.0");
+        // Page 3 must never be requested: page 2 came back short of 100, so it's the last one.
+        _fetcher.Texts["https://api.github.com/repos/dopiskur/AgrumyFirmware/releases?per_page=100&page=3"] = "[]";
+
+        FirmwareSyncResult result = await NewService().SyncAsync(FirmwareSyncMode.Refresh, "https://api.agrumy.com");
+
+        Assert.Equal(1, result.Added); // the 100 asset-less releases on page 1 contribute nothing
+        Assert.Single(_rows, r => r.Board == "esp32dev" && r.Version == "2.0.0");
+        Assert.DoesNotContain(_fetcher.Requested, u => u.Contains("page=3"));
     }
 
     [Fact]

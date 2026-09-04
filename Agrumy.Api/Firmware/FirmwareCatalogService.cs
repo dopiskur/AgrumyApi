@@ -24,6 +24,10 @@ namespace api.Firmware
         // Manifest/GitHub JSON: camelCase on our side, snake_case attributes on GitHub's records.
         private static readonly JsonSerializerOptions ManifestJson = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
+        // 50 pages * 100/page = 5000 releases - generous headroom over any repository this project
+        // will realistically have, just there so a misbehaving API can't spin FetchGitHubReleasesAsync forever.
+        private const int MaxReleasePages = 50;
+
         /// <summary>Which catalog rows a device may be offered: the ACTIVE source's rows, plus
         /// Local ones always - a manually uploaded .bin is hosted by this API regardless of what
         /// the default source is, so hiding it just because GitHub is selected would make "upload
@@ -562,8 +566,25 @@ namespace api.Firmware
         /// assets with any other name are ignored rather than guessed at.</summary>
         internal async Task<IReadOnlyList<RemoteFile>> FetchGitHubReleasesAsync(string repository, CancellationToken cancellationToken)
         {
-            string json = await fetcher.GetStringAsync($"https://api.github.com/repos/{repository}/releases?per_page=100", gitHubApi: true, cancellationToken);
-            List<GitHubRelease> releases = JsonSerializer.Deserialize<List<GitHubRelease>>(json, ManifestJson) ?? [];
+            var releases = new List<GitHubRelease>();
+            // A single ?per_page=100 request used to silently drop every release past the first
+            // page. GitHub returns a page short of per_page (often empty) once past the last one -
+            // no Link-header parsing needed, just keep incrementing page= until that happens.
+            // MaxReleasePages bounds the worst case rather than trusting the API to always behave.
+            for (int page = 1; page <= MaxReleasePages; page++)
+            {
+                string json = await fetcher.GetStringAsync($"https://api.github.com/repos/{repository}/releases?per_page=100&page={page}", gitHubApi: true, cancellationToken);
+                List<GitHubRelease>? pageReleases = JsonSerializer.Deserialize<List<GitHubRelease>>(json, ManifestJson);
+                if (pageReleases == null || pageReleases.Count == 0)
+                {
+                    break;
+                }
+                releases.AddRange(pageReleases);
+                if (pageReleases.Count < 100)
+                {
+                    break; // short page - this was the last one, skip the extra request that would just come back empty
+                }
+            }
 
             var files = new List<RemoteFile>();
             foreach (GitHubRelease release in releases.Where(r => !r.Draft))
