@@ -43,8 +43,9 @@ namespace api.Dal.Interface
         /// <summary>Sets the password on the pending bootstrap admin (the row with PwdHash IS
         /// NULL) - the ONLY writer of that row's password; once this succeeds, no row matches it
         /// again, so calling it a second time is a no-op that returns false. False also when there
-        /// was never a pending row to begin with.</summary>
-        Task<bool> BootstrapAdminSetPasswordAsync(UserSecret secret);
+        /// was never a pending row to begin with, or when setupSecret doesn't match the hash
+        /// EfRepository.SeedBootstrapAdminAsync generated (roadmap #179).</summary>
+        Task<bool> BootstrapAdminSetPasswordAsync(UserSecret secret, string setupSecret);
 
         Task<IList<UserRole>> UserRoleGetAsync();
 

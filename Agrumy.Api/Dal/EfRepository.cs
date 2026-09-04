@@ -41,7 +41,14 @@ namespace api.Dal
 
             await SeedDeviceTypeLookupsAsync(db);
             await SeedDeviceUnitSentinelsAsync(db);
-            await SeedBootstrapAdminAsync(db);
+            string? bootstrapSecret = await SeedBootstrapAdminAsync(db);
+            if (bootstrapSecret != null)
+            {
+                // The only channel this secret is ever exposed on - deliberately not written to the
+                // database in plaintext or returned by any API. Whoever deployed this instance reads
+                // it from here (journalctl/console) to complete first-run setup (roadmap #179).
+                logger.LogWarning("Bootstrap Global Admin setup secret (required by POST /api/User/BootstrapSetPassword, works once): {BootstrapSecret}", bootstrapSecret);
+            }
         }
 
         /// <summary>TimescaleDB requires the partitioning column in every unique constraint
@@ -207,13 +214,22 @@ namespace api.Dal
         /// <summary>A genuinely empty user table gets exactly one row: a Global Admin at
         /// TenantID=0 with PwdHash/PwdSalt left NULL on purpose - see UserRow.PwdHash - so
         /// Agrumy.Web's first-run "set password" screen (BootstrapAdminSetPasswordAsync below) has
-        /// something to activate.</summary>
-        private static async Task SeedBootstrapAdminAsync(AgrumyDbContext db)
+        /// something to activate. Returns the plaintext one-time setup secret (only hashed copy is
+        /// persisted) so the caller can surface it once, or null if no row was created.</summary>
+        private static async Task<string?> SeedBootstrapAdminAsync(AgrumyDbContext db)
         {
             if (await db.Users.AnyAsync())
             {
-                return;
+                return null;
             }
+
+            // Roadmap #179: without this, BootstrapSetPassword's only gate was rate limiting - a
+            // random anonymous visitor who requests it before the real admin does takes over the
+            // Global Admin account. 24 random bytes, base64url so it round-trips cleanly through a
+            // request body/URL/log line with no escaping surprises.
+            string setupSecret = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24))
+                .Replace('+', '-').Replace('/', '_').TrimEnd('=');
+            string secretSalt = AuthenticationProvider.GetSalt();
 
             var admin = new UserRow
             {
@@ -222,6 +238,8 @@ namespace api.Dal
                 Username = "admin",
                 PwdHash = null,
                 PwdSalt = null,
+                BootstrapSecretHash = AuthenticationProvider.GetHash(setupSecret, secretSalt),
+                BootstrapSecretSalt = secretSalt,
                 FirstName = "Global",
                 LastName = "Admin",
                 Enabled = true,
@@ -237,6 +255,8 @@ namespace api.Dal
 
             db.UserUserRoles.Add(new UserUserRoleRow { UserID = admin.IDUser, UserRoleID = globalAdminRoleId });
             await db.SaveChangesAsync();
+
+            return setupSecret;
         }
 
         public DbFailureKind ClassifyException(Exception ex)

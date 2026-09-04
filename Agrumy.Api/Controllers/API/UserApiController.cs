@@ -319,7 +319,10 @@ namespace api.Controllers.API
 
         /// <summary>The only way the fresh-install bootstrap Global Admin (seeded with
         /// PwdHash=NULL) gets a real password - see BootstrapAdminSetPasswordAsync for why this can
-        /// never be replayed once it has succeeded.</summary>
+        /// never be replayed once it has succeeded. SetupSecret gates this beyond rate limiting
+        /// alone (roadmap #179) - it's the token EfRepository.SeedBootstrapAdminAsync logged at
+        /// first startup, so an anonymous visitor who finds this endpoint before the real admin
+        /// reads that log can't take over the account.</summary>
         [HttpPost("BootstrapSetPassword")]
         [AllowAnonymous]
         [EnableRateLimiting("login")]
@@ -330,9 +333,9 @@ namespace api.Controllers.API
             string salt = AuthenticationProvider.GetSalt();
             var secret = new UserSecret { PwdSalt = salt, PwdHash = AuthenticationProvider.GetHash(value.NewPassword!, salt) };
 
-            return await Repo.BootstrapAdminSetPasswordAsync(secret)
+            return await Repo.BootstrapAdminSetPasswordAsync(secret, value.SetupSecret!)
                 ? Ok()
-                : StatusCode(403, "No pending bootstrap admin - a password has already been set.");
+                : StatusCode(403, "No pending bootstrap admin, or the setup secret was wrong.");
         }
 
         /// <summary>Identity comes ONLY from the JWT, not a Login field in the body - this used to

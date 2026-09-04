@@ -4,6 +4,11 @@ namespace api.ViewModels
 {
     public class SetupAdminViewModel
     {
+        // From the server console/log at first startup (roadmap #179) - see EfRepository.SeedBootstrapAdminAsync.
+        [Required(ErrorMessage = "Setup secret is required")]
+        [Display(Name = "Setup Secret")]
+        public string? SetupSecret { get; set; }
+
         [Required(ErrorMessage = "New password is required")]
         [DataType(DataType.Password)]
         [Display(Name = "New Password")]

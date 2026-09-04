@@ -9,11 +9,20 @@
 
 <div class="card-body login-card-body">
     <p class="login-box-msg">
-        First run - set a password for the Global Admin account before signing in.
+        First run - set a password for the Global Admin account before signing in. You'll need the
+        setup secret printed to the server's console/log the first time it started.
     </p>
 
     <form asp-action="SetupAdmin">
         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <div class="mb-3">
+            <label asp-for="SetupSecret" class="visually-hidden"></label>
+            <div class="input-group">
+                <input type="text" asp-for="SetupSecret" class="form-control" placeholder="Setup secret" autocomplete="off" />
+                <div class="input-group-text"><span class="bi bi-key-fill"></span></div>
+            </div>
+            <span asp-validation-for="SetupSecret" class="text-danger"></span>
+        </div>
         <div class="mb-3">
             <label asp-for="NewPassword" class="visually-hidden"></label>
             <div class="input-group">

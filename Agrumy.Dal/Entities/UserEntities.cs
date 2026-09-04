@@ -56,6 +56,11 @@ namespace api.Dal.Entities
         // BootstrapAdminSetPasswordAsync runs.
         public string? PwdHash { get; set; }
         public string? PwdSalt { get; set; }
+        // Hash of the one-time bootstrap setup secret (roadmap #179) - set alongside PwdHash=NULL
+        // on the seed row only, cleared the moment BootstrapAdminSetPasswordAsync succeeds. Never
+        // populated on any other user row.
+        public string? BootstrapSecretHash { get; set; }
+        public string? BootstrapSecretSalt { get; set; }
         // 6-char generated code; null = never issued (or explicitly cleared).
         public string? DevicePin { get; set; }
         public DateTime? DevicePinExpires { get; set; }

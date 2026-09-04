@@ -502,6 +502,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (_, normalUserId, _) = await MakeUser(t);
 
         string tag = U();
+        string setupSecretSalt = AuthenticationProvider.GetSalt();
         await using (var db = _fx.NewContext(t))
         {
             db.Users.Add(new UserRow
@@ -511,6 +512,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
                 Username = "boot_" + tag,
                 PwdHash = null,
                 PwdSalt = null,
+                BootstrapSecretHash = AuthenticationProvider.GetHash("correct-setup-secret", setupSecretSalt),
+                BootstrapSecretSalt = setupSecretSalt,
                 Enabled = true,
                 EmailVerified = true,
             });
@@ -519,10 +522,14 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
         Assert.True(await _repo.BootstrapAdminPendingAsync());
 
-        Assert.True(await _repo.BootstrapAdminSetPasswordAsync(new UserSecret { PwdHash = "boot-h", PwdSalt = "boot-s" }));
+        // Wrong setup secret must not be able to claim the account.
+        Assert.False(await _repo.BootstrapAdminSetPasswordAsync(new UserSecret { PwdHash = "wrong-h", PwdSalt = "wrong-s" }, "wrong-setup-secret"));
+        Assert.True(await _repo.BootstrapAdminPendingAsync());
+
+        Assert.True(await _repo.BootstrapAdminSetPasswordAsync(new UserSecret { PwdHash = "boot-h", PwdSalt = "boot-s" }, "correct-setup-secret"));
         Assert.False(await _repo.BootstrapAdminPendingAsync());
 
-        Assert.False(await _repo.BootstrapAdminSetPasswordAsync(new UserSecret { PwdHash = "again-h", PwdSalt = "again-s" }));
+        Assert.False(await _repo.BootstrapAdminSetPasswordAsync(new UserSecret { PwdHash = "again-h", PwdSalt = "again-s" }, "correct-setup-secret"));
 
         var normalSecret = await _repo.UserSecretGetAsync(normalUserId, null, null);
         Assert.Equal("h", normalSecret!.PwdHash);

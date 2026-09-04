@@ -126,7 +126,7 @@ namespace api.Controllers.View
 
             try
             {
-                await api.BootstrapSetPassword(new BootstrapAdminSetPassword { NewPassword = value.NewPassword });
+                await api.BootstrapSetPassword(new BootstrapAdminSetPassword { NewPassword = value.NewPassword, SetupSecret = value.SetupSecret });
             }
             catch (ApiException ex)
             {
