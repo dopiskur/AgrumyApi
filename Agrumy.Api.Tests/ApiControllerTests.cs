@@ -772,6 +772,7 @@ public class ApiControllerTests
              .Returns(Task.CompletedTask);
         _repo.Setup(r => r.UserGetAsync(null, "x@test.local", null)).ReturnsAsync(new User { IDUser = 99, Email = "x@test.local" });
         _repo.Setup(r => r.UserRolesSetAsync(99, It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 24);
@@ -792,6 +793,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.UserRolesSetAsync(100, It.IsAny<IEnumerable<string>>()))
              .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
              .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 24); // NOT tenant 0 - a regular Tenant admin, not Global admin
@@ -810,6 +812,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.UserRolesSetAsync(101, It.IsAny<IEnumerable<string>>()))
              .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
              .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 0); // Global admin
@@ -828,6 +831,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.UserRolesSetAsync(102, It.IsAny<IEnumerable<string>>()))
              .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
              .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 24);
@@ -849,6 +853,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.UserRolesSetAsync(103, It.IsAny<IEnumerable<string>>()))
              .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
              .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewUserController();
         SetCallerRoles(controller, 24, "user", RoleNames.TenantReader, RoleNames.TenantUser); // UserManagers-eligible, not an admin
@@ -1090,6 +1095,7 @@ public class ApiControllerTests
     {
         _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 99 });
         _repo.Setup(r => r.UserDeleteAsync(50)).ReturnsAsync(true);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 0);
@@ -1145,10 +1151,12 @@ public class ApiControllerTests
     public async Task UserRolesSet_TenantAdmin_CanComposeReaderPlusDeviceGrant()
     {
         _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1 });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         List<string>? written = null;
         _repo.Setup(r => r.UserRolesSetAsync(50, It.IsAny<IEnumerable<string>>()))
              .Callback<int, IEnumerable<string>>((_, roles) => written = roles.ToList())
              .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 1);
@@ -1163,7 +1171,9 @@ public class ApiControllerTests
     public async Task UserRolesSet_GlobalAdmin_CanAssignGlobalRoleToAnyTenant()
     {
         _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 99 });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string>());
         _repo.Setup(r => r.UserRolesSetAsync(50, It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 0);
@@ -1482,10 +1492,12 @@ public class ApiControllerTests
     {
         _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local" });
         _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         List<string>? seededRoles = null;
         _repo.Setup(r => r.UserRolesSetAsync(50, It.IsAny<IEnumerable<string>>()))
              .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
              .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 1); // Tenant admin

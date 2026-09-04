@@ -1,0 +1,41 @@
+@model IReadOnlyList<api.Models.AuditLogEntry>
+
+@{
+    ViewData["Title"] = "Audit Log";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Audit Log</h3>
+        <span class="float-end text-secondary small">Times shown in UTC - most recent @Model.Count entries</span>
+    </div>
+    <div class="card-body table-responsive p-0">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th class="text-nowrap">Time (UTC)</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in Model)
+                {
+                    <tr>
+                        <td class="text-nowrap">@entry.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td>@(entry.ActorEmail ?? "(unknown)")</td>
+                        <td>@entry.Action</td>
+                        <td>@entry.TargetType @entry.TargetId</td>
+                        <td class="text-break">@entry.Details</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (Model.Count == 0)
+        {
+            <p class="text-secondary p-3 mb-0">No audit entries yet.</p>
+        }
+    </div>
+</div>

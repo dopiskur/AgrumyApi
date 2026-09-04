@@ -48,6 +48,8 @@ namespace api.Dal
         public DbSet<EventDeviceRow> EventDevices => Set<EventDeviceRow>();
         public DbSet<EventServiceRow> EventServices => Set<EventServiceRow>();
 
+        public DbSet<AuditLogRow> AuditLogs => Set<AuditLogRow>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<TenantRow>(e =>
@@ -362,6 +364,19 @@ namespace api.Dal
                 e.ToTable("eventService");
                 e.HasKey(x => x.IDEventService);
                 e.Property(x => x.IDEventService).ValueGeneratedOnAdd();
+            });
+
+            modelBuilder.Entity<AuditLogRow>(e =>
+            {
+                e.ToTable("auditLog");
+                e.HasKey(x => x.IDAuditLog);
+                e.Property(x => x.IDAuditLog).ValueGeneratedOnAdd();
+                e.Property(x => x.ActorEmail).HasMaxLength(255);
+                e.Property(x => x.Action).HasMaxLength(100);
+                e.Property(x => x.TargetType).HasMaxLength(50);
+                e.Property(x => x.TargetId).HasMaxLength(50);
+                // Listing a tenant's own history is the common query; a Global admin's cross-tenant listing scans the whole table, acceptable at this volume.
+                e.HasIndex(x => new { x.TenantID, x.TimestampUtc }).HasDatabaseName("ix_auditLog_tenant_timestamp");
             });
         }
     }

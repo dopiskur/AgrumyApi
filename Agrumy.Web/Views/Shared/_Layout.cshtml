@@ -130,6 +130,15 @@
                                 </a>
                             </li>
                         }
+                        @if (hasAnyRole(RoleNames.Admins))
+                        {
+                            <li class="nav-item">
+                                <a asp-area="" asp-controller="AuditLog" asp-action="Index" class="nav-link @navActive("AuditLog")">
+                                    <i class="nav-icon bi bi-clock-history"></i>
+                                    <p>Audit Log</p>
+                                </a>
+                            </li>
+                        }
                         @if (User.IsInRole(RoleNames.GlobalAdmin))
                         {
                             <li class="nav-item">

@@ -271,5 +271,10 @@ namespace api.Dal.Interface
 
         [Post("/api/DataMaintenance/Purge")]
         Task DataMaintenancePurge([Body] DataPurgeRequest request);
+
+        // ---- Audit log --------------------------------------
+
+        [Get("/api/AuditLog")]
+        Task<List<AuditLogEntry>> AuditLogGet(int take = 200);
     }
 }

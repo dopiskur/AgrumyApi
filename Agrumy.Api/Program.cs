@@ -96,6 +96,7 @@ builder.Services.AddScoped<IDeviceUnitRepository>(sp => sp.GetRequiredService<Ef
 builder.Services.AddScoped<ICommandRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IFirmwareRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ISensorDataRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<IAuditLogRepository>(sp => sp.GetRequiredService<EfRepository>());
 
 // Cache:Redis:ConnectionString switches to Redis; unset/empty keeps the in-process default.
 string? redisConnectionString = builder.Configuration["Cache:Redis:ConnectionString"];

@@ -517,6 +517,7 @@ namespace api.Controllers.API
             if (added?.IDUser is int idUser)
             {
                 await Repo.UserRolesSetAsync(idUser, roleNames!);
+                await WriteAuditAsync("User.Created", user.TenantID, "User", idUser.ToString(), $"roles: {string.Join(", ", roleNames!)}");
             }
 
             return Ok("User created successfully: " + user.Email);
@@ -540,6 +541,24 @@ namespace api.Controllers.API
                 : (wanted, null);
         }
 
+        /// <summary>Looks up the caller's IDUser by their JWT email rather than trusting a claim, since the token carries no user-id claim.</summary>
+        private async Task WriteAuditAsync(string action, int? targetTenantId, string targetType, string targetId, string? details)
+        {
+            string? actorEmail = User.Identity?.Name;
+            User? actor = string.IsNullOrEmpty(actorEmail) ? null : await Repo.UserGetAsync(null, actorEmail, null);
+            await Repo.AuditLogAddAsync(new AuditLogEntry
+            {
+                TimestampUtc = DateTime.UtcNow,
+                TenantID = targetTenantId,
+                ActorUserID = actor?.IDUser,
+                ActorEmail = actorEmail,
+                Action = action,
+                TargetType = targetType,
+                TargetId = targetId,
+                Details = details,
+            });
+        }
+
         [HttpPut]
         [Authorize(Roles = RoleNames.UserManagers)]
         public async Task<ActionResult<bool>> UserUpdate([FromBody] UserUpdate value)
@@ -556,6 +575,8 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
             }
+
+            bool? enabledBefore = user.Enabled;
 
             if (value.Password != null)
             {
@@ -579,6 +600,11 @@ namespace api.Controllers.API
 
             await Repo.UserUpdateAsync(user);
 
+            if (enabledBefore != user.Enabled)
+            {
+                await WriteAuditAsync("User.EnabledChanged", user.TenantID, "User", user.IDUser.ToString()!, $"{enabledBefore} -> {user.Enabled}");
+            }
+
             // Non-admin callers can't touch roles at all - silently ignored, same guard as TenantID above.
             bool callerIsAdmin = CallerIsGlobalAdmin || CallerHasRole(RoleNames.TenantAdmin) || CallerHasRole(RoleNames.LegacyAdmin);
             if (value.RoleNames != null && callerIsAdmin)
@@ -589,7 +615,10 @@ namespace api.Controllers.API
                 {
                     return StatusCode(403, $"Not allowed to assign role \"{disallowed}\".");
                 }
+                IReadOnlyList<string> rolesBefore = await Repo.UserRoleNamesGetAsync(user.IDUser!.Value);
                 await Repo.UserRolesSetAsync(user.IDUser!.Value, value.RoleNames);
+                await WriteAuditAsync("User.RolesChanged", user.TenantID, "User", user.IDUser.ToString()!,
+                    $"[{string.Join(", ", rolesBefore)}] -> [{string.Join(", ", value.RoleNames)}]");
             }
 
             return Ok(true);
@@ -614,7 +643,12 @@ namespace api.Controllers.API
                 return StatusCode(403, "Target user belongs to a different tenant");
             }
 
-            return await Repo.UserDeleteAsync(idUser) ? Ok("User deleted") : NotFound("User not found");
+            bool deleted = await Repo.UserDeleteAsync(idUser);
+            if (deleted)
+            {
+                await WriteAuditAsync("User.Deleted", targetUser.TenantID, "User", idUser.ToString()!, targetUser.Email);
+            }
+            return deleted ? Ok("User deleted") : NotFound("User not found");
         }
 
         [HttpGet("Roles")]
@@ -670,7 +704,10 @@ namespace api.Controllers.API
                 return StatusCode(403, $"Not allowed to assign role \"{disallowed}\".");
             }
 
+            IReadOnlyList<string> rolesBefore = await Repo.UserRoleNamesGetAsync(value.IDUser);
             await Repo.UserRolesSetAsync(value.IDUser, value.RoleNames);
+            await WriteAuditAsync("User.RolesChanged", target.TenantID, "User", value.IDUser.ToString(),
+                $"[{string.Join(", ", rolesBefore)}] -> [{string.Join(", ", value.RoleNames)}]");
             return Ok();
         }
 
