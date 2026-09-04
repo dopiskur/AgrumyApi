@@ -14,8 +14,7 @@ namespace api.Dal.Interface
 
         /// <summary>Creates one Pending command row and bumps the device's CommandVersion in the
         /// same call. Null return means a DB-level unique constraint rejected it because another
-        /// request already created an active command for this (device, actionType) pair - see
-        /// EfRepository.AddCommandAsync (roadmap #180) - the caller treats that as a dedup skip.</summary>
+        /// request already created an active command for this (device, actionType) pair - the caller treats that as a dedup skip.</summary>
         Task<int?> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt);
 
         /// <summary>Every Pending command for this device, oldest first - CommandQueueService picks

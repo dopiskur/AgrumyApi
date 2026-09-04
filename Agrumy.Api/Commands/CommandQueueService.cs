@@ -63,9 +63,7 @@ namespace api.Commands
                 {
                     continue; // this one device is skipped, not the whole batch
                 }
-                // AddCommandAsync can still return null here even after the check above just passed -
-                // the DB-level unique index (roadmap #180) is what actually closes the race, this
-                // in-memory check is only a fast-path/early-exit, not the source of truth.
+                // AddCommandAsync can still return null here - the DB unique index closes the race, this in-memory check is only a fast-path.
                 if (await commandRepo.AddCommandAsync(deviceId, actionType, utcNow, expiresAt) is int newCommandId)
                 {
                     created.Add(newCommandId);
@@ -100,7 +98,7 @@ namespace api.Commands
             return null;
         }
 
-        /// <summary>Only a genuinely Pending command can be acknowledged; an unknown id or one already past Pending is silently ignored rather than erroring the device's otherwise-successful poll cycle over a redundant/late ack. deviceId is the authenticated caller (see DeviceApiController) - a command that resolves but belongs to a different device is treated the same as "not found" (roadmap #178, was an IDOR: any device could ack/execute any other device's command by guessing its id).</summary>
+        /// <summary>Only a genuinely Pending command can be acknowledged; deviceId ownership is checked so a command belonging to a different device is treated as not found.</summary>
         public async Task AcknowledgeCommandAsync(int commandId, int deviceId)
         {
             DeviceCommand? command = await commandRepo.GetCommandByIdAsync(commandId);
@@ -110,7 +108,7 @@ namespace api.Commands
             }
         }
 
-        /// <summary>Accepts either Pending or Acknowledged as the prior state - Pending covers Reboot (which has no "after" to ack from; its first real confirmation IS the next poll succeeding at all) and any other action whose ack happened to be lost/delayed. deviceId ownership check per roadmap #178, same as AcknowledgeCommandAsync.</summary>
+        /// <summary>Accepts either Pending or Acknowledged as the prior state - Pending covers Reboot, which has no "after" to ack from. Same deviceId ownership check as AcknowledgeCommandAsync.</summary>
         public async Task MarkExecutedAsync(int commandId, int deviceId)
         {
             DeviceCommand? command = await commandRepo.GetCommandByIdAsync(commandId);

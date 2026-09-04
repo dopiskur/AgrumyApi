@@ -19,10 +19,7 @@ namespace api.Dal
         }
 
         /// <summary>Null return means the ux_deviceCommand_device_activekey unique index rejected
-        /// the insert - another request won the same check-then-insert race between
-        /// CommandQueueService's HasActiveCommandAsync check and this call (roadmap #180). The
-        /// caller treats that exactly like the pre-insert dedup check finding an existing command:
-        /// this device is skipped, not the whole batch, and nothing 500s.</summary>
+        /// the insert - another request won the same check-then-insert race; the caller treats this device as a dedup skip, not an error.</summary>
         public async Task<int?> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt)
         {
             var row = new DeviceCommandRow

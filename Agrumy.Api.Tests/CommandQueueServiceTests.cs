@@ -94,11 +94,7 @@ public class CommandQueueServiceTests
         // Strict mock: AddCommandAsync was never set up - a call to it here would throw.
     }
 
-    /// <summary>roadmap #180: HasActiveCommandAsync passing is only a fast-path, not the source of
-    /// truth - the DB-level unique index is what actually closes the check-then-insert race. A null
-    /// from AddCommandAsync (another request won that race after this one's check already passed)
-    /// must be treated the same as if the check itself had found a duplicate: this device skipped,
-    /// no 500, no phantom id in CreatedCommandIds.</summary>
+    /// <summary>HasActiveCommandAsync is only a fast-path - a null from AddCommandAsync (lost the DB-level race) must be treated as a dedup skip too.</summary>
     [Fact]
     public async Task Device_Losing_The_DB_Level_Dedup_Race_Is_Treated_As_AllDuplicates_Not_A_Crash()
     {
@@ -251,7 +247,7 @@ public class CommandQueueServiceTests
     [Fact]
     public async Task Acknowledge_Ignores_A_Command_Belonging_To_A_Different_Device()
     {
-        // roadmap #178 (IDOR): device 500 must not be able to ack a Pending command that belongs to device 501.
+        // device 500 must not be able to ack a Pending command that belongs to device 501.
         _commands.Setup(c => c.GetCommandByIdAsync(1))
             .ReturnsAsync(new DeviceCommand { IDDeviceCommand = 1, DeviceID = 501, Status = CommandStatus.Pending });
 
@@ -263,7 +259,7 @@ public class CommandQueueServiceTests
     [Fact]
     public async Task MarkExecuted_Ignores_A_Command_Belonging_To_A_Different_Device()
     {
-        // roadmap #178 (IDOR): device 500 must not be able to mark device 501's command Executed.
+        // device 500 must not be able to mark device 501's command Executed.
         _commands.Setup(c => c.GetCommandByIdAsync(1))
             .ReturnsAsync(new DeviceCommand { IDDeviceCommand = 1, DeviceID = 501, Status = CommandStatus.Pending });
 

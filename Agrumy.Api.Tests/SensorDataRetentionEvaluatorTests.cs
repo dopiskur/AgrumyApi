@@ -54,7 +54,7 @@ public class SensorDataRetentionEvaluatorTests
 
         await NewEvaluator().RunOnceAsync();
 
-        Assert.False(capturedShrink); // never auto-shrinks - roadmap #126's OPTIMIZE TABLE stays an explicit admin choice
+        Assert.False(capturedShrink); // never auto-shrinks - OPTIMIZE TABLE stays an explicit admin choice
         Assert.InRange(capturedCutoff!.Value, DateTime.UtcNow.AddDays(-30).AddMinutes(-1), DateTime.UtcNow.AddDays(-30).AddMinutes(1));
     }
 }

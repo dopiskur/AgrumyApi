@@ -295,9 +295,7 @@ namespace api.Controllers.API
             bool rotated = await Repo.RefreshTokenRotateAsync(stored.UserID, incomingHash, newRefreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
             if (!rotated)
             {
-                // Lost the atomic rotate race to a concurrent redemption of this same token
-                // (roadmap #181) - indistinguishable at this point from genuine token reuse, so
-                // treated the same way: every session for this user dies, not just this one.
+                // Lost the atomic rotate race - indistinguishable from genuine token reuse, so every session for this user dies.
                 await Repo.RefreshTokenRevokeAllForUserAsync(stored.UserID);
                 return StatusCode(401, "Refresh token already used; all sessions for this user were revoked.");
             }
@@ -327,10 +325,7 @@ namespace api.Controllers.API
 
         /// <summary>The only way the fresh-install bootstrap Global Admin (seeded with
         /// PwdHash=NULL) gets a real password - see BootstrapAdminSetPasswordAsync for why this can
-        /// never be replayed once it has succeeded. SetupSecret gates this beyond rate limiting
-        /// alone (roadmap #179) - it's the token EfRepository.SeedBootstrapAdminAsync logged at
-        /// first startup, so an anonymous visitor who finds this endpoint before the real admin
-        /// reads that log can't take over the account.</summary>
+        /// never be replayed once it has succeeded. SetupSecret gates this beyond rate limiting alone, so a random visitor can't take over the account first.</summary>
         [HttpPost("BootstrapSetPassword")]
         [AllowAnonymous]
         [EnableRateLimiting("login")]

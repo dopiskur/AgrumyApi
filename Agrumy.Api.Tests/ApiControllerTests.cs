@@ -183,7 +183,7 @@ public class ApiControllerTests
              .ReturnsAsync(new Device { IDDevice = 500, TenantID = 3, ConfigVersion = 66 });
         _repo.Setup(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.IsAny<DeviceConfigPoll>()))
              .Returns(Task.CompletedTask);
-        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // roadmap #34: none pending
+        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // none pending
 
         var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 66, Rssi = -60 });
 
@@ -204,7 +204,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.IsAny<DeviceConfigPoll>()))
              .Returns(Task.CompletedTask);
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // BuildDeviceConfigAsync always reads this
-        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // roadmap #34: none pending
+        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // none pending
 
         // Version mismatch must return the full config from the DB read, not a cache lookup that no longer carries ConfigVersion.
         var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 65 });
@@ -284,8 +284,8 @@ public class ApiControllerTests
         StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
         _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF"))
              .ReturnsAsync(new Device { IDDevice = 500, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
-        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // roadmap #39: BuildDeviceConfigAsync always reads this now
-        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // roadmap #34: none pending
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // BuildDeviceConfigAsync always reads this now
+        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // none pending
 
         var result = await NewDeviceController().DeviceRegistration(PinRegistration("abc234"));
 
@@ -300,8 +300,8 @@ public class ApiControllerTests
              .ReturnsAsync(new Device { IDDevice = 500, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
         _repo.Setup(r => r.DeviceGetAsync(1, null, null, "112233445566"))
              .ReturnsAsync(new Device { IDDevice = 501, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
-        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // roadmap #39: BuildDeviceConfigAsync always reads this now
-        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // roadmap #34: none pending
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // BuildDeviceConfigAsync always reads this now
+        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // none pending
         _repo.Setup(r => r.GetPendingCommandsAsync(501)).ReturnsAsync(new List<DeviceCommand>());
 
         var first = await NewDeviceController().DeviceRegistration(PinRegistration("ABC234"));
@@ -346,8 +346,8 @@ public class ApiControllerTests
         Assert.NotNull(capturedUser);
         Assert.Equal(42, capturedUser!.TenantID);
         Assert.Equal(0, capturedUser.UserGroupID); // admin on a brand new tenant
-        Assert.True(capturedUser.Enabled);          // nobody else exists yet to approve them (roadmap #63)
-        Assert.False(capturedUser.EmailVerified);   // still needs to click the activation link (roadmap #24)
+        Assert.True(capturedUser.Enabled);          // nobody else exists yet to approve them
+        Assert.False(capturedUser.EmailVerified);   // still needs to click the activation link
     }
 
     [Fact]
@@ -399,7 +399,7 @@ public class ApiControllerTests
         Assert.NotNull(capturedUser);
         Assert.Equal(42, capturedUser!.TenantID); // joins the existing tenant, no new one created
         Assert.Equal(1, capturedUser.UserGroupID); // regular user, not admin
-        Assert.False(capturedUser.Enabled);        // waits for that tenant's admin to enable them (roadmap #63)
+        Assert.False(capturedUser.Enabled);        // waits for that tenant's admin to enable them
     }
 
     [Fact]
@@ -601,9 +601,7 @@ public class ApiControllerTests
         _repo.Verify(r => r.RefreshTokenRotateAsync(5, hash, It.IsAny<string>(), It.IsAny<DateTime>()), Times.Once);
     }
 
-    /// <summary>roadmap #181: RefreshTokenRotateAsync returning false means it lost the atomic
-    /// rotate race to a concurrent redemption of the same token - must be treated the same as
-    /// detected reuse (all sessions revoked, 401), not silently succeed with a phantom token.</summary>
+    /// <summary>RefreshTokenRotateAsync returning false (lost the rotate race) must be treated the same as detected reuse - all sessions revoked, 401.</summary>
     [Fact]
     public async Task RefreshToken_LosesAtomicRotateRace_RevokesAllSessionsAndReturns401()
     {

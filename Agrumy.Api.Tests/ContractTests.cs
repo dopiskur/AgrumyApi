@@ -197,8 +197,8 @@ public class ContractTests
         Assert.Equal(-67, bound.Rssi);
         Assert.Equal(153212, bound.FreeHeap);
         Assert.Equal("0.1.2", bound.FirmwareVersion);
-        Assert.Equal("esp32dev", bound.Board); // roadmap #94
-        Assert.Equal("", bound.Kit); // roadmap #149 - empty on a generic (non-kit) environment
+        Assert.Equal("esp32dev", bound.Board);
+        Assert.Equal("", bound.Kit); // empty on a generic (non-kit) environment
     }
 
     [Fact]

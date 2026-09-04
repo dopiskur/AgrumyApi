@@ -4,10 +4,7 @@ using Xunit;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>roadmap #182: SsrfGuard is what stops an admin-configured Custom firmware repository
-/// URL from being used to reach the API server's own private network. IsPrivateOrReserved is a
-/// pure function, so it's tested directly; EnsureAllowedAsync's scheme check is tested without any
-/// real DNS/network dependency since it short-circuits before resolving the host.</summary>
+/// <summary>IsPrivateOrReserved is tested directly as a pure function; EnsureAllowedAsync's scheme check needs no real DNS since it short-circuits first.</summary>
 public class SsrfGuardTests
 {
     [Theory]

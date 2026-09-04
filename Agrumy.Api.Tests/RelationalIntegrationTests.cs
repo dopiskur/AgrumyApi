@@ -391,11 +391,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.NotNull(stillRevoked!.RevokedAt);
     }
 
-    /// <summary>roadmap #181: two concurrent rotations of the same still-valid token - only one may
-    /// win (return true, insert its new token); the loser must return false and insert nothing, not
-    /// silently succeed with a second live token for the same old one. Uses two independent
-    /// DbContext/EfRepository instances (a shared EF DbContext instance is not thread-safe for
-    /// concurrent operations, so _repo alone can't stand in for two real concurrent HTTP requests).</summary>
+    /// <summary>Two concurrent rotations of the same token - only one may win; uses two independent DbContext instances since a shared one isn't thread-safe.</summary>
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task RefreshToken_ConcurrentRotateOfSameToken_OnlyOneWins(DbProviderKind provider)
     {
