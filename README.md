@@ -13,6 +13,24 @@ server side of a system whose device firmware lives in the separate `AgrumyFirmw
 repository; this repository is the API those devices talk to, plus the MVC admin
 UI operators use to manage devices, users and tenants.
 
+## Mission
+
+Everyone should have the right to grow their own food. In practice, most people
+today have neither the knowledge nor the time to keep a food garden alive -
+that's the problem Agrumy exists to lower the barrier to, not just a target
+market. The same software serves both ends without compromise: an agricultural
+cooperative or commercial nursery gets real multi-tenancy and granular RBAC
+(`api.Security.RoleNames`) to manage many operators from one backend, while a
+single hobbyist on the default tenant never has to see any of that complexity -
+just their own greenhouse.
+
+FarmBot is the closest comparison for "I don't have the knowledge or time" -
+and it's a real, shipping product that solves that problem well. But it does
+so at $2,000-$8,000, which excludes exactly the people who'd benefit most from
+it. Agrumy targets the same problem without that price floor: free, open-source
+software running on hardware priced like AliExpress components, not a
+purpose-built appliance.
+
 **.NET 10 SDK required.**
 
 `agrumy.sln` splits into these projects:
