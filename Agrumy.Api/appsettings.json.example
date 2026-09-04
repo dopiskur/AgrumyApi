@@ -103,6 +103,12 @@
       "FcmProjectId": "",
       "FcmCredentialsPath": ""
     },
+    "// Webhook": "Generic HTTP POST to an external system. Url must be https:// - checked by SsrfGuard before every send. Secret is optional, adds an X-Agrumy-Signature HMAC header.",
+    "Webhook": {
+      "Enabled": false,
+      "Url": "https://example.com/agrumy-webhook",
+      "Secret": ""
+    },
     "// OfflineCheckIntervalMinutes": "How often OfflineAlertBackgroundService sweeps every device for a newly-offline one. Independent of any device's own poll interval (SleepSeconds) - there is no single right value across a fleet with mixed intervals.",
     "OfflineCheckIntervalMinutes": 5,
     "// BatteryCheckIntervalMinutes": "How often LowBatteryAlertEvaluator sweeps every device's latest telemetry battery reading. Longer than OfflineCheckIntervalMinutes by default - a battery drains over hours/days, not seconds.",

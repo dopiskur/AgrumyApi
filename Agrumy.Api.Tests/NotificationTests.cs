@@ -1,3 +1,4 @@
+using System.Net;
 using api.Notifications;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -18,6 +19,9 @@ public class NotificationTests
 
     private static FcmPushNotificationChannel Fcm(PushChannelOptions push) =>
         new(Opts(new NotificationOptions { Push = push }), NullLogger<FcmPushNotificationChannel>.Instance);
+
+    private static WebhookNotificationChannel Webhook(WebhookChannelOptions webhook, IHttpClientFactory? factory = null) =>
+        new(Opts(new NotificationOptions { Webhook = webhook }), factory ?? new FakeHttpClientFactory(HttpStatusCode.OK), NullLogger<WebhookNotificationChannel>.Instance);
 
 
     [Fact]
@@ -153,5 +157,118 @@ public class NotificationTests
         public bool IsConfigured => true;
         public Task<NotificationResult> SendAsync(Notification notification, CancellationToken ct = default) =>
             throw new InvalidOperationException("boom");
+    }
+
+
+    [Fact]
+    public void Webhook_IsConfigured_False_When_Disabled()
+    {
+        var ch = Webhook(new WebhookChannelOptions { Enabled = false, Url = "https://example.com/hook" });
+        Assert.False(ch.IsConfigured);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("http://example.com/hook")] // not https
+    [InlineData("not a url")]
+    public void Webhook_IsConfigured_False_When_Url_Missing_Or_Not_Https(string? url)
+    {
+        var ch = Webhook(new WebhookChannelOptions { Enabled = true, Url = url });
+        Assert.False(ch.IsConfigured);
+    }
+
+    [Fact]
+    public void Webhook_IsConfigured_True_When_Enabled_With_Https_Url()
+    {
+        var ch = Webhook(new WebhookChannelOptions { Enabled = true, Url = "https://example.com/hook" });
+        Assert.True(ch.IsConfigured);
+    }
+
+    [Fact]
+    public async Task Webhook_SendAsync_Skips_When_Not_Configured()
+    {
+        var result = await Webhook(new WebhookChannelOptions()).SendAsync(Sample());
+        Assert.False(result.Sent);
+        Assert.False(result.Attempted);
+    }
+
+    [Fact]
+    public async Task Webhook_SendAsync_Blocked_By_SsrfGuard_For_Loopback_Url()
+    {
+        var ch = Webhook(new WebhookChannelOptions { Enabled = true, Url = "https://localhost/hook" });
+        var result = await ch.SendAsync(Sample());
+        Assert.False(result.Sent);
+        Assert.True(result.Attempted);
+        Assert.Contains("private/reserved", result.Detail);
+    }
+
+    [Fact]
+    public async Task Webhook_SendAsync_Posts_Json_And_Returns_Ok_On_Success()
+    {
+        var factory = new FakeHttpClientFactory(HttpStatusCode.OK);
+        var ch = Webhook(new WebhookChannelOptions { Enabled = true, Url = "https://example.com/hook" }, factory);
+
+        var result = await ch.SendAsync(Sample());
+
+        Assert.True(result.Sent);
+        Assert.Equal(HttpMethod.Post, factory.Handler.LastRequest?.Method);
+        Assert.Contains("Low water level", factory.Handler.LastRequestBody);
+        Assert.Equal("application/json", factory.Handler.LastRequest?.Content?.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Webhook_SendAsync_Returns_Failed_On_NonSuccess_StatusCode()
+    {
+        var factory = new FakeHttpClientFactory(HttpStatusCode.InternalServerError);
+        var ch = Webhook(new WebhookChannelOptions { Enabled = true, Url = "https://example.com/hook" }, factory);
+
+        var result = await ch.SendAsync(Sample());
+
+        Assert.False(result.Sent);
+        Assert.True(result.Attempted);
+    }
+
+    [Fact]
+    public async Task Webhook_SendAsync_Adds_Signature_Header_When_Secret_Configured()
+    {
+        var factory = new FakeHttpClientFactory(HttpStatusCode.OK);
+        var ch = Webhook(new WebhookChannelOptions { Enabled = true, Url = "https://example.com/hook", Secret = "shh" }, factory);
+
+        await ch.SendAsync(Sample());
+
+        Assert.True(factory.Handler.LastRequest!.Headers.Contains("X-Agrumy-Signature"));
+    }
+
+    [Fact]
+    public void Webhook_ComputeSignature_Is_Deterministic_And_Depends_On_Secret()
+    {
+        byte[] body = System.Text.Encoding.UTF8.GetBytes("{\"a\":1}");
+        string sigA = WebhookNotificationChannel.ComputeSignature(body, "secret-a");
+        string sigA2 = WebhookNotificationChannel.ComputeSignature(body, "secret-a");
+        string sigB = WebhookNotificationChannel.ComputeSignature(body, "secret-b");
+
+        Assert.Equal(sigA, sigA2);
+        Assert.NotEqual(sigA, sigB);
+    }
+
+    private sealed class FakeHttpClientFactory : IHttpClientFactory
+    {
+        public FakeHttpMessageHandler Handler { get; }
+        public FakeHttpClientFactory(HttpStatusCode statusCode) => Handler = new FakeHttpMessageHandler(statusCode);
+        public HttpClient CreateClient(string name) => new(Handler);
+    }
+
+    /// <summary>Captures the last request so a test can assert on method/body/headers without any real network call.</summary>
+    private sealed class FakeHttpMessageHandler(HttpStatusCode statusCode) : HttpMessageHandler
+    {
+        public HttpRequestMessage? LastRequest { get; private set; }
+        public string? LastRequestBody { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            LastRequest = request;
+            LastRequestBody = request.Content != null ? await request.Content.ReadAsStringAsync(cancellationToken) : null;
+            return new HttpResponseMessage(statusCode);
+        }
     }
 }

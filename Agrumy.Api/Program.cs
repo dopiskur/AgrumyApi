@@ -114,7 +114,17 @@ builder.Services.AddScoped<DbExceptionFilter>();
 builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection(NotificationOptions.SectionName));
 builder.Services.AddScoped<INotificationChannel, EmailNotificationChannel>();
 builder.Services.AddScoped<INotificationChannel, FcmPushNotificationChannel>();
+builder.Services.AddScoped<INotificationChannel, WebhookNotificationChannel>();
 builder.Services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
+
+// AllowAutoRedirect=false: a redirect response is treated as a delivery failure rather than
+// followed, same SsrfGuard-bypass concern as HttpFirmwareFetcher below, simpler to just refuse it here.
+builder.Services.AddHttpClient(WebhookNotificationChannel.ClientName, client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Agrumy.Api/1.0 (+https://github.com/dopiskur/AgrumyService)");
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
 // Scoped, not singleton: it resolves scoped repositories/dispatcher itself, and
 // PeriodicBackgroundService creates a fresh DI scope per tick.

@@ -7,6 +7,7 @@ namespace api.Notifications
 
         public EmailChannelOptions Email { get; set; } = new();
         public PushChannelOptions Push { get; set; } = new();
+        public WebhookChannelOptions Webhook { get; set; } = new();
 
         // How often OfflineAlertBackgroundService sweeps every device; 5 minutes comfortably beats ComputeOnline's minimum ~90s grace window without hammering the DB on every tick.
         public int OfflineCheckIntervalMinutes { get; set; } = 5;
@@ -40,5 +41,15 @@ namespace api.Notifications
 
         /// <summary>Path to the Google service-account JSON used to mint FCM access tokens.</summary>
         public string? FcmCredentialsPath { get; set; }
+    }
+
+    /// <summary>Generic HTTP POST webhook (Slack incoming-webhook compatible bodies need their own field mapping, this sends Agrumy's own JSON shape) - see <see cref="WebhookNotificationChannel"/>.</summary>
+    public sealed class WebhookChannelOptions
+    {
+        public bool Enabled { get; set; }
+        public string? Url { get; set; }
+
+        /// <summary>When set, each request carries an X-Agrumy-Signature header (HMAC-SHA256 of the body) so the receiver can verify it actually came from this Agrumy instance.</summary>
+        public string? Secret { get; set; }
     }
 }
