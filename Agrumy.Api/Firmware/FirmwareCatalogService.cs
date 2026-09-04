@@ -174,9 +174,16 @@ namespace api.Firmware
             var result = new FirmwareSyncResult();
             if (mode == FirmwareSyncMode.PullFull)
             {
+                // Roadmap #185: FullImageFileName (#41's blank-chip image) is a sibling file on the
+                // same row, not a separate row of its own - dropping only FileName here orphaned it
+                // on disk forever whenever a full re-pull replaced that board+version.
                 foreach (var row in (await firmwareRepo.FirmwareListAsync()).Where(r => r.Source == FirmwareSource.Local && r.FileName != null))
                 {
                     storage.Delete(row.FileName!);
+                    if (row.FullImageFileName != null)
+                    {
+                        storage.Delete(row.FullImageFileName);
+                    }
                 }
                 result.Removed = await firmwareRepo.FirmwareDeleteBySourceAsync(FirmwareSource.Local);
             }
@@ -440,9 +447,19 @@ namespace api.Firmware
             {
                 return false;
             }
-            if (row.Source == FirmwareSource.Local && row.FileName != null)
+            // Roadmap #185: FullImageFileName (#41's blank-chip image) is a sibling file on the same
+            // row, not tracked by any other row - dropping only FileName here left it orphaned on
+            // disk forever, since the DB row that named it is gone right after this.
+            if (row.Source == FirmwareSource.Local)
             {
-                storage.Delete(row.FileName);
+                if (row.FileName != null)
+                {
+                    storage.Delete(row.FileName);
+                }
+                if (row.FullImageFileName != null)
+                {
+                    storage.Delete(row.FullImageFileName);
+                }
             }
             await firmwareRepo.FirmwareDeleteAsync(idDeviceFirmware);
             return true;
