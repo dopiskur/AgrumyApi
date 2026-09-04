@@ -178,26 +178,10 @@ namespace api.Controllers.API
             return true;
         }
 
-        /// <summary>Looks a device up and checks the caller may touch it. Returns (null, 404) when
-        /// no device matches, (device, 403) on a tenant mismatch, or (device, null) when access is
-        /// allowed. A foreign tenant's device passes for Global roles - CallerManagesDevicesGlobally
-        /// on a write, the wider CallerReadsDevicesGlobally on a read.</summary>
-        private async Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(
-            Func<Task<Device?>> lookup, string ownerLabel, bool forWrite)
-        {
-            Device? device = await lookup();
-            if (device is null)
-            {
-                return (null, NotFound());
-            }
-
-            bool crossTenantAllowed = forWrite ? CallerManagesDevicesGlobally : CallerReadsDevicesGlobally;
-            if (device.TenantID != CallerTenantId && !crossTenantAllowed)
-            {
-                return (device, StatusCode(403, $"{ownerLabel} belongs to a different tenant"));
-            }
-            return (device, null);
-        }
+        /// <summary>Looks a device up and checks the caller may touch it - see ApiControllerBase.EnsureOwnedDeviceEntityAsync for the shared 404/403 logic.</summary>
+        private Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(
+            Func<Task<Device?>> lookup, string ownerLabel, bool forWrite) =>
+            EnsureOwnedDeviceEntityAsync(lookup, d => d.TenantID, ownerLabel, forWrite);
 
         #endregion
 

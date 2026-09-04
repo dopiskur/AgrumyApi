@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.API
 {
-    /// <summary>Issues a device command, resolved/fanned-out server-side by CommandQueueService. Ownership checks mirror DeviceApiController/DeviceUnitApiController (duplicated here, not shared, per this codebase's existing per-controller convention).</summary>
+    /// <summary>Issues a device command, resolved/fanned-out server-side by CommandQueueService. Ownership checks reuse ApiControllerBase.EnsureOwnedDeviceEntityAsync, always as a write (forWrite: true) since issuing a command is never a read-only action.</summary>
     [Route("/api/DeviceCommand")]
     public class DeviceCommandApiController(IRepository repo, ICache cache, CommandQueueService commandQueue) : ApiControllerBase(repo, cache)
     {
@@ -37,46 +37,13 @@ namespace api.Controllers.API
             };
         }
 
-        private async Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(int idDevice)
-        {
-            Device? device = await Repo.DeviceGetByIdAsync(idDevice);
-            if (device is null)
-            {
-                return (null, NotFound());
-            }
-            if (device.TenantID != CallerTenantId && !CallerManagesDevicesGlobally)
-            {
-                return (device, StatusCode(403, "Device belongs to a different tenant"));
-            }
-            return (device, null);
-        }
+        private Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(int idDevice) =>
+            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceGetByIdAsync(idDevice), d => d.TenantID, "Device", forWrite: true);
 
-        private async Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int idDeviceUnitZone)
-        {
-            DeviceUnitZone? zone = await Repo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone);
-            if (zone is null)
-            {
-                return (null, NotFound());
-            }
-            if (zone.TenantID != CallerTenantId && !CallerManagesDevicesGlobally)
-            {
-                return (zone, StatusCode(403, "Zone belongs to a different tenant"));
-            }
-            return (zone, null);
-        }
+        private Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int idDeviceUnitZone) =>
+            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone), z => z.TenantID, "Zone", forWrite: true);
 
-        private async Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int idDeviceUnit)
-        {
-            DeviceUnit? unit = await Repo.DeviceUnitGetByIdAsync(idDeviceUnit);
-            if (unit is null)
-            {
-                return (null, NotFound());
-            }
-            if (unit.TenantID != CallerTenantId && !CallerManagesDevicesGlobally)
-            {
-                return (unit, StatusCode(403, "Unit belongs to a different tenant"));
-            }
-            return (unit, null);
-        }
+        private Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int idDeviceUnit) =>
+            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite: true);
     }
 }

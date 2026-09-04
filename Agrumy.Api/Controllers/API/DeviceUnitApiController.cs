@@ -347,53 +347,17 @@ namespace api.Controllers.API
 
         #endregion
 
-        /// <summary>Same shape as DeviceApiController.EnsureOwnedDeviceAsync, for DeviceUnit.</summary>
-        private async Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int? idDeviceUnit, bool forWrite)
-        {
-            DeviceUnit? unit = await Repo.DeviceUnitGetByIdAsync(idDeviceUnit);
-            if (unit is null)
-            {
-                return (null, NotFound());
-            }
-            bool crossTenantAllowed = forWrite ? CallerManagesDevicesGlobally : CallerReadsDevicesGlobally;
-            if (unit.TenantID != CallerTenantId && !crossTenantAllowed)
-            {
-                return (unit, StatusCode(403, "Unit belongs to a different tenant"));
-            }
-            return (unit, null);
-        }
+        /// <summary>Same shape as DeviceApiController.EnsureOwnedDeviceAsync, for DeviceUnit - see ApiControllerBase.EnsureOwnedDeviceEntityAsync for the shared 404/403 logic.</summary>
+        private Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int? idDeviceUnit, bool forWrite) =>
+            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite);
 
         /// <summary>Same shape as EnsureOwnedUnitAsync, for DeviceUnitZone.</summary>
-        private async Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int? idDeviceUnitZone, bool forWrite)
-        {
-            DeviceUnitZone? zone = await Repo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone);
-            if (zone is null)
-            {
-                return (null, NotFound());
-            }
-            bool crossTenantAllowed = forWrite ? CallerManagesDevicesGlobally : CallerReadsDevicesGlobally;
-            if (zone.TenantID != CallerTenantId && !crossTenantAllowed)
-            {
-                return (zone, StatusCode(403, "Zone belongs to a different tenant"));
-            }
-            return (zone, null);
-        }
+        private Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int? idDeviceUnitZone, bool forWrite) =>
+            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone), z => z.TenantID, "Zone", forWrite);
 
-        /// <summary>Same shape/logic as DeviceApiController.EnsureOwnedDeviceAsync (duplicated, not shared, per this codebase's existing per-controller convention).</summary>
-        private async Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(
-            Func<Task<Device?>> lookup, string ownerLabel, bool forWrite)
-        {
-            Device? device = await lookup();
-            if (device is null)
-            {
-                return (null, NotFound());
-            }
-            bool crossTenantAllowed = forWrite ? CallerManagesDevicesGlobally : CallerReadsDevicesGlobally;
-            if (device.TenantID != CallerTenantId && !crossTenantAllowed)
-            {
-                return (device, StatusCode(403, $"{ownerLabel} belongs to a different tenant"));
-            }
-            return (device, null);
-        }
+        /// <summary>Same shape as EnsureOwnedUnitAsync, for Device.</summary>
+        private Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(
+            Func<Task<Device?>> lookup, string ownerLabel, bool forWrite) =>
+            EnsureOwnedDeviceEntityAsync(lookup, d => d.TenantID, ownerLabel, forWrite);
     }
 }
