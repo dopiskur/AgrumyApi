@@ -14,7 +14,9 @@ namespace api.Controllers.API
         [HttpGet]
         [Authorize]
         public async Task<ActionResult<string>> Get(int? deviceID, int? timeRange = 60, int? timeMDMY = 0, int? buildReport = 0) =>
-            Ok(await Repo.SensorDataGetAsync(CallerTenantId, deviceID, timeRange, timeMDMY, buildReport));
+            // Roadmap #183: was always tenant-scoped even for a Global reader/admin, unlike every
+            // other Device-domain list (DevicesGet, DeviceFleetGet, DeviceUnit dashboards).
+            Ok(await Repo.SensorDataGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, deviceID, timeRange, timeMDMY, buildReport));
 
         [HttpPost]
         [EnableRateLimiting("device-data")]
@@ -58,6 +60,7 @@ namespace api.Controllers.API
         [HttpGet("Report")]
         [Authorize]
         public async Task<ActionResult<IEnumerable<SensorDataReport>>> ReportGet(int? getData, int? idDevice, int? iDSensorDataReport) =>
-            Ok(await Repo.SensorDataReportGetAsync(CallerTenantId, getData, idDevice, iDSensorDataReport));
+            // Roadmap #183: same fix as Get above.
+            Ok(await Repo.SensorDataReportGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, getData, idDevice, iDSensorDataReport));
     }
 }

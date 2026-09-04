@@ -75,9 +75,12 @@ namespace api.Dal
                 _ => now.AddYears(-timeRange.Value),
             };
 
+            // Roadmap #183: null tenantID means a Global reader/admin, not "match rows with no
+            // tenant" - a bare == against a null parameter would translate to TenantID IS NULL in
+            // SQL and silently return zero rows, same class of bug DeviceFleetGetAsync avoids.
             var rows = await db.SensorData.AsNoTracking()
                 .Where(r => r.DeviceID == deviceID
-                            && r.TenantID == tenantID
+                            && (tenantID == null || r.TenantID == tenantID)
                             && r.Co2 != null && r.Co2 < 8000   // matches SensorDataReportBuilder: NULL Co2 rows are excluded
                             && r.DateCreated > cutoff)
                 .ToListAsync();
@@ -101,11 +104,13 @@ namespace api.Dal
         public async Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? tenantID, int? getData, int? deviceID, int? reportID)
         {
 
+            // Roadmap #183: same null-means-global reasoning as SensorDataGetAsync above, for both
+            // branches below.
             if (getData == 0)
             {
                 return await (from r in db.SensorDataReports.AsNoTracking()
                               join d in db.Devices.AsNoTracking() on r.DeviceID equals d.IDDevice
-                              where r.DeviceID == deviceID && d.TenantID == tenantID
+                              where r.DeviceID == deviceID && (tenantID == null || d.TenantID == tenantID)
                               select new SensorDataReport
                               {
                                   IDSensorDataReport = r.IDSensorDataReport,
@@ -119,7 +124,7 @@ namespace api.Dal
             {
                 return await (from r in db.SensorDataReports.AsNoTracking()
                               join d in db.Devices.AsNoTracking() on r.DeviceID equals d.IDDevice
-                              where r.IDSensorDataReport == reportID && d.TenantID == tenantID
+                              where r.IDSensorDataReport == reportID && (tenantID == null || d.TenantID == tenantID)
                               select new SensorDataReport
                               {
                                   IDSensorDataReport = r.IDSensorDataReport,
