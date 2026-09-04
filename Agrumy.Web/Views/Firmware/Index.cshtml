@@ -48,7 +48,7 @@
                 <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-local" type="button" role="tab"><i class="bi bi-hdd"></i> Local Repository</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-offline" type="button" role="tab"><i class="bi bi-folder-symlink"></i> Offline USB Repo</button>
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-offline" type="button" role="tab"><i class="bi bi-folder-symlink"></i> Offline USB Copy</button>
             </li>
         </ul>
         <div class="tab-content border border-top-0 rounded-bottom p-3">
@@ -173,8 +173,9 @@
                     on other browsers use the <code>tools/offline-repo/</code> script from the AgrumyFirmware repository instead.
                 </p>
                 <button type="button" id="buildOfflineRepo" class="btn btn-outline-secondary" data-manifest-url="@Url.Action("OfflineManifest")" data-file-url="@Url.Action("OfflineFile")">
-                    <i class="bi bi-folder-symlink"></i> Build offline repo…
+                    <i class="bi bi-folder-symlink"></i> Build offline USB copy…
                 </button>
+                <span id="offlineRepoUnsupportedHint" class="text-secondary small ms-2" hidden>Needs Chrome, Edge or Opera over HTTPS - see the note above.</span>
                 <div id="offlineRepoProgress" class="mt-2" hidden>
                     <div class="progress" role="progressbar"><div class="progress-bar" style="width:0%"></div></div>
                     <div class="small text-secondary mt-1" id="offlineRepoStatus"></div>

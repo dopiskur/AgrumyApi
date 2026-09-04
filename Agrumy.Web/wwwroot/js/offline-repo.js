@@ -13,6 +13,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (typeof window.showDirectoryPicker !== 'function') {
         button.disabled = true;
         button.title = 'Needs Chrome, Edge or Opera over HTTPS - use the tools/offline-repo script instead.';
+        // A disabled button's hover title is easy to miss - show the reason as visible text too.
+        const hint = document.getElementById('offlineRepoUnsupportedHint');
+        if (hint) { hint.hidden = false; }
         return;
     }
 
