@@ -108,6 +108,8 @@ namespace api.Dal
             }
             row.FirmwareUpdate = update;
             row.FirmwareTargetVersion = update ? targetVersion : null;
+            // Without this, GetConfig's "value.ConfigVersion == device.ConfigVersion && pendingCommand == null" short-circuit means an already-synced device never sees the flag flip until something else happens to bump ConfigVersion first.
+            row.ConfigVersion = (row.ConfigVersion ?? 0) + 1;
             await db.SaveChangesAsync();
         }
 
