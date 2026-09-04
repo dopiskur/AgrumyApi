@@ -1,9 +1,6 @@
-// Roadmap #126: "Optimize Old Data" / "Purge Old Data" on the Server Settings page. Both actions
-// dispatch a background job server-side and return immediately (202) - this script's job ends at
-// "request accepted", it does not poll for completion. Purge additionally needs, in order: (1) a
-// typed-phrase confirmation (same "at least as strict as #92" gate the API itself re-checks), then
-// (2) on MariaDB only, a separate "shrink files on disk?" dialog - drop_chunks() on Postgres/
-// TimescaleDB always reclaims space with no extra step, so that dialog never shows there.
+// Both actions dispatch a background job and return immediately (202) - this script does not poll
+// for completion. Purge needs a typed-phrase confirmation, plus (MariaDB only) a "shrink files on
+// disk?" step - Postgres/TimescaleDB's drop_chunks() always reclaims space with no extra step.
 document.addEventListener('DOMContentLoaded', function () {
     const optimizeButton = document.getElementById('dataMaintenanceOptimize');
     const purgeButton = document.getElementById('dataMaintenancePurge');

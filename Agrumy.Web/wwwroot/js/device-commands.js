@@ -1,7 +1,5 @@
-// Roadmap #34: wires every [data-device-command] button (see Views/Shared/_DeviceCommandButtons)
-// to POST /Device/IssueCommand. Attached once here (not per-partial) so a page with several
-// buttons - e.g. one command group per zone - never ends up with duplicate listeners from a
-// partial being rendered more than once.
+// Attached once here (not per-partial) so a page rendering _DeviceCommandButtons more than once
+// never ends up with duplicate listeners.
 document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('[data-device-command]').forEach(function (button) {
         button.addEventListener('click', async function () {

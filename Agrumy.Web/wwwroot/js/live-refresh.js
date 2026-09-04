@@ -1,8 +1,6 @@
-// Roadmap #90: polls a server endpoint on a fixed interval and hands the raw HTML response to
-// applyHtml to patch into the page - deliberately not a full page reload, so scroll position (and,
-// for a DataTables-backed caller, its paging/search state) survives a refresh. Pauses while the
-// tab is hidden (Page Visibility API) - no point polling a screen nobody is looking at - and
-// refreshes immediately the moment it becomes visible again instead of waiting out a stale interval.
+// Patches applyHtml into the page instead of a full reload, so scroll position and (for a
+// DataTables-backed caller) paging/search state survive a refresh. Pauses via the Page Visibility
+// API while the tab is hidden, and refreshes immediately once it becomes visible again.
 function startLiveRefresh({ url, applyHtml, intervalMs = 10000 }) {
     let timerId = null;
 

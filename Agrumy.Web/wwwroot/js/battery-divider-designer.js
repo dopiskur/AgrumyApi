@@ -1,9 +1,5 @@
-// Roadmap #12: two independent pieces of UI wired from EditSensor.cshtml's data attributes -
-// (1) show/hide the R1/R2 calibration block based on whether SensorBattery currently selects the
-// VoltageDivider option (MAX17048 ignores R1/R2 entirely), (2) the "Divider Designer" helper that
-// recommends a standard-value resistor pair for someone who hasn't picked resistors yet. The
-// saved data is ALWAYS R1/R2 in ohms - the Designer is a one-time UX aid to fill those two
-// fields, never a separate storage mechanism (matches roadmap #12's explicit design).
+// The Divider Designer is a one-time UX aid to fill R1/R2 (always stored in ohms) - never a
+// separate storage mechanism. MAX17048 ignores R1/R2 entirely, hence the show/hide below.
 
 document.addEventListener('DOMContentLoaded', function () {
     var script = document.querySelector('script[data-sensor-battery-select-id]');

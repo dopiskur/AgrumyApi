@@ -1,10 +1,6 @@
-// Roadmap #94-C1: "Build offline repo" - copies the firmware catalog into a directory the user
-// picks (a USB stick, from the OS's point of view just another folder) using the File System
-// Access API, then writes a manifest.json with SHA-256 checksums so the offline server's import
-// (#94-2b) can verify every file survived the physical transfer. Chromium-only by nature of the
-// API (Chrome/Edge/Opera; not Safari/Firefox) and HTTPS-only - the button is disabled with an
-// explanation elsewhere. Files come through this app's OfflineFile proxy, never straight from
-// GitHub: a release asset's redirect target does not answer cross-origin fetches.
+// File System Access API is Chromium-only and HTTPS-only (button disabled elsewhere when unavailable).
+// Files come through this app's OfflineFile proxy, not straight from GitHub - a release asset's
+// redirect target does not answer cross-origin fetches.
 document.addEventListener('DOMContentLoaded', function () {
     const button = document.getElementById('buildOfflineRepo');
     if (!button) {

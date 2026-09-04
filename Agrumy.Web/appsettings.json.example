@@ -5,17 +5,17 @@
     "ApiService": "http://localhost:5000"
   },
 
-  "// JWT": "Validates the bearer token stored in the auth cookie (Security/JwtTokenProvider.ValidateToken) - roadmap #48.",
+  "// JWT": "Validates the bearer token stored in the auth cookie (Security/JwtTokenProvider.ValidateToken).",
   "JWT": {
     "// SecureKey": "MUST be the exact same value as Agrumy.Api/appsettings.json JWT:SecureKey, otherwise cookie tokens fail validation and every page redirects to login.",
     "SecureKey": "CHANGE_ME_TO_A_LONG_RANDOM_SECRET_AT_LEAST_32_CHARACTERS",
-    "// Issuer": "MUST be the exact same value as Agrumy.Api/appsettings.json JWT:Issuer - ValidateToken() now checks it (roadmap #48), a mismatch fails every login.",
+    "// Issuer": "MUST be the exact same value as Agrumy.Api/appsettings.json JWT:Issuer - ValidateToken() checks it, a mismatch fails every login.",
     "Issuer": "https://api.agrumy.com",
     "// Audience": "MUST be the exact same value as Agrumy.Api/appsettings.json JWT:Audience - same reason as Issuer above.",
     "Audience": "agrumy-api"
   },
 
-  "// DataProtection": "Optional (roadmap #79) - where cookie-auth/antiforgery encryption keys persist to disk. Omit to fall back to a 'dataprotection-keys' directory next to (not inside) the app's own folder.",
+  "// DataProtection": "Optional - where cookie-auth/antiforgery encryption keys persist to disk. Omit to fall back to a 'dataprotection-keys' directory next to (not inside) the app's own folder.",
   "DataProtection": {
     "// KeyPath": "MUST be outside the folder a redeploy overwrites/wipes (e.g. NOT inside bin/), and the account the service actually runs as must be able to read+write it.",
     "KeyPath": "/home/adminagrumy/dataprotection-keys"
