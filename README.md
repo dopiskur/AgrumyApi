@@ -425,6 +425,16 @@ each option individually) and a deployment mode:
   saving a connection there restarts the service, and the existing bootstrap
   Global Admin wizard (roadmap #91) takes over from there unchanged.
 
+**Bare-metal first boot: keep the port firewalled off until setup completes**
+(roadmap #248). The setup wizard is protected against CSRF, not against
+network access - unlike the Container path, a bare-metal box's port is
+reachable from the LAN (or the internet, if opened early) the moment the
+service starts. Anyone who reaches the wizard before the box's actual owner
+can submit the database connection first. `install.sh`'s bare-metal path
+does not open the firewall for you; keep it closed (or restrict it to your
+own IP) until you've completed the wizard and the bootstrap Global Admin
+step, then open it up for real traffic.
+
 Safe to re-run - each step checks whether it's already done before acting, so
 re-running to add a component later (e.g. turn on Redis) doesn't repeat
 completed steps or overwrite existing secrets.
