@@ -357,12 +357,22 @@ Device endpoints use the separate apiId/apiKey/apiAuth scheme described in
 | Endpoint | Auth | Purpose |
 | --- | --- | --- |
 | `GET /api/Firmware` | DeviceManagers | List catalog entries, optionally filtered by board |
-| `POST /api/Firmware/Sync` | admin | Refresh the catalog from the configured source (GitHub / Custom repository) |
-| `POST /api/Firmware/Import` | admin | Pull one release's files into the **Local** repository |
-| `POST /api/Firmware/Upload` | admin | Manually add a `.bin` to the Local repository |
-| `DELETE /api/Firmware` | admin | Remove a catalog entry |
+| `POST /api/Firmware/Sync` | Global admin | Refresh the catalog from the configured source (GitHub / Custom repository) |
+| `POST /api/Firmware/Import` | Global admin | Pull one release's files into the **Local** repository |
+| `POST /api/Firmware/Upload` | Global admin | Manually add a `.bin` to the Local repository |
+| `DELETE /api/Firmware` | Global admin | Remove a catalog entry |
 | `GET /api/Firmware/Manifest`, `GET /api/Firmware/Fetch` | DeviceManagers | Offline-USB-repository preparation (`tools/offline-repo/*`) |
 | `GET /api/Firmware/Download/{fileName}` | no auth | Serves a `.bin` from the Local store (device OTA download) |
+
+**`Download` is anonymous by design** (roadmap #245) - a device's OTA fetch is a bare HTTP GET
+with no auth headers, the same as a public GitHub release asset. This is only safe because
+`fileName` is unpredictable in the sense that matters: it must match `FirmwareVersion`'s
+release convention (`agrumy-{board}-v{semver}.bin`), i.e. a caller must already know a real
+board name and an actually-released semver - not a guessable sequential id - and that
+information is itself public (the catalog and GitHub Releases already list it to anyone with
+API access). Rate-limited via the `device-data` policy (60 req/min/IP) against bulk-download
+abuse. If this ever needs to be tightened further, short-lived signed URLs are the natural
+next step - not required today.
 
 **ServerConfig** (`ServerConfigApiController`, `api/ServerConfig`)
 
