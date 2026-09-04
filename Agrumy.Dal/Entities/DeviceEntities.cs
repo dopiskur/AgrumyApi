@@ -213,6 +213,12 @@ namespace api.Dal.Entities
         public DateTime IssuedAt { get; set; }
         public DateTime ExpiresAt { get; set; }
         public DateTime? ExecutedAt { get; set; }
+        // Roadmap #180: mirrors ActionType while Status is Pending/Acknowledged, NULL once the row
+        // leaves that active window (Executed/Expired) - see EfRepository.Commands.cs. Backs the DB-
+        // level unique index (DeviceID, ActiveKey) that turns the check-then-insert dedup race in
+        // CommandQueueService.IssueCommandAsync into a real constraint instead of only a C# check
+        // (multiple NULLs are allowed by a unique index, so terminal rows never collide).
+        public int? ActiveKey { get; set; }
     }
 
     /// <summary>One row per device, upserted on every config poll - the poll itself is the

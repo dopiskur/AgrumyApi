@@ -94,6 +94,24 @@ public class CommandQueueServiceTests
         // Strict mock: AddCommandAsync was never set up - a call to it here would throw.
     }
 
+    /// <summary>roadmap #180: HasActiveCommandAsync passing is only a fast-path, not the source of
+    /// truth - the DB-level unique index is what actually closes the check-then-insert race. A null
+    /// from AddCommandAsync (another request won that race after this one's check already passed)
+    /// must be treated the same as if the check itself had found a duplicate: this device skipped,
+    /// no 500, no phantom id in CreatedCommandIds.</summary>
+    [Fact]
+    public async Task Device_Losing_The_DB_Level_Dedup_Race_Is_Treated_As_AllDuplicates_Not_A_Crash()
+    {
+        _devices.Setup(d => d.DeviceGetByIdAsync(500)).ReturnsAsync(ControllerDevice(500));
+        _commands.Setup(c => c.HasActiveCommandAsync(500, CommandActionType.Reboot, It.IsAny<DateTime>())).ReturnsAsync(false);
+        _commands.Setup(c => c.AddCommandAsync(500, CommandActionType.Reboot, It.IsAny<DateTime>(), It.IsAny<DateTime>())).ReturnsAsync((int?)null);
+
+        var result = await NewService().IssueCommandAsync(CommandTargetType.Device, 500, CommandActionType.Reboot);
+
+        Assert.Equal(IssueCommandOutcome.AllDuplicates, result.Outcome);
+        Assert.Empty(result.CreatedCommandIds);
+    }
+
     [Fact]
     public async Task Unit_FanOut_One_Zone_Already_Pending_Is_Skipped_Not_The_Whole_Batch()
     {

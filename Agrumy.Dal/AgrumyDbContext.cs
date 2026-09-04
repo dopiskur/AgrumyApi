@@ -295,6 +295,10 @@ namespace api.Dal
                 e.HasKey(x => x.IDDeviceCommand);
                 e.Property(x => x.IDDeviceCommand).ValueGeneratedOnAdd();
                 e.HasIndex(x => new { x.DeviceID, x.Status }).HasDatabaseName("ix_deviceCommand_device_status");
+                // See DeviceCommandRow.ActiveKey - a unique index works across both providers
+                // (MySQL and PostgreSQL both allow multiple NULLs through a unique index/constraint)
+                // without needing MySQL's unsupported partial/filtered index syntax.
+                e.HasIndex(x => new { x.DeviceID, x.ActiveKey }).IsUnique().HasDatabaseName("ux_deviceCommand_device_activekey");
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 

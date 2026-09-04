@@ -12,8 +12,11 @@ namespace api.Dal.Interface
         /// yet-marked rows are excluded by the ExpiresAt filter, not by Status alone.</summary>
         Task<bool> HasActiveCommandAsync(int deviceId, CommandActionType actionType, DateTime utcNow);
 
-        /// <summary>Creates one Pending command row and bumps the device's CommandVersion in the same call.</summary>
-        Task<int> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt);
+        /// <summary>Creates one Pending command row and bumps the device's CommandVersion in the
+        /// same call. Null return means a DB-level unique constraint rejected it because another
+        /// request already created an active command for this (device, actionType) pair - see
+        /// EfRepository.AddCommandAsync (roadmap #180) - the caller treats that as a dedup skip.</summary>
+        Task<int?> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt);
 
         /// <summary>Every Pending command for this device, oldest first - CommandQueueService picks
         /// the first one that is not (yet) expired and lazily expires any that are.</summary>

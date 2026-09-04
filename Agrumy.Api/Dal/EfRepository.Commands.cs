@@ -18,13 +18,19 @@ namespace api.Dal
                 c.ExpiresAt > utcNow);
         }
 
-        public async Task<int> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt)
+        /// <summary>Null return means the ux_deviceCommand_device_activekey unique index rejected
+        /// the insert - another request won the same check-then-insert race between
+        /// CommandQueueService's HasActiveCommandAsync check and this call (roadmap #180). The
+        /// caller treats that exactly like the pre-insert dedup check finding an existing command:
+        /// this device is skipped, not the whole batch, and nothing 500s.</summary>
+        public async Task<int?> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt)
         {
             var row = new DeviceCommandRow
             {
                 DeviceID = deviceId,
                 ActionType = (int)actionType,
                 Status = (int)CommandStatus.Pending,
+                ActiveKey = (int)actionType,
                 IssuedAt = issuedAt,
                 ExpiresAt = expiresAt,
             };
@@ -37,7 +43,22 @@ namespace api.Dal
                 device.CommandVersion++;
             }
 
-            await db.SaveChangesAsync();
+            try
+            {
+                await db.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (ClassifyException(ex) == DbFailureKind.ConstraintViolation)
+            {
+                // SaveChangesAsync runs both statements in one transaction, so nothing was actually
+                // persisted - detach/revert so the change tracker matches that and a later
+                // SaveChangesAsync on this same context doesn't retry either statement.
+                db.Entry(row).State = EntityState.Detached;
+                if (device != null)
+                {
+                    device.CommandVersion--;
+                }
+                return null;
+            }
             return row.IDDeviceCommand;
         }
 
@@ -67,6 +88,12 @@ namespace api.Dal
             if (executedAt != null)
             {
                 row.ExecutedAt = executedAt;
+            }
+            // Frees the (DeviceID, ActiveKey) unique slot the moment this row stops being active -
+            // Acknowledged keeps it set (still active), only the two terminal states clear it.
+            if (status is CommandStatus.Executed or CommandStatus.Expired)
+            {
+                row.ActiveKey = null;
             }
             await db.SaveChangesAsync();
         }

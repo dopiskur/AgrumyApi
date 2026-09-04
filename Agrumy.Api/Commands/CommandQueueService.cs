@@ -63,7 +63,13 @@ namespace api.Commands
                 {
                     continue; // this one device is skipped, not the whole batch
                 }
-                created.Add(await commandRepo.AddCommandAsync(deviceId, actionType, utcNow, expiresAt));
+                // AddCommandAsync can still return null here even after the check above just passed -
+                // the DB-level unique index (roadmap #180) is what actually closes the race, this
+                // in-memory check is only a fast-path/early-exit, not the source of truth.
+                if (await commandRepo.AddCommandAsync(deviceId, actionType, utcNow, expiresAt) is int newCommandId)
+                {
+                    created.Add(newCommandId);
+                }
             }
 
             return created.Count > 0
