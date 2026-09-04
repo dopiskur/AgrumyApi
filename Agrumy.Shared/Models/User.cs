@@ -27,6 +27,13 @@ namespace api.Models
 
         // IANA time zone id (e.g. "Europe/Zagreb") for display conversion of stored-UTC timestamps; null = show UTC.
         public string? TimeZone { get; set; }
+
+        // Set only by tenant import - the imported password hash is portable
+        // (same PBKDF2 algorithm everywhere) but nobody has proven they still know it on THIS
+        // server, so login is blocked until they do (see UserApiController.UserLogin's 428 gate
+        // and ForceChangePassword). Any successful password change (forced or self-service)
+        // clears it - see EfRepository.UserSetPasswordAsync.
+        public bool MustChangePassword { get; set; }
     }
 
     public class UserSecret
@@ -117,6 +124,18 @@ namespace api.Models
     /// <summary>Body of POST /api/User/ChangePassword - no Login field on purpose, identity comes only from the caller's JWT, so this can never be used as an unauthenticated password-guessing oracle.</summary>
     public class UserSetPassword
     {
+        [Required(ErrorMessage = "Old password is required")]
+        public string? OldPassword { get; set; }
+        [Required(ErrorMessage = "New password is required")]
+        public string? NewPassword { get; set; }
+    }
+
+    /// <summary>Body of POST /api/User/ForceChangePassword - same shape as UserSetPassword plus
+    /// Login, since this is reachable before a normal JWT exists (see User.MustChangePassword).</summary>
+    public class UserForceChangePassword
+    {
+        [Required(ErrorMessage = "Email or username is required")]
+        public string? Login { get; set; }
         [Required(ErrorMessage = "Old password is required")]
         public string? OldPassword { get; set; }
         [Required(ErrorMessage = "New password is required")]

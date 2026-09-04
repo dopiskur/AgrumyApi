@@ -35,5 +35,11 @@ namespace api.Dal
                     .SetProperty(u => u.BootstrapSecretSalt, (string?)null));
             return rows > 0;
         }
+
+        public async Task<bool> BootstrapAdminDiscardPendingAsync()
+        {
+            int rows = await db.Users.Where(u => u.PwdHash == null).ExecuteDeleteAsync();
+            return rows > 0;
+        }
     }
 }

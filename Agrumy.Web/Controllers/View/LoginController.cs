@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using api.Dal.Interface;
 using api.Models;
 using api.Security;
@@ -14,6 +15,8 @@ namespace api.Controllers.View
     [AllowAnonymous]
     public class LoginController(IApi api, IAuthApi authApi, ILogger<LoginController> logger) : Controller
     {
+        private static readonly JsonSerializerOptions ImportJsonOptions = new(JsonSerializerDefaults.Web);
+
         public async Task<ActionResult> Index(bool sessionExpired = false)
         {
             if (await BootstrapPendingSafeAsync())
@@ -41,6 +44,15 @@ namespace api.Controllers.View
             }
             catch (ApiException ex)
             {
+                // 428 = MustChangePassword (tenant import) - a distinct status
+                // specifically so this branches without parsing message text, unlike the
+                // wrong-credentials/not-verified/not-enabled cases below, which all still just
+                // show the same generic error.
+                if (ex.StatusCode == 428)
+                {
+                    TempData["ForceChangePasswordLogin"] = userLogin.Login;
+                    return RedirectToAction(nameof(ForceChangePassword));
+                }
                 // Wrong credentials also land here (the API answers 4xx) - expected, so only a warning.
                 logger.LogWarning("Login rejected by Agrumy.Api ({StatusCode}).", ex.StatusCode);
                 result = null;
@@ -60,6 +72,54 @@ namespace api.Controllers.View
                 return View(userLogin);
             }
 
+            await SignInAsync(result, roles);
+            return RedirectToAction("Index", "DeviceUnit");
+        }
+
+        /// <summary>Tenant-import counterpart to the login form - reached only via the 428 redirect
+        /// above (see api.Models.User.MustChangePassword). GET pre-fills Login from TempData when
+        /// the redirect carried it; a direct visit still works, just with an empty field.</summary>
+        public ActionResult ForceChangePassword()
+        {
+            return View(new UserForceChangePassword { Login = TempData["ForceChangePasswordLogin"] as string });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> ForceChangePassword(UserForceChangePassword value)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(value);
+            }
+
+            UserLoginResult? result;
+            IReadOnlyList<string>? roles;
+            try
+            {
+                result = await api.UserForceChangePassword(value);
+                roles = result?.Token is { } token ? JwtTokenProvider.ValidateToken(token) : null;
+            }
+            catch (ApiException ex)
+            {
+                ModelState.AddModelError(string.Empty, ex.Body);
+                return View(value);
+            }
+
+            if (result?.Token is null || result.RefreshToken is null || roles is null || roles.Count == 0)
+            {
+                ModelState.AddModelError(string.Empty, "Could not sign in after the password change.");
+                return View(value);
+            }
+
+            await SignInAsync(result, roles);
+            return RedirectToAction("Index", "DeviceUnit");
+        }
+
+        /// <summary>Shared by Index(POST) and ForceChangePassword(POST) - both end with the exact
+        /// same cookie sign-in once Agrumy.Api hands back a token.</summary>
+        private async Task SignInAsync(UserLoginResult result, IReadOnlyList<string> roles)
+        {
             // HttpOnly, SameSite=Strict cookie; the raw JWT/refresh token are stored tokens for BearerTokenHandler, never exposed to page script.
             var claims = new List<Claim> { new(ClaimTypes.Name, result.Email ?? "") };
             claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
@@ -72,14 +132,12 @@ namespace api.Controllers.View
             };
             props.StoreTokens(new[]
             {
-                new AuthenticationToken { Name = "access_token", Value = result.Token },
-                new AuthenticationToken { Name = "refresh_token", Value = result.RefreshToken },
+                new AuthenticationToken { Name = "access_token", Value = result.Token! }, // caller already checked both for null before this ever runs
+                new AuthenticationToken { Name = "refresh_token", Value = result.RefreshToken! },
             });
 
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), props);
-
-            return RedirectToAction("Index", "DeviceUnit");
         }
 
         public async Task<ActionResult> Logout()
@@ -135,6 +193,63 @@ namespace api.Controllers.View
             }
 
             TempData["Message"] = "Admin password set - you can now sign in.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        /// <summary>Imports a TenantExport as TenantID=0 (this server's sole
+        /// tenant), replacing the unclaimed bootstrap admin. Same "re-check BootstrapPending on
+        /// every load" fail-closed rule as SetupAdmin - the server-side TenantZeroIsEmptyAsync
+        /// gate is the REAL guard (see TenantApiController.ImportAsSentinel), this is just so the
+        /// form does not sit there invitingly once someone HAS signed in.</summary>
+        public async Task<ActionResult> ImportSentinel()
+        {
+            if (!await BootstrapPendingSafeAsync())
+            {
+                return RedirectToAction(nameof(Index));
+            }
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> ImportSentinel(TenantSentinelImportViewModel value)
+        {
+            if (!await BootstrapPendingSafeAsync())
+            {
+                return RedirectToAction(nameof(Index));
+            }
+            if (!ModelState.IsValid)
+            {
+                return View(value);
+            }
+
+            TenantExport? export;
+            try
+            {
+                export = JsonSerializer.Deserialize<TenantExport>(value.ExportJson ?? "", ImportJsonOptions);
+            }
+            catch (JsonException ex)
+            {
+                ModelState.AddModelError(nameof(value.ExportJson), "Not valid export JSON: " + ex.Message);
+                return View(value);
+            }
+            if (export is null)
+            {
+                ModelState.AddModelError(nameof(value.ExportJson), "Not valid export JSON.");
+                return View(value);
+            }
+
+            try
+            {
+                await api.TenantImportAsSentinel(export);
+            }
+            catch (ApiException ex)
+            {
+                ModelState.AddModelError(string.Empty, ex.Body);
+                return View(value);
+            }
+
+            TempData["Message"] = "Tenant imported - you can now sign in with one of its accounts (a new password is required on first login).";
             return RedirectToAction(nameof(Index));
         }
 

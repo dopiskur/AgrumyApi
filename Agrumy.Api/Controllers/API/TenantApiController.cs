@@ -1,4 +1,5 @@
 using api.Dal.Interface;
+using api.Migration;
 using api.Models;
 using api.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -12,7 +13,7 @@ namespace api.Controllers.API
     /// [Authorize(Roles=...)] attributes stay at the wide legacy-friendly net (same reasoning as
     /// ServerConfigApiController); the precise decision is the inline CallerIsGlobalAdmin/GlobalReader check.</summary>
     [Route("/api/Tenant")]
-    public class TenantApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
+    public class TenantApiController(IRepository repo, ICache cache, TenantExportService exportService, TenantImportService importService) : ApiControllerBase(repo, cache)
     {
         [Authorize(Roles = "admin," + RoleNames.GlobalReader)]
         [HttpGet("All")]
@@ -71,6 +72,69 @@ namespace api.Controllers.API
             tenant.TenantName = tenant.TenantName.Trim();
             await Repo.TenantUpdateAsync(tenant);
             return Ok();
+        }
+
+        // ---- Export/Import --------------------------------------------------
+
+        /// <summary>SENSITIVE: the response carries every exported user's password hash/salt and
+        /// every exported device's ApiKey - handle it like any other credential bundle (do not
+        /// email it unencrypted, do not commit it to a repo, etc.). Never persisted server-side -
+        /// built in memory and streamed straight back. A TenantAdmin may export only their OWN
+        /// tenant (CallerTenantId); Global admin may export any.</summary>
+        [Authorize(Roles = RoleNames.Admins)]
+        [HttpGet("Export")]
+        public async Task<ActionResult<TenantExport>> Export(int idTenant, bool includeSensorData = false, DateTime? sensorDataSinceUtc = null)
+        {
+            if (!CallerIsGlobalAdmin && !(CallerHasRole(RoleNames.TenantAdmin) && CallerTenantId == idTenant))
+            {
+                return StatusCode(403, "Exporting a tenant requires being its Tenant admin, or Global admin.");
+            }
+            return Ok(await exportService.ExportAsync(idTenant, includeSensorData, sensorDataSinceUtc));
+        }
+
+        /// <summary>ByName only - see api.Models.TenantImportTarget. Global admin only: unlike
+        /// Export, this can create a brand-new tenant or add into one the caller doesn't already
+        /// administer, so it stays at the same "Global admin only" bar as TenantAdd/TenantUpdate above.</summary>
+        [Authorize(Roles = "admin")]
+        [HttpPost("Import")]
+        public async Task<ActionResult<TenantImportResult>> Import([FromBody] TenantImportRequest value)
+        {
+            if (!CallerIsGlobalAdmin)
+            {
+                return StatusCode(403, "Importing a tenant requires the Global admin role");
+            }
+            if (value.Export is null)
+            {
+                return BadRequest("Export is required.");
+            }
+            if (string.IsNullOrWhiteSpace(value.TargetTenantName))
+            {
+                return BadRequest("TargetTenantName is required.");
+            }
+            if (value.Export.FormatVersion != TenantExport.CurrentFormatVersion)
+            {
+                return BadRequest($"Unsupported export format version '{value.Export.FormatVersion}' - this server understands '{TenantExport.CurrentFormatVersion}'.");
+            }
+            return Ok(await importService.ImportByNameAsync(value.Export, value.TargetTenantName.Trim()));
+        }
+
+        /// <summary>AsSentinel: claims TenantID=0 with this export's users/devices, replacing the
+        /// still-unclaimed bootstrap admin placeholder - see TenantImportService.ImportAsSentinelAsync
+        /// and ITenantRepository.TenantZeroIsEmptyAsync for the safety gate. Deliberately anonymous:
+        /// the whole point is a brand-new self-hosted server with nobody to authenticate as yet -
+        /// TenantZeroIsEmptyAsync (not a role check) is what stops this being called against an
+        /// already-provisioned server.</summary>
+        [AllowAnonymous]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("login")]
+        [HttpPost("ImportAsSentinel")]
+        public async Task<ActionResult<TenantImportResult>> ImportAsSentinel([FromBody] TenantExport value)
+        {
+            if (value.FormatVersion != TenantExport.CurrentFormatVersion)
+            {
+                return BadRequest($"Unsupported export format version '{value.FormatVersion}' - this server understands '{TenantExport.CurrentFormatVersion}'.");
+            }
+            var (result, error) = await importService.ImportAsSentinelAsync(value);
+            return error != null ? StatusCode(409, error) : Ok(result);
         }
     }
 }

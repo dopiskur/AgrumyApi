@@ -16,6 +16,12 @@ namespace api.Dal.Interface
         [Post("/api/User/Login")]
         Task<UserLoginResult?> UserLogin([Body] UserLogin userLogin);
 
+        /// <summary>Tenant-import counterpart to Login - proves identity with the OLD (imported)
+        /// password since MustChangePassword blocks Login itself (428). See
+        /// api.Models.User.MustChangePassword.</summary>
+        [Post("/api/User/ForceChangePassword")]
+        Task<UserLoginResult?> UserForceChangePassword([Body] UserForceChangePassword value);
+
         /// <summary>Whether the fresh-install bootstrap Global Admin still has no password -
         /// LoginController checks this on every anonymous page load to decide whether to show the
         /// normal login form or the first-run "set password" screen.</summary>
@@ -269,6 +275,20 @@ namespace api.Dal.Interface
 
         [Put("/api/Tenant")]
         Task TenantUpdate([Body] Tenant tenant);
+
+        /// <summary>SENSITIVE - see TenantApiController.Export's remarks (password hashes, device
+        /// ApiKeys). The Web controller streams this straight to the browser as a download,
+        /// never writing it to disk itself.</summary>
+        [Get("/api/Tenant/Export")]
+        Task<TenantExport> TenantExport(int idTenant, bool includeSensorData = false, DateTime? sensorDataSinceUtc = null);
+
+        [Post("/api/Tenant/Import")]
+        Task<TenantImportResult> TenantImport([Body] TenantImportRequest value);
+
+        /// <summary>Anonymous - see TenantApiController.ImportAsSentinel's remarks. Reachable from
+        /// the same SetupAdmin screen BootstrapPending/BootstrapSetPassword already use.</summary>
+        [Post("/api/Tenant/ImportAsSentinel")]
+        Task<TenantImportResult> TenantImportAsSentinel([Body] TenantExport value);
 
         // ---- Server config --------------------------------
 

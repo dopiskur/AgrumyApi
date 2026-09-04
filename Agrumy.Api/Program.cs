@@ -151,6 +151,8 @@ builder.Services.AddHostedService<WeatherBackgroundService>();
 
 builder.Services.AddScoped<CommandQueueService>();
 builder.Services.AddScoped<api.Devices.DeviceConfigBuilder>();
+builder.Services.AddScoped<api.Migration.TenantExportService>();
+builder.Services.AddScoped<api.Migration.TenantImportService>();
 
 // Singleton so it outlives any one request's DI scope; BackgroundJobRunner consumes it one job at a time.
 builder.Services.AddSingleton<BackgroundJobQueue>();

@@ -1,0 +1,75 @@
+@model api.ViewModels.TenantImportViewModel
+
+@{
+    ViewData["Title"] = "Import Tenant";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Import Tenant</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-secondary">
+            Migrate a tenant exported from another Agrumy server (Tenants &rarr; Export on the
+            source server). Every id is reassigned fresh on this server - nothing here can
+            collide with existing data. Imported users must set a new password before their
+            first login here; imported devices keep their original ApiKey unchanged.
+        </p>
+
+        @if (Model.Result is { } result)
+        {
+            <div class="alert alert-success">
+                Imported into tenant "@result.TargetTenantName" (id @result.TargetTenantId):
+                @result.UsersImported user(s), @result.DevicesImported device(s),
+                @result.UnitsImported unit(s), @result.ZonesImported zone(s),
+                @result.ZoneRulesImported rule(s)@(result.SensorDataRowsImported > 0 ? $", {result.SensorDataRowsImported} sensor reading(s)" : "").
+            </div>
+            @if (result.SkippedReasons.Any())
+            {
+                <div class="alert alert-warning">
+                    <strong>@(result.UsersSkipped + result.DevicesSkipped) row(s) skipped</strong> (already exist on this server):
+                    <ul class="mb-0">
+                        @foreach (var reason in result.SkippedReasons)
+                        {
+                            <li>@reason</li>
+                        }
+                    </ul>
+                </div>
+            }
+        }
+
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <form asp-action="Import" method="post">
+            <div class="mb-3">
+                <label class="form-label" for="exportFile">Export file</label>
+                <input type="file" id="exportFile" class="form-control" accept="application/json" />
+                <div class="form-text">Choose the .json file downloaded from the source server, or paste its contents below directly.</div>
+            </div>
+            <div class="mb-3">
+                <label asp-for="ExportJson" class="form-label"></label>
+                <textarea asp-for="ExportJson" class="form-control font-monospace" rows="10" placeholder="Paste export JSON here"></textarea>
+                <span asp-validation-for="ExportJson" class="text-danger"></span>
+            </div>
+            <div class="mb-3" style="max-width:24rem">
+                <label asp-for="TargetTenantName" class="form-label"></label>
+                <input asp-for="TargetTenantName" class="form-control" placeholder="Existing or new tenant name" />
+                <span asp-validation-for="TargetTenantName" class="text-danger"></span>
+                <div class="form-text">Ties to an existing tenant with this exact name, or creates a new one.</div>
+            </div>
+            <button type="submit" class="btn btn-primary">Import</button>
+            <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('exportFile')?.addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) { return; }
+            const reader = new FileReader();
+            reader.onload = () => { document.getElementById('ExportJson').value = reader.result; };
+            reader.readAsText(file);
+        });
+    </script>
+}

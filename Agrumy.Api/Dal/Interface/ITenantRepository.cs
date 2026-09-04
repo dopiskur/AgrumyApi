@@ -13,5 +13,12 @@ namespace api.Dal.Interface
         Task<IList<Tenant>> TenantsGetAllAsync();
         Task<Tenant?> TenantGetByIdAsync(int idTenant);
         Task TenantUpdateAsync(Tenant tenant);
+
+        /// <summary>Whether TenantID=0 is a safe target for ImportAsSentinel - true
+        /// only when it has no devices and at most the single still-unclaimed bootstrap admin row
+        /// (PwdHash IS NULL every fresh install seeds - see EfRepository.SeedBootstrapAdminAsync).
+        /// Any real device or a second/claimed user means someone is already using this server, so
+        /// import-as-sentinel refuses rather than merging into or overwriting them.</summary>
+        Task<bool> TenantZeroIsEmptyAsync();
     }
 }

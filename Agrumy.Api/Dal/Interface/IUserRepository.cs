@@ -43,6 +43,14 @@ namespace api.Dal.Interface
         /// <summary>Sets the password on the pending bootstrap admin row (PwdHash IS NULL); false if already claimed or setupSecret doesn't match.</summary>
         Task<bool> BootstrapAdminSetPasswordAsync(UserSecret secret, string setupSecret);
 
+        /// <summary>Removes the still-unclaimed bootstrap admin placeholder as part
+        /// of ImportAsSentinel claiming TenantID=0 with real imported users instead - the WHERE
+        /// PwdHash IS NULL guard means this can never touch a row someone has actually claimed,
+        /// unlike UserDeleteAsync's blanket "id &lt;= 1" protection which exists for the opposite
+        /// reason (stop an admin from deleting a REAL account 1). No-op (false) if already claimed
+        /// or already gone.</summary>
+        Task<bool> BootstrapAdminDiscardPendingAsync();
+
         Task<IList<UserRole>> UserRoleGetAsync();
 
         // A user can hold several roles at once - the userUserRole junction table is the sole

@@ -369,6 +369,62 @@ namespace api.Dal
             return null;
         }
 
+        public async Task<IList<SensorData>> SensorDataExportGetAsync(int tenantID, DateTime? sinceUtc)
+        {
+            IQueryable<SensorDataRow> q = db.SensorData.AsNoTracking().Where(s => s.TenantID == tenantID);
+            if (sinceUtc is DateTime since)
+            {
+                q = q.Where(s => s.DateCreated >= since);
+            }
+            return await q.Select(s => new SensorData
+            {
+                TenantID = s.TenantID,
+                DeviceID = s.DeviceID,
+                DeviceUnitID = s.DeviceUnitID,
+                DeviceUnitZoneID = s.DeviceUnitZoneID,
+                Battery = s.Battery,
+                Temperature = s.Temperature,
+                SoilTemperature = s.SoilTemperature,
+                Humidity = s.Humidity,
+                Moisture = s.Moisture,
+                Light = s.Light,
+                Co2 = s.Co2,
+                Tvoc = s.Tvoc,
+                Barometer = s.Barometer,
+                LiquidPH = s.LiquidPH,
+                RainLevel = s.RainLevel,
+                WaterLevel = s.WaterLevel,
+                Wind = s.Wind,
+                DateCreated = s.DateCreated ?? default,
+            }).ToListAsync();
+        }
+
+        public async Task SensorDataImportAsync(IList<SensorData> rows)
+        {
+            db.SensorData.AddRange(rows.Select(r => new SensorDataRow
+            {
+                TenantID = r.TenantID ?? 0,
+                DeviceID = r.DeviceID ?? 0,
+                DeviceUnitID = r.DeviceUnitID ?? 0,
+                DeviceUnitZoneID = r.DeviceUnitZoneID ?? 0,
+                Battery = r.Battery,
+                Temperature = r.Temperature,
+                SoilTemperature = r.SoilTemperature,
+                Humidity = r.Humidity,
+                Moisture = r.Moisture,
+                Light = r.Light,
+                Co2 = r.Co2,
+                Tvoc = r.Tvoc,
+                Barometer = r.Barometer,
+                LiquidPH = r.LiquidPH,
+                RainLevel = r.RainLevel,
+                WaterLevel = r.WaterLevel,
+                Wind = (int?)r.Wind, // SensorDataRow.Wind is int, api.Models.SensorData.Wind is double - see that column's own history
+                DateCreated = r.DateCreated,
+            }));
+            await db.SaveChangesAsync();
+        }
+
         private static double? ReadDouble(JsonObject o, string key)
         {
             if (!o.TryGetPropertyValue(key, out var n) || n is not JsonValue v)

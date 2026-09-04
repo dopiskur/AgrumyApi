@@ -73,6 +73,9 @@ namespace api.Dal.Entities
         // TimeZoneInfo resolves the IANA id correctly year-round. Null = user never chose one,
         // presented as UTC (see api.Utils.TimeZoneHelper).
         public string? TimeZone { get; set; }
+
+        // See api.Models.User.MustChangePassword for the full explanation.
+        public bool MustChangePassword { get; set; }
     }
 
     /// <summary>One issued JWT refresh token. Single-use: a rotation marks the row revoked and

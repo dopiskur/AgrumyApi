@@ -228,18 +228,70 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Account not yet enabled - waiting for administrator approval.");
             }
+            // 428 Precondition Required - a real status the Web layer can branch on without
+            // parsing message text (unlike the two checks above, which stay plain 403s since
+            // nothing today needs to react to them beyond showing an error).
+            if (user.MustChangePassword)
+            {
+                return StatusCode(428, "Password change required before continuing - this account was imported from another server.");
+            }
 
+            var (loginResult, error) = await IssueLoginResultAsync(user);
+            return error != null ? error : Ok(loginResult);
+        }
+
+        /// <summary>The tenant-import counterpart to Login: proves identity with the OLD (imported)
+        /// password rather than a JWT (login itself is blocked by MustChangePassword), sets a new
+        /// one, then logs the user straight in - same reasoning as ChangePassword already
+        /// requiring the old password, just reachable before the account's first successful login
+        /// on this server.</summary>
+        [HttpPost("ForceChangePassword")]
+        [AllowAnonymous]
+        [EnableRateLimiting("login")]
+        public async Task<ActionResult<UserLoginResult>> ForceChangePassword([FromBody] UserForceChangePassword value)
+        {
+            if (!ModelState.IsValid) { return BadRequest(ModelState); }
+
+            var (user, secret) = await LookupAsync(value.Login);
+            if (user is null || secret is null ||
+                !AuthenticationProvider.VerifyHash(secret.PwdHash, secret.PwdSalt, value.OldPassword))
+            {
+                return StatusCode(401, "Wrong username or password");
+            }
+            if (!user.MustChangePassword)
+            {
+                return StatusCode(400, "This account does not require a password change.");
+            }
+
+            var newSecret = new UserSecret { PwdSalt = AuthenticationProvider.GetSalt() };
+            newSecret.PwdHash = AuthenticationProvider.GetHash(value.NewPassword!, newSecret.PwdSalt); // [Required], guaranteed by ModelState.IsValid above
+            await Repo.UserSetPasswordAsync(user.Email, newSecret); // also clears MustChangePassword
+
+            if (user.EmailVerified != true)
+            {
+                return StatusCode(403, "Email address not verified yet - check your inbox for the activation link.");
+            }
+            if (user.Enabled != true)
+            {
+                return StatusCode(403, "Account not yet enabled - waiting for administrator approval.");
+            }
+            var (loginResult, error2) = await IssueLoginResultAsync(user);
+            return error2 != null ? error2 : Ok(loginResult);
+        }
+
+        private async Task<(UserLoginResult? result, ActionResult? error)> IssueLoginResultAsync(User user)
+        {
             IReadOnlyList<string> tokenRoles = await ResolveCallerTokenRolesAsync(user);
             if (tokenRoles.Count == 0)
             {
-                return StatusCode(500, "User has no valid role assigned.");
+                return (null, StatusCode(500, "User has no valid role assigned."));
             }
 
             string token = JwtTokenProvider.CreateToken(SecureKey!, AccessTokenMinutes, user.Email!, tokenRoles, user.TenantID.ToString()!);
             var (refreshToken, refreshTokenHash) = GenerateOpaqueToken();
             await Repo.RefreshTokenAddAsync(user.IDUser!.Value, refreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
 
-            return Ok(new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = token, RefreshToken = refreshToken });
+            return (new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = token, RefreshToken = refreshToken }, null);
         }
 
         /// <summary>Redeems a refresh token for a new access token, rotating the refresh token in the

@@ -1,0 +1,52 @@
+@model api.ViewModels.TenantSentinelImportViewModel
+
+@{
+    ViewData["Title"] = "Import Tenant";
+    Layout = "_AuthLayout";
+    ViewData["AuthBoxClass"] = "login-box";
+    ViewData["AuthBodyClass"] = "login-page";
+}
+
+<div class="card-body login-card-body">
+    <p class="login-box-msg">
+        Import a tenant exported from another Agrumy server as this server's sole tenant -
+        replaces the unclaimed default admin. Every imported user must set a new password on
+        their first login here.
+    </p>
+
+    <form asp-action="ImportSentinel">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <div class="mb-3">
+            <label class="form-label" for="exportFile">Export file</label>
+            <input type="file" id="exportFile" class="form-control" accept="application/json" />
+        </div>
+        <div class="mb-3">
+            <label asp-for="ExportJson" class="form-label"></label>
+            <textarea asp-for="ExportJson" class="form-control font-monospace" rows="8" placeholder="Paste export JSON here"></textarea>
+            <span asp-validation-for="ExportJson" class="text-danger"></span>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <div class="d-grid gap-2">
+                    <input type="submit" value="Import" class="btn btn-primary" />
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <p class="mb-0 mt-3">
+        <a asp-action="SetupAdmin" class="text-center">Back</a>
+    </p>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('exportFile')?.addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) { return; }
+            const reader = new FileReader();
+            reader.onload = () => { document.getElementById('ExportJson').value = reader.result; };
+            reader.readAsText(file);
+        });
+    </script>
+}

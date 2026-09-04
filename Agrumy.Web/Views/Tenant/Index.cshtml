@@ -10,6 +10,7 @@
         @if (User.IsInRole(RoleNames.GlobalAdmin))
         {
             <div class="card-tools">
+                <a asp-action="Import" class="btn btn-sm btn-secondary">Import</a>
                 <a asp-action="Create" class="btn btn-sm btn-info">Create New</a>
             </div>
         }
@@ -41,6 +42,7 @@
                         {
                             <div class="btn-group btn-group-sm" role="group" aria-label="Tenant actions">
                                 <a asp-action="Edit" asp-route-idTenant="@item.IDTenant" class="btn btn-primary" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
+                                <a asp-action="Export" asp-route-idTenant="@item.IDTenant" class="btn btn-outline-secondary" title="Export" aria-label="Export"><i class="bi bi-download"></i></a>
                             </div>
                         }
                     </td>

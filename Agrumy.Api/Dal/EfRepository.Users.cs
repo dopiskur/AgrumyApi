@@ -27,6 +27,7 @@ namespace api.Dal
                 Phone = user.Phone,
                 Enabled = user.Enabled,
                 EmailVerified = user.EmailVerified ?? false,
+                MustChangePassword = user.MustChangePassword,
             });
             await db.SaveChangesAsync();
         }
@@ -169,7 +170,11 @@ namespace api.Dal
             int rows = await db.Users.Where(u => u.Email == email)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(u => u.PwdHash, userSecret.PwdHash ?? "")
-                    .SetProperty(u => u.PwdSalt, userSecret.PwdSalt ?? ""));
+                    .SetProperty(u => u.PwdSalt, userSecret.PwdSalt ?? "")
+                    // Any successful password change - forced or self-service - satisfies "you
+                    // changed your password", so this is the one place that clears the flag rather
+                    // than duplicating the write in every caller.
+                    .SetProperty(u => u.MustChangePassword, false));
             return rows > 0;
         }
 
@@ -203,6 +208,7 @@ namespace api.Dal
             DateModified = u.DateModified,
             EmailVerified = u.EmailVerified,
             TimeZone = u.TimeZone,
+            MustChangePassword = u.MustChangePassword,
         };
     }
 }

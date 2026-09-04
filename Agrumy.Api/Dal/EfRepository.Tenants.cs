@@ -52,5 +52,16 @@ namespace api.Dal
             row.TenantName = tenant.TenantName ?? row.TenantName;
             await db.SaveChangesAsync();
         }
+
+        public async Task<bool> TenantZeroIsEmptyAsync()
+        {
+            if (await db.Devices.AsNoTracking().AnyAsync(d => d.TenantID == 0))
+            {
+                return false;
+            }
+            var tenant0Users = await db.Users.AsNoTracking().Where(u => u.TenantID == 0)
+                .Select(u => u.PwdHash).ToListAsync();
+            return tenant0Users.Count == 0 || (tenant0Users.Count == 1 && tenant0Users[0] == null);
+        }
     }
 }

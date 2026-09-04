@@ -23,6 +23,16 @@ namespace api.Dal.Interface
         Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? tenantID, int? getData, int? deviceID, int? sensorDataReportID);
         Task SensorDataDeleteAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY);
 
+        /// <summary>Raw, untransformed rows for a whole tenant (tenant export) - unlike
+        /// SensorDataGetAsync/the zone/unit averages above, this is not shaped for chart
+        /// consumption. sinceUtc null means every row ever recorded for the tenant.</summary>
+        Task<IList<SensorData>> SensorDataExportGetAsync(int tenantID, DateTime? sinceUtc);
+
+        /// <summary>Bulk-inserts already-tenant/device/unit/zone-remapped rows (tenant import) -
+        /// the caller has already resolved every id to its NEW value on the target
+        /// server, this just persists them as-is, IDSensorData included (auto-generated, ignored).</summary>
+        Task SensorDataImportAsync(IList<SensorData> rows);
+
         /// <summary>Downsamples every row older than cutoffUtc, per device, into one 5-minute-bucket
         /// average-without-outliers row, replacing the raw rows in place. Plain LINQ/EF throughout -
         /// identical on MariaDB and PostgreSQL, no TimescaleDB-specific SQL.</summary>
