@@ -16,6 +16,10 @@
         <form asp-action="Index">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             <input type="hidden" asp-for="IDServerConfig" />
+            @* Firmware source settings moved to the Firmware page - this form still posts the whole ServerConfig object, so these three must ride along hidden or a save from any other tab here would reset them to defaults. *@
+            <input type="hidden" asp-for="FirmwareSource" />
+            <input type="hidden" asp-for="FirmwareGitHubRepository" />
+            <input type="hidden" asp-for="FirmwareCustomRepositoryUrl" />
 
             <ul class="nav nav-tabs" role="tablist">
                 <li class="nav-item" role="presentation">
@@ -32,9 +36,6 @@
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-scheduling" type="button" role="tab">Scheduling</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-firmware" type="button" role="tab">Firmware</button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-retention" type="button" role="tab">Data Retention</button>
@@ -151,32 +152,6 @@
                         <label asp-for="ScheduleTimeZone" class="form-label"></label>
                         <select asp-for="ScheduleTimeZone" asp-items="(IEnumerable<SelectListItem>)ViewBag.TimeZones" class="form-select"></select>
                         <span asp-validation-for="ScheduleTimeZone" class="text-danger"></span>
-                    </div>
-                </div>
-
-                <div class="tab-pane fade" id="tab-firmware" role="tabpanel">
-                    <p class="text-secondary">
-                        Where device firmware comes from. <strong>GitHub</strong> (default) reads the
-                        public releases of the repository below. <strong>Local repository</strong> serves files this
-                        server stores itself - fill it on the <a asp-controller="Firmware" asp-action="Index">Firmware</a>
-                        page (pull from GitHub, import a USB directory, or upload); the only mode that works
-                        air-gapped or with a pinned self-signed certificate. <strong>Custom</strong> reads a
-                        <code>manifest.json</code> from your own URL.
-                    </p>
-                    <div class="mb-3">
-                        <label asp-for="FirmwareSource" class="form-label"></label>
-                        <select asp-for="FirmwareSource" asp-items="Html.GetEnumSelectList<FirmwareSource>()" class="form-select"></select>
-                        <span asp-validation-for="FirmwareSource" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="FirmwareGitHubRepository" class="form-label"></label>
-                        <input asp-for="FirmwareGitHubRepository" class="form-control" placeholder="dopiskur/AgrumyFirmware" />
-                        <span asp-validation-for="FirmwareGitHubRepository" class="text-danger"></span>
-                    </div>
-                    <div class="mb-0">
-                        <label asp-for="FirmwareCustomRepositoryUrl" class="form-label"></label>
-                        <input asp-for="FirmwareCustomRepositoryUrl" class="form-control" placeholder="https://firmware.example.com/agrumy/manifest.json" />
-                        <span asp-validation-for="FirmwareCustomRepositoryUrl" class="text-danger"></span>
                     </div>
                 </div>
 

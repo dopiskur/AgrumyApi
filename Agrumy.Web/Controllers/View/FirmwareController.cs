@@ -33,6 +33,30 @@ namespace api.Controllers.View
                 .Select(g => g.First())
                 .ToList();
 
+        // ServerConfigApiController.Update overwrites the whole row, so this fetches a fresh copy
+        // and only overlays the three fields this form actually shows - anything else changed
+        // concurrently on the Server Settings page would otherwise get clobbered back to whatever
+        // this page's stale model had.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> SaveSettings(FirmwareSource firmwareSource, string? firmwareGitHubRepository, string? firmwareCustomRepositoryUrl)
+        {
+            ServerConfig config = await api.ServerConfigGet();
+            config.FirmwareSource = firmwareSource;
+            config.FirmwareGitHubRepository = firmwareGitHubRepository;
+            config.FirmwareCustomRepositoryUrl = firmwareCustomRepositoryUrl;
+            try
+            {
+                await api.ServerConfigUpdate(config);
+                TempData["Message"] = "Firmware source settings saved.";
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Index));
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> Sync(FirmwareSyncMode mode)

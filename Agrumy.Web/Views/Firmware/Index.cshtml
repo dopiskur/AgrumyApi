@@ -8,6 +8,7 @@
         FirmwareSource.Custom => "Custom repository: " + Model.Config.FirmwareCustomRepositoryUrl,
         _ => "GitHub Releases: " + Model.Config.FirmwareGitHubRepository,
     };
+    var firmwareSourceItems = new SelectList(Enum.GetValues<FirmwareSource>(), source);
 }
 
 @if (TempData["Message"] is string message)
@@ -21,94 +22,141 @@
 
 <div class="card mb-3">
     <div class="card-header">
-        <h3 class="card-title">Firmware source</h3>
-        <a asp-controller="ServerConfig" asp-action="Index" class="btn btn-sm btn-outline-secondary float-end"><i class="bi bi-sliders"></i> Change in Server Settings</a>
+        <h3 class="card-title">Firmware</h3>
+        <span class="text-secondary small float-end">Active source: <strong>@sourceLabel</strong></span>
     </div>
     <div class="card-body">
-        <p class="mb-3"><strong>@sourceLabel</strong></p>
+        <ul class="nav nav-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-source" type="button" role="tab"><i class="bi bi-cloud-arrow-down"></i> Source &amp; Sync</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-local" type="button" role="tab"><i class="bi bi-hdd"></i> Local Repository</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-usb" type="button" role="tab"><i class="bi bi-usb-symbol"></i> Install via USB</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-offline" type="button" role="tab"><i class="bi bi-folder-symlink"></i> Offline USB Repo</button>
+            </li>
+        </ul>
+        <div class="tab-content border border-top-0 rounded-bottom p-3">
 
-        <div class="d-flex flex-wrap gap-2 align-items-start">
-            @if (source != FirmwareSource.Local)
-            {
-                @* Refresh re-reads the active remote source; nothing is downloaded here. *@
-                <form asp-action="Sync" method="post">
-                    <input type="hidden" name="mode" value="@FirmwareSyncMode.Refresh" />
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-repeat"></i> Refresh catalog from @(source == FirmwareSource.GitHub ? "GitHub" : "custom repository")</button>
+            <div class="tab-pane fade show active" id="tab-source" role="tabpanel">
+                <h6 class="text-uppercase text-secondary small">Where firmware comes from</h6>
+                <p class="text-secondary small">
+                    <strong>GitHub</strong> (default) reads the public releases of the repository below.
+                    <strong>Local repository</strong> serves files this server stores itself - populate it
+                    from the Local Repository tab; the only mode that works air-gapped or with a pinned
+                    self-signed certificate. <strong>Custom</strong> reads a <code>manifest.json</code> from
+                    your own URL.
+                </p>
+                <form asp-action="SaveSettings" method="post" class="row g-3 align-items-end mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Firmware source</label>
+                        <select name="firmwareSource" asp-items="firmwareSourceItems" class="form-select"></select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">GitHub repository (owner/name)</label>
+                        <input type="text" name="firmwareGitHubRepository" value="@Model.Config.FirmwareGitHubRepository" class="form-control" placeholder="dopiskur/AgrumyFirmware" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Custom repository manifest URL</label>
+                        <input type="text" name="firmwareCustomRepositoryUrl" value="@Model.Config.FirmwareCustomRepositoryUrl" class="form-control" placeholder="https://firmware.example.com/agrumy/manifest.json" />
+                    </div>
+                    <div class="col-md-1">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save</button>
+                    </div>
                 </form>
-            }
-            <form asp-action="Sync" method="post">
-                <input type="hidden" name="mode" value="@FirmwareSyncMode.PullIncremental" />
-                <button type="submit" class="btn btn-outline-primary" title="Download only releases the local store does not have yet"><i class="bi bi-cloud-download"></i> Pull from GitHub (incremental)</button>
-            </form>
-            <form asp-action="Sync" method="post" onsubmit="return confirm('Delete every locally stored firmware file and download all releases again?');">
-                <input type="hidden" name="mode" value="@FirmwareSyncMode.PullFull" />
-                <button type="submit" class="btn btn-outline-primary" title="Wipe the local store first, then download every release"><i class="bi bi-cloud-download-fill"></i> Pull from GitHub (full rebuild)</button>
-            </form>
-        </div>
 
-        <hr />
-        <div class="row g-3">
-            <div class="col-lg-6">
-                <h6 class="text-uppercase text-secondary small">Import from a directory on the server</h6>
-                <form asp-action="Import" method="post" class="d-flex gap-2">
-                    <input type="text" name="path" class="form-control" placeholder="/media/usb/agrumy-firmware" required />
-                    <button type="submit" class="btn btn-outline-primary text-nowrap"><i class="bi bi-usb-drive"></i> Import</button>
-                </form>
-                <div class="form-text">Files must be named <code>agrumy-&lt;board&gt;-v&lt;version&gt;.bin</code>; a <code>manifest.json</code> next to them (written by the offline-repo tools) is used to verify SHA-256 checksums.</div>
-            </div>
-            <div class="col-lg-6">
-                <h6 class="text-uppercase text-secondary small">Upload a .bin</h6>
-                <form asp-action="Upload" method="post" enctype="multipart/form-data" class="d-flex gap-2">
-                    <input type="file" name="file" class="form-control" accept=".bin" required />
-                    <button type="submit" class="btn btn-outline-primary text-nowrap"><i class="bi bi-upload"></i> Upload</button>
-                </form>
-                <div class="form-text">Stored in the local repository and offered to devices of that board regardless of the active source.</div>
-            </div>
-        </div>
-
-        <hr />
-        <h6 class="text-uppercase text-secondary small">Install to a device via USB</h6>
-        @if (Model.InstallableBoards.Count == 0)
-        {
-            <p class="text-secondary small mb-0">No blank-chip installable image in the catalog yet for any board - pull a newer firmware release to enable USB install.</p>
-        }
-        else
-        {
-            <p class="text-secondary small mb-2">Flashes a brand-new, never-programmed board straight from the browser - no PlatformIO, no USB toolchain.</p>
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-                <select id="flashBoardSelect" class="form-select" style="width:auto">
-                    @foreach (var f in Model.InstallableBoards)
+                <hr />
+                <h6 class="text-uppercase text-secondary small">Sync the catalog</h6>
+                <div class="d-flex flex-wrap gap-2 align-items-start">
+                    @if (source != FirmwareSource.Local)
                     {
-                        <option value="@Url.Action("InstallManifest", new { board = f.Board })">@f.Board (@f.Version)</option>
+                        @* Refresh re-reads the active remote source; nothing is downloaded here. *@
+                        <form asp-action="Sync" method="post">
+                            <input type="hidden" name="mode" value="@FirmwareSyncMode.Refresh" />
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-repeat"></i> Refresh catalog from @(source == FirmwareSource.GitHub ? "GitHub" : "custom repository")</button>
+                        </form>
                     }
-                </select>
-                <esp-web-install-button id="flashInstallButton" manifest="@Url.Action("InstallManifest", new { board = Model.InstallableBoards[0].Board })">
-                    <button type="button" slot="activate" class="btn btn-outline-primary"><i class="bi bi-usb-symbol"></i> Install</button>
-                    <span slot="unsupported" class="text-secondary small">This browser does not support Web Serial - use Chrome or Edge on desktop.</span>
-                    <span slot="not-allowed" class="text-secondary small">Web Serial requires HTTPS.</span>
-                </esp-web-install-button>
+                    <form asp-action="Sync" method="post">
+                        <input type="hidden" name="mode" value="@FirmwareSyncMode.PullIncremental" />
+                        <button type="submit" class="btn btn-outline-primary" title="Download only releases the local store does not have yet"><i class="bi bi-cloud-download"></i> Pull from GitHub (incremental)</button>
+                    </form>
+                    <form asp-action="Sync" method="post" onsubmit="return confirm('Delete every locally stored firmware file and download all releases again?');">
+                        <input type="hidden" name="mode" value="@FirmwareSyncMode.PullFull" />
+                        <button type="submit" class="btn btn-outline-primary" title="Wipe the local store first, then download every release"><i class="bi bi-cloud-download-fill"></i> Pull from GitHub (full rebuild)</button>
+                    </form>
+                </div>
             </div>
-            @* Populated by firmware-install-picker.js when the flasher's popup closes - esp-web-tools' own confirmation only lives inside that transient popup, so without this the page looks identical to before flashing the moment it's closed. *@
-            <div id="flashResultBanner" class="alert alert-info d-flex align-items-center gap-2 mt-2" role="status" hidden>
-                <i class="bi bi-info-circle"></i>
-                <span id="flashResultText"></span>
-                <button type="button" class="btn-close ms-auto" aria-label="Dismiss" onclick="document.getElementById('flashResultBanner').hidden = true"></button>
-            </div>
-        }
 
-        <hr />
-        <h6 class="text-uppercase text-secondary small">Prepare an offline USB repository</h6>
-        <p class="text-secondary small mb-2">
-            Copies every catalog file plus a <code>manifest.json</code> with SHA-256 checksums into a folder you pick (e.g. a USB stick).
-            Take it to the offline greenhouse server and use "Import from a directory" there. Chrome/Edge/Opera only -
-            on other browsers use the <code>tools/offline-repo/</code> script from the AgrumyFirmware repository instead.
-        </p>
-        <button type="button" id="buildOfflineRepo" class="btn btn-outline-secondary" data-manifest-url="@Url.Action("OfflineManifest")" data-file-url="@Url.Action("OfflineFile")">
-            <i class="bi bi-folder-symlink"></i> Build offline repo…
-        </button>
-        <div id="offlineRepoProgress" class="mt-2" hidden>
-            <div class="progress" role="progressbar"><div class="progress-bar" style="width:0%"></div></div>
-            <div class="small text-secondary mt-1" id="offlineRepoStatus"></div>
+            <div class="tab-pane fade" id="tab-local" role="tabpanel">
+                <div class="row g-3">
+                    <div class="col-lg-6">
+                        <h6 class="text-uppercase text-secondary small">Import from a directory on the server</h6>
+                        <form asp-action="Import" method="post" class="d-flex gap-2">
+                            <input type="text" name="path" class="form-control" placeholder="/media/usb/agrumy-firmware" required />
+                            <button type="submit" class="btn btn-outline-primary text-nowrap"><i class="bi bi-usb-drive"></i> Import</button>
+                        </form>
+                        <div class="form-text">Files must be named <code>agrumy-&lt;board&gt;-v&lt;version&gt;.bin</code>; a <code>manifest.json</code> next to them (written by the offline-repo tools) is used to verify SHA-256 checksums.</div>
+                    </div>
+                    <div class="col-lg-6">
+                        <h6 class="text-uppercase text-secondary small">Upload a .bin</h6>
+                        <form asp-action="Upload" method="post" enctype="multipart/form-data" class="d-flex gap-2">
+                            <input type="file" name="file" class="form-control" accept=".bin" required />
+                            <button type="submit" class="btn btn-outline-primary text-nowrap"><i class="bi bi-upload"></i> Upload</button>
+                        </form>
+                        <div class="form-text">Stored in the local repository and offered to devices of that board regardless of the active source.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-usb" role="tabpanel">
+                @if (Model.InstallableBoards.Count == 0)
+                {
+                    <p class="text-secondary small mb-0">No blank-chip installable image in the catalog yet for any board - pull a newer firmware release to enable USB install.</p>
+                }
+                else
+                {
+                    <p class="text-secondary small mb-2">Flashes a brand-new, never-programmed board straight from the browser - no PlatformIO, no USB toolchain.</p>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <select id="flashBoardSelect" class="form-select" style="width:auto">
+                            @foreach (var f in Model.InstallableBoards)
+                            {
+                                <option value="@Url.Action("InstallManifest", new { board = f.Board })">@f.Board (@f.Version)</option>
+                            }
+                        </select>
+                        <esp-web-install-button id="flashInstallButton" manifest="@Url.Action("InstallManifest", new { board = Model.InstallableBoards[0].Board })">
+                            <button type="button" slot="activate" class="btn btn-outline-primary"><i class="bi bi-usb-symbol"></i> Install</button>
+                            <span slot="unsupported" class="text-secondary small">This browser does not support Web Serial - use Chrome or Edge on desktop.</span>
+                            <span slot="not-allowed" class="text-secondary small">Web Serial requires HTTPS.</span>
+                        </esp-web-install-button>
+                    </div>
+                    @* Populated by firmware-install-picker.js when the flasher's popup closes - esp-web-tools' own confirmation only lives inside that transient popup, so without this the page looks identical to before flashing the moment it's closed. *@
+                    <div id="flashResultBanner" class="alert alert-info d-flex align-items-center gap-2 mt-2" role="status" hidden>
+                        <i class="bi bi-info-circle"></i>
+                        <span id="flashResultText"></span>
+                        <button type="button" class="btn-close ms-auto" aria-label="Dismiss" onclick="document.getElementById('flashResultBanner').hidden = true"></button>
+                    </div>
+                }
+            </div>
+
+            <div class="tab-pane fade" id="tab-offline" role="tabpanel">
+                <p class="text-secondary small mb-2">
+                    Copies every catalog file plus a <code>manifest.json</code> with SHA-256 checksums into a folder you pick (e.g. a USB stick).
+                    Take it to the offline greenhouse server and use "Import from a directory" there. Chrome/Edge/Opera only -
+                    on other browsers use the <code>tools/offline-repo/</code> script from the AgrumyFirmware repository instead.
+                </p>
+                <button type="button" id="buildOfflineRepo" class="btn btn-outline-secondary" data-manifest-url="@Url.Action("OfflineManifest")" data-file-url="@Url.Action("OfflineFile")">
+                    <i class="bi bi-folder-symlink"></i> Build offline repo…
+                </button>
+                <div id="offlineRepoProgress" class="mt-2" hidden>
+                    <div class="progress" role="progressbar"><div class="progress-bar" style="width:0%"></div></div>
+                    <div class="small text-secondary mt-1" id="offlineRepoStatus"></div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
