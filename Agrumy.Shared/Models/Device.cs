@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Text.Json.Serialization;
 
 namespace api.Models
 {
@@ -30,7 +31,13 @@ namespace api.Models
         public string? DeviceName { get; set; }
         [HiddenInput(DisplayValue = true)]
         public string? MacAddress { get; set; }
+        // Roadmap #191: the device's actual bearer credential - never serialized out to GET /api/Device
+        // or /api/Device/All, which any authenticated caller (not just DeviceManagers) could reach.
+        // DeviceApiController.BuildDeviceConfigAsync reads these two properties directly in C# (not
+        // via JSON) to populate the separate DeviceConfig response the device itself receives.
+        [JsonIgnore]
         public string? ApiId { get; set; }
+        [JsonIgnore]
         public string? ApiKey { get; set; }
         public string? ServicePoint { get; set; }
 

@@ -161,12 +161,15 @@ namespace api.Dal
             // unit/zone pair is written exclusively by DeviceAssignToZoneAsync/
             // DeviceUnassignFromZoneAsync, which keep it consistent with the zone's own DeviceUnitID;
             // touching just one of them here could silently desync a device's Unit from its Zone.
+            // Also does not set ApiId/ApiKey (roadmap #191) - [JsonIgnore] on Device.ApiId/ApiKey
+            // means device.ApiId/device.ApiKey are always null here now anyway, and even before that
+            // change this was a live footgun: any update whose payload omitted them defaulted to "",
+            // silently wiping the device's real credential. Credentials aren't editable through this
+            // generic update at all.
             row.TenantID = device.TenantID;
             row.DeviceTypeID = device.DeviceTypeID;
             row.DeviceTypeServiceID = device.DeviceTypeServiceID;
             row.DeviceName = device.DeviceName;
-            row.ApiId = device.ApiId ?? "";
-            row.ApiKey = device.ApiKey ?? "";
             row.ServicePoint = device.ServicePoint;
             row.ServicePublicKey = device.ServicePublicKey;
             row.SleepSeconds = device.SleepSeconds;
