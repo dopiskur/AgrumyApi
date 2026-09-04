@@ -389,8 +389,19 @@ namespace api.Controllers.API
         /// point is being able to SEE their tenant's resources without touching them.</summary>
         [HttpGet("All")]
         [Authorize]
-        public async Task<ActionResult<IList<User>>> UsersGet() =>
-            Ok(CallerReadsUsersGlobally ? await Repo.UsersGetAllAsync() : await Repo.UsersGetAsync(CallerTenantId));
+        public async Task<ActionResult<IList<User>>> UsersGet()
+        {
+            IList<User> users = CallerReadsUsersGlobally ? await Repo.UsersGetAllAsync() : await Repo.UsersGetAsync(CallerTenantId);
+            // Roadmap #192: DevicePin is a live, reusable device-registration credential, not a
+            // regular profile field - only its owner should ever see it (GetUserSelf), not every
+            // authenticated tenant member who can browse this list.
+            foreach (User user in users)
+            {
+                user.DevicePin = null;
+                user.DevicePinExpires = null;
+            }
+            return Ok(users);
+        }
 
         /// <summary>The caller's own record - looked up by the email in their JWT, so any authenticated user.</summary>
         [HttpGet("Self")]
@@ -472,9 +483,16 @@ namespace api.Controllers.API
             {
                 return NotFound();
             }
-            return user.TenantID != CallerTenantId && !CallerReadsUsersGlobally
-                ? StatusCode(403, "Target user belongs to a different tenant")
-                : Ok(user);
+            if (user.TenantID != CallerTenantId && !CallerReadsUsersGlobally)
+            {
+                return StatusCode(403, "Target user belongs to a different tenant");
+            }
+
+            // Roadmap #192: same reasoning as UsersGet - this is not the caller looking up
+            // themselves (that's GetUserSelf), so their live device-registration PIN stays hidden.
+            user.DevicePin = null;
+            user.DevicePinExpires = null;
+            return Ok(user);
         }
 
         // ---- write -------------------------------------------------------------
