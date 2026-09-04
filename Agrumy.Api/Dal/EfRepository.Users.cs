@@ -104,8 +104,12 @@ namespace api.Dal
 
         public async Task<User?> UserGetAsync(int? idUser, string? email, string? username)
         {
+            // LEFT JOIN: a user with no group (bootstrap admin, or any UserGroupID left NULL) must
+            // still be found by lookup - an INNER JOIN here made every login 401 on a fresh install,
+            // since a brand new userGroup table has no rows to match against.
             var q = from u in db.Users.AsNoTracking()
-                    join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup
+                    join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup into gj
+                    from g in gj.DefaultIfEmpty()
                     select new { u, g };
 
             if (idUser != null)
@@ -131,8 +135,10 @@ namespace api.Dal
 
         public async Task<IList<User>> UsersGetAsync(int? tenantID)
         {
+            // See UserGetAsync above for why this is a LEFT JOIN, not an INNER JOIN.
             var rows = await (from u in db.Users.AsNoTracking()
-                              join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup
+                              join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup into gj
+                              from g in gj.DefaultIfEmpty()
                               where u.TenantID == tenantID
                               select new { u, g }).ToListAsync();
             return rows.Select(x => ToDto(x.u, x.g)).ToList();
@@ -143,7 +149,8 @@ namespace api.Dal
         public async Task<IList<User>> UsersGetAllAsync()
         {
             var rows = await (from u in db.Users.AsNoTracking()
-                              join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup
+                              join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup into gj
+                              from g in gj.DefaultIfEmpty()
                               select new { u, g }).ToListAsync();
             return rows.Select(x => ToDto(x.u, x.g)).ToList();
         }
@@ -186,15 +193,21 @@ namespace api.Dal
         // is never empty for a real tenant.
         public async Task<IList<User>> TenantAdminsGetAsync(int tenantId)
         {
+            // Same LEFT JOIN as UserGetAsync/UsersGetAsync (a groupless user must still resolve
+            // instead of vanishing from the query), chained into a second LEFT JOIN for the role -
+            // the "r != null" in the where clause below is what actually excludes groupless/roleless
+            // users here, not the join type, so this reads identically to the old INNER JOIN pair.
             var rows = await (from u in db.Users.AsNoTracking()
-                              join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup
-                              join r in db.UserRoles.AsNoTracking() on g.UserRoleID equals r.IDUserRole
-                              where u.TenantID == tenantId && r.RoleName == "admin"
+                              join g in db.UserGroups.AsNoTracking() on u.UserGroupID equals g.IDUserGroup into gj
+                              from g in gj.DefaultIfEmpty()
+                              join r in db.UserRoles.AsNoTracking() on g!.UserRoleID equals r.IDUserRole into rj
+                              from r in rj.DefaultIfEmpty()
+                              where u.TenantID == tenantId && r != null && r.RoleName == "admin"
                               select new { u, g }).ToListAsync();
             return rows.Select(x => ToDto(x.u, x.g)).ToList();
         }
 
-        private static User ToDto(UserRow u, UserGroupRow g) => new()
+        private static User ToDto(UserRow u, UserGroupRow? g) => new()
         {
             IDUser = u.IDUser,
             TenantID = u.TenantID,
@@ -206,8 +219,8 @@ namespace api.Dal
             LastName = u.LastName,
             Phone = u.Phone,
             UserGroupID = u.UserGroupID,
-            UserRoleID = g.UserRoleID,
-            GroupName = g.GroupName,
+            UserRoleID = g?.UserRoleID,
+            GroupName = g?.GroupName,
             Enabled = u.Enabled,
             DateCreated = u.DateCreated,
             DateModified = u.DateModified,
