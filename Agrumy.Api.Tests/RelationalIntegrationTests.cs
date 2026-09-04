@@ -364,7 +364,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         string newHash = U();
         await _repo.RefreshTokenAddAsync(userId, oldHash, DateTime.UtcNow.AddDays(30));
 
-        await _repo.RefreshTokenRotateAsync(oldHash, newHash, DateTime.UtcNow.AddDays(30));
+        Assert.True(await _repo.RefreshTokenRotateAsync(userId, oldHash, newHash, DateTime.UtcNow.AddDays(30)));
 
         var old = await _repo.RefreshTokenGetAsync(oldHash);
         var replacement = await _repo.RefreshTokenGetAsync(newHash);
@@ -385,10 +385,45 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await _repo.RefreshTokenRevokeAsync(hash);
 
         // Simulates a replayed, already-revoked token: rotating it again must not resurrect it.
-        await _repo.RefreshTokenRotateAsync(hash, U(), DateTime.UtcNow.AddDays(30));
+        Assert.False(await _repo.RefreshTokenRotateAsync(userId, hash, U(), DateTime.UtcNow.AddDays(30)));
 
         var stillRevoked = await _repo.RefreshTokenGetAsync(hash);
         Assert.NotNull(stillRevoked!.RevokedAt);
+    }
+
+    /// <summary>roadmap #181: two concurrent rotations of the same still-valid token - only one may
+    /// win (return true, insert its new token); the loser must return false and insert nothing, not
+    /// silently succeed with a second live token for the same old one. Uses two independent
+    /// DbContext/EfRepository instances (a shared EF DbContext instance is not thread-safe for
+    /// concurrent operations, so _repo alone can't stand in for two real concurrent HTTP requests).</summary>
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task RefreshToken_ConcurrentRotateOfSameToken_OnlyOneWins(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+        string oldHash = U();
+        string hashA = U();
+        string hashB = U();
+        await _repo.RefreshTokenAddAsync(userId, oldHash, DateTime.UtcNow.AddDays(30));
+
+        await using var dbA = _fx.NewContext(t);
+        await using var dbB = _fx.NewContext(t);
+        var repoA = new EfRepository(dbA, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance, new NullCache());
+        var repoB = new EfRepository(dbB, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance, new NullCache());
+
+        bool[] results = await Task.WhenAll(
+            repoA.RefreshTokenRotateAsync(userId, oldHash, hashA, DateTime.UtcNow.AddDays(30)),
+            repoB.RefreshTokenRotateAsync(userId, oldHash, hashB, DateTime.UtcNow.AddDays(30)));
+
+        Assert.Single(results, true);
+        Assert.Single(results, false);
+
+        bool aWon = results[0];
+        var winnerToken = await _repo.RefreshTokenGetAsync(aWon ? hashA : hashB);
+        var loserToken = await _repo.RefreshTokenGetAsync(aWon ? hashB : hashA);
+        Assert.NotNull(winnerToken);
+        Assert.Null(winnerToken.RevokedAt);
+        Assert.Null(loserToken); // the losing call never inserted a row
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]

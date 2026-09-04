@@ -585,8 +585,8 @@ public class ApiControllerTests
         _repo.Setup(r => r.UserRoleNamesGetAsync(5)).ReturnsAsync(new List<string>());
         _repo.Setup(r => r.UserRoleGetAsync())
              .ReturnsAsync(new List<UserRole> { new() { IDUserRole = 1, RoleName = "user" } });
-        _repo.Setup(r => r.RefreshTokenRotateAsync(hash, It.IsAny<string>(), It.IsAny<DateTime>()))
-             .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.RefreshTokenRotateAsync(5, hash, It.IsAny<string>(), It.IsAny<DateTime>()))
+             .ReturnsAsync(true);
 
         var controller = NewUserController();
         var result = await controller.RefreshToken(new RefreshTokenRequest { RefreshToken = presented });
@@ -598,7 +598,35 @@ public class ApiControllerTests
         Assert.False(string.IsNullOrEmpty(login.RefreshToken));
         Assert.NotEqual(presented, login.RefreshToken); // rotated, not reissued
         Assert.Equal(new[] { "user" }, JwtTokenProvider.ValidateToken(login.Token!));
-        _repo.Verify(r => r.RefreshTokenRotateAsync(hash, It.IsAny<string>(), It.IsAny<DateTime>()), Times.Once);
+        _repo.Verify(r => r.RefreshTokenRotateAsync(5, hash, It.IsAny<string>(), It.IsAny<DateTime>()), Times.Once);
+    }
+
+    /// <summary>roadmap #181: RefreshTokenRotateAsync returning false means it lost the atomic
+    /// rotate race to a concurrent redemption of the same token - must be treated the same as
+    /// detected reuse (all sessions revoked, 401), not silently succeed with a phantom token.</summary>
+    [Fact]
+    public async Task RefreshToken_LosesAtomicRotateRace_RevokesAllSessionsAndReturns401()
+    {
+        const string presented = "raced-refresh-token";
+        string hash = HashRefreshToken(presented);
+
+        _repo.Setup(r => r.RefreshTokenGetAsync(hash)).ReturnsAsync(
+            new RefreshTokenInfo { UserID = 7, ExpiresAt = DateTime.UtcNow.AddDays(10), RevokedAt = null });
+        _repo.Setup(r => r.UserGetAsync(7, null, null))
+             .ReturnsAsync(new User { IDUser = 7, Email = "raced@example.com", UserRoleID = 1, TenantID = 0, EmailVerified = true, Enabled = true });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(7)).ReturnsAsync(new List<string>());
+        _repo.Setup(r => r.UserRoleGetAsync())
+             .ReturnsAsync(new List<UserRole> { new() { IDUserRole = 1, RoleName = "user" } });
+        _repo.Setup(r => r.RefreshTokenRotateAsync(7, hash, It.IsAny<string>(), It.IsAny<DateTime>()))
+             .ReturnsAsync(false);
+        _repo.Setup(r => r.RefreshTokenRevokeAllForUserAsync(7)).Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        var result = await controller.RefreshToken(new RefreshTokenRequest { RefreshToken = presented });
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(401, obj.StatusCode);
+        _repo.Verify(r => r.RefreshTokenRevokeAllForUserAsync(7), Times.Once);
     }
 
     [Fact]

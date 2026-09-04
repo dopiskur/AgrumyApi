@@ -11,10 +11,14 @@ namespace api.Dal.Interface
         /// <summary>The token identified by its hash, or null if no such token was ever issued.</summary>
         Task<RefreshTokenInfo?> RefreshTokenGetAsync(string tokenHash);
 
-        /// <summary>Atomically revokes <paramref name="oldTokenHash"/> (pointing it at the new hash,
-        /// for reuse-chain tracking) and inserts the new token row. No-op if the old token is missing
-        /// or already revoked - the caller is expected to have checked that first.</summary>
-        Task RefreshTokenRotateAsync(string oldTokenHash, string newTokenHash, DateTime newExpiresAt);
+        /// <summary>Revokes <paramref name="oldTokenHash"/> (pointing it at the new hash, for
+        /// reuse-chain tracking) via a single WHERE RevokedAt IS NULL update, same atomic pattern as
+        /// RefreshTokenRevokeAsync - the actual guard against two concurrent redemptions of the same
+        /// token both succeeding (roadmap #181), not just the caller's earlier read-only check.
+        /// Returns false (and inserts nothing) if that update affected zero rows: the old token was
+        /// missing, already revoked, or - the race this exists to close - revoked by a concurrent
+        /// call that reached this same statement microseconds earlier.</summary>
+        Task<bool> RefreshTokenRotateAsync(int userId, string oldTokenHash, string newTokenHash, DateTime newExpiresAt);
 
         /// <summary>Revokes one token (explicit logout). Idempotent - revoking an unknown or
         /// already-revoked token is not an error.</summary>

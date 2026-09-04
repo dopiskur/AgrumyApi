@@ -292,7 +292,15 @@ namespace api.Controllers.API
             }
 
             var (newRefreshToken, newRefreshTokenHash) = GenerateOpaqueToken();
-            await Repo.RefreshTokenRotateAsync(incomingHash, newRefreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
+            bool rotated = await Repo.RefreshTokenRotateAsync(stored.UserID, incomingHash, newRefreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
+            if (!rotated)
+            {
+                // Lost the atomic rotate race to a concurrent redemption of this same token
+                // (roadmap #181) - indistinguishable at this point from genuine token reuse, so
+                // treated the same way: every session for this user dies, not just this one.
+                await Repo.RefreshTokenRevokeAllForUserAsync(stored.UserID);
+                return StatusCode(401, "Refresh token already used; all sessions for this user were revoked.");
+            }
 
             string newAccessToken = JwtTokenProvider.CreateToken(SecureKey!, AccessTokenMinutes, user.Email!, tokenRoles, user.TenantID.ToString()!);
             return Ok(new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = newAccessToken, RefreshToken = newRefreshToken });
