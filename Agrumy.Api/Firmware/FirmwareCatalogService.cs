@@ -265,27 +265,28 @@ namespace api.Firmware
 
         private async Task<FirmwareSyncResult> ReplaceSourceRowsAsync(FirmwareSource source, IReadOnlyList<RemoteFile> remoteFiles)
         {
-            var result = new FirmwareSyncResult { Removed = await firmwareRepo.FirmwareDeleteBySourceAsync(source) };
-            foreach (RemoteFile remote in remoteFiles)
+            // Roadmap #184: remoteFiles is already a fully-fetched, materialized list by the time we
+            // get here (the caller finished talking to GitHub/the Custom manifest before calling this),
+            // so the only remaining failure window was a DB error mid-loop - closed by making the
+            // delete + every insert one atomic transaction instead of one commit per repo call.
+            List<DeviceFirmware> rows = remoteFiles.Select(remote => new DeviceFirmware
             {
-                await firmwareRepo.FirmwareAddAsync(new DeviceFirmware
-                {
-                    Board = remote.Board,
-                    Version = remote.Version,
-                    FileName = remote.FileName,
-                    Url = remote.Url,
-                    Source = source,
-                    SizeBytes = remote.SizeBytes,
-                    Sha256 = remote.Sha256,
-                    PublishedAt = remote.PublishedAt,
-                    FullImageFileName = remote.FullImageFileName,
-                    FullImageUrl = remote.FullImageUrl,
-                    FullImageSizeBytes = remote.FullImageSizeBytes,
-                    FullImageSha256 = remote.FullImageSha256,
-                });
-                result.Added++;
-            }
-            return result;
+                Board = remote.Board,
+                Version = remote.Version,
+                FileName = remote.FileName,
+                Url = remote.Url,
+                Source = source,
+                SizeBytes = remote.SizeBytes,
+                Sha256 = remote.Sha256,
+                PublishedAt = remote.PublishedAt,
+                FullImageFileName = remote.FullImageFileName,
+                FullImageUrl = remote.FullImageUrl,
+                FullImageSizeBytes = remote.FullImageSizeBytes,
+                FullImageSha256 = remote.FullImageSha256,
+            }).ToList();
+
+            int removed = await firmwareRepo.FirmwareReplaceSourceRowsAsync(source, rows);
+            return new FirmwareSyncResult { Removed = removed, Added = rows.Count };
         }
 
         // ---- import a directory on this server (mounted USB) -----------------

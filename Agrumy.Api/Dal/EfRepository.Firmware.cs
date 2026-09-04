@@ -69,6 +69,36 @@ namespace api.Dal
             return await db.DeviceFirmwares.Where(f => f.Source == s && f.Board != null).ExecuteDeleteAsync();
         }
 
+        public async Task<int> FirmwareReplaceSourceRowsAsync(FirmwareSource source, IReadOnlyList<DeviceFirmware> rows)
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync();
+
+            int s = (int)source;
+            int removed = await db.DeviceFirmwares.Where(f => f.Source == s && f.Board != null).ExecuteDeleteAsync();
+
+            db.DeviceFirmwares.AddRange(rows.Select(firmware => new DeviceFirmwareRow
+            {
+                DeviceTypeID = firmware.DeviceTypeID,
+                Board = firmware.Board,
+                Version = firmware.Version,
+                Url = firmware.Url,
+                Source = (int)firmware.Source,
+                FileName = firmware.FileName,
+                SizeBytes = firmware.SizeBytes,
+                Sha256 = firmware.Sha256,
+                PublishedAt = firmware.PublishedAt,
+                DateAdded = DateTime.UtcNow,
+                FullImageFileName = firmware.FullImageFileName,
+                FullImageUrl = firmware.FullImageUrl,
+                FullImageSizeBytes = firmware.FullImageSizeBytes,
+                FullImageSha256 = firmware.FullImageSha256,
+            }));
+            await db.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+            return removed;
+        }
+
         public async Task DeviceFirmwareUpdateSetAsync(int idDevice, bool update, string? targetVersion)
         {
             var row = await db.Devices.FirstOrDefaultAsync(d => d.IDDevice == idDevice);
