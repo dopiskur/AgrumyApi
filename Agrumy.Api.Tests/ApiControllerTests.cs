@@ -356,7 +356,7 @@ public class ApiControllerTests
         Assert.NotNull(capturedUser);
         Assert.Equal(42, capturedUser!.TenantID);
         Assert.Equal(new[] { RoleNames.TenantAdmin }, seededRoles); // admin on a brand new tenant
-        Assert.True(capturedUser.Enabled);          // nobody else exists yet to approve them
+        Assert.False(capturedUser.Enabled);         // Activate() is what enables, not registration
         Assert.False(capturedUser.EmailVerified);   // still needs to click the activation link
     }
 
@@ -417,9 +417,9 @@ public class ApiControllerTests
     }
 
     [Fact]
-    public async Task UserRegistration_ExistingTenantZero_AutoEnabled_NoOneToApprove()
+    public async Task UserRegistration_ExistingTenantZero_StillDisabled_ActivateEnablesInstead()
     {
-        // TenantID 0 has no owning admin to ask, same "nobody to approve" reasoning as a brand-new tenant's own creator above.
+        // TenantID 0 has no owning admin to ask, but that's Activate()'s decision to make, not registration's - see Activate_TenantZero_* below.
         _repo.Setup(r => r.TenantGetAsync("default")).ReturnsAsync(true);
         _repo.Setup(r => r.TenantGetIdAsync("default")).ReturnsAsync(0);
         StubActivationPlumbing("newbie@example.com", 3);
@@ -434,7 +434,7 @@ public class ApiControllerTests
         var result = await controller.UserRegistration(value);
 
         Assert.IsType<OkObjectResult>(result.Result);
-        Assert.True(capturedUser!.Enabled);
+        Assert.False(capturedUser!.Enabled);
     }
 
 
@@ -498,8 +498,14 @@ public class ApiControllerTests
     }
 
 
+    /// <summary>roadmap #222: EmailVerified is an internal tracking flag only, not an independent
+    /// login gate - Enabled is the only thing that matters. This combination isn't reachable
+    /// through the normal registration/Activate flow (Enabled only ever becomes true there once
+    /// EmailVerified is already true), but an admin-enabled account whose owner never finished
+    /// email verification is a real state (UserAdd/UserUpdate can set Enabled directly), and it
+    /// must still be allowed to sign in.</summary>
     [Fact]
-    public async Task UserLogin_CorrectPassword_EmailNotVerified_Returns403_NotAToken()
+    public async Task UserLogin_EmailNotVerified_ButEnabled_StillSucceeds()
     {
         const string password = "hunter2!";
         string salt = AuthenticationProvider.GetSalt();
@@ -509,13 +515,13 @@ public class ApiControllerTests
              .ReturnsAsync(new User { IDUser = 7, Email = "pending@example.com", TenantID = 0, EmailVerified = false, Enabled = true });
         _repo.Setup(r => r.UserSecretGetAsync(null, "pending@example.com", null))
              .ReturnsAsync(new UserSecret { PwdHash = hash, PwdSalt = salt });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(7)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
+        _repo.Setup(r => r.RefreshTokenAddAsync(7, It.IsAny<string>(), It.IsAny<DateTime>())).ReturnsAsync(1);
 
         var controller = NewUserController();
         var result = await controller.UserLogin(new UserLogin { Login = "pending@example.com", Password = password });
 
-        var obj = Assert.IsType<ObjectResult>(result.Result);
-        Assert.Equal(403, obj.StatusCode);
-        // MockBehavior.Strict: an un-set-up RefreshTokenAddAsync call would throw, proving no token was ever issued.
+        Assert.IsType<OkObjectResult>(result.Result);
     }
 
     [Fact]
@@ -914,19 +920,46 @@ public class ApiControllerTests
 
 
     [Fact]
-    public async Task Activate_ValidToken_TenantZero_VerifiesAndReportsCanSignIn()
+    public async Task Activate_ValidToken_TenantZero_EnablesDirectly_ReportsCanSignIn()
     {
         const string plaintext = "the-activation-token";
         string hash = HashRefreshToken(plaintext);
         _repo.Setup(r => r.UserActivateAsync(hash))
-             .ReturnsAsync(new User { IDUser = 1, Email = "a@example.com", TenantID = 0, Enabled = true });
+             .ReturnsAsync(new User { IDUser = 1, Email = "a@example.com", TenantID = 0, Enabled = false });
+        User? updatedUser = null;
+        _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>()))
+             .Callback<User>(u => updatedUser = u)
+             .Returns(Task.CompletedTask);
 
         var controller = NewUserController();
         var result = await controller.Activate(plaintext);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Contains("now sign in", (string)ok.Value!);
-        // Loose mock: no DispatchAsync setup needed/expected - tenant 0 has nobody to notify.
+        Assert.True(updatedUser!.Enabled);
+        // Strict mock: no UserRoleNamesGetAsync/TenantAdminsGetAsync/DispatchAsync setup needed - tenant 0 short-circuits before any of them run.
+    }
+
+    [Fact]
+    public async Task Activate_TenantsOwnCreator_EnablesDirectly_NoApprovalNeeded()
+    {
+        const string plaintext = "the-activation-token";
+        string hash = HashRefreshToken(plaintext);
+        _repo.Setup(r => r.UserActivateAsync(hash))
+             .ReturnsAsync(new User { IDUser = 9, Email = "owner@acme.local", TenantID = 42, Enabled = false });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(9)).ReturnsAsync(new List<string> { RoleNames.TenantAdmin });
+        User? updatedUser = null;
+        _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>()))
+             .Callback<User>(u => updatedUser = u)
+             .Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        var result = await controller.Activate(plaintext);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Contains("now sign in", (string)ok.Value!);
+        Assert.True(updatedUser!.Enabled);
+        // Strict mock: no TenantAdminsGetAsync/DispatchAsync setup needed - holding TenantAdmin already skips the approval branch.
     }
 
     [Fact]
@@ -936,6 +969,7 @@ public class ApiControllerTests
         string hash = HashRefreshToken(plaintext);
         var activatedUser = new User { IDUser = 2, Email = "member@acme.local", Username = "member", TenantID = 42, Enabled = false };
         _repo.Setup(r => r.UserActivateAsync(hash)).ReturnsAsync(activatedUser);
+        _repo.Setup(r => r.UserRoleNamesGetAsync(2)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         _repo.Setup(r => r.TenantAdminsGetAsync(42))
              .ReturnsAsync(new List<User> { new() { Email = "admin@acme.local" } });
 
@@ -947,6 +981,7 @@ public class ApiControllerTests
         _notifications.Verify(n => n.DispatchAsync(
             It.Is<Notification>(msg => msg.Recipient.Email == "admin@acme.local"),
             It.IsAny<CancellationToken>()), Times.Once);
+        // Strict mock: no UserUpdateAsync setup needed - the approval branch never enables the account itself.
     }
 
     [Fact]

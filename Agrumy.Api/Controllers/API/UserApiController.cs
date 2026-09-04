@@ -87,9 +87,9 @@ namespace api.Controllers.API
                 user.TenantID = await Repo.TenantGetIdAsync(value.TenantName!);
             }
 
-            // TenantID==0 (shared default tenant) has no owning admin to approve joiners, so it
-            // auto-enables like a brand-new tenant's own creator does.
-            user.Enabled = isNewTenant || user.TenantID == 0;
+            // Always starts disabled - Activate() below is what enables the account, once email
+            // ownership is proven and (for anyone but a tenant's own creator) an admin approves it.
+            user.Enabled = false;
 
             await Repo.UserAddAsync(user, userSecret);
 
@@ -127,13 +127,18 @@ namespace api.Controllers.API
                 return StatusCode(400, "Activation link is invalid or has expired.");
             }
 
-            // TenantID==0 and a brand-new tenant's own creator were already Enabled at registration
-            // above; anyone else joining an existing tenant still needs that tenant's admin to approve them.
-            if (user.TenantID != 0 && user.Enabled != true)
+            // TenantID==0 (shared default tenant) has no owning admin to approve joiners; a brand-new
+            // tenant's own creator already holds TenantAdmin from UserRegistration's isNewTenant branch,
+            // proving they're the creator rather than someone joining an existing tenant. Either way,
+            // proven email ownership is enough - no separate approval needed.
+            if (user.TenantID != 0 && !(await Repo.UserRoleNamesGetAsync(user.IDUser!.Value)).Contains(RoleNames.TenantAdmin))
             {
                 await NotifyTenantAdminsOfPendingApprovalAsync(user);
                 return Ok("Email verified. Your tenant administrator has been notified and must approve your account before you can sign in.");
             }
+
+            user.Enabled = true;
+            await Repo.UserUpdateAsync(user);
             return Ok("Email verified. You can now sign in.");
         }
 
@@ -218,19 +223,16 @@ namespace api.Controllers.API
                 return StatusCode(401, "Wrong username or password");
             }
 
-            // Checked in this order so the more specific, actionable reason (verify your email)
-            // surfaces before the generic "waiting for approval" one.
-            if (user.EmailVerified != true)
-            {
-                return StatusCode(403, "Email address not verified yet - check your inbox for the activation link.");
-            }
+            // EmailVerified is an internal tracking flag only, not an independent gate - Activate()
+            // is what turns EmailVerified into Enabled (directly, or via admin approval), so a
+            // single Enabled check already covers "not verified yet" and "awaiting approval" alike.
             if (user.Enabled != true)
             {
-                return StatusCode(403, "Account not yet enabled - waiting for administrator approval.");
+                return StatusCode(403, "Account not yet enabled - check your inbox for the activation link, or contact your administrator.");
             }
             // 428 Precondition Required - a real status the Web layer can branch on without
-            // parsing message text (unlike the two checks above, which stay plain 403s since
-            // nothing today needs to react to them beyond showing an error).
+            // parsing message text (unlike the check above, which stays a plain 403 since
+            // nothing today needs to react to it beyond showing an error).
             if (user.MustChangePassword)
             {
                 return StatusCode(428, "Password change required before continuing - this account was imported from another server.");
@@ -267,13 +269,9 @@ namespace api.Controllers.API
             newSecret.PwdHash = AuthenticationProvider.GetHash(value.NewPassword!, newSecret.PwdSalt); // [Required], guaranteed by ModelState.IsValid above
             await Repo.UserSetPasswordAsync(user.Email, newSecret); // also clears MustChangePassword
 
-            if (user.EmailVerified != true)
-            {
-                return StatusCode(403, "Email address not verified yet - check your inbox for the activation link.");
-            }
             if (user.Enabled != true)
             {
-                return StatusCode(403, "Account not yet enabled - waiting for administrator approval.");
+                return StatusCode(403, "Account not yet enabled - check your inbox for the activation link, or contact your administrator.");
             }
             var (loginResult, error2) = await IssueLoginResultAsync(user);
             return error2 != null ? error2 : Ok(loginResult);
@@ -326,8 +324,8 @@ namespace api.Controllers.API
             {
                 return StatusCode(401, "User no longer exists");
             }
-            // A refresh must not silently keep a since-disabled/unverified account logged in.
-            if (user.EmailVerified != true || user.Enabled != true)
+            // A refresh must not silently keep a since-disabled account logged in.
+            if (user.Enabled != true)
             {
                 return StatusCode(403, "Account is not active.");
             }
