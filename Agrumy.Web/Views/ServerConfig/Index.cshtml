@@ -46,8 +46,8 @@
             <div class="tab-content border border-top-0 rounded-bottom p-3 mb-3">
                 <div class="tab-pane fade show active" id="tab-hysteresis" role="tabpanel">
                     <p class="text-secondary">
-                        Dead-zone defaults a newly-added device's Controller config is seeded with
-                        (roadmap #10). Changing these has no effect on devices that already exist -
+                        Dead-zone defaults a newly-added device's Controller config is seeded with.
+                        Changing these has no effect on devices that already exist -
                         edit those individually under Device &rarr; Controller.
                     </p>
                     <div class="mb-3">
@@ -74,7 +74,7 @@
 
                 <div class="tab-pane fade" id="tab-safety-limits" role="tabpanel">
                     <p class="text-secondary">
-                        Water pump safety limits (roadmap #36): a hard ceiling the device enforces
+                        Water pump safety limits: a hard ceiling the device enforces
                         AFTER whichever mode (threshold/interval/schedule) decides the pump should
                         run, independent of it. 0 disables either one. These are only the defaults
                         seeded onto a newly-added device - edit an existing device's own values
@@ -94,7 +94,7 @@
 
                 <div class="tab-pane fade" id="tab-alerts" role="tabpanel">
                     <p class="text-secondary">
-                        Low-battery alert (roadmap #12): a device's latest battery reading at or
+                        Low-battery alert: a device's latest battery reading at or
                         below this percentage triggers one email per low-battery streak; it only
                         clears (and can re-alert) once the reading climbs back above threshold +
                         hysteresis, same dead-zone idea as the relay margins, applied to the alert
@@ -112,7 +112,7 @@
                     </div>
                     <p class="text-secondary">
                         A device repeating the identical event (e.g. "NoInternet") within this many
-                        minutes of its last one is ignored, not stored (roadmap #28).
+                        minutes of its last one is ignored, not stored.
                     </p>
                     <div class="mb-0">
                         <label asp-for="EventDedupeMinutes" class="form-label"></label>
@@ -123,8 +123,7 @@
 
                 <div class="tab-pane fade" id="tab-accounts" role="tabpanel">
                     <p class="text-secondary">
-                        Minimum minutes a user must wait between "resend activation email" requests
-                        (roadmap #24).
+                        Minimum minutes a user must wait between "resend activation email" requests.
                     </p>
                     <div class="mb-3">
                         <label asp-for="ActivationResendCooldownMinutes" class="form-label"></label>
@@ -134,7 +133,7 @@
                     <p class="text-secondary">
                         When enabled, the public Register page lets a visitor create a brand new
                         tenant (min. 6-character name) by simply typing a name that doesn't exist
-                        yet - they become that tenant's admin. Off by default (roadmap #64).
+                        yet - they become that tenant's admin. Off by default.
                     </p>
                     <div class="mb-0 form-check">
                         <input asp-for="AllowSelfServiceTenantCreation" class="form-check-input" />
@@ -145,7 +144,7 @@
                 <div class="tab-pane fade" id="tab-scheduling" role="tabpanel">
                     <p class="text-secondary">
                         Local wall-clock zone schedule-mode relay windows (Device &rarr; Controller
-                        &rarr; Schedules) are evaluated against (roadmap #39). Not set = windows
+                        &rarr; Schedules) are evaluated against. Not set = windows
                         evaluate as UTC.
                     </p>
                     <div class="mb-0">
@@ -157,7 +156,7 @@
 
                 <div class="tab-pane fade" id="tab-firmware" role="tabpanel">
                     <p class="text-secondary">
-                        Where device firmware comes from (roadmap #94). <strong>GitHub</strong> (default) reads the
+                        Where device firmware comes from. <strong>GitHub</strong> (default) reads the
                         public releases of the repository below. <strong>Local repository</strong> serves files this
                         server stores itself - fill it on the <a asp-controller="Firmware" asp-action="Index">Firmware</a>
                         page (pull from GitHub, import a USB directory, or upload); the only mode that works
@@ -183,10 +182,10 @@
 
                 <div class="tab-pane fade" id="tab-retention" role="tabpanel">
                     <p class="text-secondary">
-                        Automatic sensor data retention (roadmap #15). PostgreSQL/TimescaleDB
+                        Automatic sensor data retention. PostgreSQL/TimescaleDB
                         installs enforce this through a native retention policy (whole chunks
                         dropped in the background); MariaDB/MySQL installs enforce it through a
-                        daily purge job (roadmap #40 pattern) that deletes rows older than the
+                        daily purge job that deletes rows older than the
                         cutoff. Not set = no automatic retention - data accumulates until purged
                         manually below.
                     </p>
@@ -204,8 +203,7 @@
                         device. <strong>Optimize</strong> downsamples it to 5-minute averages
                         (outliers excluded) in place - the data stays, just less precise.
                         <strong>Purge</strong> deletes it completely, with no way to recover it.
-                        Both run in the background - this page does not wait for them to finish
-                        (roadmap #126).
+                        Both run in the background - this page does not wait for them to finish.
                     </p>
                     <div class="row g-2 align-items-end">
                         <div class="col-auto">
@@ -231,7 +229,7 @@
 
                 <div class="tab-pane fade" id="tab-weather" role="tabpanel">
                     <p class="text-secondary">
-                        Roadmap #11: when a zone's WaterPump has "Skip when rain predicted" checked
+                        When a zone's WaterPump has "Skip when rain predicted" checked
                         (Zone page &rarr; Automation rules), it also stays off whenever the forecast
                         for the location below predicts rain - regardless of what its Threshold/
                         Interval/Schedule rules decide. Requires an OpenWeatherMap API key configured

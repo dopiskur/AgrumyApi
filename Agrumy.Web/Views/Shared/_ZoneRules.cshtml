@@ -38,9 +38,8 @@
     </div>
     <div class="card-body">
         <p class="text-secondary small">
-            Roadmap #21: a function may have several rules - any rule that evaluates "on" wins (OR).
-            Threshold's metric/direction (which sensor, which side of the threshold turns it on) is
-            fixed per function - see AgrumyFirmware's ActuatorController::evaluateRule.
+            A function may have several rules - any rule that evaluates "on" wins (OR).
+            Each function has a fixed sensor and threshold direction.
         </p>
 
         @foreach (var (function, label) in functions)
@@ -130,7 +129,7 @@
         }
 
         <hr />
-        <h6 class="fw-semibold">WaterPump safety limits (roadmap #36)</h6>
+        <h6 class="fw-semibold">WaterPump safety limits</h6>
         <p class="text-secondary small">
             A hard ceiling the device enforces AFTER any rule above decides the pump should run,
             independent of it. 0 disables either one.
@@ -148,7 +147,7 @@
             <div class="form-check mb-1">
                 <input type="checkbox" class="form-check-input" id="skipWaterPumpWhenRainPredicted" name="skipWaterPumpWhenRainPredicted" value="true" checked="@Model.Zone.SkipWaterPumpWhenRainPredicted" />
                 <label class="form-check-label small" for="skipWaterPumpWhenRainPredicted">
-                    Skip when rain predicted (roadmap #11)
+                    Skip when rain predicted
                 </label>
             </div>
             <button type="submit" class="btn btn-sm btn-primary">Save</button>

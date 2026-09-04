@@ -31,7 +31,7 @@
 @section Scripts {
     <script src="~/js/live-refresh.js"></script>
     <script>
-        // Roadmap #90: no DataTables here (unlike Fleet) - a plain tbody innerHTML swap is enough.
+        // No DataTables here (unlike Fleet) - a plain tbody innerHTML swap is enough.
         document.addEventListener('DOMContentLoaded', function () {
             startLiveRefresh({
                 url: '@Url.Action("EventsRows", new { idDevice = Model.Device!.IDDevice })',

@@ -40,10 +40,8 @@
     <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.bootstrap5.min.js"></script>
     <script src="~/js/live-refresh.js"></script>
     <script>
-        // Not the shared _DataTableScripts partial (roadmap #90): this table's live-refresh
-        // callback below has to destroy and reinitialize DataTables on every poll tick - it keeps
-        // its own internal row cache, which a raw tbody innerHTML swap would silently desync from
-        // the DOM - and the shared partial has no hook for that.
+        // Not the shared _DataTableScripts partial: DataTables keeps its own row cache, so a raw
+        // tbody innerHTML swap would desync it - this callback destroys/reinits DataTables instead.
         function initFleetTable() {
             return new DataTable(document.getElementById('fleetTable'), {
                 paging: true,
