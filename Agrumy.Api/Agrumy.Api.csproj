@@ -45,6 +45,8 @@
          its own SwaggerGen output, so this no longer needs the full Swashbuckle.AspNetCore
          meta-package (which pulled in SwaggerGen and its now-unused Microsoft.OpenApi v1 pin). -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
+    <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.18.0-beta.1" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.18.0" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="9.0.1" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
     <PackageReference Include="System.Runtime.Caching" Version="10.0.0" />

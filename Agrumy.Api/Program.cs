@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using OpenTelemetry.Metrics;
 using System.Net;
 using System.Text;
 using System.Threading.RateLimiting;
@@ -179,6 +180,12 @@ builder.Services
     .AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database")
     .AddCheck<CacheHealthCheck>("cache");
+
+// Listens on the same "Agrumy.Api" Meter the JSON /metrics endpoint already reads, so Prometheus/Grafana get the identical counters with no separate instrumentation.
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics => metrics
+        .AddMeter(AgrumyMetrics.MeterName)
+        .AddPrometheusExporter());
 
 builder.Services.AddControllers(options => options.Filters.AddService<DbExceptionFilter>());
 
@@ -353,6 +360,10 @@ app.MapControllers();
 app.MapHealthChecks("/health", new HealthCheckOptions { ResponseWriter = HealthCheckResponseWriter.WriteResponse });
 
 app.MapGet("/metrics", (AgrumyMetrics metrics) => Results.Json(metrics.GetSnapshot()))
+    .RequireAuthorization(policy => policy.RequireRole(RoleNames.GlobalAdmin));
+
+// Same GlobalAdmin JWT policy as the JSON endpoint above; point Prometheus's scrape config at this path with that bearer token (no separate secret to manage).
+app.MapPrometheusScrapingEndpoint("/metrics/prometheus")
     .RequireAuthorization(policy => policy.RequireRole(RoleNames.GlobalAdmin));
 
 // Run the DB check at startup, not lazily on first request, so a bad connection string shows in deploy logs; Startup:FailFastOnDbCheck controls stop-vs-warn.
