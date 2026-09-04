@@ -379,7 +379,7 @@ each option individually) and a deployment mode:
 - **Bare-metal/standalone** - downloads the latest tagged release (see
   `.github/workflows/release.yml`) as self-contained `linux-x64` binaries, no
   .NET runtime needed on the target. Installs them as systemd services
-  (`deploy/kestrel-agrumy*.service.template`) behind nginx or Apache
+  (`deploy/Agrumy.Api.service.template`, `deploy/Agrumy.Web.service.template`) behind nginx or Apache
   (`deploy/nginx.conf.template` / `apache.conf.template`) with a certbot TLS
   cert. This path never asks about the database up front - `Agrumy.Api` boots
   into a minimal setup wizard the first time `appsettings.json` has no

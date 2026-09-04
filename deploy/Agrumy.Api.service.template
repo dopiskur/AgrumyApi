@@ -1,0 +1,18 @@
+# Installed by install.sh as /etc/systemd/system/Agrumy.Api.service. Deliberately does NOT set
+# ASPNETCORE_URLS - install.sh always writes an explicit "Urls" key into appsettings.json instead.
+
+[Unit]
+Description=Agrumy.Api (Kestrel)
+After=network.target
+
+[Service]
+Type=simple
+User={{SERVICE_USER}}
+WorkingDirectory={{INSTALL_DIR}}
+ExecStart={{INSTALL_DIR}}/Agrumy.Api
+Restart=always
+RestartSec=5
+Environment=ASPNETCORE_ENVIRONMENT=Production
+
+[Install]
+WantedBy=multi-user.target

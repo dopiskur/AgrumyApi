@@ -1,9 +1,6 @@
-# Roadmap #30 - see kestrel-agrumy.service.template's comments, identical reasoning applied to
-# Agrumy.Web.
-
 [Unit]
 Description=Agrumy.Web (Kestrel)
-After=network.target kestrel-agrumy.service
+After=network.target Agrumy.Api.service
 
 [Service]
 Type=simple
