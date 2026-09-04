@@ -43,6 +43,7 @@ namespace api.Dal
                 ScheduleTimeZone = settings.ScheduleTimeZone,
                 FirmwareSource = (int)FirmwareSource.GitHub,
                 FirmwareGitHubRepository = settings.FirmwareGitHubRepository,
+                FirmwareRefreshIntervalHours = settings.FirmwareRefreshIntervalHours,
                 SensorDataRetentionDays = settings.SensorDataRetentionDays,
                 WeatherPollIntervalMinutes = settings.WeatherPollIntervalMinutes,
                 WeatherRainSkipThreshold = settings.WeatherRainSkipThreshold,
@@ -77,6 +78,8 @@ namespace api.Dal
             row.FirmwareSource = (int)config.FirmwareSource;
             row.FirmwareGitHubRepository = config.FirmwareGitHubRepository;
             row.FirmwareCustomRepositoryUrl = config.FirmwareCustomRepositoryUrl;
+            row.FirmwareRefreshIntervalHours = config.FirmwareRefreshIntervalHours;
+            // FirmwareLastRefreshedAtUtc deliberately NOT written here - see ServerConfigFirmwareRefreshStateSetAsync below.
             row.SensorDataRetentionDays = config.SensorDataRetentionDays;
             // WeatherRainPredicted/WeatherCheckedAtUtc deliberately NOT written here - they are
             // WeatherEvaluator's computed output (see ServerConfigWeatherStateSetAsync below), so a
@@ -129,6 +132,7 @@ namespace api.Dal
             row.SensorDataRetentionDays = settings.SensorDataRetentionDays;
             row.WeatherPollIntervalMinutes = settings.WeatherPollIntervalMinutes;
             row.WeatherRainSkipThreshold = settings.WeatherRainSkipThreshold;
+            row.FirmwareRefreshIntervalHours = settings.FirmwareRefreshIntervalHours;
             await db.SaveChangesAsync();
             await ApplyRetentionPolicyAsync(settings.SensorDataRetentionDays);
         }
@@ -145,6 +149,19 @@ namespace api.Dal
             }
             row.WeatherRainPredicted = rainPredicted;
             row.WeatherCheckedAtUtc = checkedAtUtc;
+            await db.SaveChangesAsync();
+        }
+
+        /// <summary>The ONLY writer of FirmwareLastRefreshedAtUtc - called exclusively by
+        /// FirmwareCatalogRefreshEvaluator, same isolation reasoning as ServerConfigWeatherStateSetAsync above.</summary>
+        public async Task ServerConfigFirmwareRefreshStateSetAsync(DateTime checkedAtUtc, int idServerConfig = 1)
+        {
+            var row = await db.ServerConfigs.FirstOrDefaultAsync(s => s.IDServerConfig == idServerConfig);
+            if (row == null)
+            {
+                return;
+            }
+            row.FirmwareLastRefreshedAtUtc = checkedAtUtc;
             await db.SaveChangesAsync();
         }
 
@@ -175,6 +192,10 @@ namespace api.Dal
             // rather than an empty repository nobody can sync from.
             FirmwareGitHubRepository = string.IsNullOrWhiteSpace(r.FirmwareGitHubRepository) ? settings.FirmwareGitHubRepository : r.FirmwareGitHubRepository,
             FirmwareCustomRepositoryUrl = r.FirmwareCustomRepositoryUrl,
+            // A row created before #203 has NULL here - same appsettings-seed fallback as
+            // FirmwareGitHubRepository above, rather than surfacing "disabled" for every existing install.
+            FirmwareRefreshIntervalHours = r.FirmwareRefreshIntervalHours ?? settings.FirmwareRefreshIntervalHours,
+            FirmwareLastRefreshedAtUtc = r.FirmwareLastRefreshedAtUtc,
             SensorDataRetentionDays = r.SensorDataRetentionDays,
             WeatherLocationLat = r.WeatherLocationLat,
             WeatherLocationLon = r.WeatherLocationLon,

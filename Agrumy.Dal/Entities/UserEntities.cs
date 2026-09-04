@@ -128,6 +128,8 @@ namespace api.Dal.Entities
         public int FirmwareSource { get; set; }
         public string? FirmwareGitHubRepository { get; set; }
         public string? FirmwareCustomRepositoryUrl { get; set; }
+        public int? FirmwareRefreshIntervalHours { get; set; }
+        public DateTime? FirmwareLastRefreshedAtUtc { get; set; }
         public int? SensorDataRetentionDays { get; set; }
 
         // See api.Models.ServerConfig's own copies of these for the full explanation.

@@ -15,5 +15,8 @@ namespace api.Dal.Interface
         /// <summary>Narrow writer for WeatherEvaluator's computed result - see the EfRepository
         /// implementation's remarks for why this is separate from ServerConfigUpdateAsync.</summary>
         Task ServerConfigWeatherStateSetAsync(bool rainPredicted, DateTime checkedAtUtc, int idServerConfig);
+
+        /// <summary>Narrow writer for FirmwareCatalogRefreshEvaluator's last-run timestamp - same isolation reasoning as ServerConfigWeatherStateSetAsync.</summary>
+        Task ServerConfigFirmwareRefreshStateSetAsync(DateTime checkedAtUtc, int idServerConfig);
     }
 }

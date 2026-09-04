@@ -151,6 +151,9 @@ builder.Services.AddSingleton<IFirmwareFetcher, HttpFirmwareFetcher>();
 builder.Services.AddSingleton<FirmwareStorage>();
 builder.Services.AddScoped<FirmwareCatalogService>();
 
+builder.Services.AddScoped<FirmwareCatalogRefreshEvaluator>();
+builder.Services.AddHostedService<FirmwareCatalogRefreshBackgroundService>();
+
 // AgrumyMetrics is a singleton because its ConcurrentDictionary aggregate must span every
 // request/scope, unlike the AddScoped registrations above.
 builder.Services.AddSingleton<AgrumyMetrics>();

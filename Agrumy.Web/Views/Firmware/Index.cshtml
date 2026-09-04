@@ -9,6 +9,17 @@
         _ => "GitHub Releases: " + Model.Config.FirmwareGitHubRepository,
     };
     var firmwareSourceItems = new SelectList(Enum.GetValues<FirmwareSource>(), source);
+    var firmwareRefreshIntervalItems = new SelectList(new[]
+    {
+        new { Value = "", Text = "Disabled (manual only)" },
+        new { Value = "1", Text = "Every hour" },
+        new { Value = "12", Text = "Every 12 hours" },
+        new { Value = "24", Text = "Every 24 hours" },
+        new { Value = "168", Text = "Every 7 days" },
+        new { Value = "720", Text = "Every 30 days" },
+        new { Value = "4320", Text = "Every 180 days" },
+        new { Value = "8760", Text = "Every 365 days" },
+    }, "Value", "Text", Model.Config.FirmwareRefreshIntervalHours?.ToString() ?? "");
 }
 
 @if (TempData["Message"] is string message)
@@ -60,13 +71,23 @@
                         <label class="form-label">GitHub repository (owner/name)</label>
                         <input type="text" name="firmwareGitHubRepository" value="@Model.Config.FirmwareGitHubRepository" class="form-control" placeholder="dopiskur/AgrumyFirmware" />
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Custom repository manifest URL</label>
                         <input type="text" name="firmwareCustomRepositoryUrl" value="@Model.Config.FirmwareCustomRepositoryUrl" class="form-control" placeholder="https://firmware.example.com/agrumy/manifest.json" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Auto-refresh catalog</label>
+                        <select name="firmwareRefreshIntervalHours" asp-items="firmwareRefreshIntervalItems" class="form-select"></select>
                     </div>
                     <div class="col-md-1">
                         <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save</button>
                     </div>
+                    @if (Model.Config.FirmwareLastRefreshedAtUtc is DateTime lastRefreshed)
+                    {
+                        <div class="col-12">
+                            <span class="text-secondary small">Catalog last auto-refreshed: @lastRefreshed.ToString("yyyy-MM-dd HH:mm") UTC</span>
+                        </div>
+                    }
                 </form>
 
                 <hr />

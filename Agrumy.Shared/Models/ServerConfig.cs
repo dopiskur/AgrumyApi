@@ -79,6 +79,16 @@ namespace api.Models
         [Display(Name = "Custom repository manifest URL")]
         public string? FirmwareCustomRepositoryUrl { get; set; }
 
+        // Null/0 = disabled (manual-only, same as today). FirmwareCatalogRefreshBackgroundService
+        // ticks every minute and re-reads this live value, same pattern as WeatherPollIntervalMinutes.
+        [Display(Name = "Auto-refresh catalog every (hours)")]
+        public int? FirmwareRefreshIntervalHours { get; set; }
+
+        // Written only by FirmwareCatalogRefreshEvaluator (ServerConfigFirmwareRefreshStateSetAsync) -
+        // same reasoning as WeatherCheckedAtUtc, so a stale admin form post can't clobber it.
+        [Display(Name = "Catalog last auto-refreshed")]
+        public DateTime? FirmwareLastRefreshedAtUtc { get; set; }
+
         // Days of sensorData history to keep automatically. PostgreSQL/TimescaleDB installs enforce
         // this through add_retention_policy; MariaDB/MySQL installs enforce it through
         // SensorDataRetentionBackgroundService's daily purge - one shared value, two mechanisms.

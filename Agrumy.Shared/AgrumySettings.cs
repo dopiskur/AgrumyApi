@@ -75,6 +75,10 @@ namespace api
         public string FirmwareGitHubRepository { get; set; } = "dopiskur/AgrumyFirmware";
         public string? FirmwareGitHubToken { get; set; }
 
+        // Only SEEDS the serverConfig row on first creation - the admin page edits the live value.
+        // Default 24h; null/0 disables auto-refresh (manual-only, the pre-#203 behavior).
+        public int? FirmwareRefreshIntervalHours { get; set; } = 24;
+
         // Days of sensorData history to keep automatically - null = admin hasn't opted in yet, data
         // just accumulates until purged manually.
         public int? SensorDataRetentionDays { get; set; }
@@ -113,6 +117,7 @@ namespace api
             FirmwareLocalPath = configuration.GetSection("Firmware:LocalPath").Value,
             FirmwareGitHubRepository = configuration.GetSection("Firmware:GitHubRepository").Value is { Length: > 0 } repo ? repo : "dopiskur/AgrumyFirmware",
             FirmwareGitHubToken = configuration.GetSection("Firmware:GitHubToken").Value,
+            FirmwareRefreshIntervalHours = ParseIntOrNull(configuration, "ServerConfig:FirmwareRefreshIntervalHours") ?? 24,
             SensorDataRetentionDays = ParseIntOrNull(configuration, "ServerConfig:SensorDataRetentionDays"),
             WeatherApiKey = configuration.GetSection("Weather:ApiKey").Value,
             WeatherPollIntervalMinutes = ParseIntOr(configuration, "ServerConfig:WeatherPollIntervalMinutes", 15),

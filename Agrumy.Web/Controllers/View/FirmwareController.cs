@@ -39,12 +39,13 @@ namespace api.Controllers.View
         // this page's stale model had.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> SaveSettings(FirmwareSource firmwareSource, string? firmwareGitHubRepository, string? firmwareCustomRepositoryUrl)
+        public async Task<ActionResult> SaveSettings(FirmwareSource firmwareSource, string? firmwareGitHubRepository, string? firmwareCustomRepositoryUrl, int? firmwareRefreshIntervalHours)
         {
             ServerConfig config = await api.ServerConfigGet();
             config.FirmwareSource = firmwareSource;
             config.FirmwareGitHubRepository = firmwareGitHubRepository;
             config.FirmwareCustomRepositoryUrl = firmwareCustomRepositoryUrl;
+            config.FirmwareRefreshIntervalHours = firmwareRefreshIntervalHours;
             try
             {
                 await api.ServerConfigUpdate(config);

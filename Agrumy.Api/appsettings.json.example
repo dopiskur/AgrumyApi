@@ -68,7 +68,9 @@
     "// AllowSelfServiceTenantCreation": "False (default) rejects a registration for an unknown tenant name; true lets it create that tenant (min. 6-character name) and make the registrant its admin.",
     "AllowSelfServiceTenantCreation": false,
     "// TenantManagementEnabled": "False (default) hides the Tenant Management menu item even for Global admin; true shows it.",
-    "TenantManagementEnabled": false
+    "TenantManagementEnabled": false,
+    "// FirmwareRefreshIntervalHours": "Only SEEDS the serverConfig row on first creation - edit the live value on the Firmware page. Null/0 disables auto-refresh (manual Refresh/Pull only, the pre-#203 behavior).",
+    "FirmwareRefreshIntervalHours": 24
   },
 
   "// Firmware": "Firmware catalog. The active source (GitHub / Local / Custom) itself is a runtime setting on the admin Server Settings page (serverConfig row), not here.",

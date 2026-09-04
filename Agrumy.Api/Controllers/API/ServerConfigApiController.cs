@@ -107,6 +107,12 @@ namespace api.Controllers.API
                 return BadRequest("Weather rain-skip threshold must be between 0 and 100 percent.");
             }
 
+            // Negative is meaningless; 0/null both mean "auto-refresh disabled".
+            if (config.FirmwareRefreshIntervalHours is < 0)
+            {
+                return BadRequest("Firmware auto-refresh interval must be 0/empty (disabled) or a positive number of hours.");
+            }
+
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await Repo.ServerConfigUpdateAsync(config);
             return Ok();
