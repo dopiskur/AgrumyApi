@@ -287,7 +287,7 @@ namespace api.Controllers.API
             // CommandId links it back to the specific command row.
             if (eventType == DeviceEventType.CommandExecuted && value.CommandId is int commandId)
             {
-                await commandQueue.MarkExecutedAsync(commandId);
+                await commandQueue.MarkExecutedAsync(commandId, device.IDDevice!.Value);
             }
 
             return Ok();
@@ -301,7 +301,14 @@ namespace api.Controllers.API
         [Authorize(Policy = DeviceAuth.SessionPolicy)]
         public async Task<ActionResult> AckCommand([FromBody] CommandAckRequest value)
         {
-            await commandQueue.AcknowledgeCommandAsync(value.CommandId);
+            string apiId = HttpContext.DeviceApiId()!;
+            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            if (device is null)
+            {
+                return Unauthorized();
+            }
+
+            await commandQueue.AcknowledgeCommandAsync(value.CommandId, device.IDDevice!.Value);
             return Ok();
         }
 

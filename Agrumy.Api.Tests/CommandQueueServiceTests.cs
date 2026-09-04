@@ -183,10 +183,10 @@ public class CommandQueueServiceTests
 
         _commands.Setup(c => c.GetCommandByIdAsync(1)).ReturnsAsync(first);
         _commands.Setup(c => c.SetCommandStatusAsync(1, CommandStatus.Acknowledged, null)).Returns(Task.CompletedTask);
-        await service.AcknowledgeCommandAsync(1);
+        await service.AcknowledgeCommandAsync(1, 500);
 
         _commands.Setup(c => c.SetCommandStatusAsync(1, CommandStatus.Executed, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
-        await service.MarkExecutedAsync(1);
+        await service.MarkExecutedAsync(1, 500);
 
         // poll cycle 2: the first command is now Executed and gone from the pending list, the second surfaces next
         _commands.Setup(c => c.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand> { second });
@@ -202,9 +202,9 @@ public class CommandQueueServiceTests
     public async Task Acknowledge_Ignores_A_Command_That_Is_No_Longer_Pending()
     {
         _commands.Setup(c => c.GetCommandByIdAsync(1))
-            .ReturnsAsync(new DeviceCommand { IDDeviceCommand = 1, Status = CommandStatus.Acknowledged });
+            .ReturnsAsync(new DeviceCommand { IDDeviceCommand = 1, DeviceID = 500, Status = CommandStatus.Acknowledged });
 
-        await NewService().AcknowledgeCommandAsync(1);
+        await NewService().AcknowledgeCommandAsync(1, 500);
 
         // Strict mock: SetCommandStatusAsync was never set up - a redundant ack must not call it.
     }
@@ -214,7 +214,7 @@ public class CommandQueueServiceTests
     {
         _commands.Setup(c => c.GetCommandByIdAsync(999)).ReturnsAsync((DeviceCommand?)null);
 
-        await NewService().MarkExecutedAsync(999);
+        await NewService().MarkExecutedAsync(999, 500);
     }
 
     [Fact]
@@ -222,11 +222,35 @@ public class CommandQueueServiceTests
     {
         // Reboot has nothing to ack-then-execute on the same connection - MarkExecutedAsync must accept a straight Pending -> Executed transition.
         _commands.Setup(c => c.GetCommandByIdAsync(1))
-            .ReturnsAsync(new DeviceCommand { IDDeviceCommand = 1, Status = CommandStatus.Pending });
+            .ReturnsAsync(new DeviceCommand { IDDeviceCommand = 1, DeviceID = 500, Status = CommandStatus.Pending });
         _commands.Setup(c => c.SetCommandStatusAsync(1, CommandStatus.Executed, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
 
-        await NewService().MarkExecutedAsync(1);
+        await NewService().MarkExecutedAsync(1, 500);
 
         _commands.Verify(c => c.SetCommandStatusAsync(1, CommandStatus.Executed, It.IsAny<DateTime>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Acknowledge_Ignores_A_Command_Belonging_To_A_Different_Device()
+    {
+        // roadmap #178 (IDOR): device 500 must not be able to ack a Pending command that belongs to device 501.
+        _commands.Setup(c => c.GetCommandByIdAsync(1))
+            .ReturnsAsync(new DeviceCommand { IDDeviceCommand = 1, DeviceID = 501, Status = CommandStatus.Pending });
+
+        await NewService().AcknowledgeCommandAsync(1, 500);
+
+        // Strict mock: SetCommandStatusAsync was never set up - a cross-device ack must not call it.
+    }
+
+    [Fact]
+    public async Task MarkExecuted_Ignores_A_Command_Belonging_To_A_Different_Device()
+    {
+        // roadmap #178 (IDOR): device 500 must not be able to mark device 501's command Executed.
+        _commands.Setup(c => c.GetCommandByIdAsync(1))
+            .ReturnsAsync(new DeviceCommand { IDDeviceCommand = 1, DeviceID = 501, Status = CommandStatus.Pending });
+
+        await NewService().MarkExecutedAsync(1, 500);
+
+        // Strict mock: SetCommandStatusAsync was never set up - a cross-device execute confirmation must not call it.
     }
 }

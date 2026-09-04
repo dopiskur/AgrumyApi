@@ -94,21 +94,21 @@ namespace api.Commands
             return null;
         }
 
-        /// <summary>Only a genuinely Pending command can be acknowledged; an unknown id or one already past Pending is silently ignored rather than erroring the device's otherwise-successful poll cycle over a redundant/late ack.</summary>
-        public async Task AcknowledgeCommandAsync(int commandId)
+        /// <summary>Only a genuinely Pending command can be acknowledged; an unknown id or one already past Pending is silently ignored rather than erroring the device's otherwise-successful poll cycle over a redundant/late ack. deviceId is the authenticated caller (see DeviceApiController) - a command that resolves but belongs to a different device is treated the same as "not found" (roadmap #178, was an IDOR: any device could ack/execute any other device's command by guessing its id).</summary>
+        public async Task AcknowledgeCommandAsync(int commandId, int deviceId)
         {
             DeviceCommand? command = await commandRepo.GetCommandByIdAsync(commandId);
-            if (command?.Status == CommandStatus.Pending)
+            if (command?.Status == CommandStatus.Pending && command.DeviceID == deviceId)
             {
                 await commandRepo.SetCommandStatusAsync(commandId, CommandStatus.Acknowledged);
             }
         }
 
-        /// <summary>Accepts either Pending or Acknowledged as the prior state - Pending covers Reboot (which has no "after" to ack from; its first real confirmation IS the next poll succeeding at all) and any other action whose ack happened to be lost/delayed.</summary>
-        public async Task MarkExecutedAsync(int commandId)
+        /// <summary>Accepts either Pending or Acknowledged as the prior state - Pending covers Reboot (which has no "after" to ack from; its first real confirmation IS the next poll succeeding at all) and any other action whose ack happened to be lost/delayed. deviceId ownership check per roadmap #178, same as AcknowledgeCommandAsync.</summary>
+        public async Task MarkExecutedAsync(int commandId, int deviceId)
         {
             DeviceCommand? command = await commandRepo.GetCommandByIdAsync(commandId);
-            if (command != null && command.Status is CommandStatus.Pending or CommandStatus.Acknowledged)
+            if (command != null && command.Status is CommandStatus.Pending or CommandStatus.Acknowledged && command.DeviceID == deviceId)
             {
                 await commandRepo.SetCommandStatusAsync(commandId, CommandStatus.Executed, DateTime.UtcNow);
             }
