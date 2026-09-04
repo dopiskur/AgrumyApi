@@ -14,8 +14,8 @@
 }
 else
 {
-    @* Orange is the only status with anything to acknowledge - Red (offline) and Green carry no alert list. *@
-    <div class="dropdown d-inline-block">
+    @* z-index:1 keeps this above AdminLTE's .small-box-icon, which sits in the same top-right corner and otherwise swallows clicks on _UnitCubes/_ZoneCubes. *@
+    <div class="dropdown d-inline-block position-relative" style="z-index: 1;">
         <button type="button" class="badge @css border-0" data-bs-toggle="dropdown" aria-expanded="false" title="@title">
             <i class="bi @icon"></i>
         </button>
@@ -43,9 +43,13 @@ else
                             </span>
                             @if (canAcknowledge)
                             {
-                                <form asp-controller="DeviceUnit" asp-action="AcknowledgeAlert" method="post" class="flex-shrink-0">
+                                @* This partial also renders inside AJAX-swapped live-refresh fragments (_ZoneDetails), where
+                                   Context.Request.Path is the polling endpoint's path, not the browser's actual address bar
+                                   URL - read the real one client-side at submit time instead. *@
+                                <form asp-controller="DeviceUnit" asp-action="AcknowledgeAlert" method="post" class="flex-shrink-0"
+                                      onsubmit="this.querySelector('.js-return-url').value = window.location.pathname + window.location.search;">
                                     <input type="hidden" name="idEventDevice" value="@alert.IDEventDevice" />
-                                    <input type="hidden" name="returnUrl" value="@Context.Request.Path" />
+                                    <input type="hidden" name="returnUrl" class="js-return-url" value="" />
                                     <button type="submit" class="btn btn-sm btn-outline-secondary" title="Acknowledge">
                                         <i class="bi bi-check-lg"></i>
                                     </button>
