@@ -31,10 +31,7 @@ namespace api.Dal
 
         public async Task<bool> RefreshTokenRotateAsync(int userId, string oldTokenHash, string newTokenHash, DateTime newExpiresAt)
         {
-            // Same atomic WHERE RevokedAt == null guard as RefreshTokenRevokeAsync (roadmap #181) -
-            // two concurrent redemptions of the same token race for this single UPDATE statement,
-            // and only one can affect a row; the other gets 0 rows back and must not insert a
-            // second new token for a rotation it lost.
+            // Same atomic WHERE RevokedAt == null guard as RefreshTokenRevokeAsync - only one of two racing redemptions can affect a row.
             int rows = await db.RefreshTokens.Where(t => t.TokenHash == oldTokenHash && t.RevokedAt == null)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(t => t.RevokedAt, DateTime.UtcNow)

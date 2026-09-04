@@ -253,7 +253,7 @@ namespace api.Dal
                 e.HasOne<DeviceTypeSensorRow>().WithMany().HasForeignKey(x => x.SensorWind).OnDelete(DeleteBehavior.NoAction);
             });
 
-            // Roadmap #115: real one-to-many (replaces the old flat Schedule* columns).
+            // Real one-to-many, replacing the old flat Schedule* columns.
             modelBuilder.Entity<DeviceScheduleSlotRow>(e =>
             {
                 e.ToTable("deviceScheduleSlot");

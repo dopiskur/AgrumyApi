@@ -14,13 +14,7 @@ namespace api.Dal
             return await db.Users.AsNoTracking().AnyAsync(u => u.PwdHash == null);
         }
 
-        /// <summary>setupSecret must match the hash EfRepository.SeedBootstrapAdminAsync stored on
-        /// the pending row (roadmap #179) - a fetch-then-verify-then-write, not a single atomic SQL
-        /// statement, because the comparison itself needs C# (AuthenticationProvider.VerifyHash).
-        /// Still race-safe: the final write is still gated by WHERE PwdHash IS NULL, so two
-        /// concurrent calls that both pass verification can still only have one of them actually
-        /// flip the row - the loser's ExecuteUpdateAsync affects zero rows and returns false, same
-        /// as before this change.</summary>
+        /// <summary>Fetch-then-verify-then-write (verification needs C#), but still race-safe since the final write stays gated by WHERE PwdHash IS NULL.</summary>
         public async Task<bool> BootstrapAdminSetPasswordAsync(UserSecret secret, string setupSecret)
         {
             UserRow? pending = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.PwdHash == null);

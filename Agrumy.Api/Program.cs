@@ -145,9 +145,7 @@ builder.Services.AddHttpClient(HttpFirmwareFetcher.ClientName, client =>
     client.Timeout = TimeSpan.FromMinutes(5); // a full "pull from GitHub" streams several MB per file
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Agrumy.Api/1.0 (+https://github.com/dopiskur/AgrumyService)");
 })
-// AllowAutoRedirect=false: HttpFirmwareFetcher follows redirects itself, one hop at a time, so
-// SsrfGuard sees and re-validates every hop (roadmap #182) - the default handler would follow
-// silently, skipping the guard on wherever a redirect actually leads.
+// AllowAutoRedirect=false: HttpFirmwareFetcher follows redirects itself so SsrfGuard re-validates every hop.
 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddSingleton<IFirmwareFetcher, HttpFirmwareFetcher>();
 builder.Services.AddSingleton<FirmwareStorage>();

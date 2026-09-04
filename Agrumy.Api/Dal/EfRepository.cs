@@ -44,9 +44,7 @@ namespace api.Dal
             string? bootstrapSecret = await SeedBootstrapAdminAsync(db);
             if (bootstrapSecret != null)
             {
-                // The only channel this secret is ever exposed on - deliberately not written to the
-                // database in plaintext or returned by any API. Whoever deployed this instance reads
-                // it from here (journalctl/console) to complete first-run setup (roadmap #179).
+                // The only channel this secret is ever exposed on - never written to the DB in plaintext or returned by any API.
                 logger.LogWarning("Bootstrap Global Admin setup secret (required by POST /api/User/BootstrapSetPassword, works once): {BootstrapSecret}", bootstrapSecret);
             }
         }
@@ -223,10 +221,7 @@ namespace api.Dal
                 return null;
             }
 
-            // Roadmap #179: without this, BootstrapSetPassword's only gate was rate limiting - a
-            // random anonymous visitor who requests it before the real admin does takes over the
-            // Global Admin account. 24 random bytes, base64url so it round-trips cleanly through a
-            // request body/URL/log line with no escaping surprises.
+            // Without this, BootstrapSetPassword's only gate was rate limiting - anyone could claim the Global Admin account first.
             string setupSecret = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24))
                 .Replace('+', '-').Replace('/', '_').TrimEnd('=');
             string secretSalt = AuthenticationProvider.GetSalt();

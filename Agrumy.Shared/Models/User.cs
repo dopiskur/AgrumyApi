@@ -126,7 +126,7 @@ namespace api.Models
         public string? NewPassword { get; set; }
     }
 
-    /// <summary>Body of POST /api/User/BootstrapSetPassword - no Login/email field: at most one pending bootstrap admin row (PwdHash IS NULL) can ever apply, so identifying by email would only add an unauthenticated probing surface. SetupSecret is the random token EfRepository.SeedBootstrapAdminAsync logged at first startup (roadmap #179) - without it this endpoint would be an anonymous, rate-limit-only race to claim the Global Admin account on any freshly deployed instance.</summary>
+    /// <summary>Body of POST /api/User/BootstrapSetPassword - SetupSecret (logged server-side at first startup) is required so this anonymous endpoint isn't just a rate-limit-only race to claim the Global Admin account.</summary>
     public class BootstrapAdminSetPassword
     {
         [Required(ErrorMessage = "New password is required")]

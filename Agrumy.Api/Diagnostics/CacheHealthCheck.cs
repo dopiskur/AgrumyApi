@@ -21,7 +21,7 @@ namespace api.Diagnostics
             }
             catch (Exception ex)
             {
-                return HealthCheckResult.Degraded("Cache backend unreachable - app continues without it (roadmap #119).", ex);
+                return HealthCheckResult.Degraded("Cache backend unreachable - app continues without it.", ex);
             }
         }
     }

@@ -3,14 +3,7 @@ using System.Net.Sockets;
 
 namespace api.Firmware
 {
-    /// <summary>Roadmap #182: HttpFirmwareFetcher is the one place any firmware URL (GitHub API,
-    /// GitHub release asset, and - the actual risk here - an admin-configured Custom repository
-    /// manifest/file URL) ever gets fetched. Custom-source URLs are admin-controlled, which the
-    /// original code trusted outright; this guard treats them as untrusted instead, since a
-    /// compromised admin account (or an admin pasting a URL without realizing what it points at)
-    /// would otherwise make the API server an open outbound proxy into its own private network.
-    /// Applied uniformly to every fetch, not just Custom-source ones, since GitHub's own hosts are
-    /// always public HTTPS anyway - the guard costs that path nothing.</summary>
+    /// <summary>Blocks HttpFirmwareFetcher from fetching a private/loopback address, since an admin-configured Custom repository URL is otherwise trusted outright.</summary>
     public static class SsrfGuard
     {
         public static async Task EnsureAllowedAsync(Uri uri, CancellationToken cancellationToken)

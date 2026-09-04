@@ -19,10 +19,7 @@ namespace api.Firmware
     {
         public const string ClientName = "firmware";
 
-        // The "firmware" HttpClient has AllowAutoRedirect=false (see Program.cs) specifically so
-        // every hop below goes back through SsrfGuard - a scheme/private-IP check on only the
-        // FIRST url would miss a redirect to something unsafe (roadmap #182: "validate after
-        // redirect too", not just the URL an admin typed in).
+        // AllowAutoRedirect=false (Program.cs) so every hop below goes back through SsrfGuard, not just the first URL.
         private const int MaxRedirects = 5;
 
         public async Task<string> GetStringAsync(string url, bool gitHubApi, CancellationToken cancellationToken = default)

@@ -59,11 +59,7 @@ namespace api.Firmware
             }
             catch
             {
-                // Roadmap #189: IOException/disk-full/cancellation mid-write used to leave the
-                // .tmp file stranded forever (the next SaveAsync of the same fileName overwrites
-                // it via FileMode.Create, so it wasn't unbounded, but a version that's never
-                // re-uploaded left dead weight on disk indefinitely). Best-effort cleanup, in its
-                // own try/catch so a delete failure never masks the real exception below.
+                // Best-effort .tmp cleanup so a failed write doesn't leave dead weight on disk; own try/catch so a delete failure never masks the real exception.
                 try { File.Delete(tmpPath); } catch { /* best-effort */ }
                 throw;
             }
