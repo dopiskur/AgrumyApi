@@ -246,6 +246,20 @@ namespace api.Dal.Interface
         [Delete("/api/User/Group")]
         Task UserGroupDelete(int? idUserGroup);
 
+        // ---- Tenant -------------------------------------------------------
+
+        [Get("/api/Tenant/All")]
+        Task<IEnumerable<Tenant>> TenantsGet();
+
+        [Get("/api/Tenant")]
+        Task<Tenant> TenantGet(int idTenant);
+
+        [Post("/api/Tenant")]
+        Task<int> TenantAdd([Body] Tenant tenant);
+
+        [Put("/api/Tenant")]
+        Task TenantUpdate([Body] Tenant tenant);
+
         // ---- Server config --------------------------------
 
         [Get("/api/ServerConfig")]

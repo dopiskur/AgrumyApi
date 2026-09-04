@@ -123,6 +123,7 @@ namespace api.Dal.Entities
         public int? ActivationResendCooldownMinutes { get; set; }
         public int? MaxRulesPerZone { get; set; }
         public bool AllowSelfServiceTenantCreation { get; set; }
+        public bool TenantManagementEnabled { get; set; }
         public string? ScheduleTimeZone { get; set; }
         public int FirmwareSource { get; set; }
         public string? FirmwareGitHubRepository { get; set; }

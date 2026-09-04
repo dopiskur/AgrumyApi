@@ -58,6 +58,9 @@ namespace api
         // creating one until an admin opts in.
         public bool AllowSelfServiceTenantCreation { get; set; }
 
+        // Off by default - gates the Tenant Management menu item alongside the GlobalAdmin role check.
+        public bool TenantManagementEnabled { get; set; }
+
         // No fallback constant - there is no universally-reasonable default IANA zone to assume for
         // a fleet's physical location. Null (unset) is a valid, common state:
         // TimeZoneHelper.GetUtcOffsetSeconds treats it as UTC (offset 0) rather than throwing, so
@@ -105,6 +108,7 @@ namespace api
             ActivationResendCooldownMinutes = ParseIntOr(configuration, "ServerConfig:ActivationResendCooldownMinutes", 10),
             MaxRulesPerZone = ParseIntOr(configuration, "ServerConfig:MaxRulesPerZone", 10),
             AllowSelfServiceTenantCreation = ParseBoolOr(configuration, "ServerConfig:AllowSelfServiceTenantCreation", false),
+            TenantManagementEnabled = ParseBoolOr(configuration, "ServerConfig:TenantManagementEnabled", false),
             ScheduleTimeZone = configuration.GetSection("ServerConfig:ScheduleTimeZone").Value,
             FirmwareLocalPath = configuration.GetSection("Firmware:LocalPath").Value,
             FirmwareGitHubRepository = configuration.GetSection("Firmware:GitHubRepository").Value is { Length: > 0 } repo ? repo : "dopiskur/AgrumyFirmware",

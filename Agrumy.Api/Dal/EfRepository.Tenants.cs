@@ -27,5 +27,30 @@ namespace api.Dal
             await db.SaveChangesAsync();
             return row.IDTenant;
         }
+
+        public async Task<IList<Tenant>> TenantsGetAllAsync()
+        {
+            return await db.Tenants.AsNoTracking()
+                .OrderBy(t => t.TenantName)
+                .Select(t => new Tenant { IDTenant = t.IDTenant, TenantName = t.TenantName })
+                .ToListAsync();
+        }
+
+        public async Task<Tenant?> TenantGetByIdAsync(int idTenant)
+        {
+            var row = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.IDTenant == idTenant);
+            return row == null ? null : new Tenant { IDTenant = row.IDTenant, TenantName = row.TenantName };
+        }
+
+        public async Task TenantUpdateAsync(Tenant tenant)
+        {
+            var row = await db.Tenants.FirstOrDefaultAsync(t => t.IDTenant == tenant.IDTenant);
+            if (row == null)
+            {
+                return;
+            }
+            row.TenantName = tenant.TenantName ?? row.TenantName;
+            await db.SaveChangesAsync();
+        }
     }
 }

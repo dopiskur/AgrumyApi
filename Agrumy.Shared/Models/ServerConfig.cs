@@ -49,6 +49,12 @@ namespace api.Models
         [Display(Name = "Allow self-service tenant creation")]
         public bool AllowSelfServiceTenantCreation { get; set; }
 
+        // Gates the Tenant Management menu item (visible only when this is true AND the caller is
+        // Global admin - see _Layout.cshtml) - a second, independent condition on top of the role
+        // check, so a fresh install doesn't expose cross-tenant management by default.
+        [Display(Name = "Enable Tenant Management page")]
+        public bool TenantManagementEnabled { get; set; }
+
         // Single install-wide IANA zone id (e.g. "Europe/Zagreb") schedule-mode relay windows are
         // evaluated against. Null = not configured yet - BuildDeviceConfigAsync then sends every
         // device UtcOffsetSeconds=0 (UTC) rather than failing.

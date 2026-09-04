@@ -1,0 +1,31 @@
+@model api.Models.Tenant
+
+@{
+    ViewData["Title"] = "Edit";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Edit Tenant</h3>
+    </div>
+    <div class="card-body">
+        <form asp-action="Edit">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="mb-3">
+                <label asp-for="IDTenant" class="form-label"></label>
+                <p class="form-control-plaintext">@Html.DisplayFor(m => m.IDTenant)</p>
+                @Html.HiddenFor(m => m.IDTenant)
+            </div>
+            <div class="mb-0">
+                <label asp-for="TenantName" class="form-label"></label>
+                <input asp-for="TenantName" class="form-control" required />
+                <span asp-validation-for="TenantName" class="text-danger"></span>
+            </div>
+
+            <div class="mt-3">
+                <input type="submit" value="Save" class="btn btn-primary" />
+                <a asp-action="Index" class="btn btn-outline-secondary">Back to List</a>
+            </div>
+        </form>
+    </div>
+</div>

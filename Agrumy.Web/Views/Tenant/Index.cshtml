@@ -1,0 +1,56 @@
+@model IEnumerable<api.Models.Tenant>
+
+@{
+    ViewData["Title"] = "Tenants";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Tenants</h3>
+        @if (User.IsInRole(RoleNames.GlobalAdmin))
+        {
+            <div class="card-tools">
+                <a asp-action="Create" class="btn btn-sm btn-info">Create New</a>
+            </div>
+        }
+    </div>
+    <div class="card-body table-responsive p-0">
+        <table id="tenantsTable" class="table table-hover">
+            <thead>
+                <tr>
+                    <th class="d-none d-md-table-cell">
+                        @Html.DisplayNameFor(model => model.IDTenant)
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.TenantName)
+                    </th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+@foreach (var item in Model) {
+                <tr>
+                    <td class="d-none d-md-table-cell">
+                        @Html.DisplayFor(modelItem => item.IDTenant)
+                    </td>
+                    <td>
+                        @Html.DisplayFor(modelItem => item.TenantName)
+                    </td>
+                    <td>
+                        @if (User.IsInRole(RoleNames.GlobalAdmin))
+                        {
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Tenant actions">
+                                <a asp-action="Edit" asp-route-idTenant="@item.IDTenant" class="btn btn-primary" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
+                            </div>
+                        }
+                    </td>
+                </tr>
+}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_DataTableScripts" model="@("tenantsTable")" />
+}

@@ -66,7 +66,9 @@
     "// MaxRulesPerZone": "Max rules a zone can hold. Hard ceiling is 32 (AgrumyFirmware's MAX_RULES) - ServerConfigApiController.Update rejects anything above it regardless of this default.",
     "MaxRulesPerZone": 10,
     "// AllowSelfServiceTenantCreation": "False (default) rejects a registration for an unknown tenant name; true lets it create that tenant (min. 6-character name) and make the registrant its admin.",
-    "AllowSelfServiceTenantCreation": false
+    "AllowSelfServiceTenantCreation": false,
+    "// TenantManagementEnabled": "False (default) hides the Tenant Management menu item even for Global admin; true shows it.",
+    "TenantManagementEnabled": false
   },
 
   "// Firmware": "Firmware catalog. The active source (GitHub / Local / Custom) itself is a runtime setting on the admin Server Settings page (serverConfig row), not here.",

@@ -1,8 +1,19 @@
+@inject api.Dal.Interface.IApi Api
 @{
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
     Func<string, string> navActive = c => string.Equals(c, currentController, StringComparison.OrdinalIgnoreCase) ? "active" : "";
     var currentUserEmail = User.Identity?.Name;
     Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
+    // Only fetched for a Global admin, who's the only one who can ever see the menu item this
+    // gates - a Global reader/other role never pays for this extra call. Swallowed on failure
+    // (just hides the item) since this runs in the shared layout on every page - a transient Api
+    // hiccup must not take down the whole navigation shell.
+    bool tenantManagementEnabled = false;
+    if (User.IsInRole(RoleNames.GlobalAdmin))
+    {
+        try { tenantManagementEnabled = (await Api.ServerConfigGet()).TenantManagementEnabled; }
+        catch (api.Utils.ApiException) { }
+    }
 }
 <!doctype html>
 <html lang="en">
@@ -141,6 +152,15 @@
                                     <p>Server Settings</p>
                                 </a>
                             </li>
+                            @if (tenantManagementEnabled)
+                            {
+                                <li class="nav-item">
+                                    <a asp-area="" asp-controller="Tenant" asp-action="Index" class="nav-link @navActive("Tenant")">
+                                        <i class="nav-icon bi bi-buildings"></i>
+                                        <p>Tenants</p>
+                                    </a>
+                                </li>
+                            }
                         }
                         <li class="nav-item mt-2 border-top border-secondary border-opacity-25 pt-2">
                             <a asp-area="" asp-controller="Login" asp-action="Logout" class="nav-link">

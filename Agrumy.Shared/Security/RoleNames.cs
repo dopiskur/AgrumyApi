@@ -39,5 +39,8 @@ namespace api.Security
 
         // Role GRANTING stays admin-only on purpose: a Tenant User could otherwise assign themselves Tenant admin.
         public const string Admins = LegacyAdmin + "," + GlobalAdmin + "," + TenantAdmin;
+
+        /// <summary>Tenant Management read access (list/view every tenant) - write (create/rename) stays Global admin only, checked inline via CallerIsGlobalAdmin, since a Tenant scope has no meaningful self-management of ITS OWN existence.</summary>
+        public const string GlobalAdminOrReader = GlobalAdmin + "," + GlobalReader;
     }
 }

@@ -149,9 +149,17 @@
                         tenant (min. 6-character name) by simply typing a name that doesn't exist
                         yet - they become that tenant's admin. Off by default.
                     </p>
-                    <div class="mb-0 form-check">
+                    <div class="mb-3 form-check">
                         <input asp-for="AllowSelfServiceTenantCreation" class="form-check-input" />
                         <label asp-for="AllowSelfServiceTenantCreation" class="form-check-label"></label>
+                    </div>
+                    <p class="text-secondary">
+                        When enabled, Global admins get a "Tenants" menu item to list, create, and
+                        rename tenants. Global readers can view the list but not change it.
+                    </p>
+                    <div class="mb-0 form-check">
+                        <input asp-for="TenantManagementEnabled" class="form-check-input" />
+                        <label asp-for="TenantManagementEnabled" class="form-check-label"></label>
                     </div>
                 </div>
 

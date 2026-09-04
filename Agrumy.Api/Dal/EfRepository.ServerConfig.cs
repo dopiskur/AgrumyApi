@@ -39,6 +39,7 @@ namespace api.Dal
                 ActivationResendCooldownMinutes = settings.ActivationResendCooldownMinutes,
                 MaxRulesPerZone = settings.MaxRulesPerZone,
                 AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation,
+                TenantManagementEnabled = settings.TenantManagementEnabled,
                 ScheduleTimeZone = settings.ScheduleTimeZone,
                 FirmwareSource = (int)FirmwareSource.GitHub,
                 FirmwareGitHubRepository = settings.FirmwareGitHubRepository,
@@ -71,6 +72,7 @@ namespace api.Dal
             row.ActivationResendCooldownMinutes = config.ActivationResendCooldownMinutes;
             row.MaxRulesPerZone = config.MaxRulesPerZone;
             row.AllowSelfServiceTenantCreation = config.AllowSelfServiceTenantCreation;
+            row.TenantManagementEnabled = config.TenantManagementEnabled;
             row.ScheduleTimeZone = config.ScheduleTimeZone;
             row.FirmwareSource = (int)config.FirmwareSource;
             row.FirmwareGitHubRepository = config.FirmwareGitHubRepository;
@@ -122,6 +124,7 @@ namespace api.Dal
             row.ActivationResendCooldownMinutes = settings.ActivationResendCooldownMinutes;
             row.MaxRulesPerZone = settings.MaxRulesPerZone;
             row.AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation;
+            row.TenantManagementEnabled = settings.TenantManagementEnabled;
             row.ScheduleTimeZone = settings.ScheduleTimeZone;
             row.SensorDataRetentionDays = settings.SensorDataRetentionDays;
             row.WeatherPollIntervalMinutes = settings.WeatherPollIntervalMinutes;
@@ -165,6 +168,7 @@ namespace api.Dal
             ActivationResendCooldownMinutes = r.ActivationResendCooldownMinutes,
             MaxRulesPerZone = r.MaxRulesPerZone ?? settings.MaxRulesPerZone,
             AllowSelfServiceTenantCreation = r.AllowSelfServiceTenantCreation,
+            TenantManagementEnabled = r.TenantManagementEnabled,
             ScheduleTimeZone = r.ScheduleTimeZone,
             FirmwareSource = (FirmwareSource)r.FirmwareSource,
             // A row created before #94 has NULL here; the setting's seed is the right fallback
