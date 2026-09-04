@@ -88,6 +88,12 @@
                     <span slot="not-allowed" class="text-secondary small">Web Serial requires HTTPS.</span>
                 </esp-web-install-button>
             </div>
+            @* Populated by firmware-install-picker.js when the flasher's popup closes - esp-web-tools' own confirmation only lives inside that transient popup, so without this the page looks identical to before flashing the moment it's closed. *@
+            <div id="flashResultBanner" class="alert alert-info d-flex align-items-center gap-2 mt-2" role="status" hidden>
+                <i class="bi bi-info-circle"></i>
+                <span id="flashResultText"></span>
+                <button type="button" class="btn-close ms-auto" aria-label="Dismiss" onclick="document.getElementById('flashResultBanner').hidden = true"></button>
+            </div>
         }
 
         <hr />
