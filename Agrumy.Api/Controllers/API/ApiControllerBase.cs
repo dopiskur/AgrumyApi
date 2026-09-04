@@ -1,5 +1,6 @@
 using api.Dal.Interface;
 using api.Security;
+using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
@@ -11,6 +12,7 @@ namespace api.Controllers.API
     /// global <see cref="api.Filters.DbExceptionFilter"/>, so actions don't catch them individually.
     /// </summary>
     [ApiController]
+    [ApiVersion("1.0")]
     public abstract class ApiControllerBase : ControllerBase
     {
         protected IRepository Repo { get; }

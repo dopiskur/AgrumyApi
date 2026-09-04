@@ -273,6 +273,15 @@ database and is not part of this.
 
 ## API endpoints
 
+**Versioning (roadmap #215):** every route below is implicitly API version `1.0`
+(`ApiControllerBase` carries `[ApiVersion("1.0")]`, inherited by every controller) served at the
+same unversioned URL it always has - `AssumeDefaultVersionWhenUnspecified` means device firmware
+and `Agrumy.Web`'s Refit client keep working with zero version info in the request. A future
+breaking change should land as a new `[ApiVersion("2.0")]` controller under its own `api/v2/...`
+route rather than altering an existing v1 action, so old and new clients both keep working. An
+explicit version can be sent via `?api-version=1.0`, an `X-Api-Version` header, or a `v{version}`
+URL segment; an unsupported version gets `400` with an `api-supported-versions` response header.
+
 All routes below are under `Agrumy.Api`. `[Authorize]` requires a JWT bearer
 token from `POST /api/User/Login`. Most write/admin endpoints require one of
 the **composable roles** in `api.Security.RoleNames` (roadmap #66/#91) rather

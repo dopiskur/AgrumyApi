@@ -1,4 +1,5 @@
 using api;
+using Asp.Versioning;
 using api.BackgroundWorkers;
 using api.Commands;
 using api.Diagnostics;
@@ -176,6 +177,53 @@ builder.Services
 
 builder.Services.AddControllers(options => options.Filters.AddService<DbExceptionFilter>());
 
+// Every existing controller is annotated [ApiVersion("1.0")] with its route unchanged - purely
+// additive. AssumeDefaultVersionWhenUnspecified means every current caller (device firmware,
+// Agrumy.Web's Refit client) keeps working with no version info at all, resolving to the same
+// 1.0 action as before. A future breaking change adds a new [ApiVersion("2.0")] controller under
+// its own "api/v2/..." route instead of altering this one, so old and new clients both keep working.
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = ApiVersionReader.Combine(
+        new UrlSegmentApiVersionReader(),
+        new QueryStringApiVersionReader("api-version"),
+        new HeaderApiVersionReader("X-Api-Version"));
+})
+.AddMvc()
+.AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+})
+.AddOpenApi(options =>
+{
+    options.Document.AddDocumentTransformer((document, context, cancellationToken) =>
+    {
+        document.Info.Title = "Agrumy Web API";
+
+        var components = document.Components ??= new OpenApiComponents();
+        components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "Bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Description = "Please enter valid JWT"
+        };
+
+        document.Security ??= [];
+        document.Security.Add(new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+        });
+
+        return Task.CompletedTask;
+    });
+});
+
 // KnownProxies must list only real proxy IPs (Security:KnownProxies, comma-separated) -
 // trusting an arbitrary peer would let any client spoof X-Forwarded-For to both bypass
 // rate limiting and forge its apparent IP everywhere else that reads it.
@@ -254,34 +302,6 @@ builder.Services.AddHsts(options =>
     options.IncludeSubDomains = true;
 });
 
-builder.Services.AddOpenApi("v1", options =>
-{
-    options.AddDocumentTransformer((document, context, cancellationToken) =>
-    {
-        document.Info.Title = "Agrumy Web API";
-        document.Info.Version = "v1";
-
-        var components = document.Components ??= new OpenApiComponents();
-        components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
-        components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
-        {
-            Type = SecuritySchemeType.Http,
-            Scheme = "Bearer",
-            BearerFormat = "JWT",
-            In = ParameterLocation.Header,
-            Description = "Please enter valid JWT"
-        };
-
-        document.Security ??= [];
-        document.Security.Add(new OpenApiSecurityRequirement
-        {
-            [new OpenApiSecuritySchemeReference("Bearer", document)] = []
-        });
-
-        return Task.CompletedTask;
-    });
-});
-
 var app = builder.Build();
 
 // JwtTokenProvider is static (no DI reach) - hand it a logger once so token rejections
@@ -293,8 +313,10 @@ JwtTokenProvider.Logger = app.Services.GetRequiredService<ILoggerFactory>().Crea
 app.UseForwardedHeaders();
 
 // MapOpenApi() serves the Microsoft.AspNetCore.OpenApi-generated document; UseSwaggerUI
-// just renders it, pointed at that route instead of a Swashbuckle one.
-app.MapOpenApi();
+// just renders it, pointed at that route instead of a Swashbuckle one. WithDocumentPerVersion
+// generates one document per discovered API version instead of the single hardcoded "v1" this
+// used to be - still just "v1" today since that's the only version that exists.
+app.MapOpenApi().WithDocumentPerVersion();
 app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "Agrumy Web API v1"));
 
 // UseHsts only outside Development so local HTTP dev without a cert still works; UseHttpsRedirection is a no-op in dev with no https port.
