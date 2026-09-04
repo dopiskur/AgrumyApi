@@ -99,6 +99,38 @@ namespace api.Dal
             return json;
         }
 
+        public Task<string> SensorDataZoneAverageGetAsync(int? tenantID, int deviceUnitZoneID, int? timeRange, int? timeMDMY) =>
+            AveragedSensorJsonAsync(tenantID, q => q.Where(r => r.DeviceUnitZoneID == deviceUnitZoneID), timeRange, timeMDMY);
+
+        public Task<string> SensorDataUnitAverageGetAsync(int? tenantID, int deviceUnitID, int? timeRange, int? timeMDMY) =>
+            AveragedSensorJsonAsync(tenantID, q => q.Where(r => r.DeviceUnitID == deviceUnitID), timeRange, timeMDMY);
+
+        /// <summary>Shared by the zone/unit averaged-chart endpoints - same time-cutoff/bucket logic as
+        /// SensorDataGetAsync, but scoped by whichever predicate the caller supplies (zone or unit) instead
+        /// of a single device, and shaped by SensorReportShaper.BuildAveraged instead of Build.</summary>
+        private async Task<string> AveragedSensorJsonAsync(int? tenantID, Func<IQueryable<SensorDataRow>, IQueryable<SensorDataRow>> scope, int? timeRange, int? timeMDMY)
+        {
+            if (timeMDMY is not (0 or 1 or 2 or 3) || timeRange == null)
+            {
+                return "";
+            }
+
+            DateTime now = DateTime.UtcNow;
+            DateTime cutoff = timeMDMY switch
+            {
+                0 => now.AddMinutes(-timeRange.Value),
+                1 => now.AddDays(-timeRange.Value),
+                2 => now.AddMonths(-timeRange.Value),
+                _ => now.AddYears(-timeRange.Value),
+            };
+
+            IQueryable<SensorDataRow> baseQuery = db.SensorData.AsNoTracking()
+                .Where(r => (tenantID == null || r.TenantID == tenantID) && r.DateCreated > cutoff);
+            var rows = await scope(baseQuery).ToListAsync();
+
+            return SensorReportShaper.BuildAveraged(rows, timeMDMY.Value);
+        }
+
         public async Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? tenantID, int? getData, int? deviceID, int? reportID)
         {
 

@@ -13,6 +13,13 @@ namespace api.Dal.Interface
         /// </summary>
         Task SensorDataPushAsync(JsonArray jsonArray, int deviceID, int tenantID, int? deviceUnitID, int? deviceUnitZoneID);
         Task<string> SensorDataGetAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY, int? buildReport);
+
+        /// <summary>Same JSON shape as SensorDataGetAsync, but time-bucket averaged across every device in
+        /// the zone/unit instead of one device's own raw readings - a metric only one device reports
+        /// averages over just that value, so this also covers the "single contributor" case correctly.</summary>
+        Task<string> SensorDataZoneAverageGetAsync(int? tenantID, int deviceUnitZoneID, int? timeRange, int? timeMDMY);
+        Task<string> SensorDataUnitAverageGetAsync(int? tenantID, int deviceUnitID, int? timeRange, int? timeMDMY);
+
         Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? tenantID, int? getData, int? deviceID, int? sensorDataReportID);
         Task SensorDataDeleteAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY);
 

@@ -91,6 +91,68 @@ public class SensorReportShaperTests
 
         Assert.Equal("2026-08-29 09:50:00", rec.GetProperty("dateCreated").GetString());
     }
+
+
+    [Fact]
+    public void BuildAveraged_NoRows_ReturnsEmptyString()
+    {
+        Assert.Equal("", SensorReportShaper.BuildAveraged(Array.Empty<SensorDataRow>(), 1));
+    }
+
+    [Fact]
+    public void BuildAveraged_TwoDevicesSameBucket_AveragesTheMetric()
+    {
+        var rows = new[]
+        {
+            Row("2026-08-29 09:05:00", temp: 10),
+            Row("2026-08-29 09:40:00", temp: 20),
+        };
+
+        var json = SensorReportShaper.BuildAveraged(rows, 1);
+        using var doc = JsonDocument.Parse(json);
+        var arr = doc.RootElement.GetProperty("sensorData");
+
+        Assert.Equal(1, arr.GetArrayLength());
+        Assert.Equal(15, arr[0].GetProperty("temperature").GetDouble());
+    }
+
+    [Fact]
+    public void BuildAveraged_OnlyOneDeviceReportsAMetric_ShowsThatValueDirectly()
+    {
+        // Same bucket, one row has soilTemperature, the other doesn't - averaging over just the
+        // one non-null value must equal that value, not be dragged toward zero/null.
+        var withSoil = Row("2026-08-29 09:05:00", temp: 10);
+        withSoil.SoilTemperature = 18;
+        var withoutSoil = Row("2026-08-29 09:10:00", temp: 12);
+
+        var json = SensorReportShaper.BuildAveraged(new[] { withSoil, withoutSoil }, 1);
+        var rec = JsonDocument.Parse(json).RootElement.GetProperty("sensorData")[0];
+
+        Assert.Equal(18, rec.GetProperty("soilTemperature").GetDouble());
+        Assert.Equal(11, rec.GetProperty("temperature").GetDouble());
+    }
+
+    [Fact]
+    public void BuildAveraged_NoDeviceReportsAMetric_StaysNull()
+    {
+        var json = SensorReportShaper.BuildAveraged(new[] { Row("2026-08-29 09:05:00") }, 1);
+        var rec = JsonDocument.Parse(json).RootElement.GetProperty("sensorData")[0];
+
+        Assert.Equal(JsonValueKind.Null, rec.GetProperty("soilTemperature").ValueKind);
+    }
+
+    [Fact]
+    public void BuildAveraged_DifferentBuckets_KeepsThemSeparate()
+    {
+        var rows = new[]
+        {
+            Row("2026-08-29 09:05:00", temp: 10),
+            Row("2026-08-29 10:05:00", temp: 30),
+        };
+
+        Assert.Equal(2, JsonDocument.Parse(SensorReportShaper.BuildAveraged(rows, 1))
+            .RootElement.GetProperty("sensorData").GetArrayLength());
+    }
 }
 
 public class ClassifyExceptionTests

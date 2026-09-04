@@ -58,5 +58,42 @@ namespace api.Dal
                 _ => new DateTime(d.Year, d.Month, d.Day, 0, 0, 0),
             };
         }
+
+        /// <summary>Same bucketing as <see cref="Build"/>, but a zone/unit can span several devices - each
+        /// bucket averages every contributing row instead of picking the single latest one. A metric only
+        /// one device in scope reports averages over just that one value, which is the same number as
+        /// showing it directly; nulls are excluded from the average rather than treated as zero.</summary>
+        public static string BuildAveraged(IEnumerable<SensorDataRow> filteredRows, int timeMDMY)
+        {
+            var buckets = filteredRows
+                .GroupBy(r => BucketKey(r.DateCreated, timeMDMY))
+                .OrderBy(g => g.Key)
+                .ToList();
+
+            if (buckets.Count == 0)
+            {
+                return "";
+            }
+
+            var records = buckets.Select(g => new Dictionary<string, object?>
+            {
+                ["battery"] = g.Average(r => r.Battery),
+                ["temperature"] = g.Average(r => r.Temperature),
+                ["soilTemperature"] = g.Average(r => r.SoilTemperature),
+                ["humidity"] = g.Average(r => r.Humidity),
+                ["moisture"] = g.Average(r => r.Moisture),
+                ["light"] = g.Average(r => r.Light),
+                ["co2"] = g.Average(r => r.Co2),
+                ["tvoc"] = g.Average(r => r.Tvoc),
+                ["barometer"] = g.Average(r => r.Barometer),
+                ["liquidPH"] = g.Average(r => r.LiquidPH),
+                ["rainLevel"] = g.Average(r => r.RainLevel),
+                ["waterLevel"] = g.Average(r => r.WaterLevel),
+                ["wind"] = g.Average(r => r.Wind),
+                ["dateCreated"] = g.Key.ToString("yyyy-MM-dd HH:mm:ss"),
+            });
+
+            return JsonSerializer.Serialize(new Dictionary<string, object?> { ["sensorData"] = records });
+        }
     }
 }

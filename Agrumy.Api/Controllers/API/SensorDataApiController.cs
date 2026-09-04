@@ -86,5 +86,27 @@ namespace api.Controllers.API
         public async Task<ActionResult<IEnumerable<SensorDataReport>>> ReportGet(int? getData, int? idDevice, int? iDSensorDataReport) =>
             // Same fix as Get above.
             Ok(await Repo.SensorDataReportGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, getData, idDevice, iDSensorDataReport));
+
+        [HttpGet("ZoneAverage")]
+        [Authorize]
+        public async Task<ActionResult<string>> ZoneAverageGet(int deviceUnitZoneID, int? timeRange = 60, int? timeMDMY = 0)
+        {
+            if (timeRange is int range && !IsWithinMaxTimeRange(timeMDMY, range))
+            {
+                return BadRequest($"timeRange {range} exceeds the maximum allowed for this unit.");
+            }
+            return Ok(await Repo.SensorDataZoneAverageGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, deviceUnitZoneID, timeRange, timeMDMY));
+        }
+
+        [HttpGet("UnitAverage")]
+        [Authorize]
+        public async Task<ActionResult<string>> UnitAverageGet(int deviceUnitID, int? timeRange = 60, int? timeMDMY = 0)
+        {
+            if (timeRange is int range && !IsWithinMaxTimeRange(timeMDMY, range))
+            {
+                return BadRequest($"timeRange {range} exceeds the maximum allowed for this unit.");
+            }
+            return Ok(await Repo.SensorDataUnitAverageGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, deviceUnitID, timeRange, timeMDMY));
+        }
     }
 }

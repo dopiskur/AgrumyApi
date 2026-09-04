@@ -23,17 +23,28 @@ namespace api.Controllers.View
                 return RedirectToAction(nameof(Zone), new { idDeviceUnitZone = zones[0].IDDeviceUnitZone });
             }
 
+            string? timeZone = (await api.UserGetSelf()).TimeZone;
             return View(new UnitZonesViewModel
             {
                 Unit = await api.DeviceUnitGet(idDeviceUnit),
                 Zones = zones,
+                DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone,
+                // Last 24h, hourly buckets - same window _ZoneDetails' sparkline trend already uses.
+                SensorDataJson = await api.SensorDataUnitAverageGet(idDeviceUnit, 24, 1),
             });
         }
 
         public async Task<ActionResult> ZonesCubes(int idDeviceUnit) =>
             PartialView("_ZoneCubes", await api.DeviceUnitZoneDashboardListGet(idDeviceUnit));
 
-        public async Task<ActionResult> Zone(int idDeviceUnitZone) => View(await BuildZoneViewAsync(idDeviceUnitZone));
+        public async Task<ActionResult> Zone(int idDeviceUnitZone)
+        {
+            ZoneViewModel model = await BuildZoneViewAsync(idDeviceUnitZone);
+            // Last 24h, hourly buckets - same window the sparkline trend uses. Only fetched here, not
+            // in ZoneDetails (the 10s-polled fragment) - the chart lives outside that fragment.
+            model.SensorDataJson = await api.SensorDataZoneAverageGet(idDeviceUnitZone, 24, 1);
+            return View(model);
+        }
 
         public async Task<ActionResult> ZoneDetails(int idDeviceUnitZone) =>
             PartialView("_ZoneDetails", await BuildZoneViewAsync(idDeviceUnitZone));
@@ -233,15 +244,17 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
         }
 
-        // returnUrl comes from _ZoneStatusBadge's own request path (Units index, Zones list, or a
-        // single Zone page) - same pattern as _FleetRows' FirmwareUpdate form.
+        // returnUrl is read client-side from window.location by _ZoneStatusBadge's inline onsubmit -
+        // Context.Request.Path server-side would be wrong whenever the badge last rendered inside a
+        // live-refresh AJAX fragment (that request's path is the polling endpoint, not the page the
+        // browser is actually showing). Falls back to the Units index if it's ever missing/unsafe.
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> AcknowledgeAlert(int idEventDevice, string returnUrl)
+        public async Task<ActionResult> AcknowledgeAlert(int idEventDevice, string? returnUrl)
         {
             await api.DeviceEventAcknowledge(idEventDevice);
-            return LocalRedirect(returnUrl);
+            return Url.IsLocalUrl(returnUrl) ? LocalRedirect(returnUrl!) : RedirectToAction(nameof(Index));
         }
     }
 }

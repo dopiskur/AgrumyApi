@@ -3,83 +3,58 @@
 
 @{
     // Re-serializing through System.Text.Json escapes HTML-sensitive chars so Html.Raw below can't break out of the script block.
-    var safePayload = "{\"sensorData\":[]}";
+    JsonNode? parsed = null;
     if (!string.IsNullOrWhiteSpace(Model.SensorDataJson))
     {
-        try { safePayload = JsonNode.Parse(Model.SensorDataJson)!.ToJsonString(); }
+        try { parsed = JsonNode.Parse(Model.SensorDataJson); }
         catch (System.Text.Json.JsonException) { }
     }
+    var safePayload = (parsed ?? JsonNode.Parse("{\"sensorData\":[]}")!).ToJsonString();
+    var sensorDataArray = parsed?["sensorData"]?.AsArray() ?? new JsonArray();
+
+    (string Id, string FieldName, string Label)[] charts =
+    [
+        ("chart-temperature", "temperature", "Temperature"),
+        ("chart-humidity", "humidity", "Humidity"),
+        ("chart-barometer", "barometer", "Barometer"),
+        ("chart-moist", "moisture", "Soil moisture"),
+        ("chart-light", "light", "Light"),
+        ("chart-co2", "co2", "CO2"),
+        ("chart-waterLevel", "waterLevel", "Water level"),
+    ];
+    // Only a metric with at least one non-null reading gets a card - a sensor that was never
+    // enabled for this device/zone/unit shouldn't leave a permanently-empty chart behind.
+    var present = charts.Where(c => sensorDataArray.Any(record => record?[c.FieldName] != null)).ToList();
 }
 
 <div class="text-secondary small mb-2">Chart times shown in @(ViewBag.DisplayTimeZone ?? "UTC")</div>
-<div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header"><h3 class="card-title">Temperature</h3></div>
-            <div class="card-body">
-                <div id="chart-temperature" style="height: 300px;"></div>
+@if (present.Count == 0)
+{
+    <p class="text-secondary fst-italic">No sensor data yet.</p>
+}
+else
+{
+    <div class="row">
+        @foreach (var c in present)
+        {
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">@c.Label</h3></div>
+                    <div class="card-body">
+                        <div id="@c.Id" style="height: 300px;"></div>
+                    </div>
+                </div>
             </div>
-        </div>
+        }
     </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header"><h3 class="card-title">Humidity</h3></div>
-            <div class="card-body">
-                <div id="chart-humidity" style="height: 300px;"></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header"><h3 class="card-title">Barometer</h3></div>
-            <div class="card-body">
-                <div id="chart-barometer" style="height: 300px;"></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header"><h3 class="card-title">Soil moisture</h3></div>
-            <div class="card-body">
-                <div id="chart-moist" style="height: 300px;"></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header"><h3 class="card-title">Light</h3></div>
-            <div class="card-body">
-                <div id="chart-light" style="height: 300px;"></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header"><h3 class="card-title">CO2</h3></div>
-            <div class="card-body">
-                <div id="chart-co2" style="height: 300px;"></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header"><h3 class="card-title">Water level</h3></div>
-            <div class="card-body">
-                <div id="chart-waterLevel" style="height: 300px;"></div>
-            </div>
-        </div>
-    </div>
-</div>
+}
 
 <script src="~/lib/echarts/echarts.min.js"></script>
 <script src="~/js/sensor-charts.js"></script>
 <script>
     const sensorPayload = @Html.Raw(safePayload);
-    renderSensorChart('chart-temperature', sensorPayload, 'temperature', 'Temperature');
-    renderSensorChart('chart-humidity', sensorPayload, 'humidity', 'Humidity');
-    renderSensorChart('chart-barometer', sensorPayload, 'barometer', 'Barometer');
-    renderSensorChart('chart-moist', sensorPayload, 'moisture', 'Soil moisture');
-    renderSensorChart('chart-light', sensorPayload, 'light', 'Light');
-    renderSensorChart('chart-co2', sensorPayload, 'co2', 'CO2');
-    renderSensorChart('chart-waterLevel', sensorPayload, 'waterLevel', 'Water level');
+    @foreach (var c in present)
+    {
+        @:renderSensorChart('@c.Id', sensorPayload, '@c.FieldName', '@c.Label');
+    }
 </script>
