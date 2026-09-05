@@ -210,6 +210,15 @@ namespace api.Dal.Interface
         [Get("/api/Discovery/WifiConfigs")]
         Task<IList<TenantWifiConfig>> DiscoveryWifiConfigsGet();
 
+        [Post("/api/Discovery/WifiConfigs")]
+        Task<TenantWifiConfig> DiscoveryWifiConfigAdd([Body] TenantWifiConfig config);
+
+        [Put("/api/Discovery/WifiConfigs/{idTenantWifiConfig}")]
+        Task DiscoveryWifiConfigUpdate(int idTenantWifiConfig, [Body] TenantWifiConfig config);
+
+        [Delete("/api/Discovery/WifiConfigs/{idTenantWifiConfig}")]
+        Task DiscoveryWifiConfigDelete(int idTenantWifiConfig);
+
         [Post("/api/Discovery/Register")]
         Task<DiscoveryRegisterResult> DiscoveryRegister([Body] DiscoveryRegisterRequest request);
 

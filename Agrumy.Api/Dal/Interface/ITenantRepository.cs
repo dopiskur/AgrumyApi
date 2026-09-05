@@ -20,5 +20,13 @@ namespace api.Dal.Interface
         Task<IList<TenantWifiConfig>> TenantWifiConfigsGetAsync(int tenantID);
 
         Task<TenantWifiConfig> TenantWifiConfigAddAsync(TenantWifiConfig config);
+
+        /// No tenant filter - for ownership checks before an authorized write, same pattern as DeviceGetByIdAsync.
+        Task<TenantWifiConfig?> TenantWifiConfigGetByIdAsync(int idTenantWifiConfig);
+
+        Task TenantWifiConfigUpdateAsync(TenantWifiConfig config);
+
+        /// A no-op if the id does not exist.
+        Task TenantWifiConfigDeleteAsync(int idTenantWifiConfig);
     }
 }

@@ -68,7 +68,7 @@ namespace api.Controllers.API
             };
         }
 
-        /// Lets the Web layer decide the Register modal's shape (free-text SSID/password, a dropdown, or nothing) before the admin ever submits - Password is always stripped, same as Register's WifiChoices. Open to any authenticated caller, same rule as DeviceApiController.DeviceFleetGet - the Register modal itself is still gated to DeviceManagers in the Web UI.
+        /// Lets the Web layer decide the Register modal's shape (free-text SSID/password, a dropdown, or nothing) before the admin ever submits, and backs the WiFi-networks management page. Open to any authenticated caller (same rule as DeviceApiController.DeviceFleetGet) but Password is only ever included for a caller who manages this tenant's devices - a Tenant reader sees SSIDs only.
         [Authorize]
         [HttpGet("WifiConfigs")]
         public async Task<ActionResult<IList<TenantWifiConfig>>> WifiConfigs()
@@ -77,8 +77,57 @@ namespace api.Controllers.API
             {
                 return Ok(new List<TenantWifiConfig>());
             }
+            bool includePassword = CallerManagesDevices(tenantId);
             IList<TenantWifiConfig> configs = await Repo.TenantWifiConfigsGetAsync(tenantId);
-            return Ok(configs.Select(c => new TenantWifiConfig { IDTenantWifiConfig = c.IDTenantWifiConfig, TenantID = c.TenantID, Ssid = c.Ssid }).ToList());
+            return Ok(configs.Select(c => new TenantWifiConfig { IDTenantWifiConfig = c.IDTenantWifiConfig, TenantID = c.TenantID, Ssid = c.Ssid, Password = includePassword ? c.Password : null }).ToList());
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("WifiConfigs")]
+        public async Task<ActionResult<TenantWifiConfig>> WifiConfigAdd([FromBody] TenantWifiConfig config)
+        {
+            if (CallerTenantId is not int tenantId)
+            {
+                return BadRequest("Caller has no tenant to save a WiFi network under.");
+            }
+            if (string.IsNullOrWhiteSpace(config.Ssid))
+            {
+                return BadRequest("Ssid is required.");
+            }
+            config.TenantID = tenantId;
+            return Ok(await Repo.TenantWifiConfigAddAsync(config));
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPut("WifiConfigs/{idTenantWifiConfig}")]
+        public async Task<ActionResult> WifiConfigUpdate(int idTenantWifiConfig, [FromBody] TenantWifiConfig config)
+        {
+            var (existing, error) = await EnsureOwnedWifiConfigAsync(idTenantWifiConfig);
+            if (error != null)
+            {
+                return error;
+            }
+            if (string.IsNullOrWhiteSpace(config.Ssid))
+            {
+                return BadRequest("Ssid is required.");
+            }
+            config.IDTenantWifiConfig = idTenantWifiConfig;
+            config.TenantID = existing!.TenantID; // payload cannot move it to another tenant
+            await Repo.TenantWifiConfigUpdateAsync(config);
+            return Ok();
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpDelete("WifiConfigs/{idTenantWifiConfig}")]
+        public async Task<ActionResult> WifiConfigDelete(int idTenantWifiConfig)
+        {
+            var (_, error) = await EnsureOwnedWifiConfigAsync(idTenantWifiConfig);
+            if (error != null)
+            {
+                return error;
+            }
+            await Repo.TenantWifiConfigDeleteAsync(idTenantWifiConfig);
+            return Ok();
         }
 
         /// Open to any authenticated caller, same rule as DeviceApiController.DeviceFleetGet - the Register modal that acts on these results is still gated to DeviceManagers in the Web UI.
@@ -110,9 +159,9 @@ namespace api.Controllers.API
         /// <summary>Resolves the winning scanning device for DiscoveredApMac, resolves WiFi
         /// credentials (0/1/many saved TenantWifiConfig rows - see api.Models.DiscoveryRegisterRequest),
         /// (re)issues the caller's own #70 device-PIN, and queues a ProvisionDevice command carrying
-        /// both to that device. DeviceName/UnitID/ZoneID are accepted and stored on the command's
-        /// payload but nothing applies them yet - no later step in this roadmap item's plan closes
-        /// that loop.</summary>
+        /// both to that device. DeviceName/UnitID/ZoneID ride along on the same payload and are
+        /// applied once the discovered device completes its own real registration - see
+        /// CommandQueueService.ConsumePendingProvisionAsync.</summary>
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost("Register")]
         public async Task<ActionResult<DiscoveryRegisterResult>> Register([FromBody] DiscoveryRegisterRequest request)
@@ -221,5 +270,8 @@ namespace api.Controllers.API
 
         private Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int idDeviceUnit, bool forWrite) =>
             EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite);
+
+        private Task<(TenantWifiConfig? Config, ActionResult? Error)> EnsureOwnedWifiConfigAsync(int idTenantWifiConfig) =>
+            EnsureOwnedDeviceEntityAsync(() => Repo.TenantWifiConfigGetByIdAsync(idTenantWifiConfig), c => (int?)c.TenantID, "WiFi network", forWrite: true);
     }
 }

@@ -1,0 +1,141 @@
+@model IList<api.Models.TenantWifiConfig>
+@{
+    ViewData["Title"] = "WiFi Networks";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Saved WiFi networks</h3>
+        <div class="float-end">
+            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addWifiModal">
+                <i class="bi bi-plus-lg"></i> Add network
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <p class="text-secondary">
+            Used to provision newly discovered devices (Fleet/Unit/Zone "Scan for new devices") without
+            typing the SSID and password in on every registration.
+        </p>
+        @if (TempData["Message"] is string message)
+        {
+            <div class="alert alert-success">@message</div>
+        }
+        @if (TempData["Error"] is string error)
+        {
+            <div class="alert alert-warning">@error</div>
+        }
+        @if (Model.Count == 0)
+        {
+            <p class="text-secondary mb-0">No saved networks yet.</p>
+        }
+        else
+        {
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>SSID</th>
+                        <th>Password</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var config in Model)
+                    {
+                        <tr>
+                            <td>@config.Ssid</td>
+                            <td>
+                                <div class="input-group input-group-sm" style="max-width:220px;">
+                                    <input type="password" class="form-control wifi-password-field" value="@config.Password" readonly />
+                                    <button type="button" class="btn btn-outline-secondary wifi-password-toggle" title="Show/hide password"><i class="bi bi-eye"></i></button>
+                                </div>
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editWifiModal-@config.IDTenantWifiConfig" title="Edit"><i class="bi bi-pencil"></i></button>
+                                    <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Remove this saved network? Devices already provisioned with it keep working - this only affects future registrations.');">
+                                        <input type="hidden" name="idTenantWifiConfig" value="@config.IDTenantWifiConfig" />
+                                        <button type="submit" class="btn btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<div class="modal fade" id="addWifiModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="Add" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add WiFi network</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="addWifiSsid">SSID</label>
+                        <input type="text" name="Ssid" id="addWifiSsid" class="form-control" required maxlength="32" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="addWifiPassword">Password</label>
+                        <input type="password" name="Password" id="addWifiPassword" class="form-control" maxlength="64" />
+                        <div class="form-text">Leave blank for an open network.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@foreach (var config in Model)
+{
+    <div class="modal fade" id="editWifiModal-@config.IDTenantWifiConfig" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form asp-action="Update" method="post">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit WiFi network</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="idTenantWifiConfig" value="@config.IDTenantWifiConfig" />
+                        <div class="mb-3">
+                            <label class="form-label" for="editWifiSsid-@config.IDTenantWifiConfig">SSID</label>
+                            <input type="text" name="Ssid" id="editWifiSsid-@config.IDTenantWifiConfig" class="form-control" required maxlength="32" value="@config.Ssid" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="editWifiPassword-@config.IDTenantWifiConfig">Password</label>
+                            <input type="password" name="Password" id="editWifiPassword-@config.IDTenantWifiConfig" class="form-control" maxlength="64" value="@config.Password" />
+                            <div class="form-text">Leave blank for an open network.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.wifi-password-toggle').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    var field = button.parentElement.querySelector('.wifi-password-field');
+                    field.type = field.type === 'password' ? 'text' : 'password';
+                });
+            });
+        });
+    </script>
+}

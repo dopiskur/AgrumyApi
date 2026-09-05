@@ -137,6 +137,15 @@
                                 <p>@Localizer["Reporting"]</p>
                             </a>
                         </li>
+                        @if (hasAnyRole(RoleNames.DeviceManagers))
+                        {
+                            <li class="nav-item">
+                                <a asp-area="" asp-controller="WifiConfig" asp-action="Index" class="nav-link @navActive("WifiConfig")">
+                                    <i class="nav-icon bi bi-wifi"></i>
+                                    <p>@Localizer["WiFi Networks"]</p>
+                                </a>
+                            </li>
+                        }
                         @if (hasAnyRole(RoleNames.UserManagers))
                         {
                             <li class="nav-item">
