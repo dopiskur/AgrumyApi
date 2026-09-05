@@ -9,7 +9,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Unit tests for the sensor-report shaping port and database-error classification. No database - pure functions only.</summary>
+/// Unit tests for the sensor-report shaping port and database-error classification. No database - pure functions only.
 public class SensorReportShaperTests
 {
     private static SensorDataRow Row(string dateCreated, int? co2 = 400, double? temp = 20.0) => new()
@@ -140,8 +140,7 @@ public class SensorReportShaperTests
     [Fact]
     public void BuildAveraged_OnlyOneDeviceReportsAMetric_ShowsThatValueDirectly()
     {
-        // Same bucket, one row has soilTemperature, the other doesn't - averaging over just the
-        // one non-null value must equal that value, not be dragged toward zero/null.
+        // One row has soilTemperature, the other doesn't - averaging over just the one value must equal that value, not zero.
         var withSoil = Row("2026-08-29 09:05:00", temp: 10);
         withSoil.SoilTemperature = 18;
         var withoutSoil = Row("2026-08-29 09:10:00", temp: 12);

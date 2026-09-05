@@ -7,7 +7,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Exercises the firmware-lookup branch in DeviceApiController.BuildDeviceConfigAsync() through the public Register action (Config takes the same path). No database - IRepository is mocked.</summary>
+/// Exercises the firmware-lookup branch in DeviceApiController.BuildDeviceConfigAsync() through the public Register action (Config takes the same path). No database - IRepository is mocked.
 public class DeviceFirmwareOtaTests
 {
     private readonly Mock<IRepository> _repo = new(MockBehavior.Strict);
