@@ -1,21 +1,13 @@
 namespace api.Models
 {
-    /// <summary>Where an import lands. ByName ties to a tenant matched (or created) by exact
-    /// name - a normal cloud-to-cloud or private-to-private move. AsSentinel targets TenantID=0,
-    /// the "become the sole tenant on my own fresh self-hosted server" path - only reachable while
-    /// that server's bootstrap Global Admin is still unclaimed (see
-    /// ITenantRepository.TenantZeroIsEmptyAsync), and only via
-    /// TenantApiController.ImportAsSentinel, not the normal admin-authenticated Import.</summary>
+    /// Where an import lands: ByName matches/creates a tenant by exact name; AsSentinel targets TenantID=0 and is only reachable via TenantApiController.ImportAsSentinel while the bootstrap Global Admin is still unclaimed (ITenantRepository.TenantZeroIsEmptyAsync).
     public enum TenantImportTarget
     {
         ByName = 0,
         AsSentinel = 1,
     }
 
-    /// <summary>One user in a TenantExport - the User DTO plus what TenantExport needs beyond it:
-    /// the password hash/salt (portable - every Agrumy install hashes with the same PBKDF2
-    /// parameters) and the role names UserRoleNamesGetAsync already resolves by name rather than
-    /// the install-specific userRole.IDUserRole a raw id would need remapping for.</summary>
+    /// One exported user: the User DTO plus its portable PBKDF2 hash/salt and role NAMES (not the install-specific userRole.IDUserRole, which would need remapping).
     public class TenantExportUser
     {
         public User User { get; set; } = new();
@@ -24,12 +16,7 @@ namespace api.Models
         public IList<string> Roles { get; set; } = [];
     }
 
-    /// <summary>One device in a TenantExport - Device plus its Sensor/Controller config, the same
-    /// grouping DeviceUpdate already uses for the admin-edit form. ApiId/ApiKey are carried as
-    /// their OWN fields, not read off the nested Device: both are [JsonIgnore] on api.Models.Device
-    /// (never serialized to a normal device-API response, by design), which would otherwise
-    /// silently drop them from the exported JSON too - defeating the "keep the same ApiKey"
-    /// decision this whole export exists to honor.</summary>
+    /// One exported device: Device+Sensor/Controller (DeviceUpdate's grouping), with ApiId/ApiKey carried as separate fields since both are [JsonIgnore] on Device and would otherwise silently drop from the export.
     public class TenantExportDevice
     {
         public Device Device { get; set; } = new();
@@ -39,19 +26,7 @@ namespace api.Models
         public DeviceConfigController? Controller { get; set; }
     }
 
-    /// <summary>The full portable snapshot of one tenant - everything TenantID-scoped except
-    /// SensorData, which is opt-in (IncludesSensorData) given its potential volume. Deliberately
-    /// excludes ServerConfig (confirmed to carry no TenantID - it is install-wide) and the firmware
-    /// catalog (also install-wide).
-    ///
-    /// Every *.IDXxx field on every nested DTO is the SOURCE server's id, meaningful only for
-    /// stitching internal references (e.g. DeviceUnitZone.DeviceUnitID) back together during
-    /// import - TenantImportService discards every one of them and lets the target database assign
-    /// fresh ids, so an import can never collide with anything already on the target.
-    ///
-    /// SENSITIVE: carries password hashes/salts and device ApiKeys - handle like any other
-    /// credential bundle (see TenantApiController.Export's remarks). Never persisted server-side;
-    /// generated and streamed directly to the requesting admin's browser.</summary>
+    /// The full portable snapshot of one tenant (excludes install-wide ServerConfig/firmware catalog, includes SensorData only when opt-in) - SENSITIVE (password hashes, device ApiKeys), never persisted server-side, streamed directly to the admin's browser.
     public class TenantExport
     {
         public const string CurrentFormatVersion = "1";
@@ -69,18 +44,15 @@ namespace api.Models
         public IList<SensorData>? SensorData { get; set; }
     }
 
-    /// <summary>Body of POST /api/Tenant/Import (ByName only - ImportAsSentinel takes a bare
-    /// TenantExport, no target name needed since AsSentinel always means "TenantID=0").</summary>
+    /// Body of POST /api/Tenant/Import (ByName only - ImportAsSentinel takes a bare TenantExport, no target name needed).
     public class TenantImportRequest
     {
         public TenantExport? Export { get; set; }
-        /// <summary>Required for ByName - matched case-sensitively against an existing tenant, or
-        /// used to create a new one if none matches.</summary>
+        /// Required for ByName - matched case-sensitively against an existing tenant, or used to create a new one if none matches.
         public string? TargetTenantName { get; set; }
     }
 
-    /// <summary>What actually happened - counts, not the imported rows themselves (the caller
-    /// already has those, in the export they just submitted).</summary>
+    /// What actually happened - counts, not the imported rows themselves (the caller already has those, in the export they just submitted).
     public class TenantImportResult
     {
         public int TargetTenantId { get; set; }
@@ -88,8 +60,7 @@ namespace api.Models
         public int UsersImported { get; set; }
         public int UsersSkipped { get; set; }
         public int DevicesSkipped { get; set; }
-        /// <summary>Human-readable reason for each skipped user/device (global-unique-constraint
-        /// conflicts with something already on the target) - covers both counters above.</summary>
+        /// Human-readable reason for each skipped user/device (unique-constraint conflicts with something already on the target).
         public IList<string> SkippedReasons { get; set; } = [];
         public int DevicesImported { get; set; }
         public int UnitsImported { get; set; }
