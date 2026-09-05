@@ -58,7 +58,7 @@ namespace api.Dal.Interface
         /// Assigns one device to one zone (sets DeviceUnitID from the zone's own, plus DeviceUnitZoneID) and bumps ConfigVersion so the device picks it up on its next poll.
         Task DeviceAssignToZoneAsync(int idDevice, int idDeviceUnitZone);
 
-        /// Resets DeviceUnitID/DeviceUnitZoneID to the 0 "unassigned" sentinel - deliberately does NOT bump ConfigVersion or otherwise notify the device.
+        /// Resets DeviceUnitID/DeviceUnitZoneID to NULL ("unassigned") - deliberately does NOT bump ConfigVersion or otherwise notify the device.
         Task DeviceUnassignFromZoneAsync(int idDevice);
 
         // ---- Dashboard aggregation -------------------------------------

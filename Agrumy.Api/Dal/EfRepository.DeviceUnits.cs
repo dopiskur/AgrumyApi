@@ -51,8 +51,8 @@ namespace api.Dal
         public async Task<DeviceUnit> DeviceUnitAddAsync(DeviceUnit unit)
         {
             // IDDeviceUnit is ValueGeneratedNever - MySQL's default sql_mode treats an explicit 0
-            // on an AUTO_INCREMENT column as "generate a new value", which would break the
-            // IDDeviceUnit=0 "Default" sentinel every unassigned device relies on.
+            // on an AUTO_INCREMENT column as "generate a new value", which would collide with the
+            // reserved IDDeviceUnit=0 "Default" sentinel row (Math.Max(...,1) below keeps 0 free).
             int nextId = Math.Max((await db.DeviceUnits.AsNoTracking().Select(u => (int?)u.IDDeviceUnit).MaxAsync() ?? 0) + 1, 1);
             var row = new DeviceUnitRow { IDDeviceUnit = nextId, TenantID = unit.TenantID, DeviceUnitName = unit.DeviceUnitName };
             db.DeviceUnits.Add(row);
@@ -261,7 +261,7 @@ namespace api.Dal
         public async Task<IList<Device>> DeviceUnassignedGetAsync(int? tenantID, bool controllerCapable)
         {
             IQueryable<DeviceRow> q = db.Devices.AsNoTracking()
-                .Where(d => d.DeviceUnitZoneID == null || d.DeviceUnitZoneID == 0);
+                .Where(d => d.DeviceUnitZoneID == null);
             if (tenantID != null)
             {
                 q = q.Where(d => d.TenantID == tenantID);
@@ -296,8 +296,8 @@ namespace api.Dal
             // telemetry exactly as before, it just stops counting toward any zone's aggregation.
             await db.Devices.Where(d => d.IDDevice == idDevice)
                 .ExecuteUpdateAsync(s => s
-                    .SetProperty(d => d.DeviceUnitID, 0)
-                    .SetProperty(d => d.DeviceUnitZoneID, 0));
+                    .SetProperty(d => d.DeviceUnitID, (int?)null)
+                    .SetProperty(d => d.DeviceUnitZoneID, (int?)null));
         }
 
         // ---- Dashboard aggregation -------------------------------------
@@ -312,7 +312,7 @@ namespace api.Dal
             var unitRows = await units.ToListAsync();
 
             IQueryable<DeviceRow> scopedDevices = db.Devices.AsNoTracking()
-                .Where(d => d.DeviceUnitID != null && d.DeviceUnitID != 0);
+                .Where(d => d.DeviceUnitID != null);
             if (tenantID != null)
             {
                 scopedDevices = scopedDevices.Where(d => d.TenantID == tenantID);

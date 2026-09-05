@@ -29,7 +29,7 @@
         @if (!zoneScoped)
         {
             <td>
-                @if (item.DeviceUnitID is null or 0)
+                @if (item.DeviceUnitID is null)
                 {
                     <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignZoneModal" data-device-id="@item.IDDevice">Assign</button>
                 }

@@ -122,7 +122,7 @@ namespace api.Dal
                 };
             })
             // Fleet page default view: unassigned devices surfaced first, newest device first within each group.
-            .OrderBy(d => (d.DeviceUnitID ?? 0) == 0 ? 0 : 1)
+            .OrderBy(d => d.DeviceUnitID == null ? 0 : 1)
             .ThenByDescending(d => d.IDDevice)
             .ToList();
 

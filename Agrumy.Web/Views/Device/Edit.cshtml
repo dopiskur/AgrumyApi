@@ -39,7 +39,7 @@
 
             <div class="mb-3">
                 <label class="form-label">Unit / Zone</label>
-                @if (device.DeviceUnitZoneID is int zoneId && zoneId != 0)
+                @if (device.DeviceUnitZoneID is int zoneId)
                 {
                     <p class="form-control-plaintext">
                         Assigned - manage from the

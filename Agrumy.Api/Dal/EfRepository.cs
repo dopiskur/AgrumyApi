@@ -120,7 +120,7 @@ namespace api.Dal
             }
         }
 
-        /// Seeds the IDDeviceUnit=0/IDDeviceUnitZone=0 sentinel pair - without it, a fresh install's first device registration violates device.DeviceUnitID's FK, since Device defaults that column to 0, not null.
+        /// Seeds the IDDeviceUnit=0/IDDeviceUnitZone=0 sentinel pair, also reserving ID 0 so DeviceUnitAddAsync/DeviceUnitZoneAddAsync's MAX+1 never assigns it to a real Unit/Zone - device.DeviceUnitID/DeviceUnitZoneID no longer reference these rows (#313 made unassigned mean NULL, not 0), whether the rows themselves are still needed for anything else is an open question.
         private static async Task SeedDeviceUnitSentinelsAsync(AgrumyDbContext db)
         {
             if (!await db.DeviceUnits.AnyAsync())

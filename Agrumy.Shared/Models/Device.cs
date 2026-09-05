@@ -16,10 +16,11 @@ namespace api.Models
         public int TenantID { get; set; } = 0;
 
         public int? DeviceTypeID { get; set; } = 0;
+        // No default (unlike DeviceTypeID above) - null means genuinely unassigned; 0 used to be a sentinel here, now that the column allows real NULL there is no reason left to default to it.
         [HiddenInput(DisplayValue = true)]
-        public int? DeviceUnitID { get; set; } = 0;
+        public int? DeviceUnitID { get; set; }
         [HiddenInput(DisplayValue = true)]
-        public int? DeviceUnitZoneID { get; set; } = 0;
+        public int? DeviceUnitZoneID { get; set; }
         [HiddenInput(DisplayValue = true)]
         public int? DeviceConfigSensorID { get; set; }
         [HiddenInput(DisplayValue = true)]

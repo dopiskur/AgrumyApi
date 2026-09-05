@@ -43,7 +43,7 @@ public sealed class RelationalIntegrationFixture
         int deviceType = db.DeviceTypes.Where(t => t.DeviceTypeName == "greenhouse")
                            .Select(t => (int?)t.IDDeviceType).FirstOrDefault() ?? SeedDeviceType(db);
 
-        // sensorData's FK defaults DeviceUnitID/DeviceUnitZoneID to 0, so the "Default"/"Disabled" sentinel rows must exist before the FK is enforced.
+        // deviceUnitZone.DeviceUnitID has a real FK to deviceUnit - the sentinel Zone row below (DeviceUnitID=0) needs the sentinel Unit row to already exist.
         if (!db.DeviceUnits.Any())
             db.DeviceUnits.Add(new DeviceUnitRow { IDDeviceUnit = 0, TenantID = null, DeviceUnitName = "Default" });
         db.SaveChanges();
@@ -1296,7 +1296,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.DoesNotContain(seenByTenant1, u => u.IDDeviceUnit == 0); // sentinel never listed as a real unit
     }
 
-    // Unassigning resets both FKs to the 0 sentinel without bumping ConfigVersion - pure bookkeeping, no device config change.
+    // Unassigning resets both FKs to NULL without bumping ConfigVersion - pure bookkeeping, no device config change.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceAssignToZone_SetsUnitAndZone_AndBumpsConfigVersion_UnassignDoesNot(DbProviderKind provider)
     {
@@ -1316,9 +1316,32 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await _repo.DeviceUnassignFromZoneAsync(d.IDDevice.Value);
 
         var unassigned = await _repo.DeviceGetByIdAsync(d.IDDevice);
-        Assert.Equal(0, unassigned!.DeviceUnitID);
-        Assert.Equal(0, unassigned.DeviceUnitZoneID);
+        Assert.Null(unassigned!.DeviceUnitID);
+        Assert.Null(unassigned.DeviceUnitZoneID);
         Assert.Equal(originalConfigVersion + 1, unassigned.ConfigVersion); // unchanged by the unassign
+    }
+
+    // Roadmap #313: a never-assigned device must read back NULL, not the old 0 sentinel, and the Fleet page's "unassigned first" sort must still work against NULL.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task NewDevice_IsUnassigned_WithNullNotZero_AndSortsFirstOnFleet(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var unassigned = await MakeDevice(t, tenantId);
+        var (_, zone) = await MakeUnitAndZone(tenantId);
+        var assigned = await MakeDevice(t, tenantId);
+        await _repo.DeviceAssignToZoneAsync(assigned.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+
+        var fetched = await _repo.DeviceGetByIdAsync(unassigned.IDDevice);
+        Assert.Null(fetched!.DeviceUnitID);
+        Assert.Null(fetched.DeviceUnitZoneID);
+        Assert.Contains(await _repo.DeviceUnassignedGetAsync(tenantId, controllerCapable: true), d => d.IDDevice == unassigned.IDDevice);
+
+        var fleet = (await _repo.DeviceFleetGetAsync(tenantId)).ToList();
+        Assert.Null(fleet.Single(f => f.IDDevice == unassigned.IDDevice).DeviceUnitID);
+        int unassignedIndex = fleet.FindIndex(f => f.IDDevice == unassigned.IDDevice);
+        int assignedIndex = fleet.FindIndex(f => f.IDDevice == assigned.IDDevice);
+        Assert.True(unassignedIndex < assignedIndex);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -1647,8 +1670,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Null(await _repo.DeviceUnitZoneGetByIdAsync(zone.IDDeviceUnitZone));
         var stillThere = await _repo.DeviceGetByIdAsync(d.IDDevice);
         Assert.NotNull(stillThere); // device itself is untouched
-        Assert.Equal(0, stillThere!.DeviceUnitID);
-        Assert.Equal(0, stillThere.DeviceUnitZoneID);
+        Assert.Null(stillThere!.DeviceUnitID);
+        Assert.Null(stillThere.DeviceUnitZoneID);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]

@@ -63,7 +63,7 @@ namespace api.Devices
                 // DeviceConfigController object the firmware already expects. No zone assigned
                 // means an empty Rules list, so every relay function simply stays off.
                 DeviceConfigController? controller = await repo.DeviceConfigControllerGetAsync(device.DeviceConfigControllerID);
-                if (controller != null && device.DeviceUnitZoneID is int idZone and not 0)
+                if (controller != null && device.DeviceUnitZoneID is int idZone)
                 {
                     controller.Rules = await repo.DeviceUnitZoneRulesGetAsync(idZone);
                     DeviceUnitZone? zone = await repo.DeviceUnitZoneGetByIdAsync(idZone);
