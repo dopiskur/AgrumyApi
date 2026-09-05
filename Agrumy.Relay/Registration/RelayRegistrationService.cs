@@ -4,11 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace api.Relay.Registration
 {
-    /// <summary>Loads a persisted registration if one exists; otherwise registers once via the
-    /// SAME PIN flow AgrumyFirmware uses (POST /api/Device/Register), then persists the result -
-    /// mirrors AgrumyFirmware's own "load deviceRegistration.json, else initializeDevice()" boot
-    /// sequence (see AgrumyFirmware's DeviceController), just without the captive-portal UI since a
-    /// relay's email/PIN/MacAddress come from its own appsettings.json instead of a phone screen.</summary>
+    /// Loads a persisted registration if one exists; otherwise registers once via the SAME PIN flow AgrumyFirmware uses, then persists the result - same boot sequence, minus the captive-portal UI since config comes from appsettings.json instead.
     public sealed partial class RelayRegistrationService(
         AgrumyServiceClient client, RelayRegistrationStore store, ILogger<RelayRegistrationService> logger)
         : IHostedService
@@ -32,11 +28,7 @@ namespace api.Relay.Registration
             }
 
             LogRegistering(logger);
-            // Register's rate limiting (device-auth policy) is generous enough for a one-shot
-            // startup call; a transient failure here just means the relay stays unregistered and
-            // every Batch call fails loudly (RelayRegistrationState.IsComplete false) until the
-            // next restart - no retry loop, matching how AgrumyFirmware's own captive portal
-            // requires a human to notice and re-trigger it rather than retrying blindly forever.
+            // No retry loop - a transient failure here leaves the relay unregistered until the next restart, matching how AgrumyFirmware's captive portal needs a human to notice and re-trigger it.
             var state = await client.RegisterAsync(cancellationToken);
             store.Save(state);
             LogRegistered(logger, state.IdDevice);

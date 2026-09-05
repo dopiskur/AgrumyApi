@@ -7,19 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace api.Security
 {
-    /// <summary>
-    /// Authorization for the device-communication endpoints, which do not use a user JWT.
-    ///
-    /// - <see cref="ApiKeyPolicy"/> ("DeviceApiKey"): the device presents its permanent
-    ///   <c>apiId</c> + <c>apiKey</c> headers; used by <c>POST /api/Device/Authenticate</c> to
-    ///   bootstrap a session.
-    /// - <see cref="SessionPolicy"/> ("DeviceSession"): the device presents <c>apiId</c> plus the
-    ///   short-lived <c>apiAuth</c> token (issued by Authenticate, cached server-side) in the
-    ///   <c>Authorization</c> header; used by Config and SensorData POST.
-    ///
-    /// On success the handler stashes the verified apiId in <c>HttpContext.Items["apiId"]</c>;
-    /// read it with <see cref="HttpContextExtensions.DeviceApiId"/>.
-    /// </summary>
+    /// Authorization for device-communication endpoints (no user JWT): <see cref="ApiKeyPolicy"/> needs the permanent apiId+apiKey headers (Authenticate bootstrap), <see cref="SessionPolicy"/> needs apiId plus the short-lived apiAuth token (Config/SensorData); either lands the verified apiId in <c>HttpContext.Items</c>, read via <see cref="HttpContextExtensions.DeviceApiId"/>.
     public static class DeviceAuth
     {
         public const string ApiKeyPolicy = "DeviceApiKey";
@@ -46,7 +34,7 @@ namespace api.Security
 
     public static class HttpContextExtensions
     {
-        /// <summary>The apiId verified by the DeviceApiKey / DeviceSession authorization handler, or null.</summary>
+        /// The apiId verified by the DeviceApiKey / DeviceSession authorization handler, or null.
         public static string? DeviceApiId(this HttpContext http) =>
             http.Items.TryGetValue(DeviceAuth.ApiIdItemKey, out var v) ? v as string : null;
     }

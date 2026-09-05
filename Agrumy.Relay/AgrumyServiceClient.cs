@@ -5,10 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace api.Relay
 {
-    /// <summary>Thin HTTP client for the two calls a relay makes to AgrumyService - registration
-    /// (once) and Batch (repeatedly). Plain typed HttpClient rather than Refit (Agrumy.Web's own
-    /// convention): two endpoints do not earn Refit's interface/source-generator ceremony the way
-    /// Agrumy.Web's much larger surface does.</summary>
+    /// Thin HTTP client for the two calls a relay makes to AgrumyService (registration once, Batch repeatedly) - plain typed HttpClient, not Refit, since two endpoints don't earn that ceremony.
     public class AgrumyServiceClient(HttpClient http, RelayRegistrationStore registration, IOptions<RelayOptions> options)
     {
         private readonly RelaySelfOptions self = options.Value.Relay;
@@ -37,10 +34,7 @@ namespace api.Relay
             };
         }
 
-        /// <summary>Authenticates with THIS relay's own apiId/apiKey (DeviceAuth.ApiKeyPolicy on
-        /// the server side) - a relay re-sends its permanent credential on every Batch call rather
-        /// than bootstrapping a short-lived apiAuth session first, since Batch calls are already
-        /// infrequent/heavy relative to one device's own chatty per-poll session flow.</summary>
+        /// Authenticates with THIS relay's own apiId/apiKey (DeviceAuth.ApiKeyPolicy) - re-sends the permanent credential on every Batch call rather than bootstrapping a short-lived apiAuth session first.
         public async Task<RelayBatchResponse> BatchAsync(RelayBatchRequest request, CancellationToken ct)
         {
             RelayRegistrationState reg = registration.Current;
@@ -62,8 +56,7 @@ namespace api.Relay
                 ?? new RelayBatchResponse();
         }
 
-        /// <summary>This relay's own DevEUI-&gt;device mapping (Profile B) - GET
-        /// /api/Relay/DeviceMapping, same apiId/apiKey auth as Batch.</summary>
+        /// This relay's own DevEUI->device mapping (Profile B) - GET /api/Relay/DeviceMapping, same apiId/apiKey auth as Batch.
         public async Task<IList<RelayDeviceMapping>> GetDeviceMappingAsync(CancellationToken ct)
         {
             RelayRegistrationState reg = registration.Current;

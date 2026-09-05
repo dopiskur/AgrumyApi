@@ -10,18 +10,7 @@ using MQTTnet.Client;
 
 namespace api.Relay.ChirpStack
 {
-    /// <summary>Profile B (LoRaGateway) only - subscribes to ChirpStack's MQTT uplink topic,
-    /// forwards each uplink through the same /api/Relay/Batch path Profile A uses, and publishes
-    /// the batch result back as a LoRaWAN downlink.
-    ///
-    /// UNTESTED: written against ChirpStack v4's documented MQTT integration topic/payload shape
-    /// (application/{appId}/device/{devEui}/event/up, JSON body with deviceInfo.devEui/data/dr/
-    /// rxInfo; downlink at .../command/down) but never run against a real ChirpStack instance,
-    /// gateway, or LoRa end-device - none exist for this project yet. The FRMPayload wire format
-    /// this class expects (a small JSON envelope, base64 inside the uplink's "data" field) is a
-    /// placeholder: no AgrumyFirmware LoRa profile exists to define a real one. Treat every piece
-    /// of this class as a first draft to validate against real hardware, not a working
-    /// integration.</summary>
+    /// Profile B (LoRaGateway) only - subscribes to ChirpStack's MQTT uplink topic, forwards each through the same /api/Relay/Batch path Profile A uses, and publishes the result back as a downlink; UNTESTED against any real ChirpStack instance, gateway, or LoRa device - treat as a first draft, not a working integration.
     public sealed partial class ChirpStackUplinkService(
         AgrumyServiceClient client, IOptions<RelayOptions> options, ILogger<ChirpStackUplinkService> logger)
         : BackgroundService
@@ -127,9 +116,7 @@ namespace api.Relay.ChirpStack
             }
             catch (Exception ex)
             {
-                // One malformed/unrecognized uplink must never take the MQTT loop down - same
-                // "skip the poison entry, keep going" reasoning as RelayApiController.Batch's
-                // per-entry try/catch.
+                // One malformed/unrecognized uplink must never take the MQTT loop down - same "skip the poison entry" reasoning as RelayApiController.Batch's per-entry try/catch.
                 LogUplinkFailed(logger, ex);
             }
         }
@@ -150,9 +137,7 @@ namespace api.Relay.ChirpStack
 
             int sf = TryGetSpreadingFactor(root) ?? 12; // unknown SF - assume worst case (safest duty-cycle-wise)
 
-            // Placeholder wire format - see class remarks. base64-decoded "data" is expected to be
-            // small JSON: {"t":"config"|"sensor"|"event"|"ack", ...fields matching the HTTP payload
-            // the equivalent RelayEntryType expects}.
+            // Placeholder wire format (see class remarks) - base64-decoded "data" is small JSON: {"t":"config"|"sensor"|"event"|"ack", ...fields matching the equivalent RelayEntryType's HTTP payload}.
             if (!root.TryGetProperty("data", out var dataEl) || dataEl.GetString() is not string base64)
             {
                 LogNoDataField(logger, devEui);
@@ -197,8 +182,7 @@ namespace api.Relay.ChirpStack
                 ? sf
                 : null;
 
-        /// <summary>Class A: ChirpStack itself queues this for the device's next RX window - Relay
-        /// just publishes once, it never manages the actual radio timing.</summary>
+        /// Class A: ChirpStack itself queues this for the device's next RX window - Relay just publishes once, it never manages the actual radio timing.
         private async Task PublishDownlinkAsync(string devEui, RelayBatchEntryResult? result, int sf)
         {
             if (mqtt is null || !mqtt.IsConnected)
@@ -216,9 +200,7 @@ namespace api.Relay.ChirpStack
                     ? Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
                     {
                         ok = result?.Success ?? false,
-                        // Hint for the (not-yet-existing) LoRa firmware profile: how long to wait
-                        // before its next config-poll uplink, scaled to this uplink's own SF -
-                        // see api.LoRa.LoRaInterval's remarks.
+                        // Hint for the (not-yet-existing) LoRa firmware profile: how long to wait before its next config-poll uplink, scaled to this uplink's own SF - see api.LoRa.LoRaInterval.
                         retryAfterSeconds = (int)LoRaInterval.ForSpreadingFactor(sf).TotalSeconds,
                     })))
                     : null,

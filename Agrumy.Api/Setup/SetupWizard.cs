@@ -5,17 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Setup
 {
-    /// <summary>If ConnectionStrings:DefaultConnection is missing at boot, Program.cs routes here
-    /// instead of the normal pipeline: a minimal, unauthenticated page asking ONLY for DB
-    /// connection details (nothing that itself depends on a working database). Once the admin
-    /// submits a connection that actually opens, this writes it into appsettings.json and restarts
-    /// (RestartUtil) - the NEXT boot has a real connection string, so the normal pipeline takes
-    /// over, EnsureSchemaAsync provisions the schema, and the existing bootstrap Global Admin
-    /// wizard (BootstrapPending) picks up from there unchanged.
-    ///
-    /// Container installs never reach this: install.sh writes docker-compose.yml's environment
-    /// section before the container is ever created, so ConnectionStrings:DefaultConnection is
-    /// always already present at first boot there.</summary>
+    /// If ConnectionStrings:DefaultConnection is missing at boot, Program.cs routes here instead of the normal pipeline - an unauthenticated DB-details-only form that writes appsettings.json and restarts (RestartUtil) once the admin submits a connection that opens; container installs never reach this since install.sh always sets it upfront.
     internal static class SetupWizard
     {
         public static void ConfigureServices(WebApplicationBuilder builder)
@@ -41,10 +31,7 @@ namespace api.Setup
                 IHostApplicationLifetime lifetime,
                 ILogger<Program> logger) =>
             {
-                // Every rejection path below re-renders the form, which needs its OWN fresh token -
-                // the one that was just submitted is validated (single-use in intent, and tied to
-                // the request that consumed it), reusing it in the resend would fail the same way
-                // an actually-expired token does, leaving the admin unable to ever retry.
+                // Every rejection path re-renders the form with its OWN fresh token - reusing the just-submitted (single-use) one would fail the resend the same way an expired token does.
                 string FreshToken() => antiforgery.GetAndStoreTokens(context).RequestToken!;
 
                 try
@@ -106,11 +93,7 @@ namespace api.Setup
             });
         }
 
-        /// <summary>Atomic write (temp file + rename) - a crash or power loss mid-write must never
-        /// leave a half-written appsettings.json behind, which would turn "the wizard failed once"
-        /// into "the app can never boot again without manual repair". Merges into whatever
-        /// appsettings.json already exists (JWT keys, etc.) rather than replacing it, and tolerates
-        /// a missing file (empty object).</summary>
+        /// Atomic write (temp file + rename) so a crash mid-write never leaves a half-written appsettings.json; merges into whatever already exists (JWT keys etc.) rather than replacing it, tolerating a missing file.
         private static async Task WriteConnectionStringAsync(string contentRootPath, DbProviderKind provider, string connectionString)
         {
             string path = Path.Combine(contentRootPath, "appsettings.json");

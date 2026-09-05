@@ -6,14 +6,7 @@ using Microsoft.AspNetCore.Routing;
 
 namespace api.Relay.LocalForwarding
 {
-    /// <summary>Profile A (WiFiRepeater): a local device points its ServicePoint at this relay's
-    /// own address:port instead of api.agrumy.com and sends EXACTLY the same requests
-    /// (apiId/apiKey headers, same JSON bodies) it would send AgrumyService directly - completely
-    /// transparent to unmodified AgrumyFirmware, zero firmware changes. Each local call becomes one
-    /// RelayBatchEntry forwarded through the SAME /api/Relay/Batch path Profile B uses, just always
-    /// a batch of one and always flushed immediately (RelayMode only matters for Profile B - see
-    /// api.Models.RelayMode's remarks for why a live blocked HTTP connection has no use for
-    /// Aggregated batching).</summary>
+    /// Profile A (WiFiRepeater): a local device points its ServicePoint at this relay instead of api.agrumy.com, sending unmodified requests - each call becomes one always-immediate RelayBatchEntry through the same /api/Relay/Batch path Profile B uses.
     public static class ProfileAEndpoints
     {
         public static void MapProfileAEndpoints(this WebApplication app)
@@ -53,9 +46,7 @@ namespace api.Relay.LocalForwarding
             }
             catch (HttpRequestException)
             {
-                // AgrumyService unreachable - same "connection lost" shape a device's own direct
-                // call would see, so its existing retry/buffer logic (ServiceController) applies
-                // unchanged; the relay adds a hop, not a new failure mode to handle.
+                // AgrumyService unreachable - same "connection lost" shape a device's own direct call would see, so its existing retry/buffer logic applies unchanged.
                 return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
 

@@ -1,8 +1,6 @@
 namespace api.Relay.Registration
 {
-    /// <summary>What gets persisted to RelaySelfOptions.RegistrationFilePath once
-    /// POST /api/Device/Register succeeds - the same three values AgrumyFirmware keeps in its own
-    /// deviceRegistration.json, just serialized as plain JSON here instead of LittleFS.</summary>
+    /// What gets persisted to RelaySelfOptions.RegistrationFilePath once POST /api/Device/Register succeeds - the same three values AgrumyFirmware keeps in deviceRegistration.json, just plain JSON instead of LittleFS.
     public class RelayRegistrationState
     {
         public string? ApiId { get; set; }

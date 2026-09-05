@@ -3,14 +3,14 @@ using System.Text.Json;
 
 namespace api.Weather
 {
-    /// <summary>Abstraction over the actual HTTP call, so WeatherEvaluator's own logic is unit-testable with a mock, the same "thin real implementation behind a narrow interface" shape as api.Firmware.IFirmwareFetcher.</summary>
+    /// Abstraction over the actual HTTP call, so WeatherEvaluator's own logic is unit-testable with a mock - same shape as api.Firmware.IFirmwareFetcher.
     public interface IWeatherForecastClient
     {
-        /// <summary>Null means the request failed (already logged) - the caller must leave the last known state alone rather than treat a failed fetch as "no rain".</summary>
+        /// Null means the request failed (already logged) - the caller must leave the last known state alone rather than treat a failed fetch as "no rain".
         Task<double?> GetMaxRainProbabilityPercentAsync(double lat, double lon, string apiKey, CancellationToken ct);
     }
 
-    /// <summary>Uses OpenWeatherMap's free "5 day / 3 hour forecast" endpoint, not the paid One Call 3.0 - each ~3-hour bucket carries "pop" (probability of precipitation, 0-1), a closer match to "will it rain soon" than the current-conditions endpoint.</summary>
+    /// Uses OpenWeatherMap's free "5 day / 3 hour forecast" endpoint, not the paid One Call 3.0 - each bucket's "pop" (0-1) is a closer match to "will it rain soon" than the current-conditions endpoint.
     public sealed class OpenWeatherMapClient(HttpClient httpClient, ILogger<OpenWeatherMapClient> logger) : IWeatherForecastClient
     {
         private const string ForecastUrl = "https://api.openweathermap.org/data/2.5/forecast";

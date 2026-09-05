@@ -3,9 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace api.Relay.Registration
 {
-    /// <summary>In-memory holder for this relay's own ApiId/ApiKey/IDDevice, backed by a JSON file
-    /// on disk (RelaySelfOptions.RegistrationFilePath) - registered as a singleton so every request
-    /// handler and background service sees the same state without re-reading the file each time.</summary>
+    /// In-memory holder for this relay's own ApiId/ApiKey/IDDevice, backed by a JSON file on disk - registered as a singleton so every handler/background service sees the same state without re-reading the file.
     public class RelayRegistrationStore(IOptions<RelayOptions> options)
     {
         private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
