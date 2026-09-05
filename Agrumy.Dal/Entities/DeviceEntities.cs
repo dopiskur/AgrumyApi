@@ -114,14 +114,14 @@ namespace api.Dal.Entities
         public int? WaterPumpCooldownSeconds { get; set; }
 
         public bool? RelayEnabled { get; set; }
-        public int? Relay1 { get; set; }
-        public int? Relay2 { get; set; }
-        public int? Relay3 { get; set; }
-        public int? Relay4 { get; set; }
-        public int? Relay5 { get; set; }
-        public int? Relay6 { get; set; }
-        public int? Relay7 { get; set; }
-        public int? Relay8 { get; set; }
+    }
+
+    /// One physically-wired relay slot assigned to a RelayFunction (roadmap #309) - only assigned slots get a row, replacing the fixed Relay1..Relay8 columns that used to live on DeviceConfigControllerRow.
+    public class DeviceConfigControllerRelayRow
+    {
+        public int IDDeviceConfigController { get; set; }
+        public int Slot { get; set; }
+        public int RelayFunction { get; set; }
     }
 
     /// One wall-clock window for one relay function (RelayFunction = deviceTypeRelay's seed IDs, same convention as ActuatorController::RelayFunctionType) - a row's mere presence means it is active, there is no separate Enabled column.

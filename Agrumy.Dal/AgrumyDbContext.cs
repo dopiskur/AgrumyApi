@@ -28,6 +28,7 @@ namespace api.Dal
         public DbSet<DeviceTypeKitRow> DeviceTypeKits => Set<DeviceTypeKitRow>();
         public DbSet<DeviceConfigSensorRow> DeviceConfigSensors => Set<DeviceConfigSensorRow>();
         public DbSet<DeviceConfigControllerRow> DeviceConfigControllers => Set<DeviceConfigControllerRow>();
+        public DbSet<DeviceConfigControllerRelayRow> DeviceConfigControllerRelays => Set<DeviceConfigControllerRelayRow>();
         public DbSet<DeviceScheduleSlotRow> DeviceScheduleSlots => Set<DeviceScheduleSlotRow>();
         public DbSet<DeviceFirmwareRow> DeviceFirmwares => Set<DeviceFirmwareRow>();
         public DbSet<DeviceDiagnosticRow> DeviceDiagnostics => Set<DeviceDiagnosticRow>();
@@ -216,15 +217,15 @@ namespace api.Dal
                 e.ToTable("deviceConfigController");
                 e.HasKey(x => x.IDDeviceConfigController);
                 e.Property(x => x.IDDeviceConfigController).ValueGeneratedOnAdd();
-                // Relay1-8 each reference deviceTypeRelay (legacy fk_deviceConfigController_relayN).
-                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay1).OnDelete(DeleteBehavior.NoAction);
-                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay2).OnDelete(DeleteBehavior.NoAction);
-                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay3).OnDelete(DeleteBehavior.NoAction);
-                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay4).OnDelete(DeleteBehavior.NoAction);
-                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay5).OnDelete(DeleteBehavior.NoAction);
-                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay6).OnDelete(DeleteBehavior.NoAction);
-                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay7).OnDelete(DeleteBehavior.NoAction);
-                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.Relay8).OnDelete(DeleteBehavior.NoAction);
+            });
+
+            modelBuilder.Entity<DeviceConfigControllerRelayRow>(e =>
+            {
+                // Roadmap #309: replaces the old Relay1-8 columns/FKs (legacy fk_deviceConfigController_relayN) - one row per assigned slot instead of 8 fixed columns, no fixed ceiling baked into the schema itself.
+                e.ToTable("deviceConfigControllerRelay");
+                e.HasKey(x => new { x.IDDeviceConfigController, x.Slot });
+                e.HasOne<DeviceConfigControllerRow>().WithMany().HasForeignKey(x => x.IDDeviceConfigController).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne<DeviceTypeRelayRow>().WithMany().HasForeignKey(x => x.RelayFunction).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<DeviceConfigSensorRow>(e =>

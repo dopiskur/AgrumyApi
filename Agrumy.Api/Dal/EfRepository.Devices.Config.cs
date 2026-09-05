@@ -19,7 +19,15 @@ namespace api.Dal
         {
             var row = await db.DeviceConfigControllers.AsNoTracking()
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigController == deviceConfigControllerID);
-            return row == null ? null : ToDto(row);
+            if (row == null)
+            {
+                return null;
+            }
+            IList<DeviceRelaySlot> relays = await db.DeviceConfigControllerRelays.AsNoTracking()
+                .Where(r => r.IDDeviceConfigController == deviceConfigControllerID)
+                .Select(r => new DeviceRelaySlot { Slot = r.Slot, RelayFunction = r.RelayFunction })
+                .ToListAsync();
+            return ToDto(row, relays);
         }
 
         public async Task<Device?> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID)
@@ -55,14 +63,20 @@ namespace api.Dal
             {
                 // Only the relay-pin mapping lives here now - threshold/hysteresis/interval/schedule config moved to the device's assigned DeviceUnitZone, edited from the Zone page instead.
                 row.RelayEnabled = cfg.RelayEnabled;
-                row.Relay1 = cfg.Relay1;
-                row.Relay2 = cfg.Relay2;
-                row.Relay3 = cfg.Relay3;
-                row.Relay4 = cfg.Relay4;
-                row.Relay5 = cfg.Relay5;
-                row.Relay6 = cfg.Relay6;
-                row.Relay7 = cfg.Relay7;
-                row.Relay8 = cfg.Relay8;
+
+                // Wholesale replace: delete every existing slot row for this controller, then insert one row per ASSIGNED slot (RelayFunction 0/Disabled is omitted, not stored) - simpler and less error-prone than diffing against the posted set.
+                await db.DeviceConfigControllerRelays
+                    .Where(r => r.IDDeviceConfigController == ownConfigControllerId)
+                    .ExecuteDeleteAsync();
+                foreach (DeviceRelaySlot slot in cfg.Relays.Where(s => s.RelayFunction != 0))
+                {
+                    db.DeviceConfigControllerRelays.Add(new DeviceConfigControllerRelayRow
+                    {
+                        IDDeviceConfigController = ownConfigControllerId!.Value,
+                        Slot = slot.Slot,
+                        RelayFunction = slot.RelayFunction,
+                    });
+                }
             }
 
             var deviceRow = await db.Devices.FirstOrDefaultAsync(d => d.IDDevice == idDevice);
@@ -138,18 +152,11 @@ namespace api.Dal
         };
 
         // Relay-pin mapping only - Rules/WaterPumpMaxRunSeconds/WaterPumpCooldownSeconds on the DTO come from the assigned zone via DeviceApiController.BuildDeviceConfigAsync, not this row.
-        private static DeviceConfigController ToDto(DeviceConfigControllerRow c) => new()
+        private static DeviceConfigController ToDto(DeviceConfigControllerRow c, IList<DeviceRelaySlot> relays) => new()
         {
             IDDeviceConfigController = c.IDDeviceConfigController,
             RelayEnabled = c.RelayEnabled,
-            Relay1 = c.Relay1,
-            Relay2 = c.Relay2,
-            Relay3 = c.Relay3,
-            Relay4 = c.Relay4,
-            Relay5 = c.Relay5,
-            Relay6 = c.Relay6,
-            Relay7 = c.Relay7,
-            Relay8 = c.Relay8,
+            Relays = relays,
         };
     }
 }

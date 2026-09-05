@@ -364,14 +364,7 @@
         "waterPumpMaxRunSeconds",
         "waterPumpCooldownSeconds",
         "relayEnabled",
-        "relay1",
-        "relay2",
-        "relay3",
-        "relay4",
-        "relay5",
-        "relay6",
-        "relay7",
-        "relay8",
+        "relays",
         "skipWaterPumpForRain"
       ],
       "properties": {
@@ -408,57 +401,35 @@
             "null"
           ]
         },
-        "relay1": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "relay2": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "relay3": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "relay4": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "relay5": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "relay6": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "relay7": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "relay8": {
-          "type": [
-            "integer",
-            "null"
-          ]
+        "relays": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/deviceRelaySlot"
+          },
+          "description": "Roadmap #309. One entry per physically-wired relay slot with a function assigned - a slot with no entry is unassigned/disabled. Replaces the old fixed relay1..relay8 keys, removing the hardcoded 8-slot ceiling from the wire format itself (AgrumyFirmware's own MAX_RELAY_SLOTS still caps how many a given firmware build can hold)."
         },
         "skipWaterPumpForRain": {
           "type": "boolean",
           "description": "Roadmap #11. Final AND-NOT veto over WaterPump, computed server-side (DeviceApiController.BuildDeviceConfigAsync) from the assigned zone's SkipWaterPumpWhenRainPredicted AND the install-wide ServerConfig.WeatherRainPredicted - applied by AgrumyFirmware's ActuatorController::initController AFTER the OR of all WaterPump rules, same architectural slot as waterPumpMaxRunSeconds/waterPumpCooldownSeconds above."
+        }
+      }
+    },
+    "deviceRelaySlot": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Roadmap #309. camelCase serialization of api.Models.DeviceRelaySlot - one physically-wired relay position and the function assigned to it.",
+      "required": [
+        "slot",
+        "relayFunction"
+      ],
+      "properties": {
+        "slot": {
+          "type": "integer",
+          "description": "1-based physical relay position on this device's board - AgrumyFirmware indexes ConfigPin.RELAY_PINS[slot-1] to find the actual GPIO/expander pin."
+        },
+        "relayFunction": {
+          "type": "integer",
+          "description": "1=Ventilation, 2=Light, 3=Heating, 4=WaterPump (api.Models.RelayFunction) - never 0/Disabled, a disabled slot is simply omitted from the relays array rather than sent with this value."
         }
       }
     },
@@ -482,7 +453,7 @@
         },
         "relayFunction": {
           "type": "integer",
-          "description": "1=Ventilation, 2=Light, 3=Heating, 4=WaterPump (api.Models.RelayFunction) - which of the device's relay1..8 pins this rule targets, resolved device-side against its OWN relay-pin mapping above (the rule itself carries no pin number)."
+          "description": "1=Ventilation, 2=Light, 3=Heating, 4=WaterPump (api.Models.RelayFunction) - which of the device's relay slots this rule targets, resolved device-side against its OWN relays[] mapping above (the rule itself carries no slot number)."
         },
         "conditionType": {
           "type": "integer",
@@ -584,7 +555,7 @@
         },
         "actionType": {
           "type": "integer",
-          "description": "1=Reboot, 2=ForceOTA, 3=ForceConfigSync (api.Models.CommandActionType) - same server->firmware raw-int convention as relay1..8/deviceTypeServiceID, not a string."
+          "description": "1=Reboot, 2=ForceOTA, 3=ForceConfigSync (api.Models.CommandActionType) - same server->firmware raw-int convention as relayFunction/deviceTypeServiceID, not a string."
         },
         "expiresAt": {
           "type": "string",

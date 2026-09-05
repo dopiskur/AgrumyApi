@@ -1735,7 +1735,7 @@ public class ApiControllerTests
         var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
         {
             Device = new DeviceDto { IDDevice = 8 },
-            Controller = new DeviceConfigController { RelayEnabled = true, Relay1 = 16 },
+            Controller = new DeviceConfigController { RelayEnabled = true, Relays = [new DeviceRelaySlot { Slot = 1, RelayFunction = 16 }] },
         });
 
         Assert.True(result.Value);

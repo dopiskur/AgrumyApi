@@ -7,13 +7,14 @@
 
     var relayEnabledToggle = new EnabledToggleFieldViewModel { Name = ControllerField(nameof(cfg.RelayEnabled)), Label = "Relay", Value = cfg.RelayEnabled };
 
-    var relaySlots = new (string Name, int? Selected)[]
+    // Always renders exactly RelaySlotLimits.MaxSlots dropdowns regardless of how many the device actually has assigned - cfg.Relays only carries assigned slots (roadmap #309), so an unassigned slot just shows "Disabled" here.
+    var relaySlots = new (int Slot, int Selected)[RelaySlotLimits.MaxSlots];
+    for (int i = 0; i < relaySlots.Length; i++)
     {
-        (nameof(cfg.Relay1), cfg.Relay1), (nameof(cfg.Relay2), cfg.Relay2),
-        (nameof(cfg.Relay3), cfg.Relay3), (nameof(cfg.Relay4), cfg.Relay4),
-        (nameof(cfg.Relay5), cfg.Relay5), (nameof(cfg.Relay6), cfg.Relay6),
-        (nameof(cfg.Relay7), cfg.Relay7), (nameof(cfg.Relay8), cfg.Relay8),
-    };
+        int slotNumber = i + 1;
+        var assigned = cfg.Relays.FirstOrDefault(r => r.Slot == slotNumber);
+        relaySlots[i] = (slotNumber, assigned?.RelayFunction ?? 0);
+    }
 }
 
 <div class="card">
@@ -36,12 +37,14 @@
 
             <partial name="_EnabledToggleField" model="relayEnabledToggle" />
 
-            @foreach (var slot in relaySlots)
+            @for (int i = 0; i < relaySlots.Length; i++)
             {
+                var slot = relaySlots[i];
+                @Html.Hidden(ControllerField($"Relays[{i}].Slot"), slot.Slot)
                 var selectModel = new SelectFieldViewModel
                 {
-                    Name = ControllerField(slot.Name),
-                    Label = slot.Name,
+                    Name = ControllerField($"Relays[{i}].RelayFunction"),
+                    Label = "Relay" + slot.Slot,
                     Items = new SelectList(Model.DeviceTypeRelay, nameof(DeviceTypeRelay.IDDeviceTypeRelay), nameof(DeviceTypeRelay.RelayName), slot.Selected),
                 };
                 <partial name="_SelectField" model="selectModel" />

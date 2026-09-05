@@ -391,13 +391,26 @@ namespace api.Models
 
     }
 
+    /// One physically-wired relay slot and the RelayFunction assigned to it - Slot is 1-based, matching AgrumyFirmware's ConfigPin.RELAY_PINS[Slot-1]. A slot with no row is unassigned/disabled; there is no fixed count baked into this shape (roadmap #309 - the old design capped every device at exactly 8 via Relay1..Relay8 columns).
+    public class DeviceRelaySlot
+    {
+        public int Slot { get; set; }
+        public int RelayFunction { get; set; }
+    }
+
+    /// Bumping this alone (plus a matching AgrumyFirmware MAX_RELAY_SLOTS bump for boards that need more) is now the entire "support more relay slots" story - no schema/wire-format change needed.
+    public static class RelaySlotLimits
+    {
+        public const int MaxSlots = 8;
+    }
+
     /// What's left of the per-device model after thresholds/schedule/safety-limits moved to the zone (DeviceUnitZone/DeviceUnitZoneRule) - just the relay-pin mapping; Rules/WaterPump* below are populated from the assigned zone by BuildDeviceConfigAsync, not from this row.
     public class DeviceConfigController()
     {
         [HiddenInput(DisplayValue = true)]
         public int? IDDeviceConfigController { get; set; }
 
-        // The assigned zone's rules for whichever RelayFunction(s) Relay1-8 wires up; empty (all off) when the device has no zone.
+        // The assigned zone's rules for whichever RelayFunction(s) Relays wires up; empty (all off) when the device has no zone.
         public IList<DeviceUnitZoneRule> Rules { get; set; } = [];
 
         // Copied from the assigned zone's own fields - see DeviceUnitZone's remarks for why these are not Rules.
@@ -409,15 +422,8 @@ namespace api.Models
 
         // Physical/hardware, stays per-device.
         public bool? RelayEnabled { get; set; }
-        public int? Relay1 { get; set; }
-        public int? Relay2 { get; set; }
-        public int? Relay3 { get; set; }
-        public int? Relay4 { get; set; }
-        public int? Relay5 { get; set; }
-        public int? Relay6 { get; set; }
-        public int? Relay7 { get; set; }
-        public int? Relay8 { get; set; }
-
+        // One entry per assigned slot only (roadmap #309) - an unlisted slot is unassigned/disabled.
+        public IList<DeviceRelaySlot> Relays { get; set; } = [];
     }
 
     /// One wall-clock window in one of DeviceConfigController's per-function schedule lists - no RelayFunction/Enabled fields, since list membership itself means both.

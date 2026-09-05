@@ -920,7 +920,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
         await _repo.DeviceConfigControllerUpdateAsync(d.IDDevice, new DeviceConfigController
         {
-            IDDeviceConfigController = d.DeviceConfigControllerID, RelayEnabled = true, Relay1 = 2,
+            IDDeviceConfigController = d.DeviceConfigControllerID, RelayEnabled = true,
+            Relays = [new DeviceRelaySlot { Slot = 1, RelayFunction = 2 }],
         });
         var back = await _repo.DeviceGetByIdAsync(d.IDDevice);
         Assert.NotNull(back);
@@ -928,7 +929,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
         var ctrl = await _repo.DeviceConfigControllerGetAsync(d.DeviceConfigControllerID);
         Assert.True(ctrl!.RelayEnabled);
-        Assert.Equal(2, ctrl.Relay1);
+        Assert.Equal(2, Assert.Single(ctrl.Relays).RelayFunction);
         Assert.Equal(1, (await _repo.DeviceConfigSensorGetAsync(d.DeviceConfigSensorID))!.SensorTemp);
     }
 
@@ -977,10 +978,10 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await _repo.DeviceConfigControllerUpdateAsync(a.IDDevice, new DeviceConfigController
         {
             IDDeviceConfigController = b.DeviceConfigControllerID, // tampered: points at B's row
-            Relay1 = 12,
+            Relays = [new DeviceRelaySlot { Slot = 1, RelayFunction = 3 }],
         });
-        Assert.Equal(12, (await _repo.DeviceConfigControllerGetAsync(a.DeviceConfigControllerID))!.Relay1);
-        Assert.NotEqual(12, (await _repo.DeviceConfigControllerGetAsync(b.DeviceConfigControllerID))!.Relay1);
+        Assert.Equal(3, Assert.Single((await _repo.DeviceConfigControllerGetAsync(a.DeviceConfigControllerID))!.Relays).RelayFunction);
+        Assert.Empty((await _repo.DeviceConfigControllerGetAsync(b.DeviceConfigControllerID))!.Relays);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
