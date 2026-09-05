@@ -1,3 +1,5 @@
+using Npgsql;
+
 namespace api.Dal
 {
     /// Builds a consistent { reason, message } response body for database failures instead of a bare false / raw exception message.
@@ -51,6 +53,19 @@ namespace api.Dal
                 }
             }
             return false;
+        }
+
+        /// Same intent as <see cref="Mentions"/> but structural where the driver offers it: PostgresException.ConstraintName is a parsed server field, not free text, so it survives a message-wording change a future Npgsql version might make - MySqlConnector exposes no equivalent, so that path still falls back to Mentions (see RelationalIntegrationTests' regression test guarding the two literal names this is called with never silently drifting from the real schema).
+        public static bool MentionsConstraint(Exception? ex, string constraintName)
+        {
+            for (Exception? e = ex; e != null; e = e.InnerException)
+            {
+                if (e is PostgresException pg)
+                {
+                    return string.Equals(pg.ConstraintName, constraintName, System.StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            return Mentions(ex, constraintName);
         }
     }
 }

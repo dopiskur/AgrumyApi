@@ -17,11 +17,11 @@ namespace api.Filters
             }
 
             // These two named cases only give a more specific message than the general path's generic constraint_violation text - the status must still match DbErrorResponse.StatusCodeFor(ConstraintViolation) (409).
-            if (DbErrorResponse.Mentions(ex, "email_UNIQUE"))
+            if (DbErrorResponse.MentionsConstraint(ex, "email_UNIQUE"))
             {
                 context.Result = new ObjectResult("email already registered") { StatusCode = 409 };
             }
-            else if (DbErrorResponse.Mentions(ex, "Username_UNIQUE"))
+            else if (DbErrorResponse.MentionsConstraint(ex, "Username_UNIQUE"))
             {
                 context.Result = new ObjectResult("username already registered") { StatusCode = 409 };
             }

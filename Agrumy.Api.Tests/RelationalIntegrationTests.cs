@@ -166,6 +166,28 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         return saved;
     }
 
+    // Roadmap #303: DbExceptionFilter's duplicate-email/-username messages match on these literal index names - if a future migration ever renames them, this must fail loudly here instead of the filter silently falling back to the generic constraint_violation message.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task UserAdd_DuplicateEmailOrUsername_StillMatchesTheExpectedConstraintName(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, email) = await MakeUser(t);
+
+        var dupeEmail = new User { TenantID = tenantId, Email = email, Username = "u_" + U(), FirstName = "F", LastName = "L", Phone = "123", DevicePin = "PIN234", Enabled = true };
+        Exception exEmail = await Assert.ThrowsAnyAsync<Exception>(
+            () => _repo.UserAddAsync(dupeEmail, new UserSecret { PwdHash = "h", PwdSalt = "s" }));
+        Assert.True(DbErrorResponse.MentionsConstraint(exEmail, "email_UNIQUE"), "email_UNIQUE no longer matches the real schema's index name.");
+
+        // A failed SaveChangesAsync leaves the poisoned entity tracked - Use() hands back a fresh context/repo, same as a new HTTP request would get.
+        Use(provider);
+        var (existingTenantId, _, existingEmail) = await MakeUser(t);
+        string existingUsername = (await _repo.UserGetAsync(null, existingEmail, null))!.Username!;
+        var dupeUsername = new User { TenantID = existingTenantId, Email = "u2_" + U() + "@ex.com", Username = existingUsername, FirstName = "F", LastName = "L", Phone = "123", DevicePin = "PIN234", Enabled = true };
+        Exception exUsername = await Assert.ThrowsAnyAsync<Exception>(
+            () => _repo.UserAddAsync(dupeUsername, new UserSecret { PwdHash = "h", PwdSalt = "s" }));
+        Assert.True(DbErrorResponse.MentionsConstraint(exUsername, "Username_UNIQUE"), "Username_UNIQUE no longer matches the real schema's index name.");
+    }
+
     // Roadmap #302: CURRENT_TIMESTAMP/NOW() column defaults must compute in UTC regardless of the server process's own OS timezone (verified live on invent.hr, whose MySQL @@global.time_zone was SYSTEM/CEST, 2h off UTC) - SessionTimeZoneInterceptor sets this on every connection open.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task NewConnection_SessionTimeZoneIsUtc(DbProviderKind provider)
