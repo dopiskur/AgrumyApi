@@ -1127,6 +1127,114 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task Rule_UnitAndGlobalScope_AreIndependentFromZoneScope(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zone) = await MakeUnitAndZone(tenantId);
+
+        int zoneRuleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        {
+            TenantID = tenantId, DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value, RelayFunction = RelayFunction.Light,
+            Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(1, 1), ConditionConfigJson.Options), null)],
+        });
+        int unitRuleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        {
+            TenantID = tenantId, DeviceUnitID = unit.IDDeviceUnit!.Value, RelayFunction = RelayFunction.Heating,
+            Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(1, 1), ConditionConfigJson.Options), null)],
+        });
+        int globalRuleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        {
+            TenantID = tenantId, RelayFunction = RelayFunction.WaterPump,
+            Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(1, 1), ConditionConfigJson.Options), null)],
+        });
+
+        Assert.Equal(zoneRuleId, Assert.Single(await _repo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value)).IDDeviceUnitZoneRule);
+        Assert.Equal(unitRuleId, Assert.Single(await _repo.RulesGetForUnitAsync(unit.IDDeviceUnit!.Value)).IDDeviceUnitZoneRule);
+        Assert.Equal(globalRuleId, Assert.Single(await _repo.RulesGetForTenantGlobalAsync(tenantId)).IDDeviceUnitZoneRule);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task Rule_ConditionsRoundTrip_PreservesAndOrOperatorsInOrder(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (_, zone) = await MakeUnitAndZone(tenantId);
+
+        int ruleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        {
+            TenantID = tenantId, DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value, RelayFunction = RelayFunction.Ventilation,
+            Conditions =
+            [
+                new RuleCondition(ConditionType.Schedule, JsonSerializer.SerializeToNode(new ScheduleConditionConfig(127, 0, 3600), ConditionConfigJson.Options), null),
+                new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(60, 5), ConditionConfigJson.Options), LogicalOperator.And),
+                new RuleCondition(ConditionType.Interval, JsonSerializer.SerializeToNode(new IntervalConditionConfig(600, 60), ConditionConfigJson.Options), LogicalOperator.Or),
+            ],
+        });
+
+        DeviceUnitZoneRule? loaded = await _repo.RuleGetByIdAsync(ruleId);
+        Assert.NotNull(loaded);
+        Assert.Equal(3, loaded!.Conditions.Count);
+        Assert.Null(loaded.Conditions[0].Operator);
+        Assert.Equal(LogicalOperator.And, loaded.Conditions[1].Operator);
+        Assert.Equal(LogicalOperator.Or, loaded.Conditions[2].Operator);
+        Assert.Equal(ConditionType.Schedule, loaded.Conditions[0].ConditionType);
+        Assert.Equal(ConditionType.Threshold, loaded.Conditions[1].ConditionType);
+        Assert.Equal(ConditionType.Interval, loaded.Conditions[2].ConditionType);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task RulesReferencingAsync_FindsRuleTriggeredDependency_AcrossZones(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, zoneA) = await MakeUnitAndZone(tenantId);
+        var zoneB = await _repo.DeviceUnitZoneAddAsync(new DeviceUnitZone { TenantID = tenantId, DeviceUnitID = unit.IDDeviceUnit!.Value, DeviceUnitZoneName = "Zone B" });
+
+        int referencedRuleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        {
+            TenantID = tenantId, DeviceUnitZoneID = zoneA.IDDeviceUnitZone!.Value, ActionType = ActionType.Notification, SensorMetric = SensorMetric.Temperature,
+            Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(30, 1), ConditionConfigJson.Options), null)],
+            NotificationSubject = "hot",
+        });
+        int referencingRuleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        {
+            // Cross-zone reference (zoneB's rule references zoneA's rule) - explicitly allowed by #212's design.
+            TenantID = tenantId, DeviceUnitZoneID = zoneB.IDDeviceUnitZone!.Value, ActionType = ActionType.Notification, SensorMetric = null,
+            Conditions = [new RuleCondition(ConditionType.RuleTriggered, JsonSerializer.SerializeToNode(new RuleTriggeredConditionConfig(referencedRuleId), ConditionConfigJson.Options), null)],
+            NotificationSubject = "chained",
+        });
+
+        var referencing = await _repo.RulesReferencingAsync(referencedRuleId, tenantId);
+        Assert.Equal(referencingRuleId, Assert.Single(referencing).IDDeviceUnitZoneRule);
+
+        // Not referenced by anything - empty, not an error.
+        Assert.Empty(await _repo.RulesReferencingAsync(referencingRuleId, tenantId));
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task RuleNotificationWasTrue_DefaultsFalse_ThenRoundTrips(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (_, zone) = await MakeUnitAndZone(tenantId);
+        int ruleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        {
+            TenantID = tenantId, DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value, ActionType = ActionType.Notification, SensorMetric = SensorMetric.Humidity,
+            Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(80, 2), ConditionConfigJson.Options), null)],
+            NotificationSubject = "humid",
+        });
+
+        Assert.False(await _repo.RuleNotificationWasTrueGetAsync(ruleId, zone.IDDeviceUnitZone!.Value));
+
+        await _repo.RuleNotificationWasTrueSetAsync(ruleId, zone.IDDeviceUnitZone!.Value, true, DateTime.UtcNow);
+        Assert.True(await _repo.RuleNotificationWasTrueGetAsync(ruleId, zone.IDDeviceUnitZone!.Value));
+
+        await _repo.RuleNotificationWasTrueSetAsync(ruleId, zone.IDDeviceUnitZone!.Value, false, null);
+        Assert.False(await _repo.RuleNotificationWasTrueGetAsync(ruleId, zone.IDDeviceUnitZone!.Value));
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceDelete_Removes_Device_And_Its_Config_Rows(DbProviderKind provider)
     {
         var t = Use(provider);

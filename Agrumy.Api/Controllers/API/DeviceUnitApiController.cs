@@ -332,7 +332,11 @@ namespace api.Controllers.API
             }
             else
             {
-                if (rule.SensorMetric == null) { return "Notification rule: sensorMetric is required."; }
+                // sensorMetric is required only when a Threshold condition needs to know which reading to check - a pure Interval/Schedule/RuleTriggered reminder rule has nothing to measure and legitimately leaves it null.
+                if (rule.SensorMetric == null && rule.Conditions.Any(c => c.ConditionType == ConditionType.Threshold))
+                {
+                    return "Notification rule: sensorMetric is required when a condition is Threshold.";
+                }
                 if (rule.RelayFunction != null) { return "Notification rule: relayFunction must not be set."; }
                 if (string.IsNullOrWhiteSpace(rule.NotificationSubject)) { return "Notification rule: subject is required."; }
             }

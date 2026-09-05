@@ -126,6 +126,10 @@ builder.Services.AddHostedService<OfflineAlertBackgroundService>();
 builder.Services.AddScoped<LowBatteryAlertEvaluator>();
 builder.Services.AddHostedService<LowBatteryAlertBackgroundService>();
 
+// Roadmap #212: server-side evaluator for Notification-action rules - a Relay-action rule's fold runs on-device instead.
+builder.Services.AddScoped<RuleNotificationEvaluator>();
+builder.Services.AddHostedService<RuleNotificationBackgroundService>();
+
 // MariaDB retention runs here; PostgreSQL/TimescaleDB installs use EfRepository.ApplyRetentionPolicyAsync (a native TimescaleDB policy) instead.
 builder.Services.AddScoped<SensorDataRetentionEvaluator>();
 builder.Services.AddHostedService<SensorDataRetentionBackgroundService>();

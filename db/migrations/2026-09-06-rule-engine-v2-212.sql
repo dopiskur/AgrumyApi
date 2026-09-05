@@ -48,6 +48,8 @@ ALTER TABLE `deviceUnitZoneRule`
   MODIFY COLUMN `Conditions` TEXT NOT NULL,
   -- Nullable now that Unit/Global-scope rules (DeviceUnitZoneID NULL) exist alongside Zone-scope ones.
   MODIFY COLUMN `DeviceUnitZoneID` INT DEFAULT NULL,
+  -- Nullable now that a Notification-action rule has no relay to target (api.Models.ActionType) - stays required only for ActionType.Relay, enforced in DeviceUnitApiController, not the DB.
+  MODIFY COLUMN `RelayFunction` INT DEFAULT NULL,
   DROP COLUMN `ConditionType`,
   DROP COLUMN `ConditionConfig`,
   ADD INDEX IF NOT EXISTS `ix_deviceUnitZoneRule_unit` (`DeviceUnitID`),

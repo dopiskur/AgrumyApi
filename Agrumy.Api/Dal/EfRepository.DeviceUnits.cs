@@ -288,6 +288,28 @@ namespace api.Dal
             }
         }
 
+        /// False (not just missing) for a (rule, zone) pair with no row yet - a rule that has never fired for this zone has never been "true".
+        public async Task<bool> RuleNotificationWasTrueGetAsync(int ruleId, int idDeviceUnitZone) =>
+            await db.RuleNotificationStates.AsNoTracking()
+                .Where(s => s.RuleID == ruleId && s.DeviceUnitZoneID == idDeviceUnitZone)
+                .Select(s => (bool?)s.WasTrue).FirstOrDefaultAsync() ?? false;
+
+        public async Task RuleNotificationWasTrueSetAsync(int ruleId, int idDeviceUnitZone, bool wasTrue, DateTime? lastFiredAtUtc)
+        {
+            var row = await db.RuleNotificationStates.FirstOrDefaultAsync(s => s.RuleID == ruleId && s.DeviceUnitZoneID == idDeviceUnitZone);
+            if (row == null)
+            {
+                row = new RuleNotificationStateRow { RuleID = ruleId, DeviceUnitZoneID = idDeviceUnitZone };
+                db.RuleNotificationStates.Add(row);
+            }
+            row.WasTrue = wasTrue;
+            if (lastFiredAtUtc is DateTime firedAt)
+            {
+                row.LastFiredAtUtc = firedAt;
+            }
+            await db.SaveChangesAsync();
+        }
+
         private static DeviceUnitZoneRule ToDtoRule(DeviceUnitZoneRuleRow r) => new()
         {
             IDDeviceUnitZoneRule = r.IDDeviceUnitZoneRule,

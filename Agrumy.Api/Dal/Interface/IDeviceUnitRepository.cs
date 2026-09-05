@@ -99,5 +99,12 @@ namespace api.Dal.Interface
 
         /// Bumps ConfigVersion for every device assigned to this zone - called after any rules/safety-limit change so the next poll picks it up.
         Task DeviceUnitZoneConfigVersionBumpAsync(int idDeviceUnitZone);
+
+        // ---- Notification rule evaluation state --------------------------
+
+        /// False (not just missing) for a (rule, zone) pair with no row yet.
+        Task<bool> RuleNotificationWasTrueGetAsync(int ruleId, int idDeviceUnitZone);
+
+        Task RuleNotificationWasTrueSetAsync(int ruleId, int idDeviceUnitZone, bool wasTrue, DateTime? lastFiredAtUtc);
     }
 }
