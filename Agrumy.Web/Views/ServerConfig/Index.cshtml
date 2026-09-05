@@ -20,6 +20,12 @@
             <input type="hidden" asp-for="FirmwareSource" />
             <input type="hidden" asp-for="FirmwareGitHubRepository" />
             <input type="hidden" asp-for="FirmwareCustomRepositoryUrl" />
+            @* Alerts settings moved to their own page (#338) - same "ride along hidden" reasoning as the Firmware fields above. *@
+            <input type="hidden" asp-for="BatteryLowThreshold" />
+            <input type="hidden" asp-for="BatteryLowHysteresis" />
+            <input type="hidden" asp-for="EventDedupeMinutes" />
+            <input type="hidden" asp-for="ProblemEventAlertsEnabled" />
+            <input type="hidden" asp-for="ProblemEventExpiryHours" />
 
             <ul class="nav nav-tabs" role="tablist">
                 <li class="nav-item" role="presentation">
@@ -27,9 +33,6 @@
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-safety-limits" type="button" role="tab">Water Pump Safety</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-alerts" type="button" role="tab">Alerts</button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-accounts" type="button" role="tab">Accounts</button>
@@ -106,59 +109,6 @@
                         <label asp-for="WaterPumpCooldownSeconds" class="form-label"></label>
                         <input asp-for="WaterPumpCooldownSeconds" class="form-control" />
                         <span asp-validation-for="WaterPumpCooldownSeconds" class="text-danger"></span>
-                    </div>
-                </div>
-
-                <div class="tab-pane fade" id="tab-alerts" role="tabpanel">
-                    <p class="text-secondary">
-                        Low-battery alert: a device's latest battery reading at or
-                        below this percentage triggers one email per low-battery streak; it only
-                        clears (and can re-alert) once the reading climbs back above threshold +
-                        hysteresis, same dead-zone idea as the relay margins, applied to the alert
-                        instead of a relay.
-                    </p>
-                    <div class="mb-3">
-                        <label asp-for="BatteryLowThreshold" class="form-label"></label>
-                        <input asp-for="BatteryLowThreshold" class="form-control" />
-                        <span asp-validation-for="BatteryLowThreshold" class="text-danger"></span>
-                    </div>
-                    <div class="mb-3">
-                        <label asp-for="BatteryLowHysteresis" class="form-label"></label>
-                        <input asp-for="BatteryLowHysteresis" class="form-control" />
-                        <span asp-validation-for="BatteryLowHysteresis" class="text-danger"></span>
-                    </div>
-                    <p class="text-secondary">
-                        A device repeating the identical event (e.g. "NoInternet") within this many
-                        minutes of its last one is ignored, not stored.
-                    </p>
-                    <div class="mb-3">
-                        <label asp-for="EventDedupeMinutes" class="form-label"></label>
-                        <input asp-for="EventDedupeMinutes" class="form-control" />
-                        <span asp-validation-for="EventDedupeMinutes" class="text-danger"></span>
-                    </div>
-
-                    <hr />
-                    <h6 class="fw-semibold">Non-critical problem alerts</h6>
-                    <p class="text-secondary">
-                        Crash/auth/sync/OTA-failure events turn a Unit/Zone Orange (the badge lists
-                        them, with an Acknowledge button per alert) without affecting relay control.
-                        An un-acknowledged alert clears itself once it's older than the expiry below;
-                        acknowledging it clears it immediately.
-                    </p>
-                    <div class="mb-3 form-check">
-                        <input asp-for="ProblemEventAlertsEnabled" class="form-check-input" />
-                        <label asp-for="ProblemEventAlertsEnabled" class="form-check-label"></label>
-                    </div>
-                    <div class="mb-0" style="max-width:12rem">
-                        <label asp-for="ProblemEventExpiryHours" class="form-label"></label>
-                        <select asp-for="ProblemEventExpiryHours" class="form-select">
-                            <option value="1">1 hour</option>
-                            <option value="6">6 hours</option>
-                            <option value="12">12 hours</option>
-                            <option value="24">24 hours</option>
-                            <option value="48">48 hours</option>
-                        </select>
-                        <span asp-validation-for="ProblemEventExpiryHours" class="text-danger"></span>
                     </div>
                 </div>
 

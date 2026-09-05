@@ -207,6 +207,12 @@
                                     <p>@Localizer["Server Settings"]</p>
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a asp-area="" asp-controller="Alerts" asp-action="Index" class="nav-link @navActive("Alerts")">
+                                    <i class="nav-icon bi bi-bell"></i>
+                                    <p>@Localizer["Alerts"]</p>
+                                </a>
+                            </li>
                             @if (tenantManagementEnabled)
                             {
                                 <li class="nav-item">
