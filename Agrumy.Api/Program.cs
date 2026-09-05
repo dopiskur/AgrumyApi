@@ -388,3 +388,11 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+namespace api
+{
+    /// Marker type for Agrumy.Api.Tests' WebApplicationFactory - a dedicated type instead of the
+    /// implicit top-level Program avoids a CS0433 clash with Agrumy.Web's own Program once both
+    /// assemblies are referenced by the same test project.
+    public sealed class ApiHostMarker { }
+}

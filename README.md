@@ -41,7 +41,7 @@ purpose-built appliance.
 | `Agrumy.Dal` | class library | Data-access model: `AgrumyDbContext`, EF entities (`api.Dal.Entities`), provider selection (`DbProviderKind`, `DbOptionsFactory`). No stored procedures - every query is LINQ. |
 | `Agrumy.Api` | Web API | Device/sensor communication + admin API (`Controllers/API`), the `IRepository` implementation (`Dal/EfRepository`, EF Core over `Agrumy.Dal`), MySQL/MariaDB **or** PostgreSQL, JWT bearer auth, Swagger, startup DB health-check + schema creation on an empty database. |
 | `Agrumy.Web` | MVC app | Admin UI (`Controllers/View`, `Views/`, `wwwroot/`). Talks to `Agrumy.Api` **only over HTTP** (`Dal/ApiRepository` + `HttpClient` with a JWT bearer token). No direct database access. |
-| `Agrumy.Api.Tests` | test project | Integration tests that run the real EF Core stack against both providers in parallel (`AGRUMY_TEST_MYSQL`/`AGRUMY_TEST_POSTGRES` connection strings), plus unit tests for the alert/schedule/hysteresis evaluators. |
+| `Agrumy.Api.Tests` | test project | Integration tests that run the real EF Core stack against both providers in parallel (`AGRUMY_TEST_MYSQL`/`AGRUMY_TEST_POSTGRES` connection strings, both provisioned as CI service containers in `build.yml`), `WebApplicationFactory`-driven HTTP tests covering auth/rate-limiting/exception-handling through the real middleware pipeline, plus unit tests for the alert/schedule/hysteresis evaluators. |
 
 `db/` holds a historical schema dump (`agrumyDB-final.sql`, `agrumyDB-withData.sql`)
 and old deployment notes (`README.txt`), kept for reference only - the schema is now
