@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace api.Notifications
 {
-    /// <summary>Posts a JSON event to an operator-configured URL, so an external system (Slack relay, custom server) learns about an alert without polling Agrumy. Configured under <c>Notifications:Webhook</c>.</summary>
+    /// Posts a JSON event to an operator-configured URL, so an external system learns about an alert without polling Agrumy. Configured under <c>Notifications:Webhook</c>.
     public sealed class WebhookNotificationChannel : INotificationChannel
     {
         public const string ClientName = "WebhookNotificationChannel";

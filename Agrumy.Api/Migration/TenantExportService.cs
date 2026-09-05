@@ -3,10 +3,7 @@ using api.Models;
 
 namespace api.Migration
 {
-    /// <summary>Builds the full portable snapshot of one tenant - see api.Models.TenantExport for
-    /// exactly what is/isn't included and why. Read-only; every method here composes existing
-    /// IRepository reads, nothing new at the EF layer beyond SensorDataExportGetAsync (raw rows,
-    /// not the chart-shaped JSON the existing SensorData endpoints return).</summary>
+    /// Builds the full portable snapshot of one tenant - see api.Models.TenantExport for exactly what is/isn't included and why; read-only, composed from existing IRepository reads.
     public class TenantExportService(IRepository repo)
     {
         public async Task<TenantExport> ExportAsync(int tenantId, bool includeSensorData, DateTime? sensorDataSinceUtc)

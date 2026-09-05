@@ -3,27 +3,17 @@ using api.Models;
 
 namespace api.Migration
 {
-    /// <summary>Applies a TenantExport to this server - see api.Models.TenantExport's remarks for
-    /// the shape, and api.Models.TenantImportTarget for the two ways in (ByName vs AsSentinel).
-    /// Every id on the target is freshly assigned (never reuses the export's own ids), so an
-    /// import can never collide with anything already here - see the *IdMap dictionaries below,
-    /// which stitch the export's internal references (Zone-&gt;Unit, Rule-&gt;Zone, Device-&gt;Unit/
-    /// Zone, SensorData-&gt;Device/Unit/Zone) onto the fresh ids as each entity is created.</summary>
+    /// Applies a TenantExport to this server (see api.Models.TenantImportTarget for ByName vs AsSentinel) - every id on the target is freshly assigned, stitched back together via the *IdMap dictionaries below.
     public class TenantImportService(IRepository repo)
     {
-        /// <summary>ByName: ties to an existing tenant with this exact name, or creates one - see
-        /// TenantApiController.Import. GlobalAdmin-only at the controller layer.</summary>
+        /// ByName: ties to an existing tenant with this exact name, or creates one; GlobalAdmin-only at the controller layer.
         public async Task<TenantImportResult> ImportByNameAsync(TenantExport export, string targetTenantName)
         {
             int tenantId = await repo.TenantGetIdAsync(targetTenantName) ?? await repo.TenantAddAsync(targetTenantName);
             return await ImportIntoTenantAsync(export, tenantId, targetTenantName);
         }
 
-        /// <summary>AsSentinel: TenantID=0, only while TenantZeroIsEmptyAsync - see
-        /// TenantApiController.ImportAsSentinel, reachable without an existing admin session (the
-        /// whole point is "this is a brand new self-hosted server with nobody to log in as yet").
-        /// Discards the still-pending bootstrap admin placeholder first, since the export's own
-        /// users replace it as this server's real admin(s).</summary>
+        /// AsSentinel: TenantID=0, only while TenantZeroIsEmptyAsync - reachable without an admin session (a brand-new self-hosted server has nobody to log in as yet); discards the pending bootstrap admin placeholder first.
         public async Task<(TenantImportResult? result, string? error)> ImportAsSentinelAsync(TenantExport export)
         {
             if (!await repo.TenantZeroIsEmptyAsync())
@@ -54,10 +44,7 @@ namespace api.Migration
             var map = new Dictionary<int, int>();
             foreach (TenantExportUser eu in export.Users)
             {
-                // Email and Username both carry a GLOBAL unique index (not per-tenant) - importing
-                // into a server that already has either is a real, expected collision (re-running
-                // an import, or the same person already has an account here), not a bug. Skip that
-                // one row rather than failing the whole batch.
+                // Email/Username carry a GLOBAL unique index (not per-tenant) - a collision (re-run import, or already has an account) is expected, so skip the row rather than fail the batch.
                 if (!string.IsNullOrEmpty(eu.User.Email) && await repo.UserGetAsync(null, eu.User.Email, null) is not null)
                 {
                     result.UsersSkipped++;
@@ -87,8 +74,7 @@ namespace api.Migration
                 };
                 await repo.UserAddAsync(newUser, new UserSecret { PwdHash = eu.PwdHash, PwdSalt = eu.PwdSalt });
 
-                // UserAddAsync doesn't return the new id - same re-fetch-by-email pattern
-                // UserApiController.UserRegistration already uses for the same reason.
+                // UserAddAsync doesn't return the new id - same re-fetch-by-email pattern as UserApiController.UserRegistration.
                 User? added = await repo.UserGetAsync(null, eu.User.Email, null);
                 if (added?.IDUser is not int newId)
                 {
@@ -174,8 +160,7 @@ namespace api.Migration
             var map = new Dictionary<int, int>();
             foreach (TenantExportDevice ed in export.Devices)
             {
-                // ApiId is globally unique - re-running the same import, or importing a device this
-                // server already has under a different tenant, is a real collision to skip past, not fail on.
+                // ApiId is globally unique - a collision (re-run import, or already here under a different tenant) is skipped, not failed on.
                 if (!string.IsNullOrEmpty(ed.ApiId) && await repo.DeviceGetByApiIdAsync(ed.ApiId) is not null)
                 {
                     result.DevicesSkipped++;
@@ -183,8 +168,7 @@ namespace api.Migration
                     continue;
                 }
 
-                // ApiId/ApiKey kept AS EXPORTED (not regenerated) - a real device's firmware needs
-                // no reconfiguration to keep talking to whichever server now owns this row.
+                // ApiId/ApiKey kept AS EXPORTED - a real device's firmware needs no reconfiguration to keep talking to whichever server now owns this row.
                 Device created = await repo.DeviceAddAsync(new Device
                 {
                     TenantID = tenantId,
@@ -233,8 +217,7 @@ namespace api.Migration
             var rows = new List<SensorData>();
             foreach (SensorData sd in export.SensorData)
             {
-                // A reading for a device that itself got skipped (ApiId collision) has nowhere
-                // valid to attach - drop it rather than orphan it against device 0.
+                // A reading for a device that itself got skipped has nowhere valid to attach - drop it rather than orphan it against device 0.
                 if (sd.DeviceID is not int oldDeviceId || !deviceIdMap.TryGetValue(oldDeviceId, out int newDeviceId))
                 {
                     continue;

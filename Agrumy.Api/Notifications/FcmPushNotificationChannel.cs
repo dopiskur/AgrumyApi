@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace api.Notifications
 {
-    /// <summary>Firebase Cloud Messaging push channel (Android now, iOS via APNs later). PREPARED, NOT LIVE: stays skipped because <see cref="PushChannelOptions.Enabled"/> defaults to false and nothing yet supplies <see cref="NotificationRecipient.PushTokens"/> - device tokens come from the Android app registering with the API, which does not exist yet. The FCM HTTP v1 request shape and endpoint are already built below; minting an OAuth2 access token from a service account is the only real work left.</summary>
+    /// Firebase Cloud Messaging push channel (Android now, iOS via APNs later) - PREPARED, NOT LIVE: stays skipped since <see cref="PushChannelOptions.Enabled"/> defaults false and no Android app exists yet to supply <see cref="NotificationRecipient.PushTokens"/>.
     public sealed class FcmPushNotificationChannel : INotificationChannel
     {
         private const string FcmSendEndpoint = "https://fcm.googleapis.com/v1/projects/{0}/messages:send";
@@ -46,7 +46,7 @@ namespace api.Notifications
             return Task.FromResult(NotificationResult.Failed("FCM send not implemented - missing OAuth2 token provider"));
         }
 
-        /// <summary>FCM HTTP v1 message body for a single device token. Ready for use once <c>GetAccessTokenAsync</c> exists.</summary>
+        /// FCM HTTP v1 message body for a single device token. Ready for use once <c>GetAccessTokenAsync</c> exists.
         internal static string BuildFcmPayload(Notification notification, string deviceToken)
         {
             var message = new

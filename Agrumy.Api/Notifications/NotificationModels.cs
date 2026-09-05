@@ -7,7 +7,7 @@ namespace api.Notifications
         Critical,
     }
 
-    /// <summary>Where a notification goes. A channel uses whichever fields it understands.</summary>
+    /// Where a notification goes. A channel uses whichever fields it understands.
     public sealed record NotificationRecipient(
         string? Email = null,
         IReadOnlyList<string>? PushTokens = null);
@@ -18,7 +18,7 @@ namespace api.Notifications
         NotificationRecipient Recipient,
         NotificationSeverity Severity = NotificationSeverity.Warning);
 
-    /// <summary>Outcome of one channel handling one notification. <see cref="Sent"/> false covers both "not applicable" (<see cref="Skipped"/>) and "tried and failed" (<see cref="Failed"/>).</summary>
+    /// Outcome of one channel handling one notification; <see cref="Sent"/> false covers both "not applicable" (<see cref="Skipped"/>) and "tried and failed" (<see cref="Failed"/>).
     public sealed record NotificationResult(bool Sent, bool Attempted, string? Detail)
     {
         public static NotificationResult Ok(string? detail = null) => new(true, true, detail);

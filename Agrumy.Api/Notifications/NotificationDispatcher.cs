@@ -1,6 +1,6 @@
 namespace api.Notifications
 {
-    /// <summary>Fans one notification out to every configured channel.</summary>
+    /// Fans one notification out to every configured channel.
     public interface INotificationDispatcher
     {
         Task<IReadOnlyList<ChannelOutcome>> DispatchAsync(Notification notification, CancellationToken ct = default);

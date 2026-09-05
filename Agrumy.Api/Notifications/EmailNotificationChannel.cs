@@ -5,7 +5,7 @@ using MimeKit;
 
 namespace api.Notifications
 {
-    /// <summary>SMTP email delivery via MailKit. Configured under <c>Notifications:Email</c>.</summary>
+    /// SMTP email delivery via MailKit. Configured under <c>Notifications:Email</c>.
     public sealed class EmailNotificationChannel : INotificationChannel
     {
         private readonly EmailChannelOptions _options;
@@ -61,7 +61,7 @@ namespace api.Notifications
             }
         }
 
-        /// <summary>Callers pass a notification with a non-empty recipient email; FromAddress is validated by <see cref="IsConfigured"/> on the send path.</summary>
+        /// Callers pass a notification with a non-empty recipient email; FromAddress is validated by <see cref="IsConfigured"/> on the send path.
         internal MimeMessage BuildMessage(Notification notification)
         {
             var message = new MimeMessage();

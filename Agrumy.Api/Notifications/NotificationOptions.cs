@@ -1,6 +1,6 @@
 namespace api.Notifications
 {
-    /// <summary>Bound from the <c>Notifications</c> configuration section.</summary>
+    /// Bound from the <c>Notifications</c> configuration section.
     public sealed class NotificationOptions
     {
         public const string SectionName = "Notifications";
@@ -22,7 +22,7 @@ namespace api.Notifications
         public string? Host { get; set; }
         public int Port { get; set; } = 587;
 
-        /// <summary>587 with STARTTLS (true, default) vs 465 implicit TLS (false).</summary>
+        /// 587 with STARTTLS (true, default) vs 465 implicit TLS (false).
         public bool UseStartTls { get; set; } = true;
 
         public string? Username { get; set; }
@@ -31,25 +31,25 @@ namespace api.Notifications
         public string FromName { get; set; } = "Agrumy";
     }
 
-    /// <summary>FCM (Android/iOS) push. Inert until <see cref="Enabled"/> is set AND the Android app exists to register device tokens - see <see cref="FcmPushNotificationChannel"/>.</summary>
+    /// FCM (Android/iOS) push - inert until <see cref="Enabled"/> is set AND the Android app exists to register device tokens; see <see cref="FcmPushNotificationChannel"/>.
     public sealed class PushChannelOptions
     {
         public bool Enabled { get; set; }
 
-        /// <summary>Firebase project id, for the FCM HTTP v1 endpoint.</summary>
+        /// Firebase project id, for the FCM HTTP v1 endpoint.
         public string? FcmProjectId { get; set; }
 
-        /// <summary>Path to the Google service-account JSON used to mint FCM access tokens.</summary>
+        /// Path to the Google service-account JSON used to mint FCM access tokens.
         public string? FcmCredentialsPath { get; set; }
     }
 
-    /// <summary>Generic HTTP POST webhook (Slack incoming-webhook compatible bodies need their own field mapping, this sends Agrumy's own JSON shape) - see <see cref="WebhookNotificationChannel"/>.</summary>
+    /// Generic HTTP POST webhook sending Agrumy's own JSON shape (not Slack-compatible) - see <see cref="WebhookNotificationChannel"/>.
     public sealed class WebhookChannelOptions
     {
         public bool Enabled { get; set; }
         public string? Url { get; set; }
 
-        /// <summary>When set, each request carries an X-Agrumy-Signature header (HMAC-SHA256 of the body) so the receiver can verify it actually came from this Agrumy instance.</summary>
+        /// When set, each request carries an X-Agrumy-Signature header (HMAC-SHA256 of the body) so the receiver can verify it actually came from this Agrumy instance.
         public string? Secret { get; set; }
     }
 }
