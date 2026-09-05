@@ -95,7 +95,6 @@ namespace api.Controllers.API
             }
             if (device.TenantID != relayTenantId)
             {
-                // A relay belongs to one tenant - forwarding for another tenant's device would let a stolen/misconfigured relay cross tenant boundaries.
                 return new RelayBatchEntryResult { Success = false, StatusCode = 403, Error = "Device belongs to a different tenant than this relay." };
             }
 

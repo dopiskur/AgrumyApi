@@ -16,7 +16,7 @@ namespace api.Dal
             double? Temperature, double? SoilTemperature, double? Humidity, int? Moisture, int? Light,
             int? Co2, int? Tvoc, double? Barometer, double? LiquidPH, int? RainLevel, int? WaterLevel, double? Wind)
         {
-            /// <summary>Derived from this SAME snapshot's own Temperature+Humidity, never mixed across devices/readings.</summary>
+            /// <summary>Nonlinear formula - averaged per device below, not derived from already-averaged Temperature/Humidity.</summary>
             public double? Vpd => VpdCalculator.Compute(Temperature, Humidity);
         }
 
