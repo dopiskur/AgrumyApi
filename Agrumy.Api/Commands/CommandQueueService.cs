@@ -84,6 +84,24 @@ namespace api.Commands
             return await IssueToTargetsAsync(targets, CommandActionType.ScanForDevices);
         }
 
+        /// <summary>Issues a ProvisionDevice command to exactly one device (the roadmap #268
+        /// Register flow's winning scanning device), carrying payloadJson - see
+        /// api.Models.DiscoveryProvisionPayload. Same per-device dedup as every other ActionType.</summary>
+        public async Task<IssueCommandResult> IssueProvisionCommandAsync(int deviceId, string payloadJson)
+        {
+            DateTime utcNow = DateTime.UtcNow;
+            if (await commandRepo.HasActiveCommandAsync(deviceId, CommandActionType.ProvisionDevice, utcNow))
+            {
+                return new IssueCommandResult(IssueCommandOutcome.AllDuplicates, [], "A provisioning command is already pending for this device.");
+            }
+            DateTime expiresAt = utcNow + DefaultExpiry;
+            if (await commandRepo.AddCommandAsync(deviceId, CommandActionType.ProvisionDevice, utcNow, expiresAt, payloadJson) is int newCommandId)
+            {
+                return new IssueCommandResult(IssueCommandOutcome.Success, [newCommandId]);
+            }
+            return new IssueCommandResult(IssueCommandOutcome.AllDuplicates, [], "A provisioning command is already pending for this device.");
+        }
+
         /// <summary>Per-(device, ActionType) dedup then insert, shared by every fan-out entry point above.</summary>
         private async Task<IssueCommandResult> IssueToTargetsAsync(IList<Device> targets, CommandActionType actionType)
         {
@@ -131,6 +149,7 @@ namespace api.Commands
                     IDDeviceCommand = candidate.IDDeviceCommand,
                     ActionType = candidate.ActionType,
                     ExpiresAt = candidate.ExpiresAt,
+                    Payload = candidate.Payload,
                 };
             }
             return null;

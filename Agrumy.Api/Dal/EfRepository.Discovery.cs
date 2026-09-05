@@ -45,10 +45,36 @@ namespace api.Dal
                     Rssi = r.Rssi,
                     ScanningDeviceID = r.ScanningDeviceID,
                     ScanningDeviceName = d.DeviceName,
+                    TenantID = d.TenantID,
                     DateReported = r.DateReported,
                 }).ToListAsync();
 
             return DiscoveryResultPicker.Pick(reports);
+        }
+
+        public async Task<DiscoveryResult?> DiscoveryResultGetAsync(string discoveredApMac, int? tenantId)
+        {
+            IQueryable<DeviceRow> scanners = db.Devices.AsNoTracking();
+            if (tenantId != null)
+            {
+                scanners = scanners.Where(d => d.TenantID == tenantId);
+            }
+
+            var reports = await (
+                from r in db.DeviceDiscoveryReports.AsNoTracking()
+                where r.DiscoveredApMac == discoveredApMac
+                join d in scanners on r.ScanningDeviceID equals d.IDDevice
+                select new DiscoveryResult
+                {
+                    DiscoveredApMac = r.DiscoveredApMac,
+                    Rssi = r.Rssi,
+                    ScanningDeviceID = r.ScanningDeviceID,
+                    ScanningDeviceName = d.DeviceName,
+                    TenantID = d.TenantID,
+                    DateReported = r.DateReported,
+                }).ToListAsync();
+
+            return DiscoveryResultPicker.Pick(reports).SingleOrDefault();
         }
     }
 }

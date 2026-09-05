@@ -6,6 +6,7 @@ namespace api.Models
         ForceOTA = 2,
         ForceConfigSync = 3,
         ScanForDevices = 4,
+        ProvisionDevice = 5,
     }
 
     /// <summary>Device acknowledges before executing, so a command stuck at Acknowledged (never reaching Executed) means it took the command but crashed or lost power before confirming the outcome.</summary>
@@ -42,6 +43,8 @@ namespace api.Models
         public DateTime IssuedAt { get; set; }
         public DateTime ExpiresAt { get; set; }
         public DateTime? ExecutedAt { get; set; }
+        // Only ProvisionDevice sets this - see api.Models.DiscoveryProvisionPayload.
+        public string? Payload { get; set; }
     }
 
     /// <summary>Minimal shape returned inside DeviceConfig during a device's regular config poll — not a separate endpoint.</summary>
@@ -50,6 +53,7 @@ namespace api.Models
         public int IDDeviceCommand { get; set; }
         public CommandActionType ActionType { get; set; }
         public DateTime ExpiresAt { get; set; }
+        public string? Payload { get; set; }
     }
 
     /// <summary>Body of POST /api/Device/Command/Ack.</summary>

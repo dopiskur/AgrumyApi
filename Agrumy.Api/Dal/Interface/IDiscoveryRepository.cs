@@ -12,5 +12,10 @@ namespace api.Dal.Interface
         /// from scanning devices in scope - Zone if zoneId is given, else Unit if unitId is given,
         /// else every device in the tenant (Fleet-wide).</summary>
         Task<IList<DiscoveryResult>> DiscoveryResultsGetAsync(int? tenantId, int? unitId, int? zoneId);
+
+        /// <summary>Same best-pick as above, narrowed to one DiscoveredApMac - the Register flow's
+        /// winning-scanning-device lookup. tenantId scopes the eligible scanning devices, so a
+        /// caller can never resolve a winner from another tenant's scan report.</summary>
+        Task<DiscoveryResult?> DiscoveryResultGetAsync(string discoveredApMac, int? tenantId);
     }
 }

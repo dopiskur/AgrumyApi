@@ -20,7 +20,7 @@ namespace api.Dal
 
         /// <summary>Null return means the ux_deviceCommand_device_activekey unique index rejected
         /// the insert - another request won the same check-then-insert race; the caller treats this device as a dedup skip, not an error.</summary>
-        public async Task<int?> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt)
+        public async Task<int?> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt, string? payload = null)
         {
             var row = new DeviceCommandRow
             {
@@ -30,6 +30,7 @@ namespace api.Dal
                 ActiveKey = (int)actionType,
                 IssuedAt = issuedAt,
                 ExpiresAt = expiresAt,
+                Payload = payload,
             };
             db.DeviceCommands.Add(row);
 
@@ -104,6 +105,7 @@ namespace api.Dal
             IssuedAt = c.IssuedAt,
             ExpiresAt = c.ExpiresAt,
             ExecutedAt = c.ExecutedAt,
+            Payload = c.Payload,
         };
     }
 }

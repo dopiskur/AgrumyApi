@@ -14,8 +14,9 @@ namespace api.Dal.Interface
 
         /// <summary>Creates one Pending command row and bumps the device's CommandVersion in the
         /// same call. Null return means a DB-level unique constraint rejected it because another
-        /// request already created an active command for this (device, actionType) pair - the caller treats that as a dedup skip.</summary>
-        Task<int?> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt);
+        /// request already created an active command for this (device, actionType) pair - the caller treats that as a dedup skip.
+        /// payload is only ever set for ProvisionDevice (api.Models.DiscoveryProvisionPayload, JSON).</summary>
+        Task<int?> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt, string? payload = null);
 
         /// <summary>Every Pending command for this device, oldest first - CommandQueueService picks
         /// the first one that is not (yet) expired and lazily expires any that are.</summary>

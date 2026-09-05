@@ -243,6 +243,7 @@ namespace api.Dal.Entities
         public DateTime? ExecutedAt { get; set; }
         // Mirrors ActionType while active, NULL once terminal - backs the unique (DeviceID, ActiveKey) index that makes IssueCommandAsync's dedup a real DB constraint.
         public int? ActiveKey { get; set; }
+        public string? Payload { get; set; }
     }
 
     /// <summary>One row per device, upserted on every config poll - the poll itself is the

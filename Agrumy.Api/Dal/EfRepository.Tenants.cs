@@ -63,5 +63,27 @@ namespace api.Dal
                 .Select(u => u.PwdHash).ToListAsync();
             return tenant0Users.Count == 0 || (tenant0Users.Count == 1 && tenant0Users[0] == null);
         }
+
+        public async Task<IList<TenantWifiConfig>> TenantWifiConfigsGetAsync(int tenantID)
+        {
+            return await db.TenantWifiConfigs.AsNoTracking()
+                .Where(c => c.TenantID == tenantID)
+                .Select(c => new TenantWifiConfig
+                {
+                    IDTenantWifiConfig = c.IDTenantWifiConfig,
+                    TenantID = c.TenantID,
+                    Ssid = c.Ssid,
+                    Password = c.Password,
+                })
+                .ToListAsync();
+        }
+
+        public async Task<TenantWifiConfig> TenantWifiConfigAddAsync(TenantWifiConfig config)
+        {
+            var row = new TenantWifiConfigRow { TenantID = config.TenantID, Ssid = config.Ssid, Password = config.Password ?? "" };
+            db.TenantWifiConfigs.Add(row);
+            await db.SaveChangesAsync();
+            return new TenantWifiConfig { IDTenantWifiConfig = row.IDTenantWifiConfig, TenantID = row.TenantID, Ssid = row.Ssid, Password = row.Password };
+        }
     }
 }

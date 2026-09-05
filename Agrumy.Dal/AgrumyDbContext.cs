@@ -20,6 +20,7 @@ namespace api.Dal
         public AgrumyDbContext(DbContextOptions<AgrumyDbContext> options) : base(options) { }
 
         public DbSet<TenantRow> Tenants => Set<TenantRow>();
+        public DbSet<TenantWifiConfigRow> TenantWifiConfigs => Set<TenantWifiConfigRow>();
         public DbSet<UserRow> Users => Set<UserRow>();
         public DbSet<RefreshTokenRow> RefreshTokens => Set<RefreshTokenRow>();
         public DbSet<UserRoleRow> UserRoles => Set<UserRoleRow>();
@@ -62,6 +63,17 @@ namespace api.Dal
                 e.Property(x => x.TenantName).HasMaxLength(100).IsRequired();
                 e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.HasIndex(x => x.TenantName).IsUnique().HasDatabaseName("Name_UNIQUE");
+            });
+
+            modelBuilder.Entity<TenantWifiConfigRow>(e =>
+            {
+                e.ToTable("tenantWifiConfig");
+                e.HasKey(x => x.IDTenantWifiConfig);
+                e.Property(x => x.IDTenantWifiConfig).ValueGeneratedOnAdd();
+                e.Property(x => x.Ssid).HasMaxLength(32).IsRequired();
+                e.Property(x => x.Password).HasMaxLength(64).IsRequired();
+                e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                e.HasIndex(x => x.TenantID).HasDatabaseName("ix_tenantWifiConfig_tenant");
             });
 
             modelBuilder.Entity<UserRoleScopeRow>(e =>

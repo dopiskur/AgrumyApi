@@ -20,5 +20,11 @@ namespace api.Dal.Interface
         /// Any real device or a second/claimed user means someone is already using this server, so
         /// import-as-sentinel refuses rather than merging into or overwriting them.</summary>
         Task<bool> TenantZeroIsEmptyAsync();
+
+        /// <summary>Every saved WiFi AP for this tenant - roadmap #268 Register's 0/1/many
+        /// branching (DiscoveryApiController.Register) decides what to do based on this count.</summary>
+        Task<IList<TenantWifiConfig>> TenantWifiConfigsGetAsync(int tenantID);
+
+        Task<TenantWifiConfig> TenantWifiConfigAddAsync(TenantWifiConfig config);
     }
 }

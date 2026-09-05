@@ -14,6 +14,16 @@ namespace api.Dal.Entities
         public DateTime? DateCreated { get; set; }
     }
 
+    /// <summary>See api.Models.TenantWifiConfig.</summary>
+    public class TenantWifiConfigRow
+    {
+        public int IDTenantWifiConfig { get; set; }
+        public int TenantID { get; set; }
+        public string Ssid { get; set; } = "";
+        public string Password { get; set; } = "";
+        public DateTime? DateCreated { get; set; }
+    }
+
     public class UserRoleScopeRow
     {
         public int IDRoleScope { get; set; }

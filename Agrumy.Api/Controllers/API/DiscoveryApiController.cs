@@ -1,3 +1,4 @@
+using System.Text.Json;
 using api.Commands;
 using api.Dal.Interface;
 using api.Models;
@@ -9,7 +10,8 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace api.Controllers.API
 {
     /// <summary>Roadmap #268 "Scan for new devices" - device-facing report intake, the admin scan
-    /// trigger, and the aggregated results list.</summary>
+    /// trigger, the aggregated results list, and Register (PIN + WiFi credentials to the winning
+    /// scanning device).</summary>
     [Route("/api/Discovery")]
     public class DiscoveryApiController(IRepository repo, ICache cache, CommandQueueService commandQueue) : ApiControllerBase(repo, cache)
     {
@@ -96,6 +98,115 @@ namespace api.Controllers.API
 
             int? tenantId = CallerReadsDevicesGlobally ? null : CallerTenantId;
             return Ok(await Repo.DiscoveryResultsGetAsync(tenantId, unitID, zoneID));
+        }
+
+        /// <summary>Resolves the winning scanning device for DiscoveredApMac, resolves WiFi
+        /// credentials (0/1/many saved TenantWifiConfig rows - see api.Models.DiscoveryRegisterRequest),
+        /// (re)issues the caller's own #70 device-PIN, and queues a ProvisionDevice command carrying
+        /// both to that device. DeviceName/UnitID/ZoneID are accepted and stored on the command's
+        /// payload but nothing applies them yet - no later step in this roadmap item's plan closes
+        /// that loop.</summary>
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("Register")]
+        public async Task<ActionResult<DiscoveryRegisterResult>> Register([FromBody] DiscoveryRegisterRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.DiscoveredApMac))
+            {
+                return BadRequest("discoveredApMac is required.");
+            }
+
+            if (request.ZoneID is int zoneId)
+            {
+                var (_, zoneError) = await EnsureOwnedZoneAsync(zoneId, forWrite: true);
+                if (zoneError != null)
+                {
+                    return zoneError;
+                }
+            }
+            else if (request.UnitID is int unitId)
+            {
+                var (_, unitError) = await EnsureOwnedUnitAsync(unitId, forWrite: true);
+                if (unitError != null)
+                {
+                    return unitError;
+                }
+            }
+
+            int? callerTenantId = CallerManagesDevicesGlobally ? null : CallerTenantId;
+            DiscoveryResult? winner = await Repo.DiscoveryResultGetAsync(request.DiscoveredApMac, callerTenantId);
+            if (winner is null)
+            {
+                return NotFound($"No scan report found for {request.DiscoveredApMac}.");
+            }
+
+            string ssid, wifiPassword;
+            IList<TenantWifiConfig> wifiConfigs = await Repo.TenantWifiConfigsGetAsync(winner.TenantID);
+            if (wifiConfigs.Count == 0)
+            {
+                if (string.IsNullOrWhiteSpace(request.Ssid) || string.IsNullOrWhiteSpace(request.WifiPassword))
+                {
+                    return Ok(new DiscoveryRegisterResult { Outcome = DiscoveryRegisterOutcome.WifiCredentialsRequired });
+                }
+                ssid = request.Ssid;
+                wifiPassword = request.WifiPassword;
+                if (request.SaveWifiForLater)
+                {
+                    await Repo.TenantWifiConfigAddAsync(new TenantWifiConfig { TenantID = winner.TenantID, Ssid = ssid, Password = wifiPassword });
+                }
+            }
+            else if (wifiConfigs.Count == 1)
+            {
+                ssid = wifiConfigs[0].Ssid;
+                wifiPassword = wifiConfigs[0].Password!;
+            }
+            else if (wifiConfigs.FirstOrDefault(c => c.IDTenantWifiConfig == request.WifiConfigId) is TenantWifiConfig chosen)
+            {
+                ssid = chosen.Ssid;
+                wifiPassword = chosen.Password!;
+            }
+            else
+            {
+                return Ok(new DiscoveryRegisterResult
+                {
+                    Outcome = DiscoveryRegisterOutcome.WifiConfigChoiceRequired,
+                    WifiChoices = wifiConfigs.Select(c => new TenantWifiConfig { IDTenantWifiConfig = c.IDTenantWifiConfig, TenantID = c.TenantID, Ssid = c.Ssid }).ToList(),
+                });
+            }
+
+            string? callerName = User.Identity?.Name;
+            if (string.IsNullOrEmpty(callerName))
+            {
+                return Unauthorized();
+            }
+            User? caller = await Repo.UserGetAsync(null, callerName, null);
+            if (caller?.IDUser is not int callerUserId)
+            {
+                return NotFound();
+            }
+
+            string pin = AuthenticationProvider.GetPin();
+            DateTime pinExpiresAt = DateTime.UtcNow.AddHours(AuthenticationProvider.PinValidHours);
+            await Repo.UserSetDevicePinAsync(callerUserId, pin, pinExpiresAt);
+
+            string payloadJson = JsonSerializer.Serialize(new DiscoveryProvisionPayload
+            {
+                Username = callerName,
+                Pin = pin,
+                DiscoveredApMac = request.DiscoveredApMac,
+                Ssid = ssid,
+                WifiPassword = wifiPassword,
+                DeviceName = request.DeviceName,
+                UnitID = request.UnitID,
+                ZoneID = request.ZoneID,
+            });
+
+            IssueCommandResult result = await commandQueue.IssueProvisionCommandAsync(winner.ScanningDeviceID, payloadJson);
+            return result.Outcome switch
+            {
+                IssueCommandOutcome.Success => Ok(new DiscoveryRegisterResult { Outcome = DiscoveryRegisterOutcome.Success }),
+                IssueCommandOutcome.AllDuplicates => Ok(new DiscoveryRegisterResult { Outcome = DiscoveryRegisterOutcome.AlreadyPending }),
+                _ => StatusCode(500),
+            };
         }
 
         private Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int idDeviceUnitZone, bool forWrite) =>
