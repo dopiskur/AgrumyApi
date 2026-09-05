@@ -1,3 +1,4 @@
+using System.Text.Json;
 using api.Dal.Interface;
 using api.Models;
 
@@ -96,6 +97,36 @@ namespace api.Commands
                 return new IssueCommandResult(IssueCommandOutcome.Success, [newCommandId]);
             }
             return new IssueCommandResult(IssueCommandOutcome.AllDuplicates, [], "A provisioning command is already pending for this device.");
+        }
+
+        /// Finds the active ProvisionDevice command whose payload targeted this MacAddress (the roadmap
+        /// #268 Register call that led here) and marks it Executed so a later re-registration of the
+        /// same mac never reapplies a stale intent. Null when this MacAddress was never discovered/
+        /// registered through that flow - an ordinary #70 registration.
+        public async Task<DiscoveryProvisionPayload?> ConsumePendingProvisionAsync(string macAddress)
+        {
+            foreach (var candidate in await commandRepo.GetActiveProvisionCommandsAsync())
+            {
+                if (candidate.Payload is null)
+                {
+                    continue;
+                }
+                DiscoveryProvisionPayload? payload;
+                try
+                {
+                    payload = JsonSerializer.Deserialize<DiscoveryProvisionPayload>(candidate.Payload);
+                }
+                catch (JsonException)
+                {
+                    continue;
+                }
+                if (payload != null && string.Equals(payload.DiscoveredApMac, macAddress, StringComparison.OrdinalIgnoreCase))
+                {
+                    await commandRepo.SetCommandStatusAsync(candidate.IDDeviceCommand, CommandStatus.Executed, DateTime.UtcNow);
+                    return payload;
+                }
+            }
+            return null;
         }
 
         /// Per-(device, ActionType) dedup then insert, shared by every fan-out entry point above.

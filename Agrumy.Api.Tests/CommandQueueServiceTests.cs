@@ -267,4 +267,53 @@ public class CommandQueueServiceTests
 
         // Strict mock: SetCommandStatusAsync was never set up - a cross-device execute confirmation must not call it.
     }
+
+    private static string ProvisionPayloadJson(string discoveredApMac, string? deviceName = null, int? zoneId = null) =>
+        System.Text.Json.JsonSerializer.Serialize(new DiscoveryProvisionPayload
+        {
+            Username = "admin@example.com",
+            Pin = "ABC123",
+            DiscoveredApMac = discoveredApMac,
+            Ssid = "TestWifi",
+            WifiPassword = "TestPass",
+            DeviceName = deviceName,
+            ZoneID = zoneId,
+        });
+
+    [Fact]
+    public async Task ConsumePendingProvision_MatchingMac_ReturnsPayload_AndMarksExecuted()
+    {
+        var command = new DeviceCommand { IDDeviceCommand = 7, Status = CommandStatus.Acknowledged, Payload = ProvisionPayloadJson("AABBCCDDEEFF", "MySensor", 42) };
+        _commands.Setup(c => c.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand> { command });
+        _commands.Setup(c => c.SetCommandStatusAsync(7, CommandStatus.Executed, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+
+        DiscoveryProvisionPayload? result = await NewService().ConsumePendingProvisionAsync("aabbccddeeff");
+
+        Assert.NotNull(result);
+        Assert.Equal("MySensor", result!.DeviceName);
+        Assert.Equal(42, result.ZoneID);
+    }
+
+    [Fact]
+    public async Task ConsumePendingProvision_NoMatchingMac_ReturnsNull()
+    {
+        var command = new DeviceCommand { IDDeviceCommand = 7, Status = CommandStatus.Acknowledged, Payload = ProvisionPayloadJson("112233445566") };
+        _commands.Setup(c => c.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand> { command });
+
+        DiscoveryProvisionPayload? result = await NewService().ConsumePendingProvisionAsync("AABBCCDDEEFF");
+
+        Assert.Null(result);
+        // Strict mock: SetCommandStatusAsync was never set up - a non-matching mac must not consume the command.
+    }
+
+    [Fact]
+    public async Task ConsumePendingProvision_MalformedPayload_SkippedNotThrown()
+    {
+        var malformed = new DeviceCommand { IDDeviceCommand = 8, Status = CommandStatus.Pending, Payload = "not json" };
+        _commands.Setup(c => c.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand> { malformed });
+
+        DiscoveryProvisionPayload? result = await NewService().ConsumePendingProvisionAsync("AABBCCDDEEFF");
+
+        Assert.Null(result);
+    }
 }

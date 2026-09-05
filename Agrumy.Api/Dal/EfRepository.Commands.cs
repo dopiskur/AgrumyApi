@@ -66,6 +66,15 @@ namespace api.Dal
             return rows.Select(ToDto).ToList();
         }
 
+        public async Task<IList<DeviceCommand>> GetActiveProvisionCommandsAsync()
+        {
+            int[] activeStatuses = [(int)CommandStatus.Pending, (int)CommandStatus.Acknowledged];
+            var rows = await db.DeviceCommands.AsNoTracking()
+                .Where(c => c.ActionType == (int)CommandActionType.ProvisionDevice && activeStatuses.Contains(c.Status))
+                .ToListAsync();
+            return rows.Select(ToDto).ToList();
+        }
+
         public async Task<DeviceCommand?> GetCommandByIdAsync(int commandId)
         {
             var row = await db.DeviceCommands.AsNoTracking().FirstOrDefaultAsync(c => c.IDDeviceCommand == commandId);

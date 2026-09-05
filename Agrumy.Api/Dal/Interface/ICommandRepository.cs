@@ -14,6 +14,9 @@ namespace api.Dal.Interface
         /// Every Pending command for this device, oldest first - CommandQueueService picks the first not (yet) expired and lazily expires any that are.
         Task<IList<DeviceCommand>> GetPendingCommandsAsync(int deviceId);
 
+        /// Every still-active (Pending/Acknowledged) ProvisionDevice command across every device - roadmap #268's DeviceRegistration match-by-DiscoveredApMac scans this small set since the target device (not yet registered) has no DeviceID to filter by.
+        Task<IList<DeviceCommand>> GetActiveProvisionCommandsAsync();
+
         Task<DeviceCommand?> GetCommandByIdAsync(int commandId);
 
         Task SetCommandStatusAsync(int commandId, CommandStatus status, DateTime? executedAt = null);

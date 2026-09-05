@@ -314,11 +314,15 @@ namespace api.Controllers.API
                     && !string.IsNullOrEmpty(settings.RelayRegistrationSecret)
                     && DeviceAuth.ConstantTimeEquals(value.RelayRegistrationSecret, settings.RelayRegistrationSecret);
 
+                // Roadmap #268: this mac may be the target of an earlier Discovery/Register call -
+                // that queued ProvisionDevice command carries the DeviceName/Zone the admin picked then.
+                DiscoveryProvisionPayload? provision = await commandQueue.ConsumePendingProvisionAsync(value.MacAddress);
+
                 device = await Repo.DeviceAddAsync(new Device
                 {
                     ConfigVersion = 1,
                     TenantID = user.TenantID ?? 0,
-                    DeviceName = "Agrumy_" + value.MacAddress.ToUpper(),
+                    DeviceName = string.IsNullOrWhiteSpace(provision?.DeviceName) ? "Agrumy_" + value.MacAddress.ToUpper() : provision.DeviceName,
                     MacAddress = value.MacAddress,
                     ApiId = Guid.NewGuid().ToString(), // identifier, not a secret - Guid is fine
                     ApiKey = AuthenticationProvider.GetSecureToken(), // credential - needs a CSPRNG source, not Guid
@@ -328,6 +332,11 @@ namespace api.Controllers.API
                     IsRelay = provenRelay,
                     RelayProfile = provenRelay ? value.RelayProfile : null,
                 });
+
+                if (provision?.ZoneID is int zoneId)
+                {
+                    await Repo.DeviceAssignToZoneAsync(device.IDDevice!.Value, zoneId);
+                }
             }
 
             // The PIN is deliberately NOT consumed here - it stays valid for repeated registrations (multiple sensors in one session) until its own 24h expiry.
