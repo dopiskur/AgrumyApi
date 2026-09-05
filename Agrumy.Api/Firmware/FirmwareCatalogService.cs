@@ -314,6 +314,33 @@ namespace api.Firmware
                 result.Warnings.Add($"No {ManifestFileName} in the directory - files imported without checksum verification.");
             }
 
+            // Same ZIP extraction as UploadZipAsync (#337) - each .zip alongside loose .bin files in
+            // the directory extracts to its own scratch dir, then imports through this same method,
+            // so a directory can mix loose .bin files and .zip archives freely.
+            foreach (string zipPath in Directory.EnumerateFiles(path, "*.zip"))
+            {
+                string zipTempDir = Path.Combine(Path.GetTempPath(), "agrumy-firmware-import-" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(zipTempDir);
+                try
+                {
+                    await using FileStream zipContent = File.OpenRead(zipPath);
+                    FirmwareSyncResult? rejection = ExtractZip(zipContent, zipTempDir);
+                    if (rejection != null)
+                    {
+                        result.Warnings.Add($"{Path.GetFileName(zipPath)}: " + string.Join(' ', rejection.Warnings));
+                        continue;
+                    }
+                    FirmwareSyncResult zipResult = await ImportFromDirectoryAsync(zipTempDir, publicBaseUrl, cancellationToken);
+                    result.Added += zipResult.Added;
+                    result.Skipped += zipResult.Skipped;
+                    result.Warnings.AddRange(zipResult.Warnings.Select(w => $"{Path.GetFileName(zipPath)}: {w}"));
+                }
+                finally
+                {
+                    try { Directory.Delete(zipTempDir, recursive: true); } catch { /* best-effort cleanup */ }
+                }
+            }
+
             // Collected up front so the OTA loop below can look up a full-image sibling by (board, version) without a second directory scan.
             Dictionary<(string Board, string Version), string> fullImagePaths = new();
             foreach (string filePath in Directory.EnumerateFiles(path, "*.bin"))
@@ -522,33 +549,10 @@ namespace api.Firmware
             Directory.CreateDirectory(tempDir);
             try
             {
-                using (var archive = new ZipArchive(zipContent, ZipArchiveMode.Read, leaveOpen: true))
+                FirmwareSyncResult? rejection = ExtractZip(zipContent, tempDir);
+                if (rejection != null)
                 {
-                    if (archive.Entries.Count > MaxZipEntries)
-                    {
-                        return new FirmwareSyncResult { Warnings = { $"ZIP has {archive.Entries.Count} entries, more than the {MaxZipEntries} allowed - rejected." } };
-                    }
-                    long totalUncompressed = archive.Entries.Sum(e => e.Length);
-                    if (totalUncompressed > MaxZipUncompressedBytes)
-                    {
-                        return new FirmwareSyncResult { Warnings = { $"ZIP would extract to more than {MaxZipUncompressedBytes / 1024 / 1024} MB - rejected." } };
-                    }
-                    // Defense in depth beyond .NET's own entry-name checks - an entry can never resolve outside tempDir.
-                    string tempDirFull = Path.GetFullPath(tempDir) + Path.DirectorySeparatorChar;
-                    foreach (ZipArchiveEntry entry in archive.Entries)
-                    {
-                        if (string.IsNullOrEmpty(entry.Name))
-                        {
-                            continue; // directory entry
-                        }
-                        string destination = Path.GetFullPath(Path.Combine(tempDir, entry.FullName));
-                        if (!destination.StartsWith(tempDirFull, StringComparison.Ordinal))
-                        {
-                            continue;
-                        }
-                        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-                        entry.ExtractToFile(destination, overwrite: true);
-                    }
+                    return rejection;
                 }
                 return await ImportFromDirectoryAsync(tempDir, publicBaseUrl, cancellationToken);
             }
@@ -556,6 +560,41 @@ namespace api.Firmware
             {
                 try { Directory.Delete(tempDir, recursive: true); } catch { /* best-effort cleanup */ }
             }
+        }
+
+        /// Shared by UploadZipAsync and ImportFromDirectoryAsync's own .zip handling (#337) - extracts
+        /// into destDir (already created by the caller) and returns null on success, or a
+        /// warnings-only FirmwareSyncResult if the archive was rejected outright (too many entries/too
+        /// large uncompressed).
+        private static FirmwareSyncResult? ExtractZip(Stream zipContent, string destDir)
+        {
+            using var archive = new ZipArchive(zipContent, ZipArchiveMode.Read, leaveOpen: true);
+            if (archive.Entries.Count > MaxZipEntries)
+            {
+                return new FirmwareSyncResult { Warnings = { $"ZIP has {archive.Entries.Count} entries, more than the {MaxZipEntries} allowed - rejected." } };
+            }
+            long totalUncompressed = archive.Entries.Sum(e => e.Length);
+            if (totalUncompressed > MaxZipUncompressedBytes)
+            {
+                return new FirmwareSyncResult { Warnings = { $"ZIP would extract to more than {MaxZipUncompressedBytes / 1024 / 1024} MB - rejected." } };
+            }
+            // Defense in depth beyond .NET's own entry-name checks - an entry can never resolve outside destDir.
+            string destDirFull = Path.GetFullPath(destDir) + Path.DirectorySeparatorChar;
+            foreach (ZipArchiveEntry entry in archive.Entries)
+            {
+                if (string.IsNullOrEmpty(entry.Name))
+                {
+                    continue; // directory entry
+                }
+                string destination = Path.GetFullPath(Path.Combine(destDir, entry.FullName));
+                if (!destination.StartsWith(destDirFull, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                entry.ExtractToFile(destination, overwrite: true);
+            }
+            return null;
         }
 
         // ---- manifest + file access (ZIP download, Custom repositories) --------

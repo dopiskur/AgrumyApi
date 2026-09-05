@@ -253,6 +253,30 @@ public class FirmwareCatalogServiceTests
         Assert.Single(result.Warnings);
     }
 
+    [Fact]
+    public async Task Import_FindsAndExtracts_A_Zip_Alongside_A_Loose_Bin()
+    {
+        // #337: a directory can mix a loose .bin with a .zip archive - both must import.
+        SetSource(FirmwareSource.Local);
+        string usb = Path.Combine(Path.GetTempPath(), "agrumy-fw-tests", "usb-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(usb);
+        await File.WriteAllTextAsync(Path.Combine(usb, "agrumy-esp32dev-v1.0.0.bin"), "loose");
+
+        var zipStream = new MemoryStream();
+        using (var zip = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            await using Stream entry = zip.CreateEntry("agrumy-esp32s3usbotg-v2.0.0.bin").Open();
+            await entry.WriteAsync(FakeFirmwareFetcher.Bytes("zipped"));
+        }
+        await File.WriteAllBytesAsync(Path.Combine(usb, "bundle.zip"), zipStream.ToArray());
+
+        FirmwareSyncResult result = await NewService().ImportFromDirectoryAsync(usb, "https://api.agrumy.com");
+
+        Assert.Equal(2, result.Added);
+        Assert.Contains(_rows, r => r.Board == "esp32dev" && r.Version == "1.0.0");
+        Assert.Contains(_rows, r => r.Board == "esp32s3usbotg" && r.Version == "2.0.0");
+    }
+
 
     [Fact]
     public async Task Upload_Rejects_A_File_Name_Outside_The_Convention()
