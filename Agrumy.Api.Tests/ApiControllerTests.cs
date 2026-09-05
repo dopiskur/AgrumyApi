@@ -31,7 +31,7 @@ public class ApiControllerTests
         var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
         return new(_repo.Object, _cache.Object,
             new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), catalog,
-            new api.Devices.DeviceConfigBuilder(_repo.Object, catalog));
+            new api.Devices.DeviceConfigBuilder(_repo.Object, catalog), TestSettings);
     }
     private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _notifications.Object, TestSettings);
     private TenantApiController NewTenantController() => new(_repo.Object, _cache.Object,
@@ -323,6 +323,95 @@ public class ApiControllerTests
         Assert.IsType<OkObjectResult>(first.Result);
         Assert.IsType<OkObjectResult>(second.Result);
         _repo.Verify(r => r.UserSetDevicePinAsync(It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<DateTime?>()), Times.Never);
+    }
+
+    private DeviceApiController NewDeviceControllerWithRelaySecret(string? serverSecret)
+    {
+        var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
+        return new(_repo.Object, _cache.Object,
+            new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), catalog,
+            new api.Devices.DeviceConfigBuilder(_repo.Object, catalog),
+            Options.Create(new AgrumySettings { RelayRegistrationSecret = serverSecret }));
+    }
+
+    [Fact]
+    public async Task DeviceRegistration_IsRelay_CorrectSecret_IsHonored()
+    {
+        StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
+        _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF")).ReturnsAsync((Device?)null);
+        Device? captured = null;
+        _repo.Setup(r => r.DeviceAddAsync(It.IsAny<Device>()))
+             .Callback<Device>(d => captured = d)
+             .ReturnsAsync((Device d) => { d.IDDevice = 900; return d; });
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
+        _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
+
+        var result = await NewDeviceControllerWithRelaySecret("shared-secret").DeviceRegistration(new DeviceRegistration
+        {
+            Email = "owner@example.com",
+            DevicePin = "ABC234",
+            MacAddress = "AABBCCDDEEFF",
+            IsRelay = true,
+            RelayProfile = RelayProfile.WiFiRepeater,
+            RelayRegistrationSecret = "shared-secret",
+        });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.True(captured!.IsRelay);
+        Assert.Equal(RelayProfile.WiFiRepeater, captured.RelayProfile);
+    }
+
+    [Fact]
+    public async Task DeviceRegistration_IsRelay_WrongSecret_SilentlyRegistersAsOrdinaryDevice()
+    {
+        StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
+        _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF")).ReturnsAsync((Device?)null);
+        Device? captured = null;
+        _repo.Setup(r => r.DeviceAddAsync(It.IsAny<Device>()))
+             .Callback<Device>(d => captured = d)
+             .ReturnsAsync((Device d) => { d.IDDevice = 900; return d; });
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
+        _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
+
+        var result = await NewDeviceControllerWithRelaySecret("shared-secret").DeviceRegistration(new DeviceRegistration
+        {
+            Email = "owner@example.com",
+            DevicePin = "ABC234",
+            MacAddress = "AABBCCDDEEFF",
+            IsRelay = true,
+            RelayProfile = RelayProfile.WiFiRepeater,
+            RelayRegistrationSecret = "guessed-wrong",
+        });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.False(captured!.IsRelay);
+        Assert.Null(captured.RelayProfile);
+    }
+
+    [Fact]
+    public async Task DeviceRegistration_IsRelay_NoServerSecretConfigured_AlwaysDropsRelayStatus()
+    {
+        StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
+        _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF")).ReturnsAsync((Device?)null);
+        Device? captured = null;
+        _repo.Setup(r => r.DeviceAddAsync(It.IsAny<Device>()))
+             .Callback<Device>(d => captured = d)
+             .ReturnsAsync((Device d) => { d.IDDevice = 900; return d; });
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
+        _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
+
+        var result = await NewDeviceControllerWithRelaySecret(null).DeviceRegistration(new DeviceRegistration
+        {
+            Email = "owner@example.com",
+            DevicePin = "ABC234",
+            MacAddress = "AABBCCDDEEFF",
+            IsRelay = true,
+            RelayProfile = RelayProfile.WiFiRepeater,
+            RelayRegistrationSecret = "",
+        });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.False(captured!.IsRelay);
     }
 
     /// Common post-UserAddAsync plumbing every UserRegistration call goes through: recovers the freshly-inserted IDUser, writes an activation token, and assigns a starting role. Stubbed permissively here since it isn't the point of most of these tests.

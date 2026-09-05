@@ -80,9 +80,10 @@ namespace api.Models
         public string? ServicePoint { get; set; } = "api.agrumy.com";
         public int? ServiceType { get; set; } = 1;
 
-        // Agrumy.Relay sends these on its own first registration so IsRelay/RelayProfile come back set; null/false for ordinary firmware, and only consulted when the MacAddress is genuinely new.
+        // Agrumy.Relay sends these on its own first registration so IsRelay/RelayProfile come back set; null/false for ordinary firmware, and only consulted when the MacAddress is genuinely new. Honored only if RelayRegistrationSecret matches the server's configured Relay:RegistrationSecret - any other caller's IsRelay:true is silently dropped, registering an ordinary device instead.
         public bool IsRelay { get; set; }
         public RelayProfile? RelayProfile { get; set; }
+        public string? RelayRegistrationSecret { get; set; }
     }
 
     public class DeviceConfig()

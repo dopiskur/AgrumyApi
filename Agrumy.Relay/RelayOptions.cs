@@ -25,6 +25,8 @@ namespace api.Relay
         public RelayProfile Profile { get; set; } = RelayProfile.WiFiRepeater;
         /// Where registration persists ApiId/ApiKey/IDDevice after the one-time PIN succeeds, so a restart doesn't need the PIN again - same reason AgrumyFirmware persists deviceRegistration.json to LittleFS.
         public string RegistrationFilePath { get; set; } = "relay-registration.json";
+        /// Must match the server's Relay:RegistrationSecret - without it, Register still succeeds but silently drops IsRelay, so relay-only endpoints stay unreachable for this device.
+        public string RegistrationSecret { get; set; } = "";
         /// Profile A (WiFiRepeater) only - local devices point their ServicePoint at this relay's own address:port instead of AgrumyService directly.
         public int LocalPort { get; set; } = 5080;
     }

@@ -68,6 +68,9 @@ namespace api
         public int WeatherPollIntervalMinutes { get; set; } = 15;
         public double WeatherRainSkipThreshold { get; set; } = 50.0;
 
+        // Shared with Agrumy.Relay's own RelayOptions.Relay.RegistrationSecret - proves a Register call declaring IsRelay:true actually comes from Agrumy.Relay, not any client holding a valid user email+PIN. Null/empty means no relay may self-register on this server.
+        public string? RelayRegistrationSecret { get; set; }
+
         public static AgrumySettings Bind(IConfiguration configuration) => new()
         {
             DefaultConnection = configuration.GetConnectionString("DefaultConnection"),
@@ -100,6 +103,7 @@ namespace api
             WeatherApiKey = configuration.GetSection("Weather:ApiKey").Value,
             WeatherPollIntervalMinutes = ParseIntOr(configuration, "ServerConfig:WeatherPollIntervalMinutes", 15),
             WeatherRainSkipThreshold = ParseDoubleOr(configuration, "ServerConfig:WeatherRainSkipThreshold", 50.0),
+            RelayRegistrationSecret = configuration.GetSection("Relay:RegistrationSecret").Value,
         };
 
         // CurrentCulture would misparse "20.0" on a comma-decimal locale (e.g. hr-HR); InvariantCulture keeps "." as the decimal point regardless of OS locale.

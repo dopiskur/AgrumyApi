@@ -1,3 +1,4 @@
+using api;
 using api.Commands;
 using api.Controllers.API;
 using api.Dal.Interface;
@@ -27,7 +28,8 @@ public class DeviceFirmwareOtaTests
         var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
         var controller = new DeviceApiController(_repo.Object, _cache.Object,
             new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), catalog,
-            new api.Devices.DeviceConfigBuilder(_repo.Object, catalog));
+            new api.Devices.DeviceConfigBuilder(_repo.Object, catalog),
+            Microsoft.Extensions.Options.Options.Create(new AgrumySettings()));
         var result = controller.DeviceRegistration(new DeviceRegistration
         {
             Email = "owner@example.com",

@@ -19,6 +19,7 @@ namespace api.Relay
                 MacAddress = self.MacAddress,
                 IsRelay = true,
                 RelayProfile = self.Profile,
+                RelayRegistrationSecret = self.RegistrationSecret,
             };
 
             HttpResponseMessage response = await http.PostAsJsonAsync("/api/Device/Register", request, ct);

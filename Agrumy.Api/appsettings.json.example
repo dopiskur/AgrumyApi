@@ -115,6 +115,12 @@
     "BatteryCheckIntervalMinutes": 30
   },
 
+  "// Relay": "Agrumy.Relay device-forwarding infrastructure (also gated by the serverConfig RelayEnabled admin toggle).",
+  "Relay": {
+    "// RegistrationSecret": "Must match Agrumy.Relay's own RelayOptions.Relay.RegistrationSecret. Proves a device Register call declaring IsRelay:true actually comes from Agrumy.Relay, not any client holding a valid user email+PIN. Empty/missing = no relay may self-register on this server.",
+    "RegistrationSecret": ""
+  },
+
   "// Logging": "Standard ASP.NET Core logging configuration.",
   "Logging": {
     "LogLevel": {

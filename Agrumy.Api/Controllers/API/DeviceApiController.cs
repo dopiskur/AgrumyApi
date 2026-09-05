@@ -7,12 +7,15 @@ using api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace api.Controllers.API
 {
     [Route("/api/Device")]
-    public class DeviceApiController(IRepository repo, ICache cache, CommandQueueService commandQueue, FirmwareCatalogService firmwareCatalog, DeviceConfigBuilder configBuilder) : ApiControllerBase(repo, cache)
+    public class DeviceApiController(IRepository repo, ICache cache, CommandQueueService commandQueue, FirmwareCatalogService firmwareCatalog, DeviceConfigBuilder configBuilder, IOptions<AgrumySettings> settingsOptions) : ApiControllerBase(repo, cache)
     {
+        private readonly AgrumySettings settings = settingsOptions.Value;
+
         #region websvc api
 
         [Authorize]
@@ -306,6 +309,11 @@ namespace api.Controllers.API
             Device? device = await Repo.DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
             if (device is null)
             {
+                // A client merely holding a valid user email+PIN (the same bar every ordinary device meets) must not be able to claim relay status on its own say-so - only honored when it also proves it's the real Agrumy.Relay via this shared secret.
+                bool provenRelay = value.IsRelay
+                    && !string.IsNullOrEmpty(settings.RelayRegistrationSecret)
+                    && DeviceAuth.ConstantTimeEquals(value.RelayRegistrationSecret, settings.RelayRegistrationSecret);
+
                 device = await Repo.DeviceAddAsync(new Device
                 {
                     ConfigVersion = 1,
@@ -317,9 +325,8 @@ namespace api.Controllers.API
                     ServicePoint = value.ServicePoint,
                     DeviceSensorEnabled = false,
                     DeviceControllerEnabled = false,
-                    // Only Agrumy.Relay's own registration ever sets these - normal AgrumyFirmware devices leave both null/false, matching the DTO's defaults.
-                    IsRelay = value.IsRelay,
-                    RelayProfile = value.RelayProfile,
+                    IsRelay = provenRelay,
+                    RelayProfile = provenRelay ? value.RelayProfile : null,
                 });
             }
 
