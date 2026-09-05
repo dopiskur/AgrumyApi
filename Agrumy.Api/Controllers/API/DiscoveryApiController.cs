@@ -9,14 +9,11 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace api.Controllers.API
 {
-    /// <summary>Roadmap #268 "Scan for new devices" - device-facing report intake, the admin scan
-    /// trigger, the aggregated results list, and Register (PIN + WiFi credentials to the winning
-    /// scanning device).</summary>
+    /// "Scan for new devices" - device-facing report intake, the admin scan trigger, the aggregated results list, and Register (PIN + WiFi credentials to the winning scanning device).
     [Route("/api/Discovery")]
     public class DiscoveryApiController(IRepository repo, ICache cache, CommandQueueService commandQueue) : ApiControllerBase(repo, cache)
     {
-        /// <summary>No identity field in the body by design - the scanning device comes exclusively
-        /// from the authenticated apiId, same rule as DeviceApiController.PushEvent.</summary>
+        /// No identity field in the body by design - the scanning device comes exclusively from the authenticated apiId, same rule as DeviceApiController.PushEvent.
         [HttpPost("Report")]
         [EnableRateLimiting("device-data")]
         [Authorize(Policy = DeviceAuth.SessionPolicy)]
@@ -38,11 +35,7 @@ namespace api.Controllers.API
             return Ok();
         }
 
-        /// <summary>Fans ScanForDevices out to every sensor-only device in the given scope - see
-        /// CommandQueueService.IssueScanCommandAsync for the Zone/Unit/Fleet-wide resolution rule.
-        /// ZoneID/UnitID ownership is checked the same way DeviceCommandApiController checks its
-        /// Zone/Unit command targets; Fleet-wide has no entity to check, so it scopes by the
-        /// caller's own tenant instead (null only for a caller who manages devices globally).</summary>
+        /// Fans ScanForDevices out to every sensor-only device in scope (see CommandQueueService.IssueScanCommandAsync for Zone/Unit/Fleet-wide resolution) - Zone/Unit ownership is checked like DeviceCommandApiController's targets, Fleet-wide scopes by the caller's own tenant instead (null only for a global device manager).
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost("Scan")]
         public async Task<ActionResult<IReadOnlyList<int>>> Scan([FromBody] DiscoveryScanRequest request)
