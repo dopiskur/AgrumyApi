@@ -238,36 +238,14 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
         }
 
+        // ---- Rules (Zone/Unit/Global scope, roadmap #212) ----------------------------
+
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> RuleAdd(int idDeviceUnitZone, RelayFunction relayFunction, ConditionType conditionType,
-            double? threshold, double? hysteresis, int? interval, int? intervalLength, int? daysOfWeek, int? start, int? duration,
-            int? sunriseOffsetMinutes, int? sunsetOffsetMinutes)
+        public async Task<ActionResult> RuleAdd(int idDeviceUnitZone, RuleFormInput input)
         {
-            // Must use ConditionConfigJson.Options here - the options-less JsonSerializer overloads would leak PascalCase onto the wire.
-            System.Text.Json.Nodes.JsonNode? config = conditionType switch
-            {
-                ConditionType.Threshold => System.Text.Json.JsonSerializer.SerializeToNode(new ThresholdConditionConfig(threshold ?? 0, hysteresis ?? 0), ConditionConfigJson.Options),
-                ConditionType.Interval => System.Text.Json.JsonSerializer.SerializeToNode(new IntervalConditionConfig(interval ?? 0, intervalLength ?? 0), ConditionConfigJson.Options),
-                ConditionType.Schedule => System.Text.Json.JsonSerializer.SerializeToNode(new ScheduleConditionConfig(daysOfWeek ?? 0, start ?? 0, duration ?? 0), ConditionConfigJson.Options),
-                ConditionType.Astronomical => System.Text.Json.JsonSerializer.SerializeToNode(new AstronomicalConditionConfig(daysOfWeek ?? 0, sunriseOffsetMinutes ?? 0, sunsetOffsetMinutes ?? 0), ConditionConfigJson.Options),
-                _ => null,
-            };
-            try
-            {
-                await api.DeviceUnitZoneRuleAdd(new DeviceUnitZoneRule
-                {
-                    DeviceUnitZoneID = idDeviceUnitZone,
-                    ActionType = ActionType.Relay,
-                    RelayFunction = relayFunction,
-                    Conditions = [new RuleCondition(conditionType, config, null)],
-                });
-            }
-            catch (ApiException ex)
-            {
-                TempData["Error"] = ex.Body;
-            }
+            await AddRuleAsync(BuildRule(input, idDeviceUnitZone, null), r => api.DeviceUnitZoneRuleAdd(r));
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
         }
 
@@ -276,8 +254,130 @@ namespace api.Controllers.View
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> RuleDelete(int idDeviceUnitZoneRule, int idDeviceUnitZone)
         {
-            await api.DeviceUnitZoneRuleDelete(idDeviceUnitZoneRule);
+            await DeleteRuleAsync(idDeviceUnitZoneRule, r => api.DeviceUnitZoneRuleDelete(r));
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        public async Task<ActionResult> UnitRules(int idDeviceUnit) => View(new RuleEditorViewModel
+        {
+            Scope = RuleScope.Unit,
+            ScopeId = idDeviceUnit,
+            Rules = await api.DeviceUnitRulesGet(idDeviceUnit),
+            RedirectActionName = nameof(UnitRules),
+        });
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> UnitRuleAdd(int idDeviceUnit, RuleFormInput input)
+        {
+            await AddRuleAsync(BuildRule(input, null, idDeviceUnit), r => api.DeviceUnitRuleAdd(r));
+            return RedirectToAction(nameof(UnitRules), new { idDeviceUnit });
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> UnitRuleDelete(int idDeviceUnitZoneRule, int idDeviceUnit)
+        {
+            await DeleteRuleAsync(idDeviceUnitZoneRule, r => api.DeviceUnitRuleDelete(r));
+            return RedirectToAction(nameof(UnitRules), new { idDeviceUnit });
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        public async Task<ActionResult> GlobalRules() => View(new RuleEditorViewModel
+        {
+            Scope = RuleScope.Global,
+            Rules = await api.GlobalRulesGet(),
+            RedirectActionName = nameof(GlobalRules),
+        });
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> GlobalRuleAdd(RuleFormInput input)
+        {
+            await AddRuleAsync(BuildRule(input, null, null), r => api.GlobalRuleAdd(r));
+            return RedirectToAction(nameof(GlobalRules));
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> GlobalRuleDelete(int idDeviceUnitZoneRule)
+        {
+            await DeleteRuleAsync(idDeviceUnitZoneRule, r => api.GlobalRuleDelete(r));
+            return RedirectToAction(nameof(GlobalRules));
+        }
+
+        private async Task AddRuleAsync(DeviceUnitZoneRule rule, Func<DeviceUnitZoneRule, Task<int>> add)
+        {
+            try
+            {
+                await add(rule);
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+        }
+
+        private async Task DeleteRuleAsync(int idRule, Func<int?, Task> delete)
+        {
+            try
+            {
+                await delete(idRule);
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+        }
+
+        /// Builds a DeviceUnitZoneRule from the form input - exactly one of idDeviceUnitZone/idDeviceUnit is non-null for Zone/Unit scope, both null for Global.
+        private static DeviceUnitZoneRule BuildRule(RuleFormInput input, int? idDeviceUnitZone, int? idDeviceUnit)
+        {
+            var conditions = new List<RuleCondition>();
+            if (ToRuleCondition(input.Condition1) is RuleCondition c1)
+            {
+                conditions.Add(c1);
+            }
+            if (ToRuleCondition(input.Condition2) is RuleCondition c2)
+            {
+                conditions.Add(c2);
+            }
+            return new DeviceUnitZoneRule
+            {
+                DeviceUnitZoneID = idDeviceUnitZone,
+                DeviceUnitID = idDeviceUnit,
+                ActionType = input.ActionType,
+                RelayFunction = input.ActionType == ActionType.Relay ? input.RelayFunction : null,
+                SensorMetric = input.ActionType == ActionType.Notification ? input.SensorMetric : null,
+                NotificationSubject = input.ActionType == ActionType.Notification ? input.NotificationSubject : null,
+                NotificationBody = input.ActionType == ActionType.Notification ? input.NotificationBody : null,
+                Conditions = conditions,
+            };
+        }
+
+        /// Null return means "this slot is unused" (only valid for Condition2 - the form always requires Condition1.ConditionType to be set, enforced by the [Required]-equivalent BadRequest the API itself returns if this ever produces an empty list).
+        private static RuleCondition? ToRuleCondition(RuleConditionInput input)
+        {
+            if (input.ConditionType is not ConditionType type)
+            {
+                return null;
+            }
+            // Must use ConditionConfigJson.Options here - the options-less JsonSerializer overloads would leak PascalCase onto the wire.
+            System.Text.Json.Nodes.JsonNode? config = type switch
+            {
+                ConditionType.Threshold => System.Text.Json.JsonSerializer.SerializeToNode(new ThresholdConditionConfig(input.Threshold ?? 0, input.Hysteresis ?? 0), ConditionConfigJson.Options),
+                ConditionType.Interval => System.Text.Json.JsonSerializer.SerializeToNode(new IntervalConditionConfig(input.Interval ?? 0, input.IntervalLength ?? 0), ConditionConfigJson.Options),
+                ConditionType.Schedule => System.Text.Json.JsonSerializer.SerializeToNode(new ScheduleConditionConfig(input.DaysOfWeek ?? 0, input.Start ?? 0, input.Duration ?? 0), ConditionConfigJson.Options),
+                ConditionType.Astronomical => System.Text.Json.JsonSerializer.SerializeToNode(new AstronomicalConditionConfig(input.DaysOfWeek ?? 0, input.SunriseOffsetMinutes ?? 0, input.SunsetOffsetMinutes ?? 0), ConditionConfigJson.Options),
+                ConditionType.RuleTriggered => System.Text.Json.JsonSerializer.SerializeToNode(new RuleTriggeredConditionConfig(input.ReferencedRuleId ?? 0), ConditionConfigJson.Options),
+                _ => null,
+            };
+            return new RuleCondition(type, config, input.Operator);
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]

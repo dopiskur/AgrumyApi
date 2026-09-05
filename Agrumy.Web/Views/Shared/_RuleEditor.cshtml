@@ -1,0 +1,226 @@
+@using System.Text.Json
+@model api.ViewModels.RuleEditorViewModel
+@{
+    // Roadmap #212: AND/OR condition groups, Notification action, Zone/Unit/Global scope - shared
+    // across the Zone page, the Unit "Rules" tab, and the tenant-wide Global Rules page. The UI
+    // exposes up to 2 conditions per rule (RuleFormInput.Condition1/Condition2); the API/DB allow up
+    // to 8 - a wider builder is a straightforward follow-up, not a hard ceiling here.
+    var relayRules = Model.Rules.Where(r => r.ActionType == api.Models.ActionType.Relay).ToList();
+    var notificationRules = Model.Rules.Where(r => r.ActionType == api.Models.ActionType.Notification).ToList();
+    var rulesByFunction = relayRules.GroupBy(r => r.RelayFunction!.Value).ToDictionary(g => g.Key, g => g.ToList());
+    // Not ToDictionary: SensorMetric? (a valid, meaningful key here - null groups pure reminder rules) can't be a Dictionary<TKey> key at all.
+    List<api.Models.DeviceUnitZoneRule> RulesForMetric(api.Models.SensorMetric? metric) => notificationRules.Where(r => r.SensorMetric == metric).ToList();
+
+    (api.Models.RelayFunction Value, string Label)[] functions =
+    [
+        (api.Models.RelayFunction.Ventilation, "Ventilation"),
+        (api.Models.RelayFunction.Light, "Light"),
+        (api.Models.RelayFunction.Heating, "Heating"),
+        (api.Models.RelayFunction.WaterPump, "Water pump"),
+    ];
+    (api.Models.SensorMetric Value, string Label)[] metrics =
+    [
+        (api.Models.SensorMetric.Temperature, "Temperature"),
+        (api.Models.SensorMetric.SoilTemperature, "Soil temperature"),
+        (api.Models.SensorMetric.Humidity, "Humidity"),
+        (api.Models.SensorMetric.Vpd, "VPD"),
+        (api.Models.SensorMetric.Moisture, "Moisture"),
+        (api.Models.SensorMetric.Light, "Light"),
+        (api.Models.SensorMetric.Co2, "CO2"),
+        (api.Models.SensorMetric.Tvoc, "TVOC"),
+        (api.Models.SensorMetric.Barometer, "Barometer"),
+        (api.Models.SensorMetric.LiquidPH, "Liquid pH"),
+        (api.Models.SensorMetric.RainLevel, "Rain level"),
+        (api.Models.SensorMetric.WaterLevel, "Water level"),
+        (api.Models.SensorMetric.Wind, "Wind"),
+    ];
+
+    // Deserialize with ConditionConfigJson.Options (case-insensitive/camelCase) - the options-less overload fails to bind against the camelCase JSON these Add forms produce.
+    string SummarizeCondition(api.Models.RuleCondition c)
+    {
+        string body = c.ConditionType switch
+        {
+            api.Models.ConditionType.Threshold => Fmt(c.ConditionConfig?.Deserialize<api.Models.ThresholdConditionConfig>(api.Models.ConditionConfigJson.Options) is { } t ? $"threshold {t.Threshold:0.##}, hysteresis {t.Hysteresis:0.##}" : "?"),
+            api.Models.ConditionType.Interval => Fmt(c.ConditionConfig?.Deserialize<api.Models.IntervalConditionConfig>(api.Models.ConditionConfigJson.Options) is { } iv ? $"on {iv.IntervalLength}s / every {iv.Interval}s" : "?"),
+            api.Models.ConditionType.Schedule => ScheduleText(c.ConditionConfig?.Deserialize<api.Models.ScheduleConditionConfig>(api.Models.ConditionConfigJson.Options)),
+            api.Models.ConditionType.Astronomical => Fmt(c.ConditionConfig?.Deserialize<api.Models.AstronomicalConditionConfig>(api.Models.ConditionConfigJson.Options) is { } a ? $"sunrise {a.SunriseOffsetMinutes:+#;-#;0}min / sunset {a.SunsetOffsetMinutes:+#;-#;0}min" : "?"),
+            api.Models.ConditionType.RuleTriggered => Fmt(c.ConditionConfig?.Deserialize<api.Models.RuleTriggeredConditionConfig>(api.Models.ConditionConfigJson.Options) is { } rt ? $"rule #{rt.ReferencedRuleId} fired" : "?"),
+            _ => "?",
+        };
+        string op = c.Operator switch { api.Models.LogicalOperator.And => "AND ", api.Models.LogicalOperator.Or => "OR ", _ => "" };
+        return $"{op}<span class=\"badge text-bg-secondary me-1\">{c.ConditionType}</span>{body}";
+    }
+    string Fmt(string s) => s;
+    string ScheduleText(api.Models.ScheduleConditionConfig? s)
+    {
+        if (s == null) { return "?"; }
+        int start = s.Start, end = start + s.Duration;
+        return $"{start / 3600:00}:{start % 3600 / 60:00}-{end / 3600:00}:{end % 3600 / 60:00}, days 0b{Convert.ToString(s.DaysOfWeek, 2).PadLeft(7, '0')}";
+    }
+}
+
+<div class="card mb-3">
+    <div class="card-header">
+        <h3 class="card-title">Relay automation</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-secondary small">
+            A function may have several rules - any rule that evaluates "on" wins (OR). Within one
+            rule, conditions fold strictly left-to-right ("(A AND B) OR C", never "A AND (B OR C)").
+        </p>
+        @foreach (var (function, label) in functions)
+        {
+            var rules = rulesByFunction.GetValueOrDefault(function, []);
+            <div class="mb-4">
+                <h6 class="fw-semibold">
+                    @label
+                    @if (rules.Count > 0)
+                    {
+                        <span class="badge text-bg-success">configured</span>
+                    }
+                    else
+                    {
+                        <span class="badge text-bg-secondary">unconfigured</span>
+                    }
+                </h6>
+                @if (rules.Count > 0)
+                {
+                    <ul class="list-group list-group-flush mb-2">
+                        @foreach (var rule in rules)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>@Html.Raw(string.Join(" ", rule.Conditions.Select(SummarizeCondition)))</span>
+                                <form asp-action="@Model.DeleteActionName" method="post" onsubmit="return confirm('Remove this rule?');">
+                                    <input type="hidden" name="idDeviceUnitZoneRule" value="@rule.IDDeviceUnitZoneRule" />
+                                    @if (!string.IsNullOrEmpty(Model.ScopeHiddenFieldName))
+                                    {
+                                        <input type="hidden" name="@Model.ScopeHiddenFieldName" value="@Model.ScopeId" />
+                                    }
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </li>
+                        }
+                    </ul>
+                }
+                <details>
+                    <summary class="btn btn-sm btn-outline-primary" style="cursor:pointer;">+ Add rule</summary>
+                    <form asp-action="@Model.AddActionName" method="post" class="mt-2 p-2 border rounded">
+                        @if (!string.IsNullOrEmpty(Model.ScopeHiddenFieldName))
+                        {
+                            <input type="hidden" name="@Model.ScopeHiddenFieldName" value="@Model.ScopeId" />
+                        }
+                        <input type="hidden" name="ActionType" value="@((int)api.Models.ActionType.Relay)" />
+                        <input type="hidden" name="RelayFunction" value="@((int)function)" />
+                        <partial name="_RuleConditionFields" model="new RuleConditionFieldsModel(1, false, notificationRules)" />
+                        <partial name="_RuleConditionFields" model="new RuleConditionFieldsModel(2, false, notificationRules)" />
+                        <button type="submit" class="btn btn-sm btn-primary mt-2">Add rule</button>
+                    </form>
+                </details>
+            </div>
+        }
+        <p class="text-secondary small mb-0">
+            Astronomical rules need a location set under Server Settings &rarr; Weather - a day with
+            no location configured sends no rule that day (function stays off).
+        </p>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header">
+        <h3 class="card-title">Notification automation</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-secondary small">
+            Sent via the same email/webhook/push channels as other alerts, once per false-&gt;true
+            transition (no repeat spam while the condition stays true). "Another rule fired" can only
+            reference a Notification rule, and only within this same scope from this form (the API
+            itself allows any Notification rule in the tenant, including cross-zone).
+        </p>
+        @foreach (var (metric, label) in metrics)
+        {
+            var rules = RulesForMetric(metric);
+            if (rules.Count == 0) { continue; }
+            <div class="mb-3">
+                <h6 class="fw-semibold">@label <span class="badge text-bg-success">configured</span></h6>
+                <ul class="list-group list-group-flush mb-2">
+                    @foreach (var rule in rules)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span>
+                                <strong>@rule.NotificationSubject</strong> -
+                                @Html.Raw(string.Join(" ", rule.Conditions.Select(SummarizeCondition)))
+                            </span>
+                            <form asp-action="@Model.DeleteActionName" method="post" onsubmit="return confirm('Remove this rule?');">
+                                <input type="hidden" name="idDeviceUnitZoneRule" value="@rule.IDDeviceUnitZoneRule" />
+                                @if (!string.IsNullOrEmpty(Model.ScopeHiddenFieldName))
+                                {
+                                    <input type="hidden" name="@Model.ScopeHiddenFieldName" value="@Model.ScopeId" />
+                                }
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+        @{
+            var reminderRules = RulesForMetric(null);
+        }
+        @if (reminderRules.Count > 0)
+        {
+            <div class="mb-3">
+                <h6 class="fw-semibold">Reminders (no sensor metric) <span class="badge text-bg-success">configured</span></h6>
+                <ul class="list-group list-group-flush mb-2">
+                    @foreach (var rule in reminderRules)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span><strong>@rule.NotificationSubject</strong> - @Html.Raw(string.Join(" ", rule.Conditions.Select(SummarizeCondition)))</span>
+                            <form asp-action="@Model.DeleteActionName" method="post" onsubmit="return confirm('Remove this rule?');">
+                                <input type="hidden" name="idDeviceUnitZoneRule" value="@rule.IDDeviceUnitZoneRule" />
+                                @if (!string.IsNullOrEmpty(Model.ScopeHiddenFieldName))
+                                {
+                                    <input type="hidden" name="@Model.ScopeHiddenFieldName" value="@Model.ScopeId" />
+                                }
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <details>
+            <summary class="btn btn-sm btn-outline-primary" style="cursor:pointer;">+ Add notification rule</summary>
+            <form asp-action="@Model.AddActionName" method="post" class="mt-2 p-2 border rounded">
+                @if (!string.IsNullOrEmpty(Model.ScopeHiddenFieldName))
+                {
+                    <input type="hidden" name="@Model.ScopeHiddenFieldName" value="@Model.ScopeId" />
+                }
+                <input type="hidden" name="ActionType" value="@((int)api.Models.ActionType.Notification)" />
+                <div class="row g-2 mb-2">
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">Sensor metric (leave "(none)" for a pure schedule/interval reminder)</label>
+                        <select name="SensorMetric" class="form-select form-select-sm">
+                            <option value="">(none)</option>
+                            @foreach (var (metric, label) in metrics)
+                            {
+                                <option value="@((int)metric)">@label</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">Subject</label>
+                        <input type="text" name="NotificationSubject" class="form-control form-control-sm" style="width:16rem" required />
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">Body ({value}/{metric} placeholders)</label>
+                        <input type="text" name="NotificationBody" class="form-control form-control-sm" style="width:20rem" />
+                    </div>
+                </div>
+                <partial name="_RuleConditionFields" model="new RuleConditionFieldsModel(1, true, notificationRules)" />
+                <partial name="_RuleConditionFields" model="new RuleConditionFieldsModel(2, true, notificationRules)" />
+                <button type="submit" class="btn btn-sm btn-primary mt-2">Add notification rule</button>
+            </form>
+        </details>
+    </div>
+</div>

@@ -1,0 +1,93 @@
+@model api.ViewModels.RuleConditionFieldsModel
+@{
+    string prefix = $"Condition{Model.SlotNumber}";
+    bool optional = Model.SlotNumber > 1;
+}
+<fieldset class="border rounded p-2 mb-2">
+    <legend class="fs-6 fw-semibold w-auto px-1">Condition @Model.SlotNumber @(optional ? "(optional)" : "")</legend>
+    @if (optional)
+    {
+        <div class="mb-2">
+            <label class="form-label small mb-0">Joined with condition 1 by</label>
+            <select name="@(prefix).Operator" class="form-select form-select-sm" style="width:8rem">
+                <option value="">(unused - leave condition type below empty too)</option>
+                <option value="@((int)api.Models.LogicalOperator.And)">AND</option>
+                <option value="@((int)api.Models.LogicalOperator.Or)">OR</option>
+            </select>
+        </div>
+    }
+    <div class="mb-2">
+        <label class="form-label small mb-0">Condition type</label>
+        <select name="@(prefix).ConditionType" class="form-select form-select-sm" style="width:12rem">
+            @if (optional)
+            {
+                <option value="">(unused)</option>
+            }
+            <option value="@((int)api.Models.ConditionType.Threshold)">Threshold</option>
+            <option value="@((int)api.Models.ConditionType.Interval)">Interval</option>
+            <option value="@((int)api.Models.ConditionType.Schedule)">Schedule</option>
+            @if (Model.IsNotification)
+            {
+                <option value="@((int)api.Models.ConditionType.RuleTriggered)">Another rule fired</option>
+            }
+            else
+            {
+                <option value="@((int)api.Models.ConditionType.Astronomical)">Astronomical (sunrise/sunset)</option>
+            }
+        </select>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <div>
+            <label class="form-label small mb-0">Threshold</label>
+            <input type="number" step="any" name="@(prefix).Threshold" class="form-control form-control-sm" style="width:7rem" />
+        </div>
+        <div>
+            <label class="form-label small mb-0">Hysteresis</label>
+            <input type="number" step="any" min="0" name="@(prefix).Hysteresis" class="form-control form-control-sm" style="width:7rem" />
+        </div>
+        <div>
+            <label class="form-label small mb-0">Interval (s)</label>
+            <input type="number" min="1" name="@(prefix).Interval" class="form-control form-control-sm" style="width:7rem" />
+        </div>
+        <div>
+            <label class="form-label small mb-0">On for (s)</label>
+            <input type="number" min="1" name="@(prefix).IntervalLength" class="form-control form-control-sm" style="width:7rem" />
+        </div>
+        <div>
+            <label class="form-label small mb-0">Days (0-127 mask)</label>
+            <input type="number" min="0" max="127" name="@(prefix).DaysOfWeek" class="form-control form-control-sm" style="width:7rem" title="7-bit mask, bit 0 = Sunday .. bit 6 = Saturday" />
+        </div>
+        <div>
+            <label class="form-label small mb-0">Start (s since local midnight)</label>
+            <input type="number" min="0" max="86399" name="@(prefix).Start" class="form-control form-control-sm" style="width:9rem" />
+        </div>
+        <div>
+            <label class="form-label small mb-0">Duration (s)</label>
+            <input type="number" min="1" name="@(prefix).Duration" class="form-control form-control-sm" style="width:7rem" />
+        </div>
+        @if (!Model.IsNotification)
+        {
+            <div>
+                <label class="form-label small mb-0">Sunrise offset (min)</label>
+                <input type="number" min="-720" max="720" name="@(prefix).SunriseOffsetMinutes" value="0" class="form-control form-control-sm" style="width:7rem" />
+            </div>
+            <div>
+                <label class="form-label small mb-0">Sunset offset (min)</label>
+                <input type="number" min="-720" max="720" name="@(prefix).SunsetOffsetMinutes" value="0" class="form-control form-control-sm" style="width:7rem" />
+            </div>
+        }
+        @if (Model.IsNotification)
+        {
+            <div>
+                <label class="form-label small mb-0">Referenced rule (for "another rule fired")</label>
+                <select name="@(prefix).ReferencedRuleId" class="form-select form-select-sm" style="width:14rem">
+                    <option value="">(pick a rule)</option>
+                    @foreach (var rule in Model.ReferenceableRules)
+                    {
+                        <option value="@rule.IDDeviceUnitZoneRule">#@rule.IDDeviceUnitZoneRule - @rule.NotificationSubject</option>
+                    }
+                </select>
+            </div>
+        }
+    </div>
+</fieldset>

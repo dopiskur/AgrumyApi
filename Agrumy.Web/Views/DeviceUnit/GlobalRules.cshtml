@@ -1,0 +1,23 @@
+@model RuleEditorViewModel
+@{
+    ViewData["Title"] = "Global rules";
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-action="Index">Units</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Global rules</li>
+    </ol>
+</nav>
+
+@if (TempData["Error"] is string error)
+{
+    <div class="alert alert-warning">@error</div>
+}
+
+<p class="text-secondary">
+    Applies to every unit/zone you own that doesn't define its own rule for the same
+    function/metric - the least specific level of the Zone &gt; Unit &gt; Global precedence.
+</p>
+
+<partial name="_RuleEditor" model="Model" />

@@ -1,168 +1,18 @@
-@using System.Text.Json
 @model api.ViewModels.ZoneViewModel
 @{
-    // Stage 1 of #212: Relay-action rules only, one condition per rule (Operator always null) - matches
-    // what RuleAdd below still produces. AND/OR multi-condition building and the Notification-action
-    // section land in a follow-up pass; DeviceUnitZoneRule.Conditions[0] is always present for a
-    // Relay rule created through this form.
-    var relayRules = Model.Rules.Where(r => r.ActionType == ActionType.Relay).ToList();
-    var rulesByFunction = relayRules.GroupBy(r => r.RelayFunction!.Value).ToDictionary(g => g.Key, g => g.ToList());
-    (RelayFunction Value, string Label)[] functions =
-    [
-        (RelayFunction.Ventilation, "Ventilation"),
-        (RelayFunction.Light, "Light"),
-        (RelayFunction.Heating, "Heating"),
-        (RelayFunction.WaterPump, "Water pump"),
-    ];
-
-    // Deserialize with ConditionConfigJson.Options (case-insensitive/camelCase) - the options-less
-    // overload fails to bind against the camelCase JSON these Add forms produce.
-    string Summarize(DeviceUnitZoneRule rule)
+    var ruleEditorModel = new api.ViewModels.RuleEditorViewModel
     {
-        RuleCondition condition = rule.Conditions[0];
-        switch (condition.ConditionType)
-        {
-            case ConditionType.Threshold:
-                var t = condition.ConditionConfig?.Deserialize<ThresholdConditionConfig>(ConditionConfigJson.Options);
-                return $"threshold {t?.Threshold:0.##}, hysteresis {t?.Hysteresis:0.##}";
-            case ConditionType.Interval:
-                var iv = condition.ConditionConfig?.Deserialize<IntervalConditionConfig>(ConditionConfigJson.Options);
-                return $"on {iv?.IntervalLength}s out of every {iv?.Interval}s";
-            case ConditionType.Schedule:
-                var s = condition.ConditionConfig?.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options);
-                int start = s?.Start ?? 0, end = start + (s?.Duration ?? 0);
-                return $"{start / 3600:00}:{start % 3600 / 60:00}-{end / 3600:00}:{end % 3600 / 60:00}, days 0b{Convert.ToString(s?.DaysOfWeek ?? 0, 2).PadLeft(7, '0')}";
-            case ConditionType.Astronomical:
-                var a = condition.ConditionConfig?.Deserialize<AstronomicalConditionConfig>(ConditionConfigJson.Options);
-                return $"sunrise {a?.SunriseOffsetMinutes:+#;-#;0}min to sunset {a?.SunsetOffsetMinutes:+#;-#;0}min, days 0b{Convert.ToString(a?.DaysOfWeek ?? 0, 2).PadLeft(7, '0')}";
-            default:
-                return "?";
-        }
-    }
+        Scope = api.ViewModels.RuleScope.Zone,
+        ScopeId = Model.Zone!.IDDeviceUnitZone,
+        Rules = Model.Rules,
+        RedirectActionName = "Zone",
+    };
 }
 
+<partial name="_RuleEditor" model="ruleEditorModel" />
+
 <div class="card mb-3">
-    <div class="card-header">
-        <h3 class="card-title">Automation rules</h3>
-    </div>
     <div class="card-body">
-        <p class="text-secondary small">
-            A function may have several rules - any rule that evaluates "on" wins (OR).
-            Each function has a fixed sensor and threshold direction.
-        </p>
-
-        @foreach (var (function, label) in functions)
-        {
-            var rules = rulesByFunction.GetValueOrDefault(function, []);
-            <div class="mb-4">
-                <h6 class="fw-semibold">@label</h6>
-                @if (rules.Count == 0)
-                {
-                    <p class="text-secondary small mb-2">No rules - this function never turns on.</p>
-                }
-                else
-                {
-                    <ul class="list-group list-group-flush mb-2">
-                        @foreach (var rule in rules)
-                        {
-                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                                <span><span class="badge text-bg-secondary me-2">@rule.Conditions[0].ConditionType</span>@Summarize(rule)</span>
-                                <form asp-action="RuleDelete" method="post" onsubmit="return confirm('Remove this rule?');">
-                                    <input type="hidden" name="idDeviceUnitZoneRule" value="@rule.IDDeviceUnitZoneRule" />
-                                    <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
-                                </form>
-                            </li>
-                        }
-                    </ul>
-                }
-
-                <div class="d-flex flex-wrap gap-2">
-                    <details class="d-inline-block">
-                        <summary class="btn btn-sm btn-outline-primary" style="cursor:pointer;">+ Threshold rule</summary>
-                        <form asp-action="RuleAdd" method="post" class="d-flex flex-wrap align-items-end gap-2 mt-2">
-                            <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
-                            <input type="hidden" name="relayFunction" value="@((int)function)" />
-                            <input type="hidden" name="conditionType" value="@((int)ConditionType.Threshold)" />
-                            <div>
-                                <label class="form-label small mb-0">Threshold</label>
-                                <input type="number" step="any" name="threshold" class="form-control form-control-sm" style="width:8rem" required />
-                            </div>
-                            <div>
-                                <label class="form-label small mb-0">Hysteresis</label>
-                                <input type="number" step="any" min="0" name="hysteresis" class="form-control form-control-sm" style="width:8rem" required />
-                            </div>
-                            <button type="submit" class="btn btn-sm btn-primary">Add</button>
-                        </form>
-                    </details>
-                    <details class="d-inline-block">
-                        <summary class="btn btn-sm btn-outline-primary" style="cursor:pointer;">+ Interval rule</summary>
-                        <form asp-action="RuleAdd" method="post" class="d-flex flex-wrap align-items-end gap-2 mt-2">
-                            <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
-                            <input type="hidden" name="relayFunction" value="@((int)function)" />
-                            <input type="hidden" name="conditionType" value="@((int)ConditionType.Interval)" />
-                            <div>
-                                <label class="form-label small mb-0">Every (s)</label>
-                                <input type="number" min="1" name="interval" class="form-control form-control-sm" style="width:8rem" required />
-                            </div>
-                            <div>
-                                <label class="form-label small mb-0">On for (s)</label>
-                                <input type="number" min="1" name="intervalLength" class="form-control form-control-sm" style="width:8rem" required />
-                            </div>
-                            <button type="submit" class="btn btn-sm btn-primary">Add</button>
-                        </form>
-                    </details>
-                    <details class="d-inline-block">
-                        <summary class="btn btn-sm btn-outline-primary" style="cursor:pointer;">+ Schedule rule</summary>
-                        <form asp-action="RuleAdd" method="post" class="d-flex flex-wrap align-items-end gap-2 mt-2">
-                            <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
-                            <input type="hidden" name="relayFunction" value="@((int)function)" />
-                            <input type="hidden" name="conditionType" value="@((int)ConditionType.Schedule)" />
-                            <div>
-                                <label class="form-label small mb-0">Days (0-127 mask)</label>
-                                <input type="number" min="0" max="127" name="daysOfWeek" class="form-control form-control-sm" style="width:8rem" required title="7-bit mask, bit 0 = Sunday .. bit 6 = Saturday" />
-                            </div>
-                            <div>
-                                <label class="form-label small mb-0">Start (s since local midnight)</label>
-                                <input type="number" min="0" max="86399" name="start" class="form-control form-control-sm" style="width:10rem" required />
-                            </div>
-                            <div>
-                                <label class="form-label small mb-0">Duration (s)</label>
-                                <input type="number" min="1" name="duration" class="form-control form-control-sm" style="width:8rem" required />
-                            </div>
-                            <button type="submit" class="btn btn-sm btn-primary">Add</button>
-                        </form>
-                    </details>
-                    <details class="d-inline-block">
-                        <summary class="btn btn-sm btn-outline-primary" style="cursor:pointer;">+ Astronomical rule</summary>
-                        <form asp-action="RuleAdd" method="post" class="d-flex flex-wrap align-items-end gap-2 mt-2">
-                            <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
-                            <input type="hidden" name="relayFunction" value="@((int)function)" />
-                            <input type="hidden" name="conditionType" value="@((int)ConditionType.Astronomical)" />
-                            <div>
-                                <label class="form-label small mb-0">Days (0-127 mask)</label>
-                                <input type="number" min="0" max="127" name="daysOfWeek" class="form-control form-control-sm" style="width:8rem" required title="7-bit mask, bit 0 = Sunday .. bit 6 = Saturday" />
-                            </div>
-                            <div>
-                                <label class="form-label small mb-0">Sunrise offset (min)</label>
-                                <input type="number" min="-720" max="720" name="sunriseOffsetMinutes" value="0" class="form-control form-control-sm" style="width:8rem" required title="Negative starts earlier than sunrise" />
-                            </div>
-                            <div>
-                                <label class="form-label small mb-0">Sunset offset (min)</label>
-                                <input type="number" min="-720" max="720" name="sunsetOffsetMinutes" value="0" class="form-control form-control-sm" style="width:8rem" required title="Positive ends later than sunset" />
-                            </div>
-                            <button type="submit" class="btn btn-sm btn-primary">Add</button>
-                        </form>
-                    </details>
-                </div>
-                <p class="text-secondary small mb-0 mt-1">
-                    Astronomical rules need a location set under Server Settings &rarr; Weather - a
-                    day with no location configured sends no rule that day (function stays off).
-                </p>
-            </div>
-        }
-
-        <hr />
         <h6 class="fw-semibold">WaterPump safety limits</h6>
         <p class="text-secondary small">
             A hard ceiling the device enforces AFTER any rule above decides the pump should run,

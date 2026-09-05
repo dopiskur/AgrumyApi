@@ -168,7 +168,7 @@ namespace api.Dal.Interface
         [Get("/api/DeviceUnit/ZoneById")]
         Task<DeviceUnitZone> DeviceUnitZoneGetById(int? idDeviceUnitZone);
 
-        // ---- Zone rules ---------------------------------------
+        // ---- Rules (Zone/Unit/Global scope, roadmap #212) ------
 
         [Get("/api/DeviceUnit/Zone/Rule")]
         Task<IList<DeviceUnitZoneRule>> DeviceUnitZoneRulesGet(int? idDeviceUnitZone);
@@ -178,6 +178,24 @@ namespace api.Dal.Interface
 
         [Delete("/api/DeviceUnit/Zone/Rule")]
         Task DeviceUnitZoneRuleDelete(int? idDeviceUnitZoneRule);
+
+        [Get("/api/DeviceUnit/Unit/Rule")]
+        Task<IList<DeviceUnitZoneRule>> DeviceUnitRulesGet(int? idDeviceUnit);
+
+        [Post("/api/DeviceUnit/Unit/Rule")]
+        Task<int> DeviceUnitRuleAdd([Body] DeviceUnitZoneRule rule);
+
+        [Delete("/api/DeviceUnit/Unit/Rule")]
+        Task DeviceUnitRuleDelete(int? idDeviceUnitZoneRule);
+
+        [Get("/api/DeviceUnit/Global/Rule")]
+        Task<IList<DeviceUnitZoneRule>> GlobalRulesGet();
+
+        [Post("/api/DeviceUnit/Global/Rule")]
+        Task<int> GlobalRuleAdd([Body] DeviceUnitZoneRule rule);
+
+        [Delete("/api/DeviceUnit/Global/Rule")]
+        Task GlobalRuleDelete(int? idDeviceUnitZoneRule);
 
         [Get("/api/DeviceUnit/Unassigned")]
         Task<IList<DeviceDto>> DeviceUnassignedGet(bool controllerCapable);

@@ -363,6 +363,10 @@ namespace api.Controllers.API
                 {
                     return $"Condition {i + 1}: \"another rule fired\" is only valid on a Notification-action rule (a Relay rule fires on-device, invisibly to the server).";
                 }
+                if (condition.ConditionType == ConditionType.Astronomical && rule.ActionType != ActionType.Relay)
+                {
+                    return $"Condition {i + 1}: an astronomical condition is only valid on a Relay-action rule (AstronomicalRuleResolver only runs on the Relay path - api.Devices.RuleConditionEvaluator has no case for it, so a Notification rule would always evaluate this condition as false).";
+                }
                 if (RuleConditionConfigError(condition.ConditionType, condition.ConditionConfig) is string conditionError)
                 {
                     return $"Condition {i + 1}: {conditionError}";

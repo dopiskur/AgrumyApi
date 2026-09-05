@@ -1,0 +1,24 @@
+@model RuleEditorViewModel
+@{
+    ViewData["Title"] = "Unit rules";
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-action="Index">Units</a></li>
+        <li class="breadcrumb-item"><a asp-action="Zones" asp-route-idDeviceUnit="@Model.ScopeId">Zones</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Unit rules</li>
+    </ol>
+</nav>
+
+@if (TempData["Error"] is string error)
+{
+    <div class="alert alert-warning">@error</div>
+}
+
+<p class="text-secondary">
+    Applies to every zone in this unit that doesn't define its own rule for the same
+    function/metric (a zone's own rule always wins - see the Zone page's automation card).
+</p>
+
+<partial name="_RuleEditor" model="Model" />

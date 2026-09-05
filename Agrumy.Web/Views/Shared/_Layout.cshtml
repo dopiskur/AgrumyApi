@@ -163,6 +163,12 @@
                         @if (hasAnyRole(RoleNames.DeviceManagers))
                         {
                             <li class="nav-item">
+                                <a asp-area="" asp-controller="DeviceUnit" asp-action="GlobalRules" class="nav-link @(string.Equals(ViewContext.RouteData.Values["action"]?.ToString(), "GlobalRules", StringComparison.OrdinalIgnoreCase) ? "active" : "")">
+                                    <i class="nav-icon bi bi-diagram-3"></i>
+                                    <p>@Localizer["Global Rules"]</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a asp-area="" asp-controller="WifiConfig" asp-action="Index" class="nav-link @navActive("WifiConfig")">
                                     <i class="nav-icon bi bi-wifi"></i>
                                     <p>@Localizer["WiFi Networks"]</p>
