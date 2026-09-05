@@ -9,10 +9,7 @@ using Npgsql;
 
 namespace api.Dal
 {
-    /// <summary>EF Core implementation of <see cref="IRepository"/>, running on MySQL/MariaDB
-    /// (Pomelo) or PostgreSQL (Npgsql) per <c>Database:Provider</c>; split into partial files
-    /// mirroring the IRepository facets (EfRepository.Users.cs, EfRepository.Devices.cs, ...) -
-    /// this file holds the connection plumbing and the ISystemRepository members.</summary>
+    /// EF Core implementation of IRepository, split into partial files mirroring its facets (EfRepository.Users.cs, EfRepository.Devices.cs, ...) - this file holds connection plumbing and the ISystemRepository members.
     internal partial class EfRepository(AgrumyDbContext db, IOptions<AgrumySettings> settingsOptions, ILogger<EfRepository> logger, ICache cache) : IRepository
     {
         private readonly AgrumySettings settings = settingsOptions.Value;
@@ -50,10 +47,7 @@ namespace api.Dal
             }
         }
 
-        /// <summary>TimescaleDB requires the partitioning column in every unique constraint
-        /// including the PK, so converting sensorData to a hypertable means widening its PK from
-        /// IDSensorData alone to (IDSensorData, DateCreated) first. No-op on MySQL/Pomelo, and
-        /// logs-and-skips if the TimescaleDB extension isn't installed.</summary>
+        /// TimescaleDB requires the partitioning column in every unique constraint including the PK, so this widens sensorData's PK from IDSensorData alone to (IDSensorData, DateCreated) - no-op on MySQL/Pomelo.
         private async Task EnsureTimescaleHypertableAsync()
         {
             if (!db.Database.IsNpgsql())
@@ -72,8 +66,7 @@ namespace api.Dal
                 return;
             }
 
-            // One DO block, not two separate calls - the PK rename and create_hypertable() must
-            // both happen (or neither) exactly once.
+            // One DO block, not two separate calls - the PK rename and create_hypertable() must both happen (or neither) exactly once.
             const string sql = """
                 DO $$
                 DECLARE
@@ -101,11 +94,7 @@ namespace api.Dal
             await ApplyRetentionPolicyAsync((await ServerConfigGetAsync(1)).SensorDataRetentionDays);
         }
 
-        /// <summary>PostgreSQL/TimescaleDB side of sensorData retention - MariaDB's equivalent is
-        /// SensorDataRetentionBackgroundService's daily purge. add_retention_policy's interval can
-        /// only be changed by removing the old policy and adding a new one, so this runs
-        /// unconditionally on every save; null/0 removes any existing policy rather than adding one.
-        /// No-op on MySQL/Pomelo.</summary>
+        /// PostgreSQL/TimescaleDB side of sensorData retention (MariaDB's equivalent is SensorDataRetentionBackgroundService's daily purge) - add_retention_policy's interval can only change by remove-then-add, so this runs unconditionally on every save.
         private async Task ApplyRetentionPolicyAsync(int? retentionDays)
         {
             if (!db.Database.IsNpgsql())
@@ -131,11 +120,7 @@ namespace api.Dal
             }
         }
 
-        /// <summary>Seeds the IDDeviceUnit=0/IDDeviceUnitZone=0 sentinel pair - without it, a
-        /// brand-new install's first device registration violates device.DeviceUnitID's FK, since
-        /// the Shared Device model defaults DeviceUnitID/DeviceUnitZoneID to 0, not null. Global
-        /// (TenantID=null): the shared "unassigned" bucket every tenant's not-yet-zoned devices
-        /// point at.</summary>
+        /// Seeds the IDDeviceUnit=0/IDDeviceUnitZone=0 sentinel pair - without it, a fresh install's first device registration violates device.DeviceUnitID's FK, since Device defaults that column to 0, not null.
         private static async Task SeedDeviceUnitSentinelsAsync(AgrumyDbContext db)
         {
             if (!await db.DeviceUnits.AnyAsync())
@@ -150,16 +135,7 @@ namespace api.Dal
             }
         }
 
-        /// <summary>TenantID=0 is the "shared default tenant" sentinel value every bootstrap
-        /// Global Admin and self-service TenantID==0 joiner already relies on (see README) - but
-        /// unlike DeviceUnitRow/DeviceUnitZoneRow above, tenant.IDTenant stays ValueGeneratedOnAdd
-        /// (real tenants DO need auto-increment), so a normal db.Tenants.Add with IDTenant=0 gets
-        /// silently ignored by EF's own value generation. Raw SQL is required either way; MySQL/
-        /// MariaDB additionally treats a literal 0 in an AUTO_INCREMENT column as "generate one"
-        /// unless NO_AUTO_VALUE_ON_ZERO is set for the session - confirmed empirically, this is
-        /// not documented behavior anyone would reasonably guess. Without this row,
-        /// DeviceApiController.DeviceRegistration fails on FK_device_tenant_TenantID for every
-        /// device a TenantID=0 user (i.e. the bootstrap admin) registers.</summary>
+        /// TenantID=0 is the shared default tenant every bootstrap admin relies on - since tenant.IDTenant stays auto-increment, inserting IDTenant=0 needs raw SQL, and MySQL additionally needs NO_AUTO_VALUE_ON_ZERO or it silently reassigns a literal 0 (confirmed empirically).
         private static async Task SeedDefaultTenantAsync(AgrumyDbContext db)
         {
             if (await db.Tenants.AsNoTracking().AnyAsync(t => t.IDTenant == 0))
@@ -167,11 +143,7 @@ namespace api.Dal
                 return;
             }
 
-            // Both statements MUST run on the same physical connection - each bare
-            // ExecuteSqlRawAsync call may otherwise open/close its own pooled connection, in which
-            // case the SET SESSION below never reaches the connection the INSERT actually runs on
-            // (confirmed empirically: without this transaction, MySQL silently reassigned the
-            // "literal 0" insert to the next auto-increment value instead).
+            // Both statements MUST run on the same physical connection (hence the transaction) - otherwise SET SESSION never reaches the connection the INSERT runs on, and MySQL silently reassigns the literal-0 insert to the next auto-increment value.
             await using var tx = await db.Database.BeginTransactionAsync();
             if (db.Database.IsMySql())
             {
@@ -180,18 +152,13 @@ namespace api.Dal
             }
             else
             {
-                // Npgsql created the columns as case-sensitive quoted identifiers (`IDTenant`, not
-                // `idtenant`) - unquoted here would fold to lowercase and miss the real column,
-                // same reason every other EF-mapped PascalCase column needs quoting on Postgres.
+                // Npgsql created columns as case-sensitive quoted identifiers - unquoted here would fold to lowercase and miss the real column.
                 await db.Database.ExecuteSqlRawAsync("INSERT INTO tenant (\"IDTenant\", \"TenantName\") VALUES (0, 'Default')");
             }
             await tx.CommitAsync();
         }
 
-        /// <summary>These IDs must match AgrumyFirmware's ControllerController.h RelayFunctionType
-        /// enum and DeviceController.cpp serviceType() switch, and Agrumy.Web's
-        /// DeviceController.Edit - renumbering desyncs the dropdown from what the device/web code
-        /// actually does with the ID.</summary>
+        /// These IDs must match AgrumyFirmware's ControllerController.h RelayFunctionType enum and DeviceController.cpp, plus Agrumy.Web's DeviceController.Edit - renumbering desyncs the dropdown from what the device actually does.
         private static async Task SeedDeviceTypeLookupsAsync(AgrumyDbContext db)
         {
             if (!await db.DeviceTypes.AnyAsync())
@@ -248,11 +215,7 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
-        /// <summary>A genuinely empty user table gets exactly one row: a Global Admin at
-        /// TenantID=0 with PwdHash/PwdSalt left NULL on purpose - see UserRow.PwdHash - so
-        /// Agrumy.Web's first-run "set password" screen (BootstrapAdminSetPasswordAsync below) has
-        /// something to activate. Returns the plaintext one-time setup secret (only hashed copy is
-        /// persisted) so the caller can surface it once, or null if no row was created.</summary>
+        /// A genuinely empty user table gets exactly one row: a Global Admin at TenantID=0 with PwdHash/PwdSalt left NULL (see UserRow.PwdHash) for Agrumy.Web's first-run "set password" screen to activate - returns the plaintext setup secret once, or null if no row was created.
         private static async Task<string?> SeedBootstrapAdminAsync(AgrumyDbContext db)
         {
             if (await db.Users.AnyAsync())
@@ -297,8 +260,7 @@ namespace api.Dal
         {
             Exception inner = ex is DbUpdateException due && due.InnerException != null ? due.InnerException : ex;
 
-            // MySql error numbers: 1146 ER_NO_SUCH_TABLE, 1051 ER_BAD_TABLE_ERROR, 1305 SP_DOES_NOT_EXIST;
-            // 1216/1217/1451/1452 FK violation, 1062 duplicate key, 1213 deadlock, 1205 lock-wait timeout.
+            // 1146/1051/1305 = table/routine missing; 1216/1217/1451/1452 = FK violation; 1062 = duplicate key; 1213/1205 = deadlock/lock-wait timeout.
             if (inner is MySqlException mysqlEx)
             {
                 switch (mysqlEx.Number)
@@ -321,9 +283,7 @@ namespace api.Dal
                 return DbFailureKind.ConnectionFailure;
             }
 
-            // PostgreSQL SQLSTATE: 42P01 undefined_table, 42703 undefined_column, 3F000 invalid_schema_name;
-            // 23503 FK violation, 23505 unique violation, 23514 check violation; 40P01 deadlock,
-            // 40001 serialization failure, 55P03 lock not available.
+            // 42P01/42703/3F000 = missing table/column/schema; 23503/23505/23514 = FK/unique/check violation; 40P01/40001/55P03 = deadlock/serialization failure/lock unavailable.
             if (inner is PostgresException pgEx)
             {
                 switch (pgEx.SqlState)
@@ -344,10 +304,7 @@ namespace api.Dal
                 return DbFailureKind.ConnectionFailure;
             }
 
-            // MySQL text fallback for a missing table when the exception type isn't MySqlException.
-            // (PostgreSQL's "relation ... does not exist" is covered by the 42P01 SqlState above -
-            // a bare "does not exist" match would also swallow unrelated errors like a missing
-            // trigger definer.)
+            // MySQL text fallback for a missing table when the exception type isn't MySqlException - PostgreSQL's equivalent is already covered by the 42P01 SqlState above.
             if (DbErrorResponse.Mentions(ex, "doesn't exist") ||
                 DbErrorResponse.Mentions(ex, "Unknown table"))
             {
@@ -361,8 +318,7 @@ namespace api.Dal
                 return DbFailureKind.ConnectionFailure;
             }
 
-            // Anything else escaping an action (e.g. a not-found ArgumentException from the DAL) is a
-            // server-side bug, not a database outage - let it surface as 500, not a misleading 503.
+            // Anything else escaping an action is a server-side bug, not a database outage - surface it as 500, not a misleading 503.
             return DbFailureKind.Unknown;
         }
     }
