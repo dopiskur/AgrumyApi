@@ -43,9 +43,7 @@ else
                             </span>
                             @if (canAcknowledge)
                             {
-                                @* This partial also renders inside AJAX-swapped live-refresh fragments (_ZoneDetails), where
-                                   Context.Request.Path is the polling endpoint's path, not the browser's actual address bar
-                                   URL - read the real one client-side at submit time instead. *@
+                                @* This partial also renders inside AJAX-swapped live-refresh fragments (_ZoneDetails), where Request.Path is the polling endpoint's path, not the browser's address bar - read the real one client-side at submit time instead. *@
                                 <form asp-controller="DeviceUnit" asp-action="AcknowledgeAlert" method="post" class="flex-shrink-0"
                                       onsubmit="this.querySelector('.js-return-url').value = window.location.pathname + window.location.search;">
                                     <input type="hidden" name="idEventDevice" value="@alert.IDEventDevice" />

@@ -22,8 +22,7 @@
                 <p class="form-control-plaintext">@Html.DisplayFor(m => m.UserUpdate!.IDUser)</p>
                 @Html.HiddenFor(m => m.UserUpdate!.IDUser)
             </div>
-            @* Unlike Device.TenantID, this one is real and editable - UserApiController.UserUpdate
-               applies it only for Global-admin callers, silently ignored otherwise. *@
+            @* Unlike Device.TenantID, this one is real and editable - UserApiController.UserUpdate applies it only for Global-admin callers, silently ignored otherwise. *@
             <div class="mb-3">
                 <label asp-for="UserUpdate.TenantID" class="form-label"></label>
                 <input asp-for="UserUpdate.TenantID" class="form-control" />

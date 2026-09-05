@@ -31,8 +31,7 @@
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">
-            @* Status badge lives in _ZoneDetails.cshtml, not here - this header sits outside the
-               polled #zoneDetails fragment and a badge here would go stale. *@
+            @* Status badge lives in _ZoneDetails.cshtml, not here - this header sits outside the polled #zoneDetails fragment and a badge here would go stale. *@
             @zone.DeviceUnitZoneName
             @if (hasAnyRole(RoleNames.DeviceManagers))
             {

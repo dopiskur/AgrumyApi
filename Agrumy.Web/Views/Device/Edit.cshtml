@@ -92,8 +92,7 @@
                 <span asp-validation-for="Device.SleepSeconds" class="text-danger"></span>
             </div>
 
-            @* Recomputed from DeviceTypeID in DeviceController.Edit POST for every known type -
-               shown for transparency, but edits only survive for unknown type ids. *@
+            @* Recomputed from DeviceTypeID in DeviceController.Edit POST for every known type - shown for transparency, but edits only survive for unknown type ids. *@
             <div class="mb-3">
                 <label asp-for="Device.DeviceSensorEnabled" class="form-label"></label>
                 <input asp-for="Device.DeviceSensorEnabled" class="form-control" />

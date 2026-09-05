@@ -1,8 +1,7 @@
 @model api.ViewModels.SelectFieldViewModel
 
 <div class="mb-3">
-    @* DropDownList generates the element id with dots flattened to underscores - match it, or
-       the label's "for" points at nothing (same mapping as _EnabledToggleField). *@
+    @* DropDownList generates the element id with dots flattened to underscores - match it, or the label's "for" points at nothing (same mapping as _EnabledToggleField). *@
     <label class="form-label" for="@Model.Name.Replace(".", "_")">@Model.Label</label>
     @Html.DropDownList(Model.Name, Model.Items, new { @class = "form-select" })
 </div>
