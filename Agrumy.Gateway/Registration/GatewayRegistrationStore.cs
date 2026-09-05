@@ -31,11 +31,14 @@ namespace api.Gateway.Registration
             }
         }
 
+        /// Temp file + rename (same pattern as FirmwareStorage) so a crash/power-loss mid-write never leaves a half-written, unparseable registration file.
         public void Save(GatewayRegistrationState newState)
         {
             lock (gate) { state = newState; }
             string json = JsonSerializer.Serialize(newState, WriteOptions);
-            File.WriteAllText(path, json);
+            string tempPath = path + ".tmp";
+            File.WriteAllText(tempPath, json);
+            File.Move(tempPath, path, overwrite: true);
         }
     }
 }
