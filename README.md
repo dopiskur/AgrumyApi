@@ -5,24 +5,24 @@
 > If you use Agrumy, I'd genuinely love to hear about it — open an issue or
 > drop me a line.
 
-Agrumy is a small multi-tenant backend + admin UI for managing IoT devices that
-monitor and control greenhouse/citrus micro-climate - temperature, humidity, soil
-moisture, light, CO2, water level - and drive relays (ventilation, heating,
-irrigation, lighting) off configurable thresholds and time intervals. It is the
-server side of a system whose device firmware lives in the separate `AgrumyFirmware`
-repository; this repository is the API those devices talk to, plus the MVC admin
-UI operators use to manage devices, users and tenants.
+Agrumy is a backend + admin UI for IoT devices that monitor and control
+greenhouse/citrus micro-climate - temperature, humidity, soil moisture, light,
+CO2, water level - and drive relays (ventilation, heating, irrigation, lighting)
+off configurable thresholds and time intervals. It is the server side of a
+system whose device firmware lives in the separate `AgrumyFirmware` repository;
+this repository is the API those devices talk to, plus the MVC admin UI
+operators use to manage devices and users.
 
 ## Mission
 
 Everyone should have the right to grow their own food. In practice, most people
 today have neither the knowledge nor the time to keep a food garden alive -
 that's the problem Agrumy exists to lower the barrier to, not just a target
-market. The same software serves both ends without compromise: an agricultural
-cooperative or commercial nursery gets real multi-tenancy and granular RBAC
-(`api.Security.RoleNames`) to manage many operators from one backend, while a
-single hobbyist on the default tenant never has to see any of that complexity -
-just their own greenhouse.
+market. The same software serves both ends without compromise: a single
+hobbyist gets a simple, self-hosted setup for their own greenhouse, while a
+larger operation - an agricultural cooperative or commercial nursery managing
+several sites - can run the same backend at that scale, without either end
+having to adopt tooling built for the other.
 
 FarmBot is the closest comparison for "I don't have the knowledge or time" -
 and it's a real, shipping product that solves that problem well. But it does
@@ -88,9 +88,9 @@ patches applied to the pre-existing legacy database, unrelated to EF.
 Honestly, for a single greenhouse with off-the-shelf sensors, **Home Assistant or
 ESPHome is almost certainly the better choice** - mature device support, a real
 automation/rule engine, a huge community, and no backend to run or firmware to
-maintain yourself. **ThingsBoard** covers similar ground to Agrumy (multi-tenant
-device fleets, telemetry, dashboards) far more completely, with an actual rule
-engine and support for many transport protocols.
+maintain yourself. **ThingsBoard** covers similar ground to Agrumy (device
+fleets, telemetry, dashboards) far more completely, with an actual rule engine
+and support for many transport protocols.
 
 Agrumy's rule engine (roadmap #21, extended by #212) is deliberately bounded,
 not general-purpose: each relay function (ventilation/light/heating/water-pump)
@@ -110,8 +110,8 @@ one condition, you're still writing C# to add it, not YAML.
 
 Where Agrumy makes sense: you're building (or already run) your own firmware for
 a specific vertical - here, citrus/greenhouse irrigation and micro-climate - and
-want a small, self-hosted, multi-tenant backend you fully own and can shape
-around that one domain, rather than adapting a general-purpose platform's data
+want a small, self-hosted backend you fully own and can shape around that one
+domain, rather than adapting a general-purpose platform's data
 model to fit it. It's a starting point for a narrow, vertical-specific product,
 not a general home-automation hub.
 
@@ -122,10 +122,6 @@ them at one greenhouse or sprinkler system and they do that job well. Agrumy
 targets a different case: a fleet of installations under one backend. Neither
 is "better" here; they're built for different scale.
 
-- **Multi-tenant with granular RBAC.** Neither Mycodo nor OpenSprinkler has a
-  tenant concept - a single install is a single install. Agrumy's `TenantID`
-  scoping and composable roles (`api.Security.RoleNames`) let one backend host
-  many independent operators, each seeing only their own devices/users/data.
 - **A Unit/Zone hierarchy with a live dashboard.** `GET /api/DeviceUnit/Dashboard`
   rolls up status across units and zones of devices - neither competitor has a
   comparable way to organize and view a *fleet*, since they're built around
@@ -412,7 +408,7 @@ next step - not required today.
 
 ## Practical advantages
 
-Beyond the multi-tenant/architecture points above, a handful of smaller, concrete
+Beyond the architecture points above, a handful of smaller, concrete
 things that make Agrumy easier to trust and run day-to-day:
 
 - **Offline-resilient by design.** Relay control runs entirely on-device against
