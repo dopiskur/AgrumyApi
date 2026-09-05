@@ -166,6 +166,21 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         return saved;
     }
 
+    // Roadmap #302: CURRENT_TIMESTAMP/NOW() column defaults must compute in UTC regardless of the server process's own OS timezone (verified live on invent.hr, whose MySQL @@global.time_zone was SYSTEM/CEST, 2h off UTC) - SessionTimeZoneInterceptor sets this on every connection open.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task NewConnection_SessionTimeZoneIsUtc(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        await using var db = _fx.NewContext(t);
+
+        string sql = provider == DbProviderKind.Postgres
+            ? "SELECT current_setting('TIMEZONE') AS \"Value\""
+            : "SELECT @@session.time_zone AS Value";
+        string tz = await db.Database.SqlQueryRaw<string>(sql).FirstAsync();
+
+        Assert.True(tz is "UTC" or "+00:00", $"Expected the session timezone to be UTC, got '{tz}'.");
+    }
+
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task Schema_HasEveryTable(DbProviderKind provider)
     {
