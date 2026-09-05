@@ -9,7 +9,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Covers the tenant-scoping decision AuditLogApiController makes before delegating to IAuditLogRepository - a Global admin sees every tenant, everyone else only their own.</summary>
+/// Covers the tenant-scoping decision AuditLogApiController makes before delegating to IAuditLogRepository - a Global admin sees every tenant, everyone else only their own.
 public class AuditLogApiControllerTests
 {
     private readonly Mock<IRepository> _repo = new(MockBehavior.Strict);

@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>CacheRepository sits on <see cref="IDistributedCache"/> so a real distributed backend (Redis, SQL Server) is a DI swap, not a rewrite. Exercised here against <see cref="MemoryDistributedCache"/>, covering the same serialization round-trip a network-backed store would require.</summary>
+/// CacheRepository sits on <see cref="IDistributedCache"/> so a real distributed backend (Redis, SQL Server) is a DI swap, not a rewrite. Exercised here against <see cref="MemoryDistributedCache"/>, covering the same serialization round-trip a network-backed store would require.
 public class CacheRepositoryTests
 {
     private static IDistributedCache NewBackingStore() =>
@@ -39,7 +39,7 @@ public class CacheRepositoryTests
         Assert.Equal("session-token", result.apiAuth);
     }
 
-    /// <summary>Two CacheRepository instances over the SAME backing store see each other's writes - state lives in whatever IDistributedCache is registered, which is what lets a real distributed backend make this true across separate application instances.</summary>
+    /// Two CacheRepository instances over the SAME backing store see each other's writes - state lives in whatever IDistributedCache is registered, which is what lets a real distributed backend make this true across separate application instances.
     [Fact]
     public async Task TwoRepositoryInstances_OverSharedBackingStore_SeeEachOthersWrites()
     {
@@ -90,7 +90,7 @@ public class CacheRepositoryTests
         Assert.Equal(snapshot, result);
     }
 
-    /// <summary>Same distributed-visibility guarantee as <see cref="TwoRepositoryInstances_OverSharedBackingStore_SeeEachOthersWrites"/>, for the generic path - lets several concurrently open admin tabs share one real DB query instead of one each.</summary>
+    /// Same distributed-visibility guarantee as <see cref="TwoRepositoryInstances_OverSharedBackingStore_SeeEachOthersWrites"/>, for the generic path - lets several concurrently open admin tabs share one real DB query instead of one each.
     [Fact]
     public async Task GetAsync_OverSharedBackingStore_SeesAnotherInstancesSetAsync()
     {
@@ -106,7 +106,7 @@ public class CacheRepositoryTests
     }
 
 
-    /// <summary>Stands in for a Redis client throwing a connection/timeout exception - CacheRepository must not care which backend or exception type, only that the call failed.</summary>
+    /// Stands in for a Redis client throwing a connection/timeout exception - CacheRepository must not care which backend or exception type, only that the call failed.
     private sealed class ThrowingCache : IDistributedCache
     {
         public byte[]? Get(string key) => throw new InvalidOperationException("backend unreachable");

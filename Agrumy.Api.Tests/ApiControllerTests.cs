@@ -14,7 +14,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Controller tests with a mocked <see cref="IRepository"/>/<see cref="ICache"/>, bypassing the MVC pipeline (DbExceptionFilter behavior is covered by <see cref="DbExceptionFilterTests"/>).</summary>
+/// Controller tests with a mocked <see cref="IRepository"/>/<see cref="ICache"/>, bypassing the MVC pipeline (DbExceptionFilter behavior is covered by <see cref="DbExceptionFilterTests"/>).
 public class ApiControllerTests
 {
     private readonly Mock<IRepository> _repo = new(MockBehavior.Strict);
@@ -35,11 +35,11 @@ public class ApiControllerTests
     }
     private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _notifications.Object, TestSettings);
 
-    /// <summary>Gives a bare (non-DI-constructed) controller the JWT claims an [Authorize] action reads via HttpContext.User.</summary>
+    /// Gives a bare (non-DI-constructed) controller the JWT claims an [Authorize] action reads via HttpContext.User.
     private static void SetCaller(ControllerBase controller, string role, int? tenantId) =>
         SetCallerRoles(controller, tenantId, role);
 
-    /// <summary>Same, but with the full multi-role claim set a real token carries (legacy alias first, then granular roles - order matters only for CallerRole).</summary>
+    /// Same, but with the full multi-role claim set a real token carries (legacy alias first, then granular roles - order matters only for CallerRole).
     private static void SetCallerRoles(ControllerBase controller, int? tenantId, params string[] roles)
     {
         var claims = new List<Claim> { new("TenantID", tenantId.ToString() ?? "") };
@@ -323,7 +323,7 @@ public class ApiControllerTests
         _repo.Verify(r => r.UserSetDevicePinAsync(It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<DateTime?>()), Times.Never);
     }
 
-    /// <summary>Common post-UserAddAsync plumbing every UserRegistration call goes through: recovers the freshly-inserted IDUser, writes an activation token, and assigns a starting role. Stubbed permissively here since it isn't the point of most of these tests.</summary>
+    /// Common post-UserAddAsync plumbing every UserRegistration call goes through: recovers the freshly-inserted IDUser, writes an activation token, and assigns a starting role. Stubbed permissively here since it isn't the point of most of these tests.
     private void StubActivationPlumbing(string email, int idUser)
     {
         _repo.Setup(r => r.UserGetAsync(null, email, null)).ReturnsAsync(new User { IDUser = idUser, Email = email });
@@ -498,12 +498,7 @@ public class ApiControllerTests
     }
 
 
-    /// <summary>roadmap #222: EmailVerified is an internal tracking flag only, not an independent
-    /// login gate - Enabled is the only thing that matters. This combination isn't reachable
-    /// through the normal registration/Activate flow (Enabled only ever becomes true there once
-    /// EmailVerified is already true), but an admin-enabled account whose owner never finished
-    /// email verification is a real state (UserAdd/UserUpdate can set Enabled directly), and it
-    /// must still be allowed to sign in.</summary>
+    /// Enabled is the only login gate - an admin-enabled account with EmailVerified still false must still sign in.
     [Fact]
     public async Task UserLogin_EmailNotVerified_ButEnabled_StillSucceeds()
     {
@@ -636,7 +631,7 @@ public class ApiControllerTests
         Assert.Equal(500, obj.StatusCode);
     }
 
-    /// <summary>RefreshTokenRotateAsync returning false (lost the rotate race) must be treated the same as detected reuse - all sessions revoked, 401.</summary>
+    /// RefreshTokenRotateAsync returning false (lost the rotate race) must be treated the same as detected reuse - all sessions revoked, 401.
     [Fact]
     public async Task RefreshToken_LosesAtomicRotateRace_RevokesAllSessionsAndReturns401()
     {
@@ -852,9 +847,7 @@ public class ApiControllerTests
         Assert.Equal(new[] { RoleNames.TenantReader }, seededRoles);
     }
 
-    /// <summary>roadmap #204: a non-admin UserManager (Tenant User) can create accounts but must
-    /// never be able to grant roles, even by forging a RoleNames list in the request body - the
-    /// requested TenantAdmin must be silently dropped in favor of the safe default.</summary>
+    /// A non-admin UserManager forging a TenantAdmin RoleNames list must have it silently dropped in favor of the safe default.
     [Fact]
     public async Task UserAdd_NonAdminCaller_RequestedRolesIgnored_DefaultsToTenantReader()
     {
@@ -874,7 +867,7 @@ public class ApiControllerTests
         Assert.Equal(new[] { RoleNames.TenantReader }, seededRoles);
     }
 
-    /// <summary>A Tenant admin may only grant Tenant-scoped roles - requesting a Global role must 403.</summary>
+    /// A Tenant admin may only grant Tenant-scoped roles - requesting a Global role must 403.
     [Fact]
     public async Task UserAdd_TenantAdminRequestsGlobalRole_Returns403()
     {
@@ -1614,8 +1607,7 @@ public class ApiControllerTests
         Assert.Equal(new[] { RoleNames.TenantUser, RoleNames.TenantDevice }, seededRoles);
     }
 
-    /// <summary>roadmap #204: a non-admin caller's RoleNames must be silently ignored, not applied -
-    /// same guard as UserAdd. Strict mock: UserRolesSetAsync was never set up.</summary>
+    /// Same guard as UserAdd, on the Update path - strict mock: UserRolesSetAsync was never set up.
     [Fact]
     public async Task UserUpdate_NonAdminCaller_RequestedRolesIgnored()
     {
@@ -1695,9 +1687,7 @@ public class ApiControllerTests
         Assert.IsType<OkObjectResult>((await controller.Get()).Result);
     }
 
-    /// <summary>roadmap #188: an extreme timeRange used to reach now.AddYears(-timeRange) unvalidated,
-    /// throwing an uncaught ArgumentOutOfRangeException (ugly 500) instead of a clean 400. Strict
-    /// mock (SensorDataGetAsync never set up) proves the repo is never even reached.</summary>
+    /// An out-of-range timeRange must 400 before reaching the repo - strict mock (SensorDataGetAsync never set up) proves it.
     [Fact]
     public async Task SensorDataGet_TimeRangeExceedsMaxForUnit_Returns400_NeverTouchesRepo()
     {
@@ -1721,8 +1711,7 @@ public class ApiControllerTests
         Assert.Equal("[]", Assert.IsType<OkObjectResult>(result.Result).Value);
     }
 
-    /// <summary>roadmap #187: a batch over the cap must be rejected before DeviceGetByApiIdAsync or
-    /// SensorDataPushAsync ever run - strict mocks (neither set up) prove nothing downstream was touched.</summary>
+    /// A batch over the cap must 400 before DeviceGetByApiIdAsync/SensorDataPushAsync run - strict mocks (neither set up) prove it.
     [Fact]
     public async Task SensorDataPost_BatchOverLimit_Returns400_NeverTouchesRepo()
     {
@@ -1792,7 +1781,7 @@ public class ApiControllerTests
     }
 }
 
-/// <summary>Regression guards for the Phase 2 role gates: asserts the [Authorize] attribute's role list rather than driving a request.</summary>
+/// Regression guards for the Phase 2 role gates: asserts the [Authorize] attribute's role list rather than driving a request.
 public class RoleGateAuthorizationTests
 {
     private static string? RolesOn(Type controller, string method) =>

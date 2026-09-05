@@ -5,7 +5,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Exercises CommandQueueService directly - no HTTP/controller plumbing, no database (repositories are mocked).</summary>
+/// Exercises CommandQueueService directly - no HTTP/controller plumbing, no database (repositories are mocked).
 public class CommandQueueServiceTests
 {
     private readonly Mock<ICommandRepository> _commands = new(MockBehavior.Strict);
@@ -94,7 +94,7 @@ public class CommandQueueServiceTests
         // Strict mock: AddCommandAsync was never set up - a call to it here would throw.
     }
 
-    /// <summary>HasActiveCommandAsync is only a fast-path - a null from AddCommandAsync (lost the DB-level race) must be treated as a dedup skip too.</summary>
+    /// HasActiveCommandAsync is only a fast-path - a null from AddCommandAsync (lost the DB-level race) must be treated as a dedup skip too.
     [Fact]
     public async Task Device_Losing_The_DB_Level_Dedup_Race_Is_Treated_As_AllDuplicates_Not_A_Crash()
     {
@@ -182,7 +182,7 @@ public class CommandQueueServiceTests
         Assert.Null(pending);
     }
 
-    /// <summary>Two poll cycles: the first poll's ack+execute must not disturb the second, still-Pending command behind it - proves FIFO holds across cycles.</summary>
+    /// Two poll cycles: the first poll's ack+execute must not disturb the second, still-Pending command behind it - proves FIFO holds across cycles.
     [Fact]
     public async Task Two_Commands_Are_Acked_And_Executed_In_FIFO_Order_Across_Two_Poll_Cycles()
     {
