@@ -1742,7 +1742,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task SensorDataGet_Buckets_Rows_Excludes_Null_Co2_And_Writes_Report(DbProviderKind provider)
+    public async Task SensorDataGet_NullsOutlierCo2_ButKeepsTheRestOfTheRow_AndWritesReport(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
@@ -1751,25 +1751,35 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         // Anchor to mid-minute so the +/- second offsets below can never straddle a minute boundary.
         DateTime n = DateTime.Now;
         var thisMinute = new DateTime(n.Year, n.Month, n.Day, n.Hour, n.Minute, 30);
-        var prevMinute = thisMinute.AddMinutes(-1);
+        var minuteBefore = thisMinute.AddMinutes(-1);
+        var twoMinutesBefore = thisMinute.AddMinutes(-2);
 
         await using (var db = _fx.NewContext(t))
         {
             db.SensorData.AddRange(
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 400, Temperature = 1, DateCreated = prevMinute.AddSeconds(-5) },
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 401, Temperature = 2, DateCreated = prevMinute.AddSeconds(5) },
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 402, Temperature = 3, DateCreated = thisMinute.AddSeconds(-5) },
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = null, Temperature = 99, DateCreated = thisMinute.AddSeconds(-4) },
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 9000, Temperature = 88, DateCreated = thisMinute.AddSeconds(-3) });
+                // <=400 (CCS811 "not warmed up yet" sentinel) - CO2 must null out, Temperature must survive.
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 250, Temperature = 10, DateCreated = twoMinutesBefore },
+                // >=8000 (outlier/bad reading) - same expectation.
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 9000, Temperature = 20, DateCreated = minuteBefore },
+                // Genuinely in range - passes through unchanged.
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Co2 = 4000, Temperature = 30, DateCreated = thisMinute });
             await db.SaveChangesAsync();
         }
 
         string json = await _repo.SensorDataGetAsync(tenantId, d.IDDevice, 10, 0, 1);
         var arr = JsonDocument.Parse(json).RootElement.GetProperty("sensorData");
 
-        Assert.Equal(2, arr.GetArrayLength());
-        Assert.Equal(2, arr[0].GetProperty("temperature").GetDouble());
-        Assert.Equal(3, arr[1].GetProperty("temperature").GetDouble());
+        // All 3 buckets present - a device with no working CO2 reading this minute must not lose its whole row, only the co2 field.
+        Assert.Equal(3, arr.GetArrayLength());
+
+        Assert.Equal(10, arr[0].GetProperty("temperature").GetDouble());
+        Assert.Equal(JsonValueKind.Null, arr[0].GetProperty("co2").ValueKind);
+
+        Assert.Equal(20, arr[1].GetProperty("temperature").GetDouble());
+        Assert.Equal(JsonValueKind.Null, arr[1].GetProperty("co2").ValueKind);
+
+        Assert.Equal(30, arr[2].GetProperty("temperature").GetDouble());
+        Assert.Equal(4000, arr[2].GetProperty("co2").GetInt32());
 
         await using var db2 = _fx.NewContext(t);
         Assert.True(await db2.SensorDataReports.AnyAsync(r => r.DeviceID == d.IDDevice && r.SensorData == json));

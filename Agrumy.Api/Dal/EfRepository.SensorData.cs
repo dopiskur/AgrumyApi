@@ -76,9 +76,17 @@ namespace api.Dal
             var rows = await db.SensorData.AsNoTracking()
                 .Where(r => r.DeviceID == deviceID
                             && (tenantID == null || r.TenantID == tenantID)
-                            && r.Co2 != null && r.Co2 < 8000   // matches SensorDataReportBuilder: NULL Co2 rows are excluded
                             && r.DateCreated > cutoff)
                 .ToListAsync();
+
+            // CCS811 sentinel/outlier guard, CO2 column only - <=400 means "not warmed up yet" (not a real reading), >=8000 means a bad reading; nulling just this field leaves every other reading on the same row (temperature, humidity, ...) untouched, unlike excluding the whole row would.
+            foreach (var row in rows)
+            {
+                if (row.Co2 is int co2 && (co2 <= 400 || co2 >= 8000))
+                {
+                    row.Co2 = null;
+                }
+            }
 
             string json = SensorReportShaper.Build(rows, timeMDMY.Value);
 
