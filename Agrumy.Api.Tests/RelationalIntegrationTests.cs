@@ -188,6 +188,23 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(DbErrorResponse.MentionsConstraint(exUsername, "Username_UNIQUE"), "Username_UNIQUE no longer matches the real schema's index name.");
     }
 
+    // Roadmap #310: user.TenantID and eventDevice(DeviceID, Date) had no index - every tenant-scoped user list and every device-events/problem-alert scan filtered these columns with a full table scan.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task MissingIndexes_310_NowExist(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        await using var db = _fx.NewContext(t);
+
+        string sql = provider == DbProviderKind.Postgres
+            ? "SELECT indexname AS \"Value\" FROM pg_indexes WHERE schemaname = 'public'"
+            : "SELECT INDEX_NAME AS Value FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE()";
+        var indexNames = (await db.Database.SqlQueryRaw<string>(sql).ToListAsync())
+            .Select(n => n.ToLowerInvariant()).ToHashSet();
+
+        Assert.Contains("ix_user_tenant", indexNames);
+        Assert.Contains("ix_eventdevice_device_date", indexNames);
+    }
+
     // Roadmap #302: CURRENT_TIMESTAMP/NOW() column defaults must compute in UTC regardless of the server process's own OS timezone (verified live on invent.hr, whose MySQL @@global.time_zone was SYSTEM/CEST, 2h off UTC) - SessionTimeZoneInterceptor sets this on every connection open.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task NewConnection_SessionTimeZoneIsUtc(DbProviderKind provider)

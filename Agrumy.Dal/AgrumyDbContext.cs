@@ -111,6 +111,8 @@ namespace api.Dal
                 e.HasIndex(x => x.Email).IsUnique().HasDatabaseName("email_UNIQUE");
                 e.HasIndex(x => x.Username).IsUnique().HasDatabaseName("Username_UNIQUE");
                 e.HasIndex(x => x.ActivationTokenHash).IsUnique().HasDatabaseName("ActivationTokenHash_UNIQUE");
+                // Every tenant-scoped user list filters by TenantID alone - roadmap #310.
+                e.HasIndex(x => x.TenantID).HasDatabaseName("ix_user_tenant");
             });
 
             modelBuilder.Entity<RefreshTokenRow>(e =>
@@ -275,6 +277,8 @@ namespace api.Dal
                 // resold across tenants; NULL MacAddress/TenantID rows never collide, so
                 // pre-registration rows are unaffected.
                 e.HasIndex(x => new { x.MacAddress, x.TenantID }).IsUnique().HasDatabaseName("MacAddress_TenantID_UNIQUE");
+                // TenantID is the SECOND column of the unique index above, so a plain WHERE TenantID = x (every tenant-scoped device list) cannot use it as a prefix - roadmap #310.
+                e.HasIndex(x => x.TenantID).HasDatabaseName("ix_device_tenant");
                 // Legacy device FKs (fk_device_*). DeviceUnitZoneID has no FK on device.
                 e.HasOne<DeviceConfigControllerRow>().WithMany().HasForeignKey(x => x.DeviceConfigControllerID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceConfigSensorRow>().WithMany().HasForeignKey(x => x.DeviceConfigSensorID).OnDelete(DeleteBehavior.NoAction);
@@ -387,6 +391,8 @@ namespace api.Dal
                 e.ToTable("eventDevice");
                 e.HasKey(x => x.IDEventDevice);
                 e.Property(x => x.IDEventDevice).ValueGeneratedOnAdd();
+                // Every device-events read/problem-alert scan filters DeviceID plus a Date range - roadmap #310.
+                e.HasIndex(x => new { x.DeviceID, x.Date }).HasDatabaseName("ix_eventDevice_device_date");
             });
 
             modelBuilder.Entity<EventServiceRow>(e =>
