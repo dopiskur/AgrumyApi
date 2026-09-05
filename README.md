@@ -41,7 +41,7 @@ purpose-built appliance.
 | `Agrumy.Dal` | class library | Data-access model: `AgrumyDbContext`, EF entities (`api.Dal.Entities`), provider selection (`DbProviderKind`, `DbOptionsFactory`). No stored procedures - every query is LINQ. |
 | `Agrumy.Api` | Web API | Device/sensor communication + admin API (`Controllers/API`), the `IRepository` implementation (`Dal/EfRepository`, EF Core over `Agrumy.Dal`), MySQL/MariaDB **or** PostgreSQL, JWT bearer auth, Swagger, startup DB health-check + schema creation on an empty database. |
 | `Agrumy.Web` | MVC app | Admin UI (`Controllers/View`, `Views/`, `wwwroot/`). Talks to `Agrumy.Api` **only over HTTP** (`Dal/ApiRepository` + `HttpClient` with a JWT bearer token). No direct database access. |
-| `Agrumy.Api.Tests` | test project | Integration tests that run the real EF Core stack against both providers in parallel (`AGRUMY_TEST_MYSQL`/`AGRUMY_TEST_POSTGRES` connection strings, both provisioned as CI service containers in `build.yml`), `WebApplicationFactory`-driven HTTP tests covering auth/rate-limiting/exception-handling through the real middleware pipeline, plus unit tests for the alert/schedule/hysteresis evaluators. |
+| `Agrumy.Api.Tests` | test project | Integration tests that run the real EF Core stack against both providers in parallel (`AGRUMY_TEST_MYSQL`/`AGRUMY_TEST_POSTGRES` connection strings, both provisioned as CI service containers in `build.yml`), `WebApplicationFactory`-driven HTTP tests covering auth/rate-limiting/exception-handling through the real middleware pipeline, plus unit tests for the alert/schedule/hysteresis evaluators and the #212 rule-engine fold/hierarchy logic. |
 
 `db/` holds a historical schema dump (`agrumyDB-final.sql`, `agrumyDB-withData.sql`)
 and old deployment notes (`README.txt`), kept for reference only - the schema is now
@@ -73,6 +73,9 @@ patches applied to the pre-existing legacy database, unrelated to EF.
    and carries on with the previous config instead of halting, so irrigation/
    climate control keeps running on stale-but-known-good settings through an
    outage; it just won't pick up config *changes* until connectivity comes back.
+   A Notification-action rule (roadmap #212) is the one exception to "control
+   is local to the device" - it has no relay to drive, so it's evaluated
+   server-side instead, by `RuleNotificationEvaluator`.
 5. **Heartbeat and commands.** Every config-poll doubles as a heartbeat -
    `Uptime`/`Rssi`/`FreeHeap`/`FirmwareVersion`/`Board` land in `deviceDiagnostic`
    and drive the Fleet page's online/offline status. The same poll response
@@ -89,13 +92,21 @@ maintain yourself. **ThingsBoard** covers similar ground to Agrumy (multi-tenant
 device fleets, telemetry, dashboards) far more completely, with an actual rule
 engine and support for many transport protocols.
 
-Agrumy's rule engine (roadmap #21) is deliberately narrow, not general-purpose:
-each relay function (ventilation/light/heating/water-pump) on a zone holds a set
-of Threshold/Interval/Schedule rules, any one of which turning "on" wins (OR
-only - no AND/composite conditions across rules or across functions). Threshold's
-metric and direction are fixed per function, not user-configurable. If you need
-"if X and not Y between 6pm and 10pm, do Z," you're still writing C# to add it,
-not YAML.
+Agrumy's rule engine (roadmap #21, extended by #212) is deliberately bounded,
+not general-purpose: each relay function (ventilation/light/heating/water-pump)
+- or, for a Notification-action rule, each sensor metric - holds a set of
+rules, any one of which turning "on" wins (OR across rules, unchanged since
+#21). Within one rule, up to 8 Threshold/Interval/Schedule/Astronomical
+conditions fold strictly left-to-right by AND/OR ("(A AND B) OR C", never
+"A AND (B OR C)" - no parentheses or operator precedence). Rules live at Zone,
+Unit, or tenant-wide Global scope; the most specific scope defining a rule for
+a given function/metric wins outright, it doesn't merge with a less specific
+one. A Notification-action rule can also fire on another Notification rule's
+own result ("another rule fired") for simple chaining. Threshold's metric/
+direction is still implicit per relay function; a Notification rule picks an
+explicit sensor metric instead, since there's no relay to imply one. If you
+need arbitrary nested boolean logic spanning different metrics/functions in
+one condition, you're still writing C# to add it, not YAML.
 
 Where Agrumy makes sense: you're building (or already run) your own firmware for
 a specific vertical - here, citrus/greenhouse irrigation and micro-climate - and
@@ -191,6 +202,7 @@ listens on (5000 by default, set in `Agrumy.Api/Properties/launchSettings.json`)
 | `Notifications:Webhook:*` | no (default off) | roadmap #214 - generic HTTP POST channel for notifying an external system. `Enabled` + `Url` (must be `https://`) are the minimum; optional `Secret` adds an `X-Agrumy-Signature` HMAC-SHA256 header the receiver can verify. `Url` goes through the same `SsrfGuard` as firmware fetches before every send. |
 | `Notifications:OfflineCheckIntervalMinutes` | no (default `5`) | roadmap #40 - how often `OfflineAlertBackgroundService` sweeps every device for a newly-offline one and notifies its tenant's admins via whatever `Notifications:*` channels are configured above |
 | `Notifications:BatteryCheckIntervalMinutes` | no (default `30`) | roadmap #12 - how often `LowBatteryAlertEvaluator` sweeps every device's latest battery telemetry; longer than the offline interval by default since a battery drains over hours/days, not seconds |
+| `Notifications:RuleCheckIntervalMinutes` | no (default `5`) | roadmap #212 - how often `RuleNotificationEvaluator` sweeps Notification-action rules (the server-side counterpart to the on-device Relay-action rule engine, since firmware has no way to send a notification itself) |
 | `Firmware:LocalPath` | no (default `firmware-store`) | roadmap #94 - directory the **Local** firmware repository stores/serves `.bin` files from (`GET /api/Firmware/Download/{file}`). Relative = under the content root; must be writable by the service user. |
 | `Firmware:GitHubRepository` | no (default `dopiskur/AgrumyFirmware`) | `owner/name` whose GitHub Releases feed the catalog - only seeds the `serverConfig` row, the live value is edited on the Server Settings page |
 | `Firmware:GitHubToken` | no | optional GitHub API token; public repositories need none |
@@ -348,8 +360,8 @@ Device endpoints use the separate apiId/apiKey/apiAuth scheme described in
 | `POST/PUT/DELETE /api/DeviceUnit/Zone` | DeviceManagers | Create / update / delete a zone |
 | `GET /api/DeviceUnit/Unassigned` | DeviceManagers | Devices not yet placed in any zone |
 | `POST /api/DeviceUnit/Assign`, `POST /api/DeviceUnit/Unassign` | DeviceManagers | Place / remove a device from a zone |
-| `GET /api/DeviceUnit/Zone/Rule` | JWT | Roadmap #21: a zone's automation rules (Threshold/Interval/Schedule per relay function) |
-| `POST/DELETE /api/DeviceUnit/Zone/Rule` | DeviceManagers | Add / remove one rule - several rules per relay function are OR'd together, there is no whole-list replace |
+| `GET /api/DeviceUnit/Zone/Rule`, `GET /api/DeviceUnit/Unit/Rule`, `GET /api/DeviceUnit/Global/Rule` | JWT | Roadmap #21/#212: a zone/unit/tenant's automation rules - Zone > Unit > Global precedence, the most specific scope defining a rule for a function/metric wins outright, it doesn't merge with a less specific one |
+| `POST/DELETE` on the same three routes | DeviceManagers | Add / remove one rule - each rule is a flat, left-to-right AND/OR-folded list of up to 8 conditions (Threshold/Interval/Schedule/Astronomical for the Relay action; the same plus RuleTriggered, "another rule fired," for the Notification action). Several rules per function/metric still OR together, no whole-list replace; delete returns 409 if another rule's RuleTriggered condition still references it |
 | `GET /api/DeviceUnit/Dashboard`, `Dashboard/Zones`, `Dashboard/Zone` | JWT | Roadmap #116: hierarchical dashboard rollups (per-unit, per-zone-list, per-zone) |
 
 **Firmware** (`FirmwareApiController`, roadmap #94/#93, `api/Firmware`)
@@ -407,9 +419,10 @@ things that make Agrumy easier to trust and run day-to-day:
   its last-saved config (see "Control is local to the device" above) - a lost
   connection to the API doesn't stop irrigation/climate control, it just delays
   picking up config changes.
-- **73 native firmware unit tests in CI**, no hardware required
-  (`AgrumyFirmware/test/test_native_*`) - relay/hysteresis/schedule/safety-limit
-  logic is regression-tested on every push, not just checked by hand on a bench.
+- **109 native firmware unit tests in CI**, no hardware required
+  (`AgrumyFirmware/test/test_native_*`) - relay/hysteresis/schedule/safety-limit/
+  AND-OR-fold logic is regression-tested on every push, not just checked by hand
+  on a bench.
 - **Contract-first device↔API.** Every device request/response shape is a JSON
   Schema in `contracts/device-api/`, checked against both the firmware and the
   API's actual field usage (`AgrumyFirmware/tools/contract-check`) - firmware and
@@ -424,10 +437,12 @@ things that make Agrumy easier to trust and run day-to-day:
   enforces cooldown/max-run ordering for every relay function directly on the
   device, so a bad or delayed config can't leave a pump or heater running
   unbounded even during an outage.
-- **A predictable threshold + hysteresis + schedule rule model.** No hidden
-  automation DSL to learn - each relay function's behavior is one of three
-  well-defined rule types, OR'd together (see "Why not just use Home Assistant"
-  above for what this deliberately doesn't try to be).
+- **A predictable, bounded rule model, not a hidden DSL.** Threshold/Interval/
+  Schedule/Astronomical conditions fold left-to-right by AND/OR (roadmap #212)
+  - never nested or precedence-based - and a Zone/Unit/Global rule hierarchy
+  plus a Notification action type cover most real automation needs without
+  becoming a general rule engine to learn (see "Why not just use Home
+  Assistant" above for what this deliberately doesn't try to be).
 - **Battery-powered devices as a first-class case**, not an afterthought -
   battery telemetry, low-battery alerting (roadmap #12) and deep sleep for
   sensor-only nodes are built in, not bolted on.
