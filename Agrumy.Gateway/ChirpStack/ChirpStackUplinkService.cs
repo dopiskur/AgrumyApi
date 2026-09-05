@@ -160,12 +160,19 @@ namespace api.Gateway.ChirpStack
                 return;
             }
 
+            // SensorData's own handler (GatewayApiController.RunSensorDataAsync) requires an array
+            // payload, unlike the other three types which deserialize the envelope object directly -
+            // the LoRa firmware nests its sensor readings under "d" for exactly this reason.
+            JsonElement payload = entryType == GatewayEntryType.SensorData && envelope.RootElement.TryGetProperty("d", out var sensorArray)
+                ? sensorArray.Clone()
+                : envelope.RootElement.Clone();
+
             var entry = new GatewayBatchEntry
             {
                 DeviceApiId = mapping.DeviceApiId,
                 DeviceApiKey = mapping.DeviceApiKey,
                 Type = entryType.Value,
-                Payload = envelope.RootElement.Clone(),
+                Payload = payload,
             };
             GatewayBatchResponse response = await client.BatchAsync(new GatewayBatchRequest { Entries = [entry] }, CancellationToken.None);
             GatewayBatchEntryResult? result = response.Results.FirstOrDefault();
