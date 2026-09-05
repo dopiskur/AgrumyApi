@@ -95,6 +95,13 @@ namespace api.Controllers.API
         protected bool CallerReadsDevicesGlobally =>
             CallerManagesDevicesGlobally || CallerHasRole(RoleNames.GlobalReader);
 
+        /// True only when a Data Reader grant is the caller's SOLE access - device configuration/rules and user accounts stay hidden from that narrow, sensor-data-and-metrics-only role, but never from anyone who also holds a broader role.
+        protected bool CallerIsDataReaderOnly =>
+            (CallerHasRole(RoleNames.GlobalDataReader) || CallerHasRole(RoleNames.TenantDataReader))
+            && !CallerIsGlobalAdmin && !CallerHasRole(RoleNames.GlobalReader) && !CallerManagesDevicesGlobally
+            && !CallerHasRole(RoleNames.TenantAdmin) && !CallerHasRole(RoleNames.TenantReader) && !CallerHasRole(RoleNames.TenantDevice)
+            && !CallerManagesUsersGlobally && !CallerHasRole(RoleNames.TenantUser);
+
         /// Shared body behind each Device-domain controller's per-entity EnsureOwned* helper: 404 on missing, 403 on tenant mismatch unless the caller's role crosses tenants (CallerManagesDevicesGlobally on a write, the wider CallerReadsDevicesGlobally on a read).
         protected async Task<(T? Entity, ActionResult? Error)> EnsureOwnedDeviceEntityAsync<T>(Func<Task<T?>> lookup, Func<T, int?> tenantIdOf, string ownerLabel, bool forWrite) where T : class
         {

@@ -364,11 +364,11 @@ app.MapControllers();
 app.MapHealthChecks("/health", new HealthCheckOptions { ResponseWriter = HealthCheckResponseWriter.WriteResponse });
 
 app.MapGet("/metrics", (AgrumyMetrics metrics) => Results.Json(metrics.GetSnapshot()))
-    .RequireAuthorization(policy => policy.RequireRole(RoleNames.GlobalAdmin));
+    .RequireAuthorization(policy => policy.RequireRole(RoleNames.MetricsReaders));
 
-// Same GlobalAdmin JWT policy as the JSON endpoint above; point Prometheus's scrape config at this path with that bearer token (no separate secret to manage).
+// Same JWT policy as the JSON endpoint above; point Prometheus's scrape config at this path with that bearer token (no separate secret to manage).
 app.MapPrometheusScrapingEndpoint("/metrics/prometheus")
-    .RequireAuthorization(policy => policy.RequireRole(RoleNames.GlobalAdmin));
+    .RequireAuthorization(policy => policy.RequireRole(RoleNames.MetricsReaders));
 
 // Run the DB check at startup, not lazily on first request, so a bad connection string shows in deploy logs; Startup:FailFastOnDbCheck controls stop-vs-warn.
 using (var scope = app.Services.CreateScope())

@@ -417,6 +417,10 @@ namespace api.Controllers.API
         [Authorize]
         public async Task<ActionResult<IList<User>>> UsersGet()
         {
+            if (CallerIsDataReaderOnly)
+            {
+                return StatusCode(403, "Data Reader role cannot view user accounts.");
+            }
             IList<User> users = CallerReadsUsersGlobally ? await Repo.UsersGetAllAsync() : await Repo.UsersGetAsync(CallerTenantId);
             // DevicePin is a live credential, not a profile field - only its owner (GetUserSelf) should see it, not this list.
             foreach (User user in users)
@@ -496,6 +500,10 @@ namespace api.Controllers.API
         [Authorize]
         public async Task<ActionResult<User>> UserGet(int idUser)
         {
+            if (CallerIsDataReaderOnly)
+            {
+                return StatusCode(403, "Data Reader role cannot view user accounts.");
+            }
             User? user = await Repo.UserGetAsync(idUser, null, null);
             if (user is null)
             {

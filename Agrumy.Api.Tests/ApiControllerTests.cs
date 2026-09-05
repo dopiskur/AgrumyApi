@@ -34,6 +34,7 @@ public class ApiControllerTests
             new api.Devices.DeviceConfigBuilder(_repo.Object, catalog), TestSettings);
     }
     private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _notifications.Object, TestSettings);
+    private DeviceUnitApiController NewDeviceUnitController() => new(_repo.Object, _cache.Object, TestSettings);
     private TenantApiController NewTenantController() => new(_repo.Object, _cache.Object,
         new api.Migration.TenantExportService(_repo.Object), new api.Migration.TenantImportService(_repo.Object));
 
@@ -136,6 +137,103 @@ public class ApiControllerTests
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         Assert.Same(cfg, ok.Value);
+    }
+
+    [Fact]
+    public async Task DeviceConfigSensorGet_TenantDataReaderOnly_Returns403_NeverLooksUpDevice()
+    {
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantDataReader);
+        var result = await controller.DeviceConfigSensorGet(5);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        // Strict mock: an un-set-up DeviceGetByDeviceConfigSensorIdAsync call would throw, proving it never runs.
+    }
+
+    [Fact]
+    public async Task DeviceConfigControllerGet_GlobalDataReaderOnly_Returns403_NeverLooksUpDevice()
+    {
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 0, "user", RoleNames.GlobalDataReader);
+        var result = await controller.DeviceConfigControllerGet(5);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        // Strict mock: an un-set-up DeviceGetByDeviceConfigControllerIdAsync call would throw, proving it never runs.
+    }
+
+    [Fact]
+    public async Task DeviceConfigSensorGet_TenantDataReaderPlusTenantReader_NotBlocked()
+    {
+        // Holding a broader role alongside Data Reader must not be MORE restrictive than the broader role alone.
+        _repo.Setup(r => r.DeviceGetByDeviceConfigSensorIdAsync(5)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 1 });
+        _repo.Setup(r => r.DeviceConfigSensorGetAsync(5)).ReturnsAsync(new DeviceConfigSensor { IDDeviceConfigSensor = 5 });
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.TenantDataReader);
+        var result = await controller.DeviceConfigSensorGet(5);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task DeviceUnitZoneRulesGet_TenantDataReaderOnly_Returns403_NeverLooksUpZone()
+    {
+        var controller = NewDeviceUnitController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantDataReader);
+        var result = await controller.DeviceUnitZoneRulesGet(5);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        // Strict mock: an un-set-up DeviceUnitZoneGetByIdAsync call would throw, proving it never runs.
+    }
+
+    [Fact]
+    public async Task UsersGet_TenantDataReaderOnly_Returns403()
+    {
+        var controller = NewUserController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantDataReader);
+        var result = await controller.UsersGet();
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        // Strict mock: an un-set-up UsersGetAsync call would throw, proving it never runs.
+    }
+
+    [Fact]
+    public async Task UserGet_GlobalDataReaderOnly_Returns403()
+    {
+        var controller = NewUserController();
+        SetCallerRoles(controller, 0, "user", RoleNames.GlobalDataReader);
+        var result = await controller.UserGet(7);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        // Strict mock: an un-set-up UserGetAsync call would throw, proving it never runs.
+    }
+
+    [Fact]
+    public async Task GetUserSelf_TenantDataReaderOnly_StillAllowed()
+    {
+        // Viewing one's OWN account is not "reading user accounts" in the roadmap #282 sense.
+        _repo.Setup(r => r.UserGetAsync(null, "reader@test.local", null)).ReturnsAsync(new User { IDUser = 9, Email = "reader@test.local" });
+
+        var controller = NewUserController();
+        var claims = new List<Claim> { new("TenantID", "1"), new(ClaimTypes.Name, "reader@test.local"), new(ClaimTypes.Role, RoleNames.TenantDataReader) };
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test")) } };
+        var result = await controller.GetUserSelf();
+
+        Assert.IsType<OkObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public void RoleNames_DataReaders_AreRegisteredAndScopedToMetrics()
+    {
+        Assert.Contains(RoleNames.GlobalDataReader, RoleNames.All);
+        Assert.Contains(RoleNames.TenantDataReader, RoleNames.All);
+        Assert.Contains(RoleNames.GlobalDataReader, RoleNames.MetricsReaders);
+        Assert.Contains(RoleNames.TenantDataReader, RoleNames.MetricsReaders);
+        // A Data Reader must never be folded into a role group that can manage devices or users.
+        Assert.DoesNotContain(RoleNames.GlobalDataReader, RoleNames.DeviceManagers);
+        Assert.DoesNotContain(RoleNames.TenantDataReader, RoleNames.DeviceManagers);
+        Assert.DoesNotContain(RoleNames.GlobalDataReader, RoleNames.UserManagers);
+        Assert.DoesNotContain(RoleNames.TenantDataReader, RoleNames.UserManagers);
     }
 
     [Fact]

@@ -71,6 +71,10 @@ namespace api.Controllers.API
         [HttpGet("Sensor")]
         public async Task<ActionResult<DeviceConfigSensor>> DeviceConfigSensorGet(int? deviceConfigSensorID)
         {
+            if (CallerIsDataReaderOnly)
+            {
+                return StatusCode(403, "Data Reader role cannot view device configuration.");
+            }
             var (_, error) = await EnsureOwnedDeviceAsync(
                 () => Repo.DeviceGetByDeviceConfigSensorIdAsync(deviceConfigSensorID), "Sensor config", forWrite: false);
             if (error != null)
@@ -85,6 +89,10 @@ namespace api.Controllers.API
         [HttpGet("Controller")]
         public async Task<ActionResult<DeviceConfigController>> DeviceConfigControllerGet(int? deviceConfigControllerID)
         {
+            if (CallerIsDataReaderOnly)
+            {
+                return StatusCode(403, "Data Reader role cannot view device configuration.");
+            }
             var (_, error) = await EnsureOwnedDeviceAsync(
                 () => Repo.DeviceGetByDeviceConfigControllerIdAsync(deviceConfigControllerID), "Controller config", forWrite: false);
             if (error != null)

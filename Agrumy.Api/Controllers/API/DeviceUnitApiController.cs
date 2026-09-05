@@ -155,6 +155,10 @@ namespace api.Controllers.API
         [HttpGet("Zone/Rule")]
         public async Task<ActionResult<IList<DeviceUnitZoneRule>>> DeviceUnitZoneRulesGet(int? idDeviceUnitZone)
         {
+            if (CallerIsDataReaderOnly)
+            {
+                return StatusCode(403, "Data Reader role cannot view zone rules.");
+            }
             var (zone, error) = await EnsureOwnedZoneAsync(idDeviceUnitZone, forWrite: false);
             if (error != null)
             {

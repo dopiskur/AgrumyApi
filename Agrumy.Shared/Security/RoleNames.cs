@@ -15,10 +15,15 @@ namespace api.Security
         public const string TenantUser = "Tenant User";
         public const string TenantDevice = "Tenant Device";
 
+        // Standalone, narrow bases (like GlobalReader/TenantReader) - sensor data + server metrics only, never device configuration or user accounts (see CallerIsDataReaderOnly).
+        public const string GlobalDataReader = "Global Data Reader";
+        public const string TenantDataReader = "Tenant Data Reader";
+
         public static readonly IReadOnlyList<string> All = new[]
         {
             GlobalAdmin, GlobalReader, GlobalUser, GlobalDevice,
             TenantAdmin, TenantReader, TenantUser, TenantDevice,
+            GlobalDataReader, TenantDataReader,
         };
 
         // Legacy role names - still what every [Authorize(Roles="admin")] check across older call sites looks for; CreateToken derives and adds one of these alongside the real role set so nothing built before the multi-role model breaks.
@@ -42,5 +47,8 @@ namespace api.Security
 
         /// Tenant Management read access (list/view every tenant) - write (create/rename) stays Global admin only, checked inline via CallerIsGlobalAdmin, since a Tenant scope has no meaningful self-management of ITS OWN existence.
         public const string GlobalAdminOrReader = GlobalAdmin + "," + GlobalReader;
+
+        /// May read server metrics (/metrics, /metrics/prometheus) - RequireRole takes individual names, not a comma-joined [Authorize] string.
+        public static readonly string[] MetricsReaders = { GlobalAdmin, GlobalDataReader, TenantDataReader };
     }
 }
