@@ -108,6 +108,13 @@ namespace api.Models
         // Aggregated mode only (see RelayBatchResponse); clamped 10-300 by ServerConfigApiController.Update, same pattern as MaxRulesPerZone.
         [Display(Name = "Aggregated wait window (seconds)")]
         public int RelayWaitWindowSeconds { get; set; } = 30;
+
+        // Enforced by api.Security.PasswordPolicy wherever a NEW password is set; clamped 4-128 by ServerConfigApiController.Update.
+        [Display(Name = "Minimum password length")]
+        public int PasswordMinLength { get; set; } = 8;
+
+        [Display(Name = "Require upper/lower case, digit, and symbol")]
+        public bool PasswordRequireComplexity { get; set; }
     }
 
     /// The only ServerConfig field a pre-login, unauthenticated page may see - Register uses it to decide whether to show "create a new tenant" without needing the admin-only /api/ServerConfig.

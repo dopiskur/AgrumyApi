@@ -143,5 +143,9 @@ namespace api.Dal.Entities
         // See api.Models.ServerConfig's own copies of these for the full explanation.
         public bool ProblemEventAlertsEnabled { get; set; } = true;
         public int ProblemEventExpiryHours { get; set; } = 24;
+
+        // See api.Security.PasswordPolicy for the full explanation.
+        public int PasswordMinLength { get; set; }
+        public bool PasswordRequireComplexity { get; set; }
     }
 }

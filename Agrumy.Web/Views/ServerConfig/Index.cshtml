@@ -184,9 +184,22 @@
                         When enabled, Global admins get a "Tenants" menu item to list, create, and
                         rename tenants. Global readers can view the list but not change it.
                     </p>
-                    <div class="mb-0 form-check">
+                    <div class="mb-3 form-check">
                         <input asp-for="TenantManagementEnabled" class="form-check-input" />
                         <label asp-for="TenantManagementEnabled" class="form-check-label"></label>
+                    </div>
+                    <p class="text-secondary">
+                        Enforced whenever a user sets a new password (registration, admin reset, self
+                        change) - never against an existing password already on file.
+                    </p>
+                    <div class="mb-3" style="width:10rem">
+                        <label asp-for="PasswordMinLength" class="form-label"></label>
+                        <input asp-for="PasswordMinLength" class="form-control" />
+                        <span asp-validation-for="PasswordMinLength" class="text-danger"></span>
+                    </div>
+                    <div class="mb-0 form-check">
+                        <input asp-for="PasswordRequireComplexity" class="form-check-input" />
+                        <label asp-for="PasswordRequireComplexity" class="form-check-label"></label>
                     </div>
                 </div>
 

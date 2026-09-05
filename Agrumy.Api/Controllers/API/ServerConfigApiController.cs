@@ -129,6 +129,11 @@ namespace api.Controllers.API
                 return BadRequest("Problem alert expiry must be one of 1, 6, 12, 24, or 48 hours.");
             }
 
+            if (config.PasswordMinLength is < 4 or > 128)
+            {
+                return BadRequest("Minimum password length must be between 4 and 128.");
+            }
+
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await Repo.ServerConfigUpdateAsync(config);
             return Ok();

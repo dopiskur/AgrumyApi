@@ -349,7 +349,7 @@ public class ApiControllerTests
              .Returns(Task.CompletedTask);
 
         var controller = NewUserController();
-        var value = new UserRegistration { Email = "owner@acme.local", Username = "owner", Password = "pw", TenantName = "AcmeCorp" };
+        var value = new UserRegistration { Email = "owner@acme.local", Username = "owner", Password = "TestPass123!", TenantName = "AcmeCorp" };
         var result = await controller.UserRegistration(value);
 
         Assert.IsType<OkObjectResult>(result.Result);
@@ -362,13 +362,26 @@ public class ApiControllerTests
     }
 
     [Fact]
+    public async Task UserRegistration_PasswordTooShort_Returns400AndDoesNotCreateUser()
+    {
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { PasswordMinLength = 8 });
+
+        var controller = NewUserController();
+        var value = new UserRegistration { Email = "owner@acme.local", Username = "owner", Password = "short1", TenantName = "AcmeCorp" };
+        var result = await controller.UserRegistration(value);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        // Strict mock: an un-set-up TenantGetAsync/UserAddAsync call would throw, proving the policy check ran before touching either.
+    }
+
+    [Fact]
     public async Task UserRegistration_UnknownTenantName_SelfServiceDisabled_Returns403AndDoesNotCreateTenant()
     {
         _repo.Setup(r => r.TenantGetAsync("AcmeCorp")).ReturnsAsync(false);
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { AllowSelfServiceTenantCreation = false });
 
         var controller = NewUserController();
-        var value = new UserRegistration { Email = "owner@acme.local", Username = "owner", Password = "pw", TenantName = "AcmeCorp" };
+        var value = new UserRegistration { Email = "owner@acme.local", Username = "owner", Password = "TestPass123!", TenantName = "AcmeCorp" };
         var result = await controller.UserRegistration(value);
 
         var obj = Assert.IsType<ObjectResult>(result.Result);
@@ -383,7 +396,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { AllowSelfServiceTenantCreation = true });
 
         var controller = NewUserController();
-        var value = new UserRegistration { Email = "owner@acme.local", Username = "owner", Password = "pw", TenantName = "abc" };
+        var value = new UserRegistration { Email = "owner@acme.local", Username = "owner", Password = "TestPass123!", TenantName = "abc" };
         var result = await controller.UserRegistration(value);
 
         Assert.IsType<BadRequestObjectResult>(result.Result);
@@ -395,6 +408,7 @@ public class ApiControllerTests
     {
         _repo.Setup(r => r.TenantGetAsync("Acme")).ReturnsAsync(true);
         _repo.Setup(r => r.TenantGetIdAsync("Acme")).ReturnsAsync(42);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
         StubActivationPlumbing("member@acme.local", 2);
         List<string>? seededRoles = null;
         _repo.Setup(r => r.UserRolesSetAsync(2, It.IsAny<IEnumerable<string>>()))
@@ -407,7 +421,7 @@ public class ApiControllerTests
              .Returns(Task.CompletedTask);
 
         var controller = NewUserController();
-        var value = new UserRegistration { Email = "member@acme.local", Username = "member", Password = "pw", TenantName = "Acme" };
+        var value = new UserRegistration { Email = "member@acme.local", Username = "member", Password = "TestPass123!", TenantName = "Acme" };
         var result = await controller.UserRegistration(value);
 
         Assert.IsType<OkObjectResult>(result.Result);
@@ -423,6 +437,7 @@ public class ApiControllerTests
         // TenantID 0 has no owning admin to ask, but that's Activate()'s decision to make, not registration's - see Activate_TenantZero_* below.
         _repo.Setup(r => r.TenantGetAsync("default")).ReturnsAsync(true);
         _repo.Setup(r => r.TenantGetIdAsync("default")).ReturnsAsync(0);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
         StubActivationPlumbing("newbie@example.com", 3);
 
         User? capturedUser = null;
@@ -431,7 +446,7 @@ public class ApiControllerTests
              .Returns(Task.CompletedTask);
 
         var controller = NewUserController();
-        var value = new UserRegistration { Email = "newbie@example.com", Username = "newbie", Password = "pw", TenantName = "default" };
+        var value = new UserRegistration { Email = "newbie@example.com", Username = "newbie", Password = "TestPass123!", TenantName = "default" };
         var result = await controller.UserRegistration(value);
 
         Assert.IsType<OkObjectResult>(result.Result);
@@ -539,6 +554,23 @@ public class ApiControllerTests
         Assert.Equal(403, obj.StatusCode);
     }
 
+    [Fact]
+    public async Task ForceChangePassword_NewPasswordTooShort_Returns400_NeverLooksUpUser()
+    {
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { PasswordMinLength = 8 });
+
+        var controller = NewUserController();
+        var result = await controller.ForceChangePassword(new UserForceChangePassword
+        {
+            Login = "imported@example.com",
+            OldPassword = "old-imported-pw",
+            NewPassword = "short1",
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        // Strict mock: an un-set-up UserGetAsync/UserSecretGetAsync call would throw, proving the policy check ran first.
+    }
+
 
     [Fact]
     public async Task BootstrapPending_DelegatesToRepo()
@@ -559,6 +591,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.BootstrapAdminSetPasswordAsync(It.IsAny<UserSecret>(), "right-secret"))
              .Callback<UserSecret, string>((s, _) => captured = s)
              .ReturnsAsync(true);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var controller = NewUserController();
         var result = await controller.BootstrapSetPassword(new BootstrapAdminSetPassword { NewPassword = "hunter2!", SetupSecret = "right-secret" });
@@ -574,6 +607,7 @@ public class ApiControllerTests
     public async Task BootstrapSetPassword_NoPendingAdmin_Returns403()
     {
         _repo.Setup(r => r.BootstrapAdminSetPasswordAsync(It.IsAny<UserSecret>(), It.IsAny<string>())).ReturnsAsync(false);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var controller = NewUserController();
         var result = await controller.BootstrapSetPassword(new BootstrapAdminSetPassword { NewPassword = "hunter2!", SetupSecret = "wrong-secret" });
@@ -780,10 +814,11 @@ public class ApiControllerTests
         _repo.Setup(r => r.UserGetAsync(null, "x@test.local", null)).ReturnsAsync(new User { IDUser = 99, Email = "x@test.local" });
         _repo.Setup(r => r.UserRolesSetAsync(99, It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
         _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 24);
-        var value = new UserAdd { TenantID = 999, Email = "x@test.local", Username = "x", Password = "pw", Enabled = true };
+        var value = new UserAdd { TenantID = 999, Email = "x@test.local", Username = "x", Password = "TestPass123!", Enabled = true };
         var result = await controller.UserAdd(value);
 
         Assert.IsType<OkObjectResult>(result.Result);
@@ -801,10 +836,11 @@ public class ApiControllerTests
              .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
              .Returns(Task.CompletedTask);
         _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 24); // NOT tenant 0 - a regular Tenant admin, not Global admin
-        var value = new UserAdd { Email = "boss@test.local", Username = "boss", Password = "pw", RoleNames = new() { RoleNames.TenantAdmin }, Enabled = true };
+        var value = new UserAdd { Email = "boss@test.local", Username = "boss", Password = "TestPass123!", RoleNames = new() { RoleNames.TenantAdmin }, Enabled = true };
         await controller.UserAdd(value);
 
         Assert.Equal(new[] { RoleNames.TenantAdmin }, seededRoles);
@@ -820,10 +856,11 @@ public class ApiControllerTests
              .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
              .Returns(Task.CompletedTask);
         _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 0); // Global admin
-        var value = new UserAdd { Email = "boss@test.local", Username = "boss", Password = "pw", RoleNames = new() { RoleNames.GlobalAdmin }, Enabled = true };
+        var value = new UserAdd { Email = "boss@test.local", Username = "boss", Password = "TestPass123!", RoleNames = new() { RoleNames.GlobalAdmin }, Enabled = true };
         await controller.UserAdd(value);
 
         Assert.Equal(new[] { RoleNames.GlobalAdmin }, seededRoles);
@@ -839,10 +876,11 @@ public class ApiControllerTests
              .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
              .Returns(Task.CompletedTask);
         _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 24);
-        var value = new UserAdd { Email = "newbie@test.local", Username = "newbie", Password = "pw", Enabled = true };
+        var value = new UserAdd { Email = "newbie@test.local", Username = "newbie", Password = "TestPass123!", Enabled = true };
         await controller.UserAdd(value);
 
         Assert.Equal(new[] { RoleNames.TenantReader }, seededRoles);
@@ -859,10 +897,11 @@ public class ApiControllerTests
              .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
              .Returns(Task.CompletedTask);
         _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var controller = NewUserController();
         SetCallerRoles(controller, 24, "user", RoleNames.TenantReader, RoleNames.TenantUser); // UserManagers-eligible, not an admin
-        var value = new UserAdd { Email = "sneaky@test.local", Username = "sneaky", Password = "pw", RoleNames = new() { RoleNames.TenantAdmin }, Enabled = true };
+        var value = new UserAdd { Email = "sneaky@test.local", Username = "sneaky", Password = "TestPass123!", RoleNames = new() { RoleNames.TenantAdmin }, Enabled = true };
         await controller.UserAdd(value);
 
         Assert.Equal(new[] { RoleNames.TenantReader }, seededRoles);
@@ -872,9 +911,11 @@ public class ApiControllerTests
     [Fact]
     public async Task UserAdd_TenantAdminRequestsGlobalRole_Returns403()
     {
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
+
         var controller = NewUserController();
         SetCaller(controller, "admin", 24); // Tenant admin, not Global
-        var value = new UserAdd { Email = "x@test.local", Username = "x", Password = "pw", RoleNames = new() { RoleNames.GlobalAdmin }, Enabled = true };
+        var value = new UserAdd { Email = "x@test.local", Username = "x", Password = "TestPass123!", RoleNames = new() { RoleNames.GlobalAdmin }, Enabled = true };
 
         var result = await controller.UserAdd(value);
 
@@ -1133,6 +1174,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         _repo.Setup(r => r.UserDeleteAsync(50)).ReturnsAsync(true);
         _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 0);
@@ -1194,6 +1236,7 @@ public class ApiControllerTests
              .Callback<int, IEnumerable<string>>((_, roles) => written = roles.ToList())
              .Returns(Task.CompletedTask);
         _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 1);
@@ -1211,6 +1254,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string>());
         _repo.Setup(r => r.UserRolesSetAsync(50, It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
         _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 0);
@@ -1603,6 +1647,7 @@ public class ApiControllerTests
              .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
              .Returns(Task.CompletedTask);
         _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var controller = NewUserController();
         SetCaller(controller, "admin", 1); // Tenant admin

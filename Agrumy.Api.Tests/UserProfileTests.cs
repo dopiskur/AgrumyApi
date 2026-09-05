@@ -258,9 +258,10 @@ public class UserProfileTests
         _repo.Setup(r => r.UserGetAsync(null, "me@x.com", null)).ReturnsAsync(new User { IDUser = 5, Email = "me@x.com" });
         _repo.Setup(r => r.UserSecretGetAsync(null, "me@x.com", null)).ReturnsAsync(secret);
         _repo.Setup(r => r.UserSetPasswordAsync("me@x.com", It.IsAny<UserSecret>())).ReturnsAsync(true);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var result = await NewController("me@x.com").UserSetPassword(
-            new UserSetPassword { OldPassword = "old-pw", NewPassword = "new-pw" });
+            new UserSetPassword { OldPassword = "old-pw", NewPassword = "New-Password-123" });
 
         Assert.IsType<OkObjectResult>(result.Result);
         _repo.VerifyAll();
@@ -274,14 +275,27 @@ public class UserProfileTests
 
         _repo.Setup(r => r.UserGetAsync(null, "me@x.com", null)).ReturnsAsync(new User { IDUser = 5, Email = "me@x.com" });
         _repo.Setup(r => r.UserSecretGetAsync(null, "me@x.com", null)).ReturnsAsync(new UserSecret { PwdHash = hash, PwdSalt = salt });
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
 
         var result = await NewController("me@x.com").UserSetPassword(
-            new UserSetPassword { OldPassword = "wrong-pw", NewPassword = "new-pw" });
+            new UserSetPassword { OldPassword = "wrong-pw", NewPassword = "New-Password-123" });
 
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(401, obj.StatusCode);
         // MockBehavior.Strict: an un-set-up UserSetPasswordAsync call would already have thrown.
 
+    }
+
+    [Fact]
+    public async Task ChangePassword_NewPasswordTooShort_Returns400_And_NeverLooksUpUser()
+    {
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { PasswordMinLength = 8 });
+
+        var result = await NewController("me@x.com").UserSetPassword(
+            new UserSetPassword { OldPassword = "old-pw", NewPassword = "short1" });
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        _repo.Verify(r => r.UserGetAsync(It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>()), Times.Never);
     }
 
     [Fact]

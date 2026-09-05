@@ -48,10 +48,15 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
+            ServerConfig serverConfig = await Repo.ServerConfigGetAsync(1);
+            if (PasswordPolicy.Validate(value.Password, serverConfig) is string passwordError)
+            {
+                return BadRequest(passwordError);
+            }
+
             bool isNewTenant = !await Repo.TenantGetAsync(value.TenantName!);
             if (isNewTenant)
             {
-                ServerConfig serverConfig = await Repo.ServerConfigGetAsync(1);
                 if (!serverConfig.AllowSelfServiceTenantCreation)
                 {
                     return StatusCode(403, "Unknown tenant name, and self-service tenant creation is disabled.");
@@ -231,6 +236,11 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
+            if (PasswordPolicy.Validate(value.NewPassword, await Repo.ServerConfigGetAsync(1)) is string passwordError)
+            {
+                return BadRequest(passwordError);
+            }
+
             var (user, secret) = await LookupAsync(value.Login);
             if (user is null || secret is null ||
                 !AuthenticationProvider.VerifyHash(secret.PwdHash, secret.PwdSalt, value.OldPassword))
@@ -348,6 +358,11 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
+            if (PasswordPolicy.Validate(value.NewPassword, await Repo.ServerConfigGetAsync(1)) is string passwordError)
+            {
+                return BadRequest(passwordError);
+            }
+
             string salt = AuthenticationProvider.GetSalt();
             var secret = new UserSecret { PwdSalt = salt, PwdHash = AuthenticationProvider.GetHash(value.NewPassword!, salt) };
 
@@ -373,6 +388,10 @@ namespace api.Controllers.API
             if (value.OldPassword == value.NewPassword)
             {
                 return StatusCode(403, "The new password must be different from the old password");
+            }
+            if (PasswordPolicy.Validate(value.NewPassword, await Repo.ServerConfigGetAsync(1)) is string passwordError)
+            {
+                return BadRequest(passwordError);
             }
 
             var (user, secret) = await LookupAsync(name);
@@ -500,6 +519,11 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
+            if (PasswordPolicy.Validate(value.Password, await Repo.ServerConfigGetAsync(1)) is string passwordError)
+            {
+                return BadRequest(passwordError);
+            }
+
             (List<string>? roleNames, ActionResult? error) = ResolveGrantedRoles(value.RoleNames);
             if (error != null)
             {
@@ -594,6 +618,10 @@ namespace api.Controllers.API
 
             if (value.Password != null)
             {
+                if (PasswordPolicy.Validate(value.Password, await Repo.ServerConfigGetAsync(1)) is string passwordError)
+                {
+                    return BadRequest(passwordError);
+                }
                 // Admin/self edit - no old-password check here, so the fresh salt+hash fully replace whatever was there; no need to read the current secret first.
                 string salt = AuthenticationProvider.GetSalt();
                 await Repo.UserSetPasswordAsync(user.Email, new UserSecret
