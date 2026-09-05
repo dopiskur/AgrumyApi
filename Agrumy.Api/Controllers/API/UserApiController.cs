@@ -584,6 +584,10 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
             }
+            if (!CallerOutranksTarget(await Repo.UserRoleNamesGetAsync(user.IDUser!.Value)))
+            {
+                return StatusCode(403, "Not allowed to manage a user with equal or higher privilege.");
+            }
 
             bool? enabledBefore = user.Enabled;
 
@@ -649,6 +653,10 @@ namespace api.Controllers.API
             if (!CallerManagesUsers(targetUser.TenantID))
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
+            }
+            if (!CallerOutranksTarget(await Repo.UserRoleNamesGetAsync(targetUser.IDUser!.Value)))
+            {
+                return StatusCode(403, "Not allowed to manage a user with equal or higher privilege.");
             }
 
             bool deleted = await Repo.UserDeleteAsync(idUser);

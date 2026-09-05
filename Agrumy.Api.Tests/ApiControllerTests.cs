@@ -1093,6 +1093,7 @@ public class ApiControllerTests
     public async Task UserUpdate_GlobalAdmin_CanReassignTenantID()
     {
         _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 99, Email = "x@test.local" });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         User? capturedUser = null;
         _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>()))
              .Callback<User>(u => capturedUser = u)
@@ -1110,6 +1111,7 @@ public class ApiControllerTests
     public async Task UserUpdate_NonGlobalAdmin_CannotReassignTenantID()
     {
         _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local" });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         User? capturedUser = null;
         _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>()))
              .Callback<User>(u => capturedUser = u)
@@ -1127,6 +1129,7 @@ public class ApiControllerTests
     public async Task UserDelete_GlobalAdmin_DifferentTenant_BypassesTheTenantCheck()
     {
         _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 99 });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         _repo.Setup(r => r.UserDeleteAsync(50)).ReturnsAsync(true);
         _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
@@ -1577,6 +1580,7 @@ public class ApiControllerTests
     public async Task UserUpdate_TenantUser_OwnTenant_Succeeds()
     {
         _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local" });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
 
         var controller = NewUserController();
@@ -1612,6 +1616,7 @@ public class ApiControllerTests
     public async Task UserUpdate_NonAdminCaller_RequestedRolesIgnored()
     {
         _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local" });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
 
         var controller = NewUserController();
@@ -1625,6 +1630,7 @@ public class ApiControllerTests
     public async Task UserUpdate_TenantAdminRequestsGlobalRole_Returns403()
     {
         _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local" });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
         _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
 
         var controller = NewUserController();
@@ -1647,6 +1653,78 @@ public class ApiControllerTests
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(403, obj.StatusCode);
         _repo.Verify(r => r.UserUpdateAsync(It.IsAny<User>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UserUpdate_TenantUser_TargetIsTenantAdmin_Returns403()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "boss@test.local" });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantAdmin });
+
+        var controller = NewUserController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.TenantUser);
+        var result = await controller.UserUpdate(new UserUpdate { IDUser = 50, Enabled = false });
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        _repo.Verify(r => r.UserUpdateAsync(It.IsAny<User>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UserDelete_TenantUser_TargetIsTenantAdmin_Returns403()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "boss@test.local" });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantAdmin });
+
+        var controller = NewUserController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.TenantUser);
+        var result = await controller.Delete(50);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        _repo.Verify(r => r.UserDeleteAsync(It.IsAny<int?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UserUpdate_TenantAdmin_TargetIsAnotherTenantAdmin_Succeeds()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "peer-admin@test.local" });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantAdmin });
+        _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 1); // Tenant admin
+        var result = await controller.UserUpdate(new UserUpdate { IDUser = 50, FirstName = "New" });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        _repo.Verify(r => r.UserUpdateAsync(It.IsAny<User>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UserUpdate_GlobalUser_TargetIsGlobalAdmin_Returns403()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "super@test.local" });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.GlobalAdmin });
+
+        var controller = NewUserController();
+        SetCallerRoles(controller, 0, "user", RoleNames.GlobalReader, RoleNames.GlobalUser);
+        var result = await controller.UserUpdate(new UserUpdate { IDUser = 50, Enabled = false });
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        _repo.Verify(r => r.UserUpdateAsync(It.IsAny<User>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UserUpdate_GlobalUser_TargetIsTenantAdmin_Succeeds()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "tenant-admin@test.local" });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantAdmin });
+        _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCallerRoles(controller, 0, "user", RoleNames.GlobalReader, RoleNames.GlobalUser);
+        var result = await controller.UserUpdate(new UserUpdate { IDUser = 50, FirstName = "New" });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        _repo.Verify(r => r.UserUpdateAsync(It.IsAny<User>()), Times.Once);
     }
 
     [Fact]

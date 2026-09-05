@@ -59,6 +59,25 @@ namespace api.Controllers.API
             ((CallerHasRole(RoleNames.TenantAdmin) || CallerHasRole(RoleNames.TenantUser) || LegacyAdminFallback)
              && targetTenantId == CallerTenantId);
 
+        /// Beyond CallerManagesUsers' tenant check: may the caller act on a user holding <paramref name="targetRoleNames"/>, given relative privilege - Global admin outranks everyone; a Global User grant outranks everyone except a Global admin; Tenant admin outranks everyone in-tenant; a plain Tenant User grant outranks everyone in-tenant except a Tenant admin.
+        protected bool CallerOutranksTarget(IEnumerable<string> targetRoleNames)
+        {
+            ICollection<string> targetRoles = targetRoleNames as ICollection<string> ?? targetRoleNames.ToList();
+            if (targetRoles.Contains(RoleNames.GlobalAdmin))
+            {
+                return CallerIsGlobalAdmin;
+            }
+            if (CallerManagesUsersGlobally)
+            {
+                return true;
+            }
+            if (CallerHasRole(RoleNames.TenantAdmin) || LegacyAdminFallback)
+            {
+                return true;
+            }
+            return !targetRoles.Contains(RoleNames.TenantAdmin);
+        }
+
         protected bool CallerManagesDevicesGlobally =>
             CallerIsGlobalAdmin || CallerHasRole(RoleNames.GlobalDevice);
 
