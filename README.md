@@ -398,6 +398,50 @@ next step - not required today.
 | `POST /api/SensorData` | rate-limited | Device telemetry push (includes `Battery` since roadmap #12) |
 | `DELETE /api/SensorData` | JWT admin | Bulk-delete sensor data for a device/time range |
 
+## Practical advantages
+
+Beyond the multi-tenant/architecture points above, a handful of smaller, concrete
+things that make Agrumy easier to trust and run day-to-day:
+
+- **Offline-resilient by design.** Relay control runs entirely on-device against
+  its last-saved config (see "Control is local to the device" above) - a lost
+  connection to the API doesn't stop irrigation/climate control, it just delays
+  picking up config changes.
+- **73 native firmware unit tests in CI**, no hardware required
+  (`AgrumyFirmware/test/test_native_*`) - relay/hysteresis/schedule/safety-limit
+  logic is regression-tested on every push, not just checked by hand on a bench.
+- **Contract-first device↔API.** Every device request/response shape is a JSON
+  Schema in `contracts/device-api/`, checked against both the firmware and the
+  API's actual field usage (`AgrumyFirmware/tools/contract-check`) - firmware and
+  server can't silently drift apart on wire format.
+- **OTA plus fully offline firmware distribution.** The same firmware catalog
+  (roadmap #94) that drives normal OTA updates also supports offline USB
+  installs and Local/Custom repository sources - useful anywhere internet
+  access to GitHub isn't guaranteed.
+- **One-line self-hosted install** (see below) - no config file to hand-write,
+  no database to prepare first, safe to re-run.
+- **On-device safety limits, not just server-side policy.** `ActuatorController`
+  enforces cooldown/max-run ordering for every relay function directly on the
+  device, so a bad or delayed config can't leave a pump or heater running
+  unbounded even during an outage.
+- **A predictable threshold + hysteresis + schedule rule model.** No hidden
+  automation DSL to learn - each relay function's behavior is one of three
+  well-defined rule types, OR'd together (see "Why not just use Home Assistant"
+  above for what this deliberately doesn't try to be).
+- **Battery-powered devices as a first-class case**, not an afterthought -
+  battery telemetry, low-battery alerting (roadmap #12) and deep sleep for
+  sensor-only nodes are built in, not bolted on.
+- **A tiered storage strategy that scales down as well as up.** Plain MySQL/
+  MariaDB for a small deployment, TimescaleDB hypertables for a large one
+  (roadmap #14) - the same schema and queries either way, chosen by one config
+  value.
+- **A clear vertical focus.** Agrumy isn't trying to be a general home-automation
+  hub - every model and rule is shaped around greenhouse/citrus micro-climate
+  and irrigation specifically, not a generic "IoT platform."
+- **Crop-specific configuration templates are on the roadmap** (#60/#61) - the
+  goal is that setting up a new zone eventually starts from agronomy know-how
+  already built into the product, not a blank set of thresholds to guess at.
+
 ## Self-hosted install (roadmap #30)
 
 For anyone standing up their own instance (not the maintainer's own alpha
