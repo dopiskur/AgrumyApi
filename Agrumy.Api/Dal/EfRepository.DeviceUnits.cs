@@ -16,7 +16,7 @@ namespace api.Dal
             double? Temperature, double? SoilTemperature, double? Humidity, int? Moisture, int? Light,
             int? Co2, int? Tvoc, double? Barometer, double? LiquidPH, int? RainLevel, int? WaterLevel, double? Wind)
         {
-            /// <summary>Nonlinear formula - averaged per device below, not derived from already-averaged Temperature/Humidity.</summary>
+            /// Nonlinear formula - averaged per device below, not derived from already-averaged Temperature/Humidity.
             public double? Vpd => VpdCalculator.Compute(Temperature, Humidity);
         }
 

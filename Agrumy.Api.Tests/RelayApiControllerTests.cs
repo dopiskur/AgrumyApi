@@ -9,7 +9,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>A relay must only forward entries for devices in its own tenant, never cross a tenant boundary.</summary>
+/// A relay must only forward entries for devices in its own tenant, never cross a tenant boundary.
 public class RelayApiControllerTests
 {
     private readonly Mock<IRepository> _repo = new(MockBehavior.Strict);

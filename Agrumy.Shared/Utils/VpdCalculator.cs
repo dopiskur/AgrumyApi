@@ -1,6 +1,6 @@
 namespace api.Utils
 {
-    /// <summary>Air VPD (kPa) via the Tetens formula from Temperature (°C) + Humidity (%RH); null if either is missing.</summary>
+    /// Air VPD (kPa) via the Tetens formula from Temperature (°C) + Humidity (%RH); null if either is missing.
     public static class VpdCalculator
     {
         public static double? Compute(double? temperatureC, double? humidityPercent)
