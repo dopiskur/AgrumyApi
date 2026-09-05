@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using api.Commands;
 using api.Controllers.API;
@@ -5,6 +6,7 @@ using api.Dal.Interface;
 using api.Models;
 using api.Security;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Moq;
 
 namespace Agrumy.Api.Tests;
@@ -17,14 +19,30 @@ public class RelayApiControllerTests
 
     private RelayApiController NewController(string callerApiId)
     {
-        var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
-        var controller = new RelayApiController(_repo.Object, _cache.Object,
-            new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), catalog,
-            new api.Devices.DeviceConfigBuilder(_repo.Object, catalog));
+        var controller = NewJwtController();
         var http = new DefaultHttpContext();
         http.Items[DeviceAuth.ApiIdItemKey] = callerApiId;
         controller.ControllerContext = new() { HttpContext = http };
         return controller;
+    }
+
+    private RelayApiController NewJwtController()
+    {
+        var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
+        return new RelayApiController(_repo.Object, _cache.Object,
+            new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), catalog,
+            new api.Devices.DeviceConfigBuilder(_repo.Object, catalog));
+    }
+
+    /// Gives a bare (non-DI-constructed) controller the JWT claims an [Authorize] action reads via HttpContext.User - same pattern as ApiControllerTests.SetCallerRoles.
+    private static void SetCallerRoles(ControllerBase controller, int? tenantId, params string[] roles)
+    {
+        var claims = new List<Claim> { new("TenantID", tenantId.ToString() ?? "") };
+        claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims)) }
+        };
     }
 
     private static JsonElement EmptyPayload() => JsonDocument.Parse("{}").RootElement;
@@ -70,5 +88,57 @@ public class RelayApiControllerTests
         var result = Assert.Single(Assert.IsType<RelayBatchResponse>(Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(response.Result).Value).Results);
         Assert.True(result.Success);
         Assert.Equal(200, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeviceMappingAdd_CallerFromDifferentTenantThanRelay_Returns403_NeverCallsRepo()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(1)).ReturnsAsync(new Device { IDDevice = 1, IsRelay = true, TenantID = 1 });
+
+        var controller = NewJwtController();
+        SetCallerRoles(controller, 2, RoleNames.TenantDevice); // caller manages tenant 2, relay belongs to tenant 1
+        var result = await controller.DeviceMappingAdd(new RelayDeviceMapping { IDRelayDevice = 1, DevEUI = "ABCDEF0123456789", IDDevice = 5 });
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        // Strict mock: an un-set-up RelayDeviceMappingAddAsync call would throw, proving no mapping was attempted.
+    }
+
+    [Fact]
+    public async Task DeviceMappingAdd_GlobalAdminFromDifferentTenant_PassesRelaysOwnTenantId_NotCallersOwn()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(1)).ReturnsAsync(new Device { IDDevice = 1, IsRelay = true, TenantID = 1 });
+        _repo.Setup(r => r.RelayDeviceMappingAddAsync(1, "ABCDEF0123456789", 5, 1)).ReturnsAsync(true);
+
+        var controller = NewJwtController();
+        // GlobalAdmin's own tenant (0) legitimately crosses the relay-ownership check, but the relay's OWN tenant (1) - not the caller's - must be what's passed down for the device-tenant guard.
+        SetCallerRoles(controller, 0, RoleNames.GlobalAdmin);
+        var result = await controller.DeviceMappingAdd(new RelayDeviceMapping { IDRelayDevice = 1, DevEUI = "abcdef0123456789", IDDevice = 5 });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        _repo.Verify(r => r.RelayDeviceMappingAddAsync(1, "ABCDEF0123456789", 5, 1), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeviceMappingGetAll_CallerFromDifferentTenantThanRelay_Returns403()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(1)).ReturnsAsync(new Device { IDDevice = 1, IsRelay = true, TenantID = 1 });
+
+        var controller = NewJwtController();
+        SetCallerRoles(controller, 2, RoleNames.TenantDevice);
+        var result = await controller.DeviceMappingGetAll(1);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+    }
+
+    [Fact]
+    public async Task DeviceMappingDelete_CallerFromDifferentTenantThanRelay_Returns403_NeverCallsRepo()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(1)).ReturnsAsync(new Device { IDDevice = 1, IsRelay = true, TenantID = 1 });
+
+        var controller = NewJwtController();
+        SetCallerRoles(controller, 2, RoleNames.TenantDevice);
+        var result = await controller.DeviceMappingDelete(idRelayDeviceMapping: 9, idRelayDevice: 1);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
     }
 }

@@ -14,8 +14,8 @@ namespace api.Dal.Interface
         /// Same rows as above, WITH each mapped device's ApiKey - only ever served to the owning relay itself, never to the admin UI.
         Task<IList<RelayDeviceMapping>> RelayDeviceMappingsWithSecretsGetAsync(int idRelayDevice);
 
-        /// False (no-op) if idDevice doesn't exist or DevEUI is already mapped for this relay - the unique index is the real guard, this is just a friendlier failure than a raw constraint exception.
-        Task<bool> RelayDeviceMappingAddAsync(int idRelayDevice, string devEUI, int idDevice);
+        /// False (no-op) if idDevice doesn't exist, belongs to a different tenant than relayTenantId, or DevEUI is already mapped for this relay - the unique index is the real guard for the last case, this is just a friendlier failure than a raw constraint exception.
+        Task<bool> RelayDeviceMappingAddAsync(int idRelayDevice, string devEUI, int idDevice, int relayTenantId);
 
         Task<bool> RelayDeviceMappingDeleteAsync(int idRelayDeviceMapping, int idRelayDevice);
     }

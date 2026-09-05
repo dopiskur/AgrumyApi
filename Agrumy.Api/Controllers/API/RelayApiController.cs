@@ -190,10 +190,21 @@ namespace api.Controllers.API
         public async Task<ActionResult<IList<DeviceDto>>> RelaysGetAll() =>
             Ok((await Repo.RelayDevicesGetAllAsync()).Select(d => d.ToDto()).ToList());
 
+        /// Looks the relay device up and checks the caller may touch it - same shared 404/403 logic every other Device-domain controller uses (ApiControllerBase.EnsureOwnedDeviceEntityAsync).
+        private Task<(Device? Relay, ActionResult? Error)> EnsureOwnedRelayAsync(int idRelayDevice, bool forWrite) =>
+            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceGetByIdAsync(idRelayDevice), d => d.TenantID, "Relay", forWrite);
+
         [HttpGet("DeviceMapping/All")]
         [Authorize(Roles = RoleNames.DeviceManagers)]
-        public async Task<ActionResult<IList<RelayDeviceMapping>>> DeviceMappingGetAll(int idRelayDevice) =>
-            Ok(await Repo.RelayDeviceMappingsGetAsync(idRelayDevice));
+        public async Task<ActionResult<IList<RelayDeviceMapping>>> DeviceMappingGetAll(int idRelayDevice)
+        {
+            var (_, error) = await EnsureOwnedRelayAsync(idRelayDevice, forWrite: false);
+            if (error != null)
+            {
+                return error;
+            }
+            return Ok(await Repo.RelayDeviceMappingsGetAsync(idRelayDevice));
+        }
 
         [HttpPost("DeviceMapping")]
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -203,13 +214,25 @@ namespace api.Controllers.API
             {
                 return BadRequest("IDRelayDevice, DevEUI and IDDevice are required.");
             }
-            bool added = await Repo.RelayDeviceMappingAddAsync(idRelay, value.DevEUI.Trim().ToUpperInvariant(), idDevice);
-            return added ? Ok(true) : Conflict("That DevEUI is already mapped for this relay, or IDDevice does not exist.");
+            var (relay, error) = await EnsureOwnedRelayAsync(idRelay, forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            bool added = await Repo.RelayDeviceMappingAddAsync(idRelay, value.DevEUI.Trim().ToUpperInvariant(), idDevice, relay!.TenantID);
+            return added ? Ok(true) : Conflict("That DevEUI is already mapped for this relay, or IDDevice does not exist or belongs to a different tenant than the relay.");
         }
 
         [HttpDelete("DeviceMapping")]
         [Authorize(Roles = RoleNames.DeviceManagers)]
-        public async Task<ActionResult<bool>> DeviceMappingDelete(int idRelayDeviceMapping, int idRelayDevice) =>
-            Ok(await Repo.RelayDeviceMappingDeleteAsync(idRelayDeviceMapping, idRelayDevice));
+        public async Task<ActionResult<bool>> DeviceMappingDelete(int idRelayDeviceMapping, int idRelayDevice)
+        {
+            var (_, error) = await EnsureOwnedRelayAsync(idRelayDevice, forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            return Ok(await Repo.RelayDeviceMappingDeleteAsync(idRelayDeviceMapping, idRelayDevice));
+        }
     }
 }

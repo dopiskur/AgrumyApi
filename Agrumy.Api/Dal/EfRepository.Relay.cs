@@ -36,9 +36,10 @@ namespace api.Dal
                 DateCreated = m.DateCreated,
             };
 
-        public async Task<bool> RelayDeviceMappingAddAsync(int idRelayDevice, string devEUI, int idDevice)
+        public async Task<bool> RelayDeviceMappingAddAsync(int idRelayDevice, string devEUI, int idDevice, int relayTenantId)
         {
-            if (!await db.Devices.AsNoTracking().AnyAsync(d => d.IDDevice == idDevice))
+            // Unconditional, no caller-role exception (same reasoning as DeviceUnitApiController's Zone/Assign check) - a relay must never be handed another tenant's device ApiKey, not even by a Global admin's mistake.
+            if (!await db.Devices.AsNoTracking().AnyAsync(d => d.IDDevice == idDevice && d.TenantID == relayTenantId))
             {
                 return false;
             }
