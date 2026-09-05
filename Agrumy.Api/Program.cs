@@ -253,6 +253,18 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
+    // A fixed-window limiter's RetryAfter metadata is exact (window reset time), so a caller
+    // that honors it - notably Agrumy.Relay, whose 429s reach devices as a "Wait" signal on
+    // their own config-poll - gets a real number instead of guessing a backoff.
+    options.OnRejected = (context, ct) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+        }
+        return ValueTask.CompletedTask;
+    };
+
     static RateLimitPartition<string> IpFixedWindow(HttpContext httpContext, int permitLimit) =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",

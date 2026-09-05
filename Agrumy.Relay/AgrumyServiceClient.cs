@@ -5,6 +5,12 @@ using Microsoft.Extensions.Options;
 
 namespace api.Relay
 {
+    /// AgrumyService rate-limited this relay's own Batch call (many devices share one egress IP) - carries RetryAfterSeconds so ProfileAEndpoints can turn this into a "Wait" response on the device's own config-poll instead of masking it as a generic failure.
+    public class RelayRateLimitedException(int retryAfterSeconds) : Exception
+    {
+        public int RetryAfterSeconds { get; } = retryAfterSeconds;
+    }
+
     /// Thin HTTP client for the two calls a relay makes to AgrumyService (registration once, Batch repeatedly) - plain typed HttpClient, not Refit, since two endpoints don't earn that ceremony.
     public class AgrumyServiceClient(HttpClient http, RelayRegistrationStore registration, IOptions<RelayOptions> options)
     {
@@ -52,6 +58,12 @@ namespace api.Relay
             message.Headers.Add("apiKey", reg.ApiKey);
 
             HttpResponseMessage response = await http.SendAsync(message, ct);
+            if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                // Same 10-300s clamp ServerConfigApiController.Update enforces for RelayWaitWindowSeconds - a missing/malformed header falls back to that range's default rather than an unbounded wait.
+                int retryAfter = response.Headers.RetryAfter?.Delta is TimeSpan delta ? Math.Clamp((int)delta.TotalSeconds, 10, 300) : 30;
+                throw new RelayRateLimitedException(retryAfter);
+            }
             response.EnsureSuccessStatusCode();
             return (await response.Content.ReadFromJsonAsync<RelayBatchResponse>(ct))
                 ?? new RelayBatchResponse();

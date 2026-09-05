@@ -49,6 +49,12 @@ namespace api.Relay.LocalForwarding
                 // AgrumyService unreachable - same "connection lost" shape a device's own direct call would see, so its existing retry/buffer logic applies unchanged.
                 return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
+            catch (RelayRateLimitedException ex)
+            {
+                // A genuine 429, not a generic failure - the device's own apiConfig() recognizes this distinctly and waits the given window instead of counting it toward its reboot-on-repeated-failure escalation.
+                req.HttpContext.Response.Headers.RetryAfter = ex.RetryAfterSeconds.ToString();
+                return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+            }
 
             RelayBatchEntryResult result = response.Results.Count > 0
                 ? response.Results[0]
