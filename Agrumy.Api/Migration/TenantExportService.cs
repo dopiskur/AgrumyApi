@@ -54,8 +54,7 @@ namespace api.Migration
                 exportDevices.Add(new TenantExportDevice
                 {
                     Device = d,
-                    // Read off the in-memory Device (populated fine server-side), not left to JSON
-                    // serialization - see TenantExportDevice's own remarks for why that would drop them.
+                    // Read off the in-memory Device, not left to JSON serialization - see TenantExportDevice's remarks for why that would drop them.
                     ApiId = d.ApiId,
                     ApiKey = d.ApiKey,
                     Sensor = d.DeviceConfigSensorID is int sId ? await repo.DeviceConfigSensorGetAsync(sId) : null,

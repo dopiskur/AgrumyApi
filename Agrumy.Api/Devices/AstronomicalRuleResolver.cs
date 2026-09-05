@@ -4,7 +4,7 @@ using api.Utils;
 
 namespace api.Devices
 {
-    /// Compiles each Astronomical rule (#228) into an effective Schedule rule for today's local date before a config is sent, so the firmware only ever has to understand ConditionType.Schedule. A rule that can't be resolved today (no ServerConfig location set, polar day/night, or an offset pair collapsing the window to zero/negative length) is dropped rather than sent broken - the function's other rules (if any) still apply.
+    /// Compiles each Astronomical rule into an effective Schedule rule for today's local date so the firmware only ever has to understand ConditionType.Schedule; a rule that can't be resolved today (no location set, polar day/night, or a zero/negative window) is dropped rather than sent broken, leaving the function's other rules intact.
     public static class AstronomicalRuleResolver
     {
         public static IList<DeviceUnitZoneRule> Resolve(IList<DeviceUnitZoneRule> rules, ServerConfig serverConfig, DateOnly localDate, int utcOffsetSeconds)

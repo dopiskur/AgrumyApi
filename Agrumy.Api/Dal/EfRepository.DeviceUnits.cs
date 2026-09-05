@@ -50,9 +50,7 @@ namespace api.Dal
 
         public async Task<DeviceUnit> DeviceUnitAddAsync(DeviceUnit unit)
         {
-            // IDDeviceUnit is ValueGeneratedNever - MySQL's default sql_mode treats an explicit 0
-            // on an AUTO_INCREMENT column as "generate a new value", which would collide with the
-            // reserved IDDeviceUnit=0 "Default" sentinel row (Math.Max(...,1) below keeps 0 free).
+            // IDDeviceUnit is ValueGeneratedNever - MySQL's default sql_mode treats an explicit 0 on an AUTO_INCREMENT column as "generate a new value", which would collide with the reserved IDDeviceUnit=0 sentinel (Math.Max(...,1) below keeps 0 free).
             int nextId = Math.Max((await db.DeviceUnits.AsNoTracking().Select(u => (int?)u.IDDeviceUnit).MaxAsync() ?? 0) + 1, 1);
             var row = new DeviceUnitRow { IDDeviceUnit = nextId, TenantID = unit.TenantID, DeviceUnitName = unit.DeviceUnitName };
             db.DeviceUnits.Add(row);
@@ -129,8 +127,7 @@ namespace api.Dal
             {
                 return;
             }
-            // TenantID/DeviceUnitID intentionally not overwritten - renaming a zone must not
-            // silently move it to another unit or tenant.
+            // TenantID/DeviceUnitID intentionally not overwritten - renaming a zone must not silently move it to another unit or tenant.
             row.DeviceUnitZoneName = zone.DeviceUnitZoneName;
             row.WaterPumpMaxRunSeconds = zone.WaterPumpMaxRunSeconds;
             row.WaterPumpCooldownSeconds = zone.WaterPumpCooldownSeconds;
@@ -158,8 +155,7 @@ namespace api.Dal
                 await DeviceUnassignFromZoneAsync(deviceId);
             }
 
-            // App-level cleanup, not a DB-level CASCADE - see AgrumyDbContext's
-            // DeviceUnitZoneRuleRow config, DeleteBehavior.NoAction.
+            // App-level cleanup, not a DB-level CASCADE - see AgrumyDbContext's DeviceUnitZoneRuleRow config, DeleteBehavior.NoAction.
             await db.DeviceUnitZoneRules.Where(r => r.DeviceUnitZoneID == idDeviceUnitZone).ExecuteDeleteAsync();
 
             await db.DeviceUnitZones.Where(z => z.IDDeviceUnitZone == idDeviceUnitZone).ExecuteDeleteAsync();
@@ -292,8 +288,7 @@ namespace api.Dal
 
         public async Task DeviceUnassignFromZoneAsync(int idDevice)
         {
-            // No ConfigVersion bump - the device is not notified and keeps polling/reporting
-            // telemetry exactly as before, it just stops counting toward any zone's aggregation.
+            // No ConfigVersion bump - the device is not notified, it just stops counting toward any zone's aggregation.
             await db.Devices.Where(d => d.IDDevice == idDevice)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(d => d.DeviceUnitID, (int?)null)
@@ -452,8 +447,7 @@ namespace api.Dal
             {
                 SensorDataRow? s = d.LatestSensorDataId != null && latestById.TryGetValue(d.LatestSensorDataId.Value, out var row) ? row : null;
                 bool enabled = d.Enabled == true;
-                // A disabled device is expected to be silent - its offline-ness must not redden a
-                // zone/unit nobody expects it to report into.
+                // A disabled device is expected to be silent - its offline-ness must not redden a zone/unit nobody expects it to report into.
                 bool online = !enabled || DeviceFleetStatus.ComputeOnline(d.LastSeenAt, d.SleepSeconds, utcNow);
                 return new UnitZoneDeviceSnapshot(
                     d.DeviceUnitID, d.DeviceUnitZoneID, enabled, online, d.HasRecentProblemEvent,
@@ -474,8 +468,7 @@ namespace api.Dal
             }
 
             DateTime cutoff = DateTime.UtcNow.AddHours(-problemEventExpiryHours);
-            // OrderByDescending must run before the final Select - EF cannot translate ordering by a
-            // member of a record it just constructed inside the join's own result selector.
+            // OrderByDescending must run before the final Select - EF cannot translate ordering by a member of a record it just constructed inside the join's own result selector.
             var rows = await devices
                 .Join(
                     db.EventDevices.AsNoTracking().Where(e => e.AcknowledgedAt == null && e.Date >= cutoff && ProblemEventTypeIds.Contains(e.EventID)),

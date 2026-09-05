@@ -88,7 +88,7 @@ namespace api.Controllers.API
             // A new tenant's creator starts as its admin; everyone else starts as a read-only Tenant reader until granted more via PUT /api/User/UserRoles.
             string startingRole = isNewTenant ? RoleNames.TenantAdmin : RoleNames.TenantReader;
 
-            // One transaction (tenant create + user add + activation token + starting role) - a crash partway must never leave a user row with no role (roadmap #293). Sets user.TenantID on the same object this method returns.
+            // One transaction (tenant create + user add + activation token + starting role) so a crash partway never leaves a user row with no role; sets user.TenantID on the same object this method returns.
             await Repo.RegisterUserAsync(user, userSecret,
                 existingTenantId: isNewTenant ? null : await Repo.TenantGetIdAsync(value.TenantName!),
                 newTenantName: isNewTenant ? value.TenantName : null,

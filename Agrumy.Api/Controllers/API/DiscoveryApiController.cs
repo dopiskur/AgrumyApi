@@ -157,12 +157,7 @@ namespace api.Controllers.API
             return Ok(await Repo.DiscoveryResultsGetAsync(tenantId, unitID, zoneID));
         }
 
-        /// <summary>Resolves the winning scanning device for DiscoveredApMac, resolves WiFi
-        /// credentials (0/1/many saved TenantWifiConfig rows - see api.Models.DiscoveryRegisterRequest),
-        /// (re)issues the caller's own #70 device-PIN, and queues a ProvisionDevice command carrying
-        /// both to that device. DeviceName/UnitID/ZoneID ride along on the same payload and are
-        /// applied once the discovered device completes its own real registration - see
-        /// CommandQueueService.ConsumePendingProvisionAsync.</summary>
+        /// Resolves the winning scanning device for DiscoveredApMac, resolves WiFi credentials (0/1/many saved TenantWifiConfig rows - see api.Models.DiscoveryRegisterRequest), (re)issues the caller's own device-PIN, and queues a ProvisionDevice command carrying both plus DeviceName/UnitID/ZoneID to that device, applied once it completes its own real registration (see CommandQueueService.ConsumePendingProvisionAsync).
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost("Register")]
         public async Task<ActionResult<DiscoveryRegisterResult>> Register([FromBody] DiscoveryRegisterRequest request)

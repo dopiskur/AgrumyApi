@@ -82,10 +82,7 @@ namespace api.Dal
                       EXECUTE format('ALTER TABLE %I DROP CONSTRAINT %I', 'sensorData', pk_name);
                     END IF;
                     ALTER TABLE "sensorData" ADD PRIMARY KEY ("IDSensorData", "DateCreated");
-                    -- create_hypertable's first parameter is REGCLASS: an unquoted-looking literal
-                    -- here gets folded to lowercase by the implicit text->regclass cast (same
-                    -- identifier-normalization rule as bare SQL), missing this mixed-case table -
-                    -- the embedded double quotes below are what make it match "sensorData" exactly.
+                    -- create_hypertable's first parameter is REGCLASS: an unquoted literal here folds to lowercase and misses this mixed-case table - the embedded double quotes below make it match "sensorData" exactly.
                     PERFORM create_hypertable('"sensorData"', 'DateCreated', migrate_data => true, if_not_exists => true);
                   END IF;
                 END $$;
@@ -121,7 +118,7 @@ namespace api.Dal
             }
         }
 
-        /// Seeds the IDDeviceUnit=0/IDDeviceUnitZone=0 sentinel pair, also reserving ID 0 so DeviceUnitAddAsync/DeviceUnitZoneAddAsync's MAX+1 never assigns it to a real Unit/Zone - device.DeviceUnitID/DeviceUnitZoneID no longer reference these rows (#313 made unassigned mean NULL, not 0), whether the rows themselves are still needed for anything else is an open question.
+        /// Seeds the IDDeviceUnit=0/IDDeviceUnitZone=0 sentinel pair, also reserving ID 0 so DeviceUnitAddAsync/DeviceUnitZoneAddAsync's MAX+1 never assigns it to a real Unit/Zone.
         private static async Task SeedDeviceUnitSentinelsAsync(AgrumyDbContext db)
         {
             if (!await db.DeviceUnits.AnyAsync())
@@ -206,8 +203,7 @@ namespace api.Dal
                     new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.AnalogWaterLevel, SensorName = "Analog water tank", WaterTankLevel = 1 });
             }
 
-            // Any Kit string not in this table falls back to the existing, admin-controlled
-            // DeviceType/DeviceControllerEnabled signal - see DeviceFleetGetAsync.
+            // Any Kit string not in this table falls back to the existing, admin-controlled DeviceType/DeviceControllerEnabled signal - see DeviceFleetGetAsync.
             if (!await db.DeviceTypeKits.AnyAsync())
             {
                 db.DeviceTypeKits.AddRange(

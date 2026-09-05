@@ -141,8 +141,7 @@ namespace api.Dal
             return rows.Select(ToDto).ToList();
         }
 
-        // Same query as UsersGetAsync minus the tenant filter - callers (UserApiController) only
-        // reach this after confirming the caller is a TenantID==0 admin.
+        // Same query as UsersGetAsync minus the tenant filter - callers (UserApiController) only reach this after confirming the caller is a TenantID==0 admin.
         public async Task<IList<User>> UsersGetAllAsync()
         {
             var rows = await db.Users.AsNoTracking().ToListAsync();

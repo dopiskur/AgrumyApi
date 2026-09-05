@@ -11,17 +11,13 @@ namespace api.Commands
         Task PublishAsync(Device device, PendingCommand command, CancellationToken ct = default);
     }
 
-    /// Pure topic convention (roadmap #146) - matches AgrumyFirmware's MqttController subscribe topic exactly, kept separate from MqttCommandPublisher so the wire contract is testable without a broker.
+    /// Pure topic convention matching AgrumyFirmware's MqttController subscribe topic exactly, kept separate from MqttCommandPublisher so the wire contract is testable without a broker.
     public static class MqttCommandTopic
     {
         public static string ForDevice(int tenantId, int deviceId) => $"agrumy/{tenantId}/{deviceId}/command";
     }
 
-    /// Best-effort instant command delivery over MQTT (#146), alongside the HTTP/JWT poll cycle - never
-    /// the only way a command reaches a device, since CommandQueueService.GetPendingCommandAsync's next
-    /// poll response always carries it too. A no-op whenever ServerConfig.MqttTransportEnabled is off or
-    /// no broker host is configured; a broker/network failure here is swallowed (logged, not thrown) so
-    /// it can never fail the command-issuing request that triggered it.
+    /// Best-effort instant command delivery over MQTT alongside the HTTP/JWT poll cycle - never the only way a command reaches a device, since CommandQueueService.GetPendingCommandAsync's next poll response always carries it too; a no-op when MqttTransportEnabled is off or unconfigured, and any broker/network failure is swallowed so it can never fail the triggering request.
     public sealed class MqttCommandPublisher(IRepository repo, ILogger<MqttCommandPublisher> logger) : IMqttCommandPublisher
     {
         public async Task PublishAsync(Device device, PendingCommand command, CancellationToken ct = default)
@@ -33,9 +29,7 @@ namespace api.Commands
             }
 
             string topic = MqttCommandTopic.ForDevice(device.TenantID, deviceId);
-            // ConditionConfigJson.Options (JsonSerializerDefaults.Web, no enum converter) camelCases
-            // property names and leaves ActionType as its underlying int - the same shape the existing
-            // HTTP config-poll response already sends this same PendingCommand type as.
+            // ConditionConfigJson.Options camelCases properties and leaves ActionType as its int, matching the shape the HTTP config-poll response already sends this same type as.
             byte[] payload = JsonSerializer.SerializeToUtf8Bytes(command, ConditionConfigJson.Options);
 
             try

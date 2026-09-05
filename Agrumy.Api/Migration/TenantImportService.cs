@@ -107,8 +107,7 @@ namespace api.Migration
             return map;
         }
 
-        // IDDeviceUnit/IDDeviceUnitZone=0 are shared sentinels ("unassigned"/"Disabled") with the
-        // SAME meaning on every server - never remapped, just passed through.
+        // IDDeviceUnit/IDDeviceUnitZone=0 are shared "unassigned"/"Disabled" sentinels, same meaning on every server - never remapped, just passed through.
         private static int RemapOrSentinel(int oldId, Dictionary<int, int> map) =>
             oldId == 0 ? 0 : map.GetValueOrDefault(oldId, 0);
 

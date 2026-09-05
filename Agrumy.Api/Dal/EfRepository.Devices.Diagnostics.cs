@@ -32,8 +32,7 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
-        // Short absolute-TTL cache so any number of concurrently open admin tabs share one real
-        // fleet query per window instead of each re-running the full per-device scan.
+        // Short absolute-TTL cache so any number of concurrently open admin tabs share one real fleet query per window instead of each re-running the full per-device scan.
         private static readonly TimeSpan FleetCacheTtl = TimeSpan.FromSeconds(6);
 
         public async Task<IList<DeviceFleetStatus>> DeviceFleetGetAsync(int? tenantID)

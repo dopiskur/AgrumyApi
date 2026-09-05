@@ -129,8 +129,7 @@ namespace api.Dal
             return rows.Select(ToDto).ToList();
         }
 
-        // Same query minus the tenant filter - callers (DeviceApiController) only reach this after
-        // CallerReadsDevicesGlobally passed, mirroring UsersGetAllAsync.
+        // Same query minus the tenant filter - callers (DeviceApiController) only reach this after CallerReadsDevicesGlobally passed, mirroring UsersGetAllAsync.
         public async Task<IList<Device>> DevicesGetAllAsync()
         {
             var rows = await db.Devices.AsNoTracking().ToListAsync();
@@ -168,7 +167,7 @@ namespace api.Dal
                 return;
             }
 
-            // Does not set MacAddress, config-id columns, DeviceUnitID/DeviceUnitZoneID (written exclusively by DeviceAssignToZoneAsync/DeviceUnassignFromZoneAsync to stay consistent), or ApiId/ApiKey (omitting them used to wipe a device's real credential).
+            // Does not set MacAddress, config-id columns, DeviceUnitID/DeviceUnitZoneID (written exclusively by DeviceAssignToZoneAsync/DeviceUnassignFromZoneAsync to stay consistent), or ApiId/ApiKey (omitting them would wipe a device's real credential).
             row.TenantID = device.TenantID;
             row.DeviceTypeID = device.DeviceTypeID;
             row.DeviceTypeServiceID = device.DeviceTypeServiceID;

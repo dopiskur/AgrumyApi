@@ -23,9 +23,7 @@ namespace api.Firmware
                 throw new SsrfBlockedException($"could not resolve host '{uri.Host}'.", ex);
             }
 
-            // Every resolved address is checked, not just the first - DNS can return a public
-            // address alongside a private one, and .NET doesn't guarantee which one a later actual
-            // connect attempt picks.
+            // Every resolved address is checked, not just the first - DNS can return a public address alongside a private one, and a later connect attempt isn't guaranteed to pick either one.
             if (addresses.Length == 0 || Array.Exists(addresses, IsPrivateOrReserved))
             {
                 throw new SsrfBlockedException($"'{uri.Host}' resolves to a private/reserved address.");

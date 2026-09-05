@@ -17,7 +17,7 @@ namespace api.Dal.Interface
         /// Bulk-marks every Pending, already-expired command for this device Expired in one statement - the N-row-write alternative to expiring them one at a time in a loop.
         Task ExpirePendingCommandsAsync(int deviceId, DateTime utcNow);
 
-        /// Every still-active (Pending/Acknowledged) ProvisionDevice command across every device - roadmap #268's DeviceRegistration match-by-DiscoveredApMac scans this small set since the target device (not yet registered) has no DeviceID to filter by.
+        /// Every still-active (Pending/Acknowledged) ProvisionDevice command across every device - DeviceRegistration's match-by-DiscoveredApMac scans this small set since the target device (not yet registered) has no DeviceID to filter by.
         Task<IList<DeviceCommand>> GetActiveProvisionCommandsAsync();
 
         Task<DeviceCommand?> GetCommandByIdAsync(int commandId);

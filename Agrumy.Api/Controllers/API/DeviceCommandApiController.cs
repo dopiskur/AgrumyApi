@@ -41,7 +41,7 @@ namespace api.Controllers.API
             };
         }
 
-        /// Status of one previously-issued command - the roadmap #294 gap: IssueCommand's CreatedCommandIds had no way to check on afterward short of direct DB access.
+        /// Status of one previously-issued command - IssueCommand's CreatedCommandIds otherwise had no way to check on afterward short of direct DB access.
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpGet("{idDeviceCommand}")]
         public async Task<ActionResult<DeviceCommand>> GetCommand(int idDeviceCommand)

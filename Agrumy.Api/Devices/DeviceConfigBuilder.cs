@@ -26,10 +26,7 @@ namespace api.Devices
 
         public async Task<DeviceConfig> BuildAsync(Device device, PendingCommand? pendingCommand, string? board)
         {
-            // Computed fresh on every Config/Register response rather than cached, so a DST
-            // transition or an admin changing the tenant's ScheduleTimeZone reaches every device on
-            // its very next poll (subject to NeedsRefreshAsync's own heartbeat gate). ServerConfig is
-            // still fetched here and reused for WeatherRainPredicted below.
+            // Computed fresh (not cached) every response so a DST shift or ScheduleTimeZone change reaches every device on its next poll; also reused below for WeatherRainPredicted.
             ServerConfig serverConfig = await repo.ServerConfigGetAsync(1);
             // Per-tenant, not global - a device with no tenant row (shouldn't happen) or an unset zone both fall back to UTC via GetUtcOffsetSeconds' own null handling.
             Tenant? tenant = await repo.TenantGetByIdAsync(device.TenantID);
@@ -60,9 +57,7 @@ namespace api.Devices
                 PendingCommand = pendingCommand,
             };
 
-            // The firmware does a version comparison of its own, so an offer being present on every
-            // Config sync is fine - harmless on Register too, since a freshly-created device has
-            // FirmwareUpdate == null and ResolveOfferAsync returns null for that.
+            // Firmware compares versions itself, so an offer present on every Config sync is fine, and harmless on Register too since ResolveOfferAsync returns null for a freshly-created device.
             DeviceFirmware? firmware = await firmwareCatalog.ResolveOfferAsync(device, board);
             if (firmware != null)
             {
@@ -77,10 +72,7 @@ namespace api.Devices
             }
             if (deviceConfig.DeviceControllerEnabled == true)
             {
-                // Relay-pin mapping still comes from the device's own row, but Rules and safety
-                // limits come from whichever zone the device is assigned to - merged into the SAME
-                // DeviceConfigController object the firmware already expects. No zone assigned
-                // means an empty Rules list, so every relay function simply stays off.
+                // Relay-pin mapping comes from the device row, but Rules/safety limits come from its zone, merged into the same DeviceConfigController; no zone means an empty Rules list so every relay stays off.
                 DeviceConfigController? controller = await repo.DeviceConfigControllerGetAsync(device.DeviceConfigControllerID);
                 if (controller != null && device.DeviceUnitZoneID is int idZone)
                 {
@@ -90,8 +82,7 @@ namespace api.Devices
                     DeviceUnitZone? zone = await repo.DeviceUnitZoneGetByIdAsync(idZone);
                     controller.WaterPumpMaxRunSeconds = zone?.WaterPumpMaxRunSeconds;
                     controller.WaterPumpCooldownSeconds = zone?.WaterPumpCooldownSeconds;
-                    // Computed here as a single AND-NOT gate, not sent as two separate flags - see
-                    // DeviceConfigController.SkipWaterPumpForRain's remarks.
+                    // Computed here as a single AND-NOT gate, not sent as two separate flags - see DeviceConfigController.SkipWaterPumpForRain's remarks.
                     controller.SkipWaterPumpForRain = zone?.SkipWaterPumpWhenRainPredicted == true && serverConfig.WeatherRainPredicted;
                 }
                 deviceConfig.DeviceConfigController = controller;

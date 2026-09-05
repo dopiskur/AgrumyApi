@@ -10,16 +10,12 @@ namespace api.Setup
     /// If ConnectionStrings:DefaultConnection is missing at boot, Program.cs routes here instead of the normal pipeline - an unauthenticated DB-details-only form that writes appsettings.json and restarts (RestartUtil) once the admin submits a connection that opens; container installs never reach this since install.sh always sets it upfront.
     internal static class SetupWizard
     {
-        // One-time, process-lifetime token gating the wizard (roadmap #321/#248) - closes the window
-        // between the service starting and the admin reaching the page: whoever gets there first over
-        // the network still needs this value, which only reaches the service's own log (same pattern
-        // as the bootstrap Global Admin setup secret).
+        // One-time, process-lifetime token gating the wizard - only reaches the service's own log, so whoever reaches the page first over the network still can't use it without console/log access.
         private static readonly string SetupToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
 
         public static void ConfigureServices(WebApplicationBuilder builder)
         {
-            // The wizard's only real risk window is "whoever reaches this unauthenticated page
-            // before the admin does" - antiforgery is a cheap extra guard against a cross-site POST specifically.
+            // Cheap extra guard against a cross-site POST during the unauthenticated setup window.
             builder.Services.AddAntiforgery();
             builder.Services.AddLogging();
         }

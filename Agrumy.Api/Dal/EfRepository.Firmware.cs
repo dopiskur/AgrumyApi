@@ -63,8 +63,7 @@ namespace api.Dal
         public async Task<int> FirmwareDeleteBySourceAsync(FirmwareSource source)
         {
             int s = (int)source;
-            // Legacy hand-inserted rows (null Board) are never swept by a source refresh - nothing
-            // here knows how to recreate them.
+            // Legacy hand-inserted rows (null Board) are never swept by a source refresh - nothing here knows how to recreate them.
             return await db.DeviceFirmwares.Where(f => f.Source == s && f.Board != null).ExecuteDeleteAsync();
         }
 

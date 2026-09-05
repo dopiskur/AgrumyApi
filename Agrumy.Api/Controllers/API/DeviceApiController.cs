@@ -113,7 +113,7 @@ namespace api.Controllers.API
         public async Task<ActionResult<IList<DeviceFleetStatus>>> DeviceFleetGet() =>
             Ok(await Repo.DeviceFleetGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
 
-        /// Same status DeviceFleetGet carries for one device, without scanning the whole fleet - for a single-device detail page (roadmap #295).
+        /// Same status DeviceFleetGet carries for one device, without scanning the whole fleet - for a single-device detail page.
         [Authorize]
         [HttpGet("FleetStatus")]
         public async Task<ActionResult<DeviceFleetStatus>> DeviceFleetStatusGet(int idDevice)
@@ -337,8 +337,7 @@ namespace api.Controllers.API
                     && !string.IsNullOrEmpty(settings.GatewayRegistrationSecret)
                     && DeviceAuth.ConstantTimeEquals(value.GatewayRegistrationSecret, settings.GatewayRegistrationSecret);
 
-                // Roadmap #268: this mac may be the target of an earlier Discovery/Register call -
-                // that queued ProvisionDevice command carries the DeviceName/Zone the admin picked then.
+                // This mac may be the target of an earlier Discovery/Register call whose queued ProvisionDevice command carries the DeviceName/Zone the admin picked then.
                 DiscoveryProvisionPayload? provision = await commandQueue.ConsumePendingProvisionAsync(value.MacAddress);
 
                 device = await Repo.DeviceAddAsync(new Device
@@ -365,8 +364,7 @@ namespace api.Controllers.API
                 }
             }
 
-            // The PIN is deliberately NOT consumed here - it stays valid for repeated registrations (multiple sensors in one session) until its own 24h expiry.
-            // A genuinely new device never has a pending command, but Register also handles re-registration (factory reset, etc.), where one could legitimately still be queued.
+            // The PIN is deliberately NOT consumed here (stays valid for repeated registrations until its own 24h expiry), and Register also handles re-registration, where a pending command could legitimately still be queued.
             PendingCommand? pendingCommand = await commandQueue.GetPendingCommandAsync(device.IDDevice!.Value);
             // Register carries no Board - null falls back to the legacy per-type lookup.
             return Ok(await configBuilder.BuildAsync(device, pendingCommand, board: null));

@@ -24,8 +24,7 @@ namespace api.Dal
             }
             catch (Exception ex)
             {
-                // Caught as plain Exception since IDistributedCache is backend-agnostic - a miss here
-                // just costs one extra device auth round-trip, not correctness.
+                // Caught as plain Exception since IDistributedCache is backend-agnostic - a miss here just costs one extra device auth round-trip, not correctness.
                 LogBackendUnavailable(logger, ex, nameof(GetDeviceCacheAsync), key);
                 return new DeviceCache { apiAuth = null };
             }
@@ -43,8 +42,7 @@ namespace api.Dal
             }
             catch (Exception ex)
             {
-                // A dropped write just means the next auth check misses and the device re-authenticates -
-                // no different from the entry never having been written at all.
+                // A dropped write just means the next auth check misses and the device re-authenticates, same as if it was never written.
                 LogBackendUnavailable(logger, ex, nameof(SetItemAsync), key);
             }
         }

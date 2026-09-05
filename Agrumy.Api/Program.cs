@@ -29,8 +29,7 @@ Config.Init(builder.Configuration);
 AgrumySettings settingsForBootCheck = AgrumySettings.Bind(builder.Configuration);
 builder.Services.AddSingleton(Options.Create(settingsForBootCheck));
 
-// A first boot with no DB connection string routes to the minimal setup wizard instead of
-// the rest of this file, until an admin supplies one - see Agrumy.Api/Setup/SetupWizard.cs.
+// A first boot with no DB connection string routes to the minimal setup wizard instead of the rest of this file, until an admin supplies one - see Agrumy.Api/Setup/SetupWizard.cs.
 if (string.IsNullOrWhiteSpace(settingsForBootCheck.DefaultConnection))
 {
     api.Setup.SetupWizard.ConfigureServices(builder);
@@ -63,13 +62,11 @@ builder.Services
     .AddJwtBearer(o => {
         // Same factory JwtTokenProvider.ValidateToken uses - see its BuildValidationParameters for why.
         o.TokenValidationParameters = JwtTokenProvider.BuildValidationParameters(secureKey, jwtIssuer, jwtAudience);
-        // A JWT is self-validating and cannot be un-issued before its own expiry, so a password
-        // change or Enabled->false only takes effect immediately via this extra per-request check.
+        // A JWT is self-validating and cannot be un-issued before its own expiry, so a password change or Enabled->false only takes effect immediately via this extra per-request check.
         o.Events = new JwtBearerEvents { OnTokenValidated = TokenRevocationValidator.ValidateAsync };
     });
 
-// Device-communication endpoints authenticate by apiId/apiKey (or the short-lived apiAuth
-// session token), not a user JWT - see api.Security.DeviceAuth.
+// Device-communication endpoints authenticate by apiId/apiKey (or the short-lived apiAuth session token), not a user JWT - see api.Security.DeviceAuth.
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy(DeviceAuth.ApiKeyPolicy, p => p.AddRequirements(new DeviceApiKeyRequirement()));
@@ -107,16 +104,14 @@ else
 builder.Services.AddScoped<ICache, CacheRepository>();
 builder.Services.AddScoped<DbExceptionFilter>();
 
-// FCM push channel is registered but stays inert until the Android app registers device
-// tokens - see FcmPushNotificationChannel.
+// FCM push channel is registered but stays inert until the Android app registers device tokens - see FcmPushNotificationChannel.
 builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection(NotificationOptions.SectionName));
 builder.Services.AddScoped<INotificationChannel, EmailNotificationChannel>();
 builder.Services.AddScoped<INotificationChannel, FcmPushNotificationChannel>();
 builder.Services.AddScoped<INotificationChannel, WebhookNotificationChannel>();
 builder.Services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
 
-// AllowAutoRedirect=false: a redirect response is treated as a delivery failure rather than
-// followed, same SsrfGuard-bypass concern as HttpFirmwareFetcher below, simpler to just refuse it here.
+// AllowAutoRedirect=false: a redirect response is treated as a delivery failure rather than followed, same SsrfGuard-bypass concern as HttpFirmwareFetcher below, simpler to just refuse it here.
 builder.Services.AddHttpClient(WebhookNotificationChannel.ClientName, client =>
 {
     client.Timeout = TimeSpan.FromSeconds(10);
@@ -124,16 +119,14 @@ builder.Services.AddHttpClient(WebhookNotificationChannel.ClientName, client =>
 })
 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
-// Scoped, not singleton: it resolves scoped repositories/dispatcher itself, and
-// PeriodicBackgroundService creates a fresh DI scope per tick.
+// Scoped, not singleton: it resolves scoped repositories/dispatcher itself, and PeriodicBackgroundService creates a fresh DI scope per tick.
 builder.Services.AddScoped<OfflineAlertEvaluator>();
 builder.Services.AddHostedService<OfflineAlertBackgroundService>();
 
 builder.Services.AddScoped<LowBatteryAlertEvaluator>();
 builder.Services.AddHostedService<LowBatteryAlertBackgroundService>();
 
-// MariaDB retention runs here; PostgreSQL/TimescaleDB installs use
-// EfRepository.ApplyRetentionPolicyAsync (a native TimescaleDB policy) instead.
+// MariaDB retention runs here; PostgreSQL/TimescaleDB installs use EfRepository.ApplyRetentionPolicyAsync (a native TimescaleDB policy) instead.
 builder.Services.AddScoped<SensorDataRetentionEvaluator>();
 builder.Services.AddHostedService<SensorDataRetentionBackgroundService>();
 
@@ -171,8 +164,7 @@ builder.Services.AddScoped<FirmwareCatalogService>();
 builder.Services.AddScoped<FirmwareCatalogRefreshEvaluator>();
 builder.Services.AddHostedService<FirmwareCatalogRefreshBackgroundService>();
 
-// AgrumyMetrics is a singleton because its ConcurrentDictionary aggregate must span every
-// request/scope, unlike the AddScoped registrations above.
+// AgrumyMetrics is a singleton because its ConcurrentDictionary aggregate must span every request/scope, unlike the AddScoped registrations above.
 builder.Services.AddSingleton<AgrumyMetrics>();
 builder.Services
     .AddHealthChecks()
@@ -187,11 +179,7 @@ builder.Services.AddOpenTelemetry()
 
 builder.Services.AddControllers(options => options.Filters.AddService<DbExceptionFilter>());
 
-// Every existing controller is annotated [ApiVersion("1.0")] with its route unchanged - purely
-// additive. AssumeDefaultVersionWhenUnspecified means every current caller (device firmware,
-// Agrumy.Web's Refit client) keeps working with no version info at all, resolving to the same
-// 1.0 action as before. A future breaking change adds a new [ApiVersion("2.0")] controller under
-// its own "api/v2/..." route instead of altering this one, so old and new clients both keep working.
+// AssumeDefaultVersionWhenUnspecified keeps every existing caller (device firmware, Agrumy.Web's Refit client) working unversioned on 1.0; a future breaking change adds its own [ApiVersion("2.0")] controller instead of altering this one.
 builder.Services.AddApiVersioning(options =>
 {
     options.DefaultApiVersion = new ApiVersion(1, 0);
@@ -234,9 +222,7 @@ builder.Services.AddApiVersioning(options =>
     });
 });
 
-// KnownProxies must list only real proxy IPs (Security:KnownProxies, comma-separated) -
-// trusting an arbitrary peer would let any client spoof X-Forwarded-For to both bypass
-// rate limiting and forge its apparent IP everywhere else that reads it.
+// KnownProxies must list only real proxy IPs (Security:KnownProxies) - trusting an arbitrary peer would let any client spoof X-Forwarded-For to bypass rate limiting and forge its apparent IP.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -258,9 +244,7 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // A fixed-window limiter's RetryAfter metadata is exact (window reset time), so a caller
-    // that honors it - notably Agrumy.Gateway, whose 429s reach devices as a "Wait" signal on
-    // their own config-poll - gets a real number instead of guessing a backoff.
+    // A fixed-window limiter's RetryAfter metadata is exact, so a caller that honors it - notably Agrumy.Gateway, forwarding it to devices as a "Wait" signal - gets a real number instead of guessing a backoff.
     options.OnRejected = (context, ct) =>
     {
         if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter))
@@ -293,8 +277,7 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 
-// ClearProviders first, or JSON console just stacks on top of the default plain-text
-// provider CreateBuilder registers.
+// ClearProviders first, or JSON console just stacks on top of the default plain-text provider CreateBuilder registers.
 builder.Logging.ClearProviders();
 if (builder.Environment.IsDevelopment())
 {
@@ -326,18 +309,13 @@ builder.Services.AddHsts(options =>
 
 var app = builder.Build();
 
-// JwtTokenProvider is static (no DI reach) - hand it a logger once so token rejections
-// land in the normal log pipeline instead of vanishing.
+// JwtTokenProvider is static (no DI reach) - hand it a logger once so token rejections land in the normal log pipeline instead of vanishing.
 JwtTokenProvider.Logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(JwtTokenProvider));
 
-// Must run before anything that reads Connection.RemoteIpAddress or Request.Scheme - the
-// rate limiter below, but also UseHttpsRedirection/UseHsts further down.
+// Must run before anything that reads Connection.RemoteIpAddress or Request.Scheme - the rate limiter below, but also UseHttpsRedirection/UseHsts further down.
 app.UseForwardedHeaders();
 
-// MapOpenApi() serves the Microsoft.AspNetCore.OpenApi-generated document; UseSwaggerUI
-// just renders it, pointed at that route instead of a Swashbuckle one. WithDocumentPerVersion
-// generates one document per discovered API version instead of the single hardcoded "v1" this
-// used to be - still just "v1" today since that's the only version that exists.
+// UseSwaggerUI just renders the Microsoft.AspNetCore.OpenApi-generated document; WithDocumentPerVersion generates one per discovered API version instead of a single hardcoded "v1".
 app.MapOpenApi().WithDocumentPerVersion();
 app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "Agrumy Web API v1"));
 
@@ -355,8 +333,7 @@ app.UseMiddleware<SecurityHeadersMiddleware>();
 
 app.UseRouting();
 
-// After UseRouting (needs the matched route pattern) but before rate limiting/auth/the
-// endpoint itself, so recorded duration covers the whole request.
+// After UseRouting (needs the matched route pattern) but before rate limiting/auth/the endpoint itself, so recorded duration covers the whole request.
 app.UseMiddleware<RequestMetricsMiddleware>();
 
 app.UseRateLimiter();
@@ -365,8 +342,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Unauthenticated on purpose: restart/deploy probes and external uptime monitors need to
-// reach this without a JWT; it exposes only up/down + which dependency, nothing sensitive.
+// Unauthenticated on purpose: restart/deploy probes and external uptime monitors need to reach this without a JWT; it exposes only up/down + which dependency, nothing sensitive.
 app.MapHealthChecks("/health", new HealthCheckOptions { ResponseWriter = HealthCheckResponseWriter.WriteResponse });
 
 app.MapGet("/metrics", (AgrumyMetrics metrics) => Results.Json(metrics.GetSnapshot()))

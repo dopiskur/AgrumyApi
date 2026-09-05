@@ -55,7 +55,7 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
-        // A caller-supplied (timeRange, timeMDMY) pair is otherwise unbounded - years/decades would load the device's entire history into memory for in-process aggregation (roadmap #301). Chosen generously above any legitimate chart/report window.
+        // A caller-supplied (timeRange, timeMDMY) pair is otherwise unbounded - years/decades would load the device's entire history into memory for in-process aggregation. Chosen generously above any legitimate chart/report window.
         private const int MaxLookbackDays = 400;
 
         /// UTC so the cutoff compares against UTC DateCreated without a DST-sized skew; never further back than MaxLookbackDays regardless of what the caller asked for.
@@ -415,7 +415,7 @@ namespace api.Dal
                 LiquidPH = r.LiquidPH,
                 RainLevel = r.RainLevel,
                 WaterLevel = r.WaterLevel,
-                Wind = (int?)r.Wind, // SensorDataRow.Wind is int, api.Models.SensorData.Wind is double - see that column's own history
+                Wind = (int?)r.Wind, // SensorDataRow.Wind is int, api.Models.SensorData.Wind is double
                 DateCreated = r.DateCreated,
             }));
             await db.SaveChangesAsync();

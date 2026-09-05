@@ -8,7 +8,7 @@ namespace api.Dal.Interface
         Task UserAddAsync(User user, UserSecret userHash);
         Task UserUpdateAsync(User user);
 
-        /// Registration, atomically: optionally creates a new tenant, adds the user (with TenantID set from whichever tenant applies), issues its first activation token, and seeds its starting role - one transaction, so a crash partway can never leave a user row with no role (roadmap #293). Returns the new IDUser.
+        /// Registration, atomically: optionally creates a new tenant, adds the user (with TenantID set from whichever tenant applies), issues its first activation token, and seeds its starting role - one transaction, so a crash partway can never leave a user row with no role. Returns the new IDUser.
         Task<int> RegisterUserAsync(User user, UserSecret userSecret, int? existingTenantId, string? newTenantName,
             string activationTokenHash, DateTime activationTokenExpiresAtUtc, IEnumerable<string> startingRoles);
 
@@ -46,8 +46,7 @@ namespace api.Dal.Interface
 
         Task<IList<UserRole>> UserRoleGetAsync();
 
-        // A user can hold several roles at once - the userUserRole junction table is the sole
-        // source of truth for this set.
+        // A user can hold several roles at once - the userUserRole junction table is the sole source of truth for this set.
 
         /// Every role name currently assigned to this user via userUserRole - empty (never null) for a user nobody has migrated/assigned yet.
         Task<IReadOnlyList<string>> UserRoleNamesGetAsync(int idUser);

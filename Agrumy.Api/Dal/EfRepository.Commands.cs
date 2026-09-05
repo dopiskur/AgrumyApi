@@ -103,8 +103,7 @@ namespace api.Dal
             {
                 row.ExecutedAt = executedAt;
             }
-            // Frees the (DeviceID, ActiveKey) unique slot the moment this row stops being active -
-            // Acknowledged keeps it set (still active), only the two terminal states clear it.
+            // Frees the (DeviceID, ActiveKey) unique slot the moment this row stops being active - Acknowledged keeps it set, only the two terminal states clear it.
             if (status is CommandStatus.Executed or CommandStatus.Expired)
             {
                 row.ActiveKey = null;
@@ -112,7 +111,7 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
-        /// Bulk-deletes terminal-status (Executed/Expired) rows older than the cutoff - deviceCommand otherwise grows unbounded (roadmap #294), Pending/Acknowledged rows are never touched regardless of age.
+        /// Bulk-deletes terminal-status (Executed/Expired) rows older than the cutoff since deviceCommand otherwise grows unbounded - Pending/Acknowledged rows are never touched regardless of age.
         public async Task PurgeOldCommandsAsync(DateTime issuedBeforeUtc, CancellationToken ct = default)
         {
             int[] terminalStatuses = [(int)CommandStatus.Executed, (int)CommandStatus.Expired];

@@ -100,8 +100,7 @@ namespace api.Controllers.API
             }
             catch (JsonException ex)
             {
-                // A malformed entry must not take the rest of the batch down with it - same reason
-                // SensorController.flushBufferedSensorData() drops a poison file instead of wedging.
+                // A malformed entry must not take the rest of the batch down with it - same reason SensorController.flushBufferedSensorData() drops a poison file instead of wedging.
                 return new GatewayBatchEntryResult { Success = false, StatusCode = 400, Error = "Malformed payload: " + ex.Message };
             }
         }

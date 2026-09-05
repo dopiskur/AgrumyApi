@@ -82,8 +82,7 @@ namespace api.Commands
             return await IssueToTargetsAsync(targets, CommandActionType.ScanForDevices);
         }
 
-        /// Issues a ProvisionDevice command to exactly one device (the roadmap #268 Register flow's
-        /// winning scanning device), carrying payloadJson - see api.Models.DiscoveryProvisionPayload.
+        /// Issues a ProvisionDevice command to exactly one device (the Register flow's winning scanning device), carrying payloadJson - see api.Models.DiscoveryProvisionPayload.
         public async Task<IssueCommandResult> IssueProvisionCommandAsync(int deviceId, string payloadJson)
         {
             DateTime utcNow = DateTime.UtcNow;
@@ -110,10 +109,7 @@ namespace api.Commands
             return new IssueCommandResult(IssueCommandOutcome.AllDuplicates, [], "A provisioning command is already pending for this device.");
         }
 
-        /// Finds the active ProvisionDevice command whose payload targeted this MacAddress (the roadmap
-        /// #268 Register call that led here) and marks it Executed so a later re-registration of the
-        /// same mac never reapplies a stale intent. Null when this MacAddress was never discovered/
-        /// registered through that flow - an ordinary #70 registration.
+        /// Finds the active ProvisionDevice command whose payload targeted this MacAddress and marks it Executed so a later re-registration of the same mac never reapplies a stale intent; null when this mac never went through that discovery/registration flow.
         public async Task<DiscoveryProvisionPayload?> ConsumePendingProvisionAsync(string macAddress)
         {
             foreach (var candidate in await commandRepo.GetActiveProvisionCommandsAsync())
