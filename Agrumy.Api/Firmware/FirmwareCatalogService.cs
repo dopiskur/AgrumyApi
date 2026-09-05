@@ -68,8 +68,10 @@ namespace api.Firmware
             {
                 IList<DeviceFirmware> candidates = await ListForBoardAsync(board);
                 DeviceFirmware? match = device.FirmwareTargetVersion is { Length: > 0 } target
+                    // A pinned target is offered even without a checksum - RequestUpdateAsync already refused to pin one that lacks it, so reaching here with one means an operator explicitly wants it anyway (imported/legacy row).
                     ? candidates.FirstOrDefault(c => FirmwareVersion.AreEqual(c.Version, target))
-                    : candidates.FirstOrDefault();
+                    // "latest" must mean latest the firmware will actually accept - roadmap #292: OtaController.update refuses outright without a valid SHA-256, so offering a checksum-less build here is a silent dead end.
+                    : candidates.FirstOrDefault(c => !string.IsNullOrEmpty(c.Sha256));
                 if (match != null)
                 {
                     return match;
@@ -102,9 +104,15 @@ namespace api.Firmware
                 return "The device has not reported its board yet - only \"latest\" can be requested until it polls with a firmware that does.";
             }
             IList<DeviceFirmware> candidates = await ListForBoardAsync(board);
-            if (!candidates.Any(c => FirmwareVersion.AreEqual(c.Version, normalized)))
+            DeviceFirmware? candidate = candidates.FirstOrDefault(c => FirmwareVersion.AreEqual(c.Version, normalized));
+            if (candidate == null)
             {
                 return $"Version {normalized} is not in the catalog for board {board}.";
+            }
+            // OtaController.update refuses outright without a valid SHA-256 (roadmap #292) - a GitHub release with no manifest.json asset reaches the catalog this way, and arming the flag would just silently do nothing on every future poll.
+            if (string.IsNullOrEmpty(candidate.Sha256))
+            {
+                return $"Version {normalized} has no SHA-256 checksum in the catalog - the device firmware refuses to install it without one.";
             }
             await firmwareRepo.DeviceFirmwareUpdateSetAsync(idDevice, true, normalized);
             return null;

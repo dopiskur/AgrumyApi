@@ -321,8 +321,8 @@ public class FirmwareCatalogServiceTests
     public async Task ResolveOffer_Pinned_Target_Wins_Over_Latest()
     {
         SetSource(FirmwareSource.GitHub);
-        _rows.Add(new DeviceFirmware { IDDeviceFirmware = 1, Board = "esp32dev", Version = "1.0.0", Source = FirmwareSource.GitHub, Url = "u100" });
-        _rows.Add(new DeviceFirmware { IDDeviceFirmware = 2, Board = "esp32dev", Version = "1.1.0", Source = FirmwareSource.GitHub, Url = "u110" });
+        _rows.Add(new DeviceFirmware { IDDeviceFirmware = 1, Board = "esp32dev", Version = "1.0.0", Source = FirmwareSource.GitHub, Url = "u100", Sha256 = "abc100" });
+        _rows.Add(new DeviceFirmware { IDDeviceFirmware = 2, Board = "esp32dev", Version = "1.1.0", Source = FirmwareSource.GitHub, Url = "u110", Sha256 = "abc110" });
         var device = new Device { IDDevice = 1, FirmwareUpdate = true, DeviceTypeID = 3 };
 
         Assert.Equal("1.1.0", (await NewService().ResolveOfferAsync(device, "esp32dev"))!.Version);
@@ -344,7 +344,7 @@ public class FirmwareCatalogServiceTests
     public async Task RequestUpdate_Specific_Version_Must_Exist_For_The_Device_Board()
     {
         SetSource(FirmwareSource.GitHub);
-        _rows.Add(new DeviceFirmware { IDDeviceFirmware = 1, Board = "esp32dev", Version = "1.0.0", Source = FirmwareSource.GitHub });
+        _rows.Add(new DeviceFirmware { IDDeviceFirmware = 1, Board = "esp32dev", Version = "1.0.0", Source = FirmwareSource.GitHub, Sha256 = "abc100" });
         _repo.Setup(r => r.DeviceBoardGetAsync(5)).ReturnsAsync("esp32dev");
         _repo.Setup(r => r.DeviceFirmwareUpdateSetAsync(5, true, "1.0.0")).Returns(Task.CompletedTask);
         var service = NewService();
@@ -364,11 +364,39 @@ public class FirmwareCatalogServiceTests
         _repo.Verify(r => r.DeviceFirmwareUpdateSetAsync(5, true, null), Times.Once);
     }
 
+    // Roadmap #292: a GitHub release with no manifest.json asset reaches the catalog with Sha256=null - OtaController.update refuses to install without one, so "latest" must skip it rather than offer a build that silently never applies.
+    [Fact]
+    public async Task ResolveOffer_Latest_SkipsAChecksumlessBuild_FallsBackToTheNewestWithOne()
+    {
+        SetSource(FirmwareSource.GitHub);
+        _rows.Add(new DeviceFirmware { IDDeviceFirmware = 1, Board = "esp32dev", Version = "1.0.0", Source = FirmwareSource.GitHub, Sha256 = "abc100" });
+        _rows.Add(new DeviceFirmware { IDDeviceFirmware = 2, Board = "esp32dev", Version = "1.1.0", Source = FirmwareSource.GitHub, Sha256 = null }); // no manifest.json on this release
+        var device = new Device { IDDevice = 1, FirmwareUpdate = true, DeviceTypeID = 3 };
+
+        DeviceFirmware? offer = await NewService().ResolveOfferAsync(device, "esp32dev");
+
+        Assert.Equal("1.0.0", offer!.Version); // 1.1.0 is newer but has no checksum, so it must never be offered as "latest"
+    }
+
+    [Fact]
+    public async Task RequestUpdate_RefusesToPinAVersionWithNoChecksum()
+    {
+        SetSource(FirmwareSource.GitHub);
+        _rows.Add(new DeviceFirmware { IDDeviceFirmware = 1, Board = "esp32dev", Version = "1.1.0", Source = FirmwareSource.GitHub, Sha256 = null });
+        _repo.Setup(r => r.DeviceBoardGetAsync(5)).ReturnsAsync("esp32dev");
+        var device = new Device { IDDevice = 5 };
+
+        string? error = await NewService().RequestUpdateAsync(device, "1.1.0");
+
+        Assert.Contains("no SHA-256 checksum", error);
+        // Strict mock: DeviceFirmwareUpdateSetAsync was never set up - proves the flag was never armed.
+    }
+
     [Fact]
     public async Task NoteHeartbeat_Clears_The_Request_Only_When_The_Reported_Version_Matches()
     {
         SetSource(FirmwareSource.GitHub);
-        _rows.Add(new DeviceFirmware { IDDeviceFirmware = 1, Board = "esp32dev", Version = "1.1.0", Source = FirmwareSource.GitHub });
+        _rows.Add(new DeviceFirmware { IDDeviceFirmware = 1, Board = "esp32dev", Version = "1.1.0", Source = FirmwareSource.GitHub, Sha256 = "abc110" });
         _repo.Setup(r => r.DeviceFirmwareUpdateSetAsync(5, false, null)).Returns(Task.CompletedTask);
         var service = NewService();
         var device = new Device { IDDevice = 5, FirmwareUpdate = true };

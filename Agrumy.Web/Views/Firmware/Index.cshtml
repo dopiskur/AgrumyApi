@@ -211,7 +211,16 @@
                             </td>
                             <td class="d-none d-md-table-cell">@(f.SizeBytes is long s ? $"{s / 1024} KB" : "-")</td>
                             <td class="d-none d-md-table-cell">@(f.PublishedAt?.ToString("yyyy-MM-dd") ?? "-")</td>
-                            <td class="d-none d-lg-table-cell"><code class="small">@(f.Sha256 is { Length: > 12 } sha ? sha[..12] + "…" : "-")</code></td>
+                            <td class="d-none d-lg-table-cell">
+                                @if (f.Sha256 is { Length: > 12 } sha)
+                                {
+                                    <code class="small">@(sha[..12])…</code>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-warning" title="No checksum - the device firmware refuses to install this build">no checksum</span>
+                                }
+                            </td>
                             <td>
                                 <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Remove this build from the catalog@(f.Source == FirmwareSource.Local ? " and delete the stored file" : "")?');">
                                     <input type="hidden" name="idDeviceFirmware" value="@f.IDDeviceFirmware" />
