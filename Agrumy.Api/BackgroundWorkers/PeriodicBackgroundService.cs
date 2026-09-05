@@ -1,11 +1,11 @@
 namespace api.BackgroundWorkers
 {
-    /// <summary>Reusable recurring-work base for hosted services. Each tick runs in its own DI scope, since IHostedService is singleton-lifetime and every repository/dispatcher here is scoped; one tick throwing is logged and never kills the loop.</summary>
+    /// Reusable recurring-work base for hosted services; each tick runs in its own DI scope since IHostedService is singleton-lifetime, and one tick throwing is logged without killing the loop.
     public abstract class PeriodicBackgroundService(IServiceScopeFactory scopeFactory, ILogger logger) : BackgroundService
     {
         protected abstract TimeSpan Interval { get; }
 
-        /// <summary>One tick's work, given a fresh DI scope's IServiceProvider. Let it throw - ExecuteAsync isolates one tick's failure from the next.</summary>
+        /// One tick's work, given a fresh DI scope's IServiceProvider; let it throw - ExecuteAsync isolates one tick's failure from the next.
         protected abstract Task DoWorkAsync(IServiceProvider scopedProvider, CancellationToken ct);
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

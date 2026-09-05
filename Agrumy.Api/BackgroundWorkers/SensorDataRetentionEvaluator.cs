@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.BackgroundWorkers
 {
-    /// <summary>MariaDB/MySQL has no equivalent to TimescaleDB's add_retention_policy, so this does a daily DELETE WHERE DateCreated &lt; cutoff (shrinkAfterPurge false: OPTIMIZE TABLE's full rebuild is too expensive to run unattended daily). No-ops on Postgres, where ApplyRetentionPolicyAsync handles it instead.</summary>
+    /// MariaDB/MySQL has no add_retention_policy equivalent, so this daily-DELETEs past the cutoff (no OPTIMIZE TABLE - too expensive to run unattended); no-ops on Postgres, where ApplyRetentionPolicyAsync handles it instead.
     public sealed class SensorDataRetentionEvaluator(
         AgrumyDbContext db, IServerConfigRepository serverConfigRepo, ISensorDataRepository sensorDataRepo)
     {

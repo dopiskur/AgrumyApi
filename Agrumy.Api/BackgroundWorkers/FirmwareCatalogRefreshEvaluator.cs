@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace api.BackgroundWorkers
 {
-    /// <summary>Periodically re-syncs the firmware catalog from its active source, same "fixed 1-minute tick, live-reread interval" pattern as WeatherEvaluator.</summary>
+    /// Periodically re-syncs the firmware catalog from its active source, same fixed-tick/live-reread-interval pattern as WeatherEvaluator.
     public sealed class FirmwareCatalogRefreshEvaluator(
         IServerConfigRepository serverConfigRepo, FirmwareCatalogService catalog, IOptions<AgrumySettings> settingsOptions,
         ILogger<FirmwareCatalogRefreshEvaluator> logger)

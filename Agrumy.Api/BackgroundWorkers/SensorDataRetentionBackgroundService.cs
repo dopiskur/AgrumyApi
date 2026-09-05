@@ -1,6 +1,6 @@
 namespace api.BackgroundWorkers
 {
-    /// <summary>Thin PeriodicBackgroundService wrapper - the actual logic lives in SensorDataRetentionEvaluator, kept separate for testability.</summary>
+    /// Thin PeriodicBackgroundService wrapper - the actual logic lives in SensorDataRetentionEvaluator, kept separate for testability.
     public sealed class SensorDataRetentionBackgroundService(
         IServiceScopeFactory scopeFactory,
         ILogger<SensorDataRetentionBackgroundService> logger)
