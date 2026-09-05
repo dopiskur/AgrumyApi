@@ -3,17 +3,12 @@ using Microsoft.Extensions.Configuration;
 
 namespace api
 {
-    /// <summary>Bind() reads from the real host <see cref="IConfiguration"/> (each process's own
-    /// <c>builder.Configuration</c>), so this respects <c>appsettings.{Environment}.json</c>
-    /// overrides and standard env-var/user-secrets providers, and is constructor-injectable/
-    /// mockable via <c>IOptions&lt;AgrumySettings&gt;</c>.</summary>
+    /// Populated via Bind() from the host's own IConfiguration (env-var/user-secrets overrides included), not a static singleton, so it stays constructor-injectable and mockable.
     public class AgrumySettings
     {
         public string? DefaultConnection { get; set; }
 
-        /// <summary>Raw value of Database:Provider (mysql | mariadb | postgres | postgresql), env
-        /// var AGRUMY_DB_PROVIDER takes precedence. Null/empty =&gt; mysql. Parsed by
-        /// api.Dal.DbProviderKindParser.</summary>
+        /// Raw Database:Provider value (mysql|mariadb|postgres|postgresql); AGRUMY_DB_PROVIDER env var takes precedence, null/empty defaults to mysql via api.Dal.DbProviderKindParser.
         public string? DatabaseProvider { get; set; }
 
         public string? JwtSecureKey { get; set; }
@@ -22,14 +17,10 @@ namespace api
 
         public string? ApiService { get; set; }
 
-        // If true, overwrite the DB serverConfig row's hysteresis fields from
-        // ServerConfig:Hysteresis on every startup instead of only seeding them once when the row
-        // is first created. Defaults false, since leaving it true keeps clobbering any admin-UI
-        // edit on every restart.
+        // Overwrites serverConfig's hysteresis fields from config on every startup instead of seeding once; false by default so it doesn't clobber admin-UI edits on restart.
         public bool ServerConfigReload { get; set; }
 
-        // Fallback hysteresis defaults if ServerConfig:Hysteresis is missing from appsettings.json
-        // entirely (upgrade from an older config file) - same values the firmware used to hardcode.
+        // Fallback hysteresis defaults when ServerConfig:Hysteresis is missing entirely - same values firmware used to hardcode.
         public double HysteresisWaterLevel { get; set; } = 5.0;
         public double HysteresisTemperature { get; set; } = 1.0;
         public double HysteresisHumidity { get; set; } = 5.0;
@@ -39,9 +30,7 @@ namespace api
         public double BatteryLowThreshold { get; set; } = 20.0;
         public double BatteryLowHysteresis { get; set; } = 5.0;
 
-        // WaterPump-only device-side safety limit defaults - 30 min max continuous run and a 5 min
-        // cooldown. Only seeds NEW devices at creation - an existing device's DeviceConfigController
-        // row is never retroactively changed by editing these.
+        // WaterPump-only safety-limit defaults (30min run/5min cooldown); only seeds new devices, never retroactively changes existing DeviceConfigController rows.
         public int WaterPumpMaxRunSeconds { get; set; } = 1800;
         public int WaterPumpCooldownSeconds { get; set; } = 300;
 
@@ -54,38 +43,27 @@ namespace api
         // Hard ceiling is 32 (AgrumyFirmware DeviceModel.h's MAX_RULES), enforced in ServerConfigApiController.Update - this is only the default.
         public int MaxRulesPerZone { get; set; } = 10;
 
-        // Off by default - UserRegistration rejects an unknown tenant name instead of silently
-        // creating one until an admin opts in.
+        // Off by default - UserRegistration rejects unknown tenant names until an admin opts in.
         public bool AllowSelfServiceTenantCreation { get; set; }
 
         // Off by default - gates the Tenant Management menu item alongside the GlobalAdmin role check.
         public bool TenantManagementEnabled { get; set; }
 
-        // No fallback constant - there is no universally-reasonable default IANA zone to assume for
-        // a fleet's physical location. Null (unset) is a valid, common state:
-        // TimeZoneHelper.GetUtcOffsetSeconds treats it as UTC (offset 0) rather than throwing, so
-        // schedule mode is inert-but-safe until an admin sets this on the Server Settings page.
+        // No fallback constant - null is valid and treated as UTC by TimeZoneHelper.GetUtcOffsetSeconds, so schedule mode stays inert-but-safe until an admin sets this.
         public string? ScheduleTimeZone { get; set; }
 
-        // LocalPath: where the Local repository keeps its .bin files (relative to the content root
-        // unless absolute; null = FirmwareStorage.DefaultRelativePath). GitHubRepository: only the
-        // SEED for the DB serverConfig row - the admin page edits the live value. GitHubToken:
-        // optional, see HttpFirmwareFetcher.
+        // FirmwareLocalPath: relative to content root, null = FirmwareStorage.DefaultRelativePath. FirmwareGitHubRepository only seeds serverConfig - the admin page owns the live value.
         public string? FirmwareLocalPath { get; set; }
         public string FirmwareGitHubRepository { get; set; } = "dopiskur/AgrumyFirmware";
         public string? FirmwareGitHubToken { get; set; }
 
-        // Only SEEDS the serverConfig row on first creation - the admin page edits the live value.
-        // Default 24h; null/0 disables auto-refresh (manual-only, the pre-#203 behavior).
+        // Only seeds serverConfig on first creation - the admin page owns the live value; null/0 disables auto-refresh (manual-only).
         public int? FirmwareRefreshIntervalHours { get; set; } = 24;
 
-        // Days of sensorData history to keep automatically - null = admin hasn't opted in yet, data
-        // just accumulates until purged manually.
+        // Days of sensorData history to auto-purge; null = admin hasn't opted in, data just accumulates.
         public int? SensorDataRetentionDays { get; set; }
 
-        // OpenWeatherMap API key - a secret, not an operational admin-tunable value, so it is never
-        // exposed through ServerConfigApiController. Location/poll-interval/threshold ARE
-        // operational and live in api.Models.ServerConfig instead, seeded from the two defaults below.
+        // A secret, never exposed through ServerConfigApiController - unlike location/poll-interval/threshold, which are operational and live in api.Models.ServerConfig instead.
         public string? WeatherApiKey { get; set; }
         public int WeatherPollIntervalMinutes { get; set; } = 15;
         public double WeatherRainSkipThreshold { get; set; } = 50.0;
@@ -124,10 +102,7 @@ namespace api
             WeatherRainSkipThreshold = ParseDoubleOr(configuration, "ServerConfig:WeatherRainSkipThreshold", 50.0),
         };
 
-        // IConfiguration stores every value as its literal JSON text (e.g. "20.0"). Parsing that
-        // with the ambient CultureInfo.CurrentCulture is wrong on any host whose locale uses ","
-        // as the decimal separator (e.g. hr-HR) - "20.0" would parse as 200 or throw. InvariantCulture
-        // makes appsettings.json's "." always mean decimal point, regardless of the OS locale.
+        // CurrentCulture would misparse "20.0" on a comma-decimal locale (e.g. hr-HR); InvariantCulture keeps "." as the decimal point regardless of OS locale.
         private static double ParseDoubleOr(IConfiguration configuration, string key, double fallback) =>
             double.TryParse(configuration.GetSection(key).Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
                 ? value

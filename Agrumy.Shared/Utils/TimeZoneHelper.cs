@@ -1,9 +1,9 @@
 namespace api.Utils
 {
-    /// <summary>UTC-to-user-local display conversion: the database keeps every timestamp in UTC and only the presentation layer converts, using the IANA zone id from user.TimeZone so DST resolves correctly on both Windows and Linux.</summary>
+    /// UTC-to-user-local display conversion: the database keeps every timestamp in UTC and only the presentation layer converts, using the IANA zone id from user.TimeZone so DST resolves correctly on both Windows and Linux.
     public static class TimeZoneHelper
     {
-        /// <summary>Null/empty/unknown zone id falls back to returning the UTC input unchanged — a stale or corrupt stored id must degrade to UTC display, never throw at render time.</summary>
+        /// Null/empty/unknown zone id falls back to returning the UTC input unchanged — a stale or corrupt stored id must degrade to UTC display, never throw at render time.
         public static DateTime ToUserLocalTime(DateTime utcDateTime, string? userTimeZoneId)
         {
             if (string.IsNullOrWhiteSpace(userTimeZoneId))
@@ -27,7 +27,7 @@ namespace api.Utils
             }
         }
 
-        /// <summary>Plain integer offset for the device-side half of schedule-mode relay control - an ESP32 has no timezone database, unlike an IANA id. Null/unknown zone falls back to 0 (UTC).</summary>
+        /// Plain integer offset for the device-side half of schedule-mode relay control - an ESP32 has no timezone database, unlike an IANA id. Null/unknown zone falls back to 0 (UTC).
         public static int GetUtcOffsetSeconds(DateTime utcNow, string? timeZoneId)
         {
             if (string.IsNullOrWhiteSpace(timeZoneId))
@@ -50,7 +50,7 @@ namespace api.Utils
             }
         }
 
-        /// <summary>Validates a caller-supplied zone id and normalizes it to IANA form, so a Windows id still stores as "Europe/Zagreb" - the DB holds one canonical format regardless of which OS served the page.</summary>
+        /// Validates a caller-supplied zone id and normalizes it to IANA form, so a Windows id still stores as "Europe/Zagreb" - the DB holds one canonical format regardless of which OS served the page.
         public static bool TryNormalizeToIana(string? timeZoneId, out string ianaId)
         {
             ianaId = "";
@@ -65,7 +65,7 @@ namespace api.Utils
             return true;
         }
 
-        /// <summary>Dropdown source: (IANA id, display name) pairs, deduplicated by IANA id because several Windows zones map onto one IANA zone.</summary>
+        /// Dropdown source: (IANA id, display name) pairs, deduplicated by IANA id because several Windows zones map onto one IANA zone.
         public static IReadOnlyList<(string Id, string DisplayName)> GetTimeZoneOptions()
         {
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
