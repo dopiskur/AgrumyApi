@@ -629,7 +629,7 @@ namespace api.Dal
             DateTime cutoff = utcNow.AddHours(-SensorTrend.HourBuckets);
 
             var rows = await db.SensorData.AsNoTracking()
-                .Where(s => zoneIds.Contains(s.DeviceUnitZoneID) && s.DateCreated >= cutoff)
+                .Where(s => s.DeviceUnitZoneID != null && zoneIds.Contains(s.DeviceUnitZoneID.Value) && s.DateCreated >= cutoff)
                 .Select(s => new
                 {
                     s.DateCreated, s.Temperature, s.SoilTemperature, s.Humidity, s.Moisture, s.Light,

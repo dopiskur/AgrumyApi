@@ -26,8 +26,8 @@ namespace api.Dal
                     // Identity is server-authoritative - the matching keys in the JSON payload are deliberately ignored.
                     DeviceID = deviceID,
                     TenantID = tenantID,
-                    DeviceUnitID = deviceUnitID ?? 0,
-                    DeviceUnitZoneID = deviceUnitZoneID ?? 0,
+                    DeviceUnitID = deviceUnitID,
+                    DeviceUnitZoneID = deviceUnitZoneID,
                     Battery = ReadInt(o, "battery"),
                     Temperature = ReadDouble(o, "temperature"),
                     SoilTemperature = ReadDouble(o, "soilTemperature"),
@@ -401,8 +401,8 @@ namespace api.Dal
             {
                 TenantID = r.TenantID ?? 0,
                 DeviceID = r.DeviceID ?? 0,
-                DeviceUnitID = r.DeviceUnitID ?? 0,
-                DeviceUnitZoneID = r.DeviceUnitZoneID ?? 0,
+                DeviceUnitID = r.DeviceUnitID,
+                DeviceUnitZoneID = r.DeviceUnitZoneID,
                 Battery = r.Battery,
                 Temperature = r.Temperature,
                 SoilTemperature = r.SoilTemperature,
