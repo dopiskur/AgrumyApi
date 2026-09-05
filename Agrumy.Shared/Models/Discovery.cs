@@ -25,10 +25,7 @@ namespace api.Models
         public DateTime DateReported { get; set; }
     }
 
-    /// <summary>Body of POST /api/Discovery/Register. WifiConfigId/Ssid/WifiPassword/SaveWifiForLater
-    /// are only needed depending on how many TenantWifiConfig rows the tenant already has - see
-    /// DiscoveryApiController.Register for the 0/1/many branching and DiscoveryRegisterOutcome for
-    /// how the caller is told which one applies.</summary>
+    /// Body of POST /api/Discovery/Register - WifiConfigId/Ssid/WifiPassword/SaveWifiForLater are needed depending on how many TenantWifiConfig rows the tenant already has, per DiscoveryApiController.Register's branching (see DiscoveryRegisterOutcome for how the caller learns which one applies).
     public class DiscoveryRegisterRequest
     {
         public string DiscoveredApMac { get; set; } = "";
@@ -51,19 +48,14 @@ namespace api.Models
         AlreadyPending,
     }
 
-    /// <summary>Response of POST /api/Discovery/Register. WifiChoices is populated only for
-    /// WifiConfigChoiceRequired - always Password-stripped, for a picker dropdown, never for display.</summary>
+    /// Response of POST /api/Discovery/Register; WifiChoices is populated only for WifiConfigChoiceRequired, always Password-stripped for a picker dropdown, never for display.
     public class DiscoveryRegisterResult
     {
         public DiscoveryRegisterOutcome Outcome { get; set; }
         public IList<TenantWifiConfig>? WifiChoices { get; set; }
     }
 
-    /// <summary>The DeviceCommand.Payload JSON for a ProvisionDevice command - what the winning
-    /// scanning device needs to complete roadmap #268 step 6 (connect to DiscoveredApMac as a
-    /// client, POST these to its WiFiManager captive portal). DeviceName/UnitID/ZoneID ride along
-    /// for a future step to apply once the device completes its own real /api/Device/Register -
-    /// nothing consumes them yet.</summary>
+    /// The DeviceCommand.Payload JSON for a ProvisionDevice command - what the winning scanning device needs to connect to DiscoveredApMac as a client and POST these to its WiFiManager captive portal; DeviceName/UnitID/ZoneID ride along for a future step once the device completes its own /api/Device/Register, unused today.
     public class DiscoveryProvisionPayload
     {
         public string Username { get; set; } = "";

@@ -8,9 +8,7 @@
         public string? ScheduleTimeZone { get; set; }
     }
 
-    /// <summary>One saved WiFi AP a tenant's admin can hand to a newly discovered device
-    /// (roadmap #268) instead of typing it in again on every Register. Password is omitted from
-    /// any list response the UI uses just to pick one (see DiscoveryApiController.Register).</summary>
+    /// One saved WiFi AP a tenant's admin can hand to a newly discovered device instead of typing it in again on every Register; Password is omitted from any list response the UI uses just to pick one (see DiscoveryApiController.Register).
     public class TenantWifiConfig
     {
         public int IDTenantWifiConfig { get; set; }

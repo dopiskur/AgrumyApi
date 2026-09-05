@@ -1,6 +1,6 @@
 namespace api.Utils
 {
-    /// NOAA solar-position formulas (the same ones behind NOAA's published sunrise/sunset calculator, ~1 minute accuracy) - used by api.Devices.AstronomicalRuleResolver (#228) to turn a lat/lon into today's sunrise/sunset. Longitude is positive East, matching ServerConfig.WeatherLocationLon/the OpenWeatherMap client already in this codebase.
+    /// NOAA solar-position formulas (the same ones behind NOAA's published sunrise/sunset calculator, ~1 minute accuracy) - used by api.Devices.AstronomicalRuleResolver to turn a lat/lon into today's sunrise/sunset. Longitude is positive East, matching ServerConfig.WeatherLocationLon/the OpenWeatherMap client already in this codebase.
     public static class SolarCalculator
     {
         /// Seconds since local midnight for sunrise/sunset on localDate, or null for either when the sun never rises/sets that day (polar day/night) at this latitude.

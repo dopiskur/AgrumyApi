@@ -16,7 +16,7 @@ namespace api.Models
         public int TenantID { get; set; } = 0;
 
         public int? DeviceTypeID { get; set; } = 0;
-        // No default (unlike DeviceTypeID above) - null means genuinely unassigned; 0 used to be a sentinel here, now that the column allows real NULL there is no reason left to default to it.
+        // No default (unlike DeviceTypeID above) - null means genuinely unassigned, not a 0-as-sentinel value.
         [HiddenInput(DisplayValue = true)]
         public int? DeviceUnitID { get; set; }
         [HiddenInput(DisplayValue = true)]
@@ -391,7 +391,7 @@ namespace api.Models
 
     }
 
-    /// One physically-wired relay slot and the RelayFunction assigned to it - Slot is 1-based, matching AgrumyFirmware's ConfigPin.RELAY_PINS[Slot-1]. A slot with no row is unassigned/disabled; there is no fixed count baked into this shape (roadmap #309 - the old design capped every device at exactly 8 via Relay1..Relay8 columns).
+    /// One physically-wired relay slot and the RelayFunction assigned to it - Slot is 1-based, matching AgrumyFirmware's ConfigPin.RELAY_PINS[Slot-1]. A slot with no row is unassigned/disabled; there is no fixed count baked into this shape, unlike the old fixed Relay1..Relay8 columns.
     public class DeviceRelaySlot
     {
         public int Slot { get; set; }
@@ -422,7 +422,7 @@ namespace api.Models
 
         // Physical/hardware, stays per-device.
         public bool? RelayEnabled { get; set; }
-        // One entry per assigned slot only (roadmap #309) - an unlisted slot is unassigned/disabled.
+        // One entry per assigned slot only - an unlisted slot is unassigned/disabled.
         public IList<DeviceRelaySlot> Relays { get; set; } = [];
     }
 

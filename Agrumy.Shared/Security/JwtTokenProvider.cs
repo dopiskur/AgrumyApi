@@ -75,7 +75,7 @@ namespace api.Security
         /// Every role claim on a valid token, or null if the token is invalid/expired/wrongly-signed. An empty (non-null) list means the token validated but carried no roles — callers must treat that as "no roles", not "check failed".
         public static IReadOnlyList<string>? ValidateToken(string token) => ValidateToken(token, Config.secureKey);
 
-        /// The one place TokenValidationParameters is built - Agrumy.Api's AddJwtBearer (Program.cs) uses this too, so the #218 ClockSkew-mismatch bug class (two independently hand-written parameter sets drifting apart) is now structurally impossible rather than merely tested for.
+        /// The one place TokenValidationParameters is built - Agrumy.Api's AddJwtBearer (Program.cs) uses this too, so two independently hand-written parameter sets can no longer drift apart on ClockSkew or any other setting.
         public static TokenValidationParameters BuildValidationParameters(string secureKey, string? issuer, string? audience) => new()
         {
             ValidateIssuerSigningKey = true,
