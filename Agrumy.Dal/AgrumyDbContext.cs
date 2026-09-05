@@ -133,9 +133,6 @@ namespace api.Dal
                 e.ToTable("serverConfig");
                 e.HasKey(x => x.IDServerConfig);
                 e.Property(x => x.IDServerConfig).ValueGeneratedNever();
-                e.Property(x => x.ServerConfigName).HasMaxLength(100);
-                e.Property(x => x.ConfigKey).HasMaxLength(128).IsRequired();
-                e.Property(x => x.ServerConfigCol).HasColumnName("serverConfigcol").HasMaxLength(45);
                 e.Property(x => x.FirmwareGitHubRepository).HasMaxLength(200);
                 e.Property(x => x.FirmwareCustomRepositoryUrl).HasMaxLength(500);
             });

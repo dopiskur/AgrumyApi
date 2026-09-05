@@ -362,8 +362,6 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var b = await _repo.ServerConfigGetAsync(id);
 
         Assert.Equal(id, a.IDServerConfig);
-        Assert.False(string.IsNullOrWhiteSpace(a.ConfigKey));
-        Assert.Equal(a.ConfigKey, b.ConfigKey);
         Assert.Equal(80, a.PortHTTP);
         Assert.Equal(443, a.PortHTTPS);
     }

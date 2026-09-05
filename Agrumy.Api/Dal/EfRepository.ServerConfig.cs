@@ -21,8 +21,6 @@ namespace api.Dal
             var generated = new ServerConfigRow
             {
                 IDServerConfig = idServerConfig,
-                ServerConfigName = "DefaultGenerated" + idServerConfig,
-                ConfigKey = Guid.NewGuid().ToString(),
                 PortHTTP = 80,
                 PortHTTPS = 443,
                 WaterLevelHysteresis = settings.HysteresisWaterLevel,
@@ -120,8 +118,6 @@ namespace api.Dal
                 row = new ServerConfigRow
                 {
                     IDServerConfig = idServerConfig,
-                    ServerConfigName = "DefaultGenerated" + idServerConfig,
-                    ConfigKey = Guid.NewGuid().ToString(),
                     PortHTTP = 80,
                     PortHTTPS = 443,
                 };
@@ -178,8 +174,6 @@ namespace api.Dal
         private ServerConfig ToDto(ServerConfigRow r) => new()
         {
             IDServerConfig = r.IDServerConfig,
-            ServerConfigName = r.ServerConfigName,
-            ConfigKey = r.ConfigKey,
             PortHTTP = r.PortHTTP,
             PortHTTPS = r.PortHTTPS,
             WaterLevelHysteresis = r.WaterLevelHysteresis,

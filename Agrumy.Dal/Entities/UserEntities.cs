@@ -88,12 +88,9 @@ namespace api.Dal.Entities
     public class ServerConfigRow
     {
         public int IDServerConfig { get; set; }
-        public string? ServerConfigName { get; set; }
-        public string ConfigKey { get; set; } = "";
         public string? JWTKey { get; set; }
         public int? PortHTTP { get; set; }
         public int? PortHTTPS { get; set; }
-        public string? ServerConfigCol { get; set; }
 
         // Server-wide hysteresis defaults - see api.Models.ServerConfig for the full story.
         public double? WaterLevelHysteresis { get; set; }
