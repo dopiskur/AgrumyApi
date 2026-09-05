@@ -41,6 +41,20 @@ namespace api.Controllers.API
             };
         }
 
+        /// Status of one previously-issued command - the roadmap #294 gap: IssueCommand's CreatedCommandIds had no way to check on afterward short of direct DB access.
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpGet("{idDeviceCommand}")]
+        public async Task<ActionResult<DeviceCommand>> GetCommand(int idDeviceCommand)
+        {
+            DeviceCommand? command = await Repo.GetCommandByIdAsync(idDeviceCommand);
+            if (command == null)
+            {
+                return NotFound();
+            }
+            var (_, error) = await EnsureOwnedDeviceAsync(command.DeviceID);
+            return error ?? Ok(command);
+        }
+
         private Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(int idDevice) =>
             EnsureOwnedDeviceEntityAsync(() => Repo.DeviceGetByIdAsync(idDevice), d => d.TenantID, "Device", forWrite: true);
 

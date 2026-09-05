@@ -230,6 +230,34 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.False(await _repo.TenantGetAsync(newTenantName)); // the tenant the failed registration would have created must not exist either
     }
 
+    // Roadmap #294: deviceCommand otherwise grows unbounded - only terminal (Executed/Expired) rows older than the cutoff are purged, Pending/Acknowledged and recent rows are left alone regardless of status.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task PurgeOldCommands_DeletesOnlyOldTerminalRows(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+        DateTime now = DateTime.UtcNow;
+
+        await using (var db = _fx.NewContext(t))
+        {
+            db.DeviceCommands.AddRange(
+                new DeviceCommandRow { DeviceID = d.IDDevice!.Value, ActionType = (int)CommandActionType.Reboot, Status = (int)CommandStatus.Executed, IssuedAt = now.AddDays(-40), ExpiresAt = now.AddDays(-40) }, // old + terminal - purged
+                new DeviceCommandRow { DeviceID = d.IDDevice!.Value, ActionType = (int)CommandActionType.ForceOTA, Status = (int)CommandStatus.Expired, IssuedAt = now.AddDays(-40), ExpiresAt = now.AddDays(-40) }, // old + terminal - purged
+                new DeviceCommandRow { DeviceID = d.IDDevice!.Value, ActionType = (int)CommandActionType.ForceConfigSync, Status = (int)CommandStatus.Executed, IssuedAt = now.AddDays(-1), ExpiresAt = now.AddDays(-1) }, // terminal but recent - kept
+                new DeviceCommandRow { DeviceID = d.IDDevice!.Value, ActionType = (int)CommandActionType.Reboot, Status = (int)CommandStatus.Pending, ExpiresAt = now.AddDays(40), IssuedAt = now.AddDays(-40) }); // old but still active - kept
+            await db.SaveChangesAsync();
+        }
+
+        await _repo.PurgeOldCommandsAsync(now.AddDays(-30));
+
+        await using var verify = _fx.NewContext(t);
+        List<int> remainingStatuses = await verify.DeviceCommands.Where(c => c.DeviceID == d.IDDevice!.Value).Select(c => c.Status).ToListAsync();
+        Assert.Equal(2, remainingStatuses.Count);
+        Assert.Contains((int)CommandStatus.Executed, remainingStatuses); // the recent one
+        Assert.Contains((int)CommandStatus.Pending, remainingStatuses);  // the old-but-active one
+    }
+
     // Roadmap #310: user.TenantID and eventDevice(DeviceID, Date) had no index - every tenant-scoped user list and every device-events/problem-alert scan filtered these columns with a full table scan.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task MissingIndexes_310_NowExist(DbProviderKind provider)

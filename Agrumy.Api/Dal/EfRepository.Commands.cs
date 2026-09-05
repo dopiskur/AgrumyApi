@@ -112,6 +112,15 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
+        /// Bulk-deletes terminal-status (Executed/Expired) rows older than the cutoff - deviceCommand otherwise grows unbounded (roadmap #294), Pending/Acknowledged rows are never touched regardless of age.
+        public async Task PurgeOldCommandsAsync(DateTime issuedBeforeUtc, CancellationToken ct = default)
+        {
+            int[] terminalStatuses = [(int)CommandStatus.Executed, (int)CommandStatus.Expired];
+            await db.DeviceCommands
+                .Where(c => terminalStatuses.Contains(c.Status) && c.IssuedAt < issuedBeforeUtc)
+                .ExecuteDeleteAsync(ct);
+        }
+
         private static DeviceCommand ToDto(DeviceCommandRow c) => new()
         {
             IDDeviceCommand = c.IDDeviceCommand,

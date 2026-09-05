@@ -37,6 +37,8 @@ public class ApiControllerTests
             new api.Devices.DeviceConfigBuilder(_repo.Object, catalog), TestSettings);
     }
     private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _jobQueue, TestSettings);
+    private DeviceCommandApiController NewDeviceCommandController() =>
+        new(_repo.Object, _cache.Object, new CommandQueueService(_repo.Object, _repo.Object, _repo.Object));
 
     /// UserApiController enqueues notification jobs instead of dispatching them inline (roadmap #305) - this runs the one job a test expects to have been queued against a fake scope resolving the same mocks, then lets the test assert on _notifications/_repo as before.
     private async Task RunOneQueuedJobAsync()
@@ -2375,6 +2377,47 @@ public class ApiControllerTests
         Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
         // Strict mock: an un-set-up TenantGetByIdAsync/AuditLogAddAsync call would throw, proving the export never ran.
     }
+
+    // Roadmap #294: IssueCommand's CreatedCommandIds had no way to check on afterward short of direct DB access.
+    [Fact]
+    public async Task GetCommand_OwnTenant_ReturnsStatus()
+    {
+        _repo.Setup(r => r.GetCommandByIdAsync(9)).ReturnsAsync(new DeviceCommand { IDDeviceCommand = 9, DeviceID = 8, ActionType = CommandActionType.Reboot, Status = CommandStatus.Pending });
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 1 });
+
+        var controller = NewDeviceCommandController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantDevice);
+        var result = await controller.GetCommand(9);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(CommandStatus.Pending, ((DeviceCommand)ok.Value!).Status);
+    }
+
+    [Fact]
+    public async Task GetCommand_UnknownId_Returns404()
+    {
+        _repo.Setup(r => r.GetCommandByIdAsync(9)).ReturnsAsync((DeviceCommand?)null);
+
+        var controller = NewDeviceCommandController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantDevice);
+        var result = await controller.GetCommand(9);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task GetCommand_ForeignTenant_Returns403()
+    {
+        _repo.Setup(r => r.GetCommandByIdAsync(9)).ReturnsAsync(new DeviceCommand { IDDeviceCommand = 9, DeviceID = 8, ActionType = CommandActionType.Reboot, Status = CommandStatus.Pending });
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 99 });
+
+        var controller = NewDeviceCommandController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantDevice);
+        var result = await controller.GetCommand(9);
+
+        var obj = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(403, obj.StatusCode);
+    }
 }
 
 /// Regression guards for the Phase 2 role gates: asserts the [Authorize] attribute's role list rather than driving a request.
@@ -2432,4 +2475,5 @@ public class RoleGateAuthorizationTests
         Assert.Contains(controller.GetMethod("MappingDelete")!.GetCustomAttributes(inherit: true),
             a => a is Microsoft.AspNetCore.Mvc.ValidateAntiForgeryTokenAttribute);
     }
+
 }

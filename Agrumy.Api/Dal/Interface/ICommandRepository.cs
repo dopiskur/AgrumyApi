@@ -23,5 +23,8 @@ namespace api.Dal.Interface
         Task<DeviceCommand?> GetCommandByIdAsync(int commandId);
 
         Task SetCommandStatusAsync(int commandId, CommandStatus status, DateTime? executedAt = null);
+
+        /// Deletes every terminal-status (Executed/Expired) row issued before the cutoff - deviceCommand has no other cleanup mechanism.
+        Task PurgeOldCommandsAsync(DateTime issuedBeforeUtc, CancellationToken ct = default);
     }
 }

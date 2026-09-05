@@ -136,6 +136,9 @@ builder.Services.AddHostedService<LowBatteryAlertBackgroundService>();
 builder.Services.AddScoped<SensorDataRetentionEvaluator>();
 builder.Services.AddHostedService<SensorDataRetentionBackgroundService>();
 
+builder.Services.AddScoped<DeviceCommandRetentionEvaluator>();
+builder.Services.AddHostedService<DeviceCommandRetentionBackgroundService>();
+
 builder.Services.AddHttpClient<IWeatherForecastClient, OpenWeatherMapClient>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(15);
