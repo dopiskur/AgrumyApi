@@ -5,8 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IFirmwareRepository members - the catalog rows themselves; the legacy
-    /// board-less DeviceFirmwareLatestGetAsync lookup lives in EfRepository.Devices.Firmware.cs.</summary>
+    /// IFirmwareRepository members - the catalog rows themselves; the legacy board-less DeviceFirmwareLatestGetAsync lookup lives in EfRepository.Devices.Firmware.cs.
     internal partial class EfRepository
     {
         public async Task<IList<DeviceFirmware>> FirmwareListAsync()

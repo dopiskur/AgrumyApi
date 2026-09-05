@@ -5,8 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IUserRepository members: bootstrap admin - the "is there a pending first-run admin"
-    /// check and its one-time password set.</summary>
+    /// IUserRepository members: bootstrap admin - the "is there a pending first-run admin" check and its one-time password set.
     internal partial class EfRepository
     {
         public async Task<bool> BootstrapAdminPendingAsync()
@@ -23,10 +22,7 @@ namespace api.Dal
                 return false;
             }
 
-            // WHERE PwdHash IS NULL, not a Login/email match - this is what makes the door close
-            // permanently once used. Clearing the BootstrapSecret* columns here isn't load-bearing
-            // for replay (PwdHash IS NULL already stops that) but leaves no live secret hash sitting
-            // around once it has served its purpose.
+            // WHERE PwdHash IS NULL (not a Login/email match) is what makes the door close permanently once used - clearing BootstrapSecret* isn't load-bearing for replay but leaves no live secret hash lying around.
             int rows = await db.Users.Where(u => u.PwdHash == null)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(u => u.PwdHash, secret.PwdHash)

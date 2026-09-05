@@ -18,8 +18,7 @@ namespace api.Dal
                 c.ExpiresAt > utcNow);
         }
 
-        /// <summary>Null return means the ux_deviceCommand_device_activekey unique index rejected
-        /// the insert - another request won the same check-then-insert race; the caller treats this device as a dedup skip, not an error.</summary>
+        /// Null return means the ux_deviceCommand_device_activekey unique index rejected the insert (another request won the race) - the caller treats this as a dedup skip, not an error.
         public async Task<int?> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt, string? payload = null)
         {
             var row = new DeviceCommandRow
@@ -47,9 +46,7 @@ namespace api.Dal
             }
             catch (DbUpdateException ex) when (ClassifyException(ex) == DbFailureKind.ConstraintViolation)
             {
-                // SaveChangesAsync runs both statements in one transaction, so nothing was actually
-                // persisted - detach/revert so the change tracker matches that and a later
-                // SaveChangesAsync on this same context doesn't retry either statement.
+                // SaveChangesAsync runs both statements in one transaction, so nothing was actually persisted - detach/revert so a later SaveChangesAsync on this context doesn't retry either statement.
                 db.Entry(row).State = EntityState.Detached;
                 if (device != null)
                 {

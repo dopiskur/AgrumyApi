@@ -4,8 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IUserRepository members: email activation - issuing/reissuing an activation token
-    /// and redeeming it.</summary>
+    /// IUserRepository members: email activation - issuing/reissuing an activation token and redeeming it.
     internal partial class EfRepository
     {
 

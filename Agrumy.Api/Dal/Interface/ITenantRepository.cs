@@ -16,8 +16,7 @@ namespace api.Dal.Interface
         /// True only when TenantID=0 has no devices and at most the single still-unclaimed bootstrap admin row (see EfRepository.SeedBootstrapAdminAsync) - any real device or claimed user means ImportAsSentinel must refuse rather than overwrite them.
         Task<bool> TenantZeroIsEmptyAsync();
 
-        /// <summary>Every saved WiFi AP for this tenant - roadmap #268 Register's 0/1/many
-        /// branching (DiscoveryApiController.Register) decides what to do based on this count.</summary>
+        /// Every saved WiFi AP for this tenant - DiscoveryApiController.Register's 0/1/many branching decides what to do based on this count.
         Task<IList<TenantWifiConfig>> TenantWifiConfigsGetAsync(int tenantID);
 
         Task<TenantWifiConfig> TenantWifiConfigAddAsync(TenantWifiConfig config);

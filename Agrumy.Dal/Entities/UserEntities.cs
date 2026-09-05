@@ -9,7 +9,7 @@ namespace api.Dal.Entities
         public DateTime? DateCreated { get; set; }
     }
 
-    /// <summary>See api.Models.TenantWifiConfig.</summary>
+    /// See api.Models.TenantWifiConfig.
     public class TenantWifiConfigRow
     {
         public int IDTenantWifiConfig { get; set; }

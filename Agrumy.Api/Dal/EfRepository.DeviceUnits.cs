@@ -6,8 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IDeviceUnitRepository members: Unit/Zone CRUD, device assignment, and the
-    /// hierarchical dashboard aggregation.</summary>
+    /// IDeviceUnitRepository members: Unit/Zone CRUD, device assignment, and the hierarchical dashboard aggregation.
     internal partial class EfRepository
     {
         /// A record, not the SensorData DTO - carries only what dashboard aggregation needs.
@@ -140,8 +139,7 @@ namespace api.Dal
             await DeviceUnitZoneConfigVersionBumpAsync(idDeviceUnitZone: row.IDDeviceUnitZone);
         }
 
-        /// <summary>Bumps ConfigVersion for every device in the zone (bulk update, not
-        /// fetch-then-loop) so the next config poll picks up a zone-level rule/safety-limit change.</summary>
+        /// Bumps ConfigVersion for every device in the zone (bulk update, not fetch-then-loop) so the next poll picks up a zone-level rule/safety-limit change.
         public async Task DeviceUnitZoneConfigVersionBumpAsync(int idDeviceUnitZone)
         {
             await db.Devices.Where(d => d.DeviceUnitZoneID == idDeviceUnitZone)
@@ -416,10 +414,7 @@ namespace api.Dal
             return (expiryHours, config.ProblemEventAlertsEnabled);
         }
 
-        /// <summary>Latest telemetry per device in <paramref name="devices"/> - EF cannot translate
-        /// a whole-row correlated subquery, so this pulls the latest SensorData id per device via
-        /// scalar subqueries (portable across MySQL/MariaDB/Postgres, no LATERAL/APPLY) then
-        /// batch-fetches the rows.</summary>
+        /// Latest telemetry per device - EF can't translate a whole-row correlated subquery, so this pulls the latest SensorData id per device via portable scalar subqueries, then batch-fetches the rows.
         private async Task<List<UnitZoneDeviceSnapshot>> GetDeviceSnapshotsAsync(IQueryable<DeviceRow> devices, int problemEventExpiryHours, bool problemEventAlertsEnabled)
         {
             DateTime utcNow = DateTime.UtcNow;
@@ -467,14 +462,10 @@ namespace api.Dal
             }).ToList();
         }
 
-        /// <summary>Not just the age-out'able carrier for JOIN projection - lets the alert list group
-        /// by unit/zone without a second round trip to look either up from DeviceID.</summary>
+        /// Carries JOIN projection fields - lets the alert list group by unit/zone without a second round trip to look either up from DeviceID.
         private sealed record UnitZoneProblemAlertRow(int? DeviceUnitID, int? DeviceUnitZoneID, int IDEventDevice, int DeviceID, string? DeviceName, int EventID, DateTime? Date, string? Message);
 
-        /// <summary>Every un-acknowledged problem event still inside the expiry window, for devices
-        /// in <paramref name="devices"/> - the same predicate GetDeviceSnapshotsAsync's
-        /// HasRecentProblemEvent uses, just returning the actual rows instead of a bool so the
-        /// dashboard can show what triggered Orange, not just that something did.</summary>
+        /// Every un-acknowledged problem event still inside the expiry window - same predicate as GetDeviceSnapshotsAsync's HasRecentProblemEvent, but returns the actual rows so the dashboard can show what triggered Orange.
         private async Task<List<UnitZoneProblemAlertRow>> GetProblemAlertsAsync(IQueryable<DeviceRow> devices, int problemEventExpiryHours, bool problemEventAlertsEnabled)
         {
             if (!problemEventAlertsEnabled)
@@ -505,10 +496,7 @@ namespace api.Dal
             Message = a.Message,
         };
 
-        /// <summary>Red beats Orange beats Green. Only ENABLED devices' online state counts toward
-        /// Red; a disabled device can never redden its zone, but it still shows a red "Offline"
-        /// badge on its own Fleet/zone row, so it turns the zone/unit Orange instead of leaving it
-        /// silently Green.</summary>
+        /// Red beats Orange beats Green - only enabled devices' online state counts toward Red, so a disabled-but-offline device turns the zone/unit Orange instead of Green.
         private static ZoneStatus ComputeStatus(IReadOnlyCollection<UnitZoneDeviceSnapshot> snapshots)
         {
             if (snapshots.Any(s => s.Enabled && !s.Online))
@@ -522,10 +510,7 @@ namespace api.Dal
             return ZoneStatus.Green;
         }
 
-        /// <summary>Last-24h hourly average per sensor type across every device in the given zones.
-        /// Filters sensorData directly by DeviceUnitZoneID rather than going through
-        /// GetDeviceSnapshotsAsync's per-device shape, since a trend needs every reading in the
-        /// window, not just the latest one - ix_sensorData_deviceUnitZone_date backs this.</summary>
+        /// Last-24h hourly average per sensor type across the given zones - filters sensorData directly by DeviceUnitZoneID (ix_sensorData_deviceUnitZone_date) since a trend needs every reading, not just the latest.
         private async Task<SensorTrend> BuildTrendAsync(List<int> zoneIds)
         {
             var trend = new SensorTrend();
@@ -572,15 +557,11 @@ namespace api.Dal
             return trend;
         }
 
-        /// <summary>0 = the bucket ending 24h ago (oldest) .. 23 = the bucket ending now (current
-        /// hour). A timestamp older than the 24h window or (defensively) in the future falls
-        /// outside [0, HourBuckets) - the caller filters those out.</summary>
+        /// 0 = the bucket ending 24h ago, 23 = the current hour - a timestamp outside the 24h window (or, defensively, in the future) falls outside [0, HourBuckets), which the caller filters out.
         private static int HourBucketIndex(DateTime dateCreated, DateTime utcNow) =>
             SensorTrend.HourBuckets - 1 - (int)Math.Floor((utcNow - dateCreated).TotalHours);
 
-        /// <summary>Per-sensor-type average across snapshots, each type independent - LINQ's
-        /// nullable Average() already ignores null elements and returns null (not an exception) for
-        /// an empty/all-null source, which is exactly "no device in scope has reported this type".</summary>
+        /// Per-sensor-type average across snapshots - LINQ's nullable Average() already ignores nulls and returns null (not an exception) for an all-null source, exactly "no device reported this type".
         private static SensorAverages Average(IReadOnlyCollection<UnitZoneDeviceSnapshot> snapshots) => new()
         {
             Temperature = snapshots.Select(s => s.Temperature).Average(),

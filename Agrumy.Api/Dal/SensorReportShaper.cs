@@ -4,16 +4,10 @@ using api.Utils;
 
 namespace api.Dal
 {
-    /// <summary>
-    /// Time-bucket grouping and JSON assembly only; the caller (<see cref="EfRepository.SensorDataGetAsync"/>)
-    /// does the row filter. <c>timeMDMY</c> buckets: 0 =&gt; minute, 1 =&gt; hour, 2/3 =&gt; day. One row
-    /// per bucket, pinned to "latest by DateCreated".
-    /// </summary>
+    /// Time-bucket grouping and JSON assembly only (the caller does the row filter) - timeMDMY buckets: 0=minute, 1=hour, 2/3=day; one row per bucket, pinned to latest by DateCreated.
     internal static class SensorReportShaper
     {
-        /// <returns>
-        /// JSON <c>{"sensorData":[...]}</c>, or <c>""</c> when no rows match (the proc returned SQL NULL, read as <c>""</c>).
-        /// </returns>
+        /// <returns>JSON {"sensorData":[...]}, or "" when no rows match.</returns>
         public static string Build(IEnumerable<SensorDataRow> filteredRows, int timeMDMY)
         {
             var buckets = filteredRows
@@ -61,10 +55,7 @@ namespace api.Dal
             };
         }
 
-        /// <summary>Same bucketing as <see cref="Build"/>, but a zone/unit can span several devices - each
-        /// bucket averages every contributing row instead of picking the single latest one. A metric only
-        /// one device in scope reports averages over just that one value, which is the same number as
-        /// showing it directly; nulls are excluded from the average rather than treated as zero.</summary>
+        /// Same bucketing as Build, but a zone/unit can span several devices - each bucket averages every contributing row instead of picking the single latest one, nulls excluded rather than treated as zero.
         public static string BuildAveraged(IEnumerable<SensorDataRow> filteredRows, int timeMDMY)
         {
             var buckets = filteredRows
