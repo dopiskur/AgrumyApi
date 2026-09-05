@@ -2128,4 +2128,14 @@ public class RoleGateAuthorizationTests
         Assert.DoesNotContain(RoleNames.TenantUser, RoleNames.Admins);
         Assert.DoesNotContain(RoleNames.GlobalUser, RoleNames.Admins);
     }
+
+    [Fact]
+    public void RelayController_MappingWrites_RequireAntiForgeryToken()
+    {
+        var controller = typeof(api.Controllers.View.RelayController);
+        Assert.Contains(controller.GetMethod("MappingAdd")!.GetCustomAttributes(inherit: true),
+            a => a is Microsoft.AspNetCore.Mvc.ValidateAntiForgeryTokenAttribute);
+        Assert.Contains(controller.GetMethod("MappingDelete")!.GetCustomAttributes(inherit: true),
+            a => a is Microsoft.AspNetCore.Mvc.ValidateAntiForgeryTokenAttribute);
+    }
 }

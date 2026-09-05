@@ -36,6 +36,7 @@ namespace api.Controllers.View
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<ActionResult> MappingAdd(int idRelayDevice, string devEUI, int idDevice)
         {
             await api.RelayDeviceMappingAdd(new RelayDeviceMapping
@@ -48,6 +49,7 @@ namespace api.Controllers.View
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<ActionResult> MappingDelete(int idRelayDeviceMapping, int idRelayDevice)
         {
             await api.RelayDeviceMappingDelete(idRelayDeviceMapping, idRelayDevice);
