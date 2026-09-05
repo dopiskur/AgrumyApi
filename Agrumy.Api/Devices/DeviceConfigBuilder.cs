@@ -53,6 +53,7 @@ namespace api.Devices
                 Reset = device.Reset,
                 FirmwareUpdate = device.FirmwareUpdate,
                 Enabled = device.Enabled,
+                EmergencyStop = tenant?.EmergencyStopActive == true,
                 CommandVersion = device.CommandVersion,
                 PendingCommand = pendingCommand,
             };

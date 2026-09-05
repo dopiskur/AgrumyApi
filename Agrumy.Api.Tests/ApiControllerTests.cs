@@ -1790,6 +1790,78 @@ public class ApiControllerTests
         Assert.Null(saved!.ScheduleTimeZone);
     }
 
+    [Fact]
+    public async Task EmergencyStopActivate_OwnTenant_Succeeds_AndAudits()
+    {
+        _repo.Setup(r => r.TenantEmergencyStopSetAsync(5, true)).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+
+        var controller = NewTenantController();
+        SetCallerRoles(controller, 5, RoleNames.TenantDevice);
+
+        var result = await controller.EmergencyStopActivate();
+
+        Assert.IsType<OkResult>(result);
+        _repo.Verify(r => r.TenantEmergencyStopSetAsync(5, true), Times.Once);
+    }
+
+    [Fact]
+    public async Task EmergencyStopActivate_AnotherTenant_Returns403_AndNeverWrites()
+    {
+        var controller = NewTenantController();
+        SetCallerRoles(controller, 5, RoleNames.TenantDevice);
+
+        var result = await controller.EmergencyStopActivate(idTenant: 6);
+
+        var status = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(403, status.StatusCode);
+        // MockBehavior.Strict: TenantEmergencyStopSetAsync has no setup, proving cross-tenant was rejected before any write.
+    }
+
+    [Fact]
+    public async Task EmergencyStopActivate_GlobalAdmin_CanTargetAnyTenant()
+    {
+        _repo.Setup(r => r.TenantEmergencyStopSetAsync(6, true)).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+
+        var controller = NewTenantController();
+        SetCallerRoles(controller, 0, RoleNames.GlobalAdmin);
+
+        var result = await controller.EmergencyStopActivate(idTenant: 6);
+
+        Assert.IsType<OkResult>(result);
+        _repo.Verify(r => r.TenantEmergencyStopSetAsync(6, true), Times.Once);
+    }
+
+    [Fact]
+    public async Task EmergencyStopClear_OwnTenant_Succeeds()
+    {
+        _repo.Setup(r => r.TenantEmergencyStopSetAsync(5, false)).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+
+        var controller = NewTenantController();
+        SetCallerRoles(controller, 5, RoleNames.TenantAdmin);
+
+        var result = await controller.EmergencyStopClear();
+
+        Assert.IsType<OkResult>(result);
+        _repo.Verify(r => r.TenantEmergencyStopSetAsync(5, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task EmergencyStopStatus_ReturnsCurrentTenantFlag()
+    {
+        _repo.Setup(r => r.TenantGetByIdAsync(5)).ReturnsAsync(new Tenant { IDTenant = 5, EmergencyStopActive = true });
+
+        var controller = NewTenantController();
+        SetCallerRoles(controller, 5, RoleNames.TenantDevice);
+
+        var result = await controller.EmergencyStopStatus();
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.True((bool)ok.Value!);
+    }
+
 
     [Fact]
     public async Task ServerConfigUpdate_WaterPumpMaxRunSecondsNegative_Returns400_AndNeverWrites()

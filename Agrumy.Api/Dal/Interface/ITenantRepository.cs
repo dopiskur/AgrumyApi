@@ -13,6 +13,9 @@ namespace api.Dal.Interface
         Task<Tenant?> TenantGetByIdAsync(int idTenant);
         Task TenantUpdateAsync(Tenant tenant);
 
+        /// The only writer of Tenant.EmergencyStopActive (roadmap #230) - also bumps ConfigVersion for every device in the tenant so the change reaches them on their next poll rather than waiting for the heartbeat window.
+        Task TenantEmergencyStopSetAsync(int idTenant, bool active);
+
         /// True only when TenantID=0 has no devices and at most the single still-unclaimed bootstrap admin row (see EfRepository.SeedBootstrapAdminAsync) - any real device or claimed user means ImportAsSentinel must refuse rather than overwrite them.
         Task<bool> TenantZeroIsEmptyAsync();
 

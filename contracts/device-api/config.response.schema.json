@@ -30,6 +30,7 @@
     "firmwareUrl",
     "firmwareSha256",
     "enabled",
+    "emergencyStop",
     "deviceConfigSensor",
     "deviceConfigController",
     "commandVersion",
@@ -186,6 +187,13 @@
         "boolean",
         "null"
       ]
+    },
+    "emergencyStop": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Roadmap #230. Tenant-wide fail-closed switch (Tenant.EmergencyStopActive) - true forces every relay off ahead of any rule, independent of deviceConfigController's own relayEnabled."
     },
     "deviceConfigSensor": {
       "description": "Populated only when deviceSensorEnabled is true; otherwise serialized as null (System.Text.Json keeps the key).",

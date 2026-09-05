@@ -86,6 +86,51 @@ namespace api.Controllers.API
             return Ok();
         }
 
+        // ---- Emergency stop (roadmap #230) -----------------------------------
+
+        /// Fail-closed, tenant-wide: forces every actuator in idTenant (defaulting to the caller's own) off ahead of any rule, until explicitly cleared. Deliberately one click, no confirmation - unlike a destructive action, hesitation here is the wrong default.
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("EmergencyStop")]
+        public async Task<ActionResult> EmergencyStopActivate(int? idTenant = null)
+        {
+            int targetTenantId = idTenant ?? CallerTenantId ?? -1;
+            if (!CallerManagesDevices(targetTenantId))
+            {
+                return StatusCode(403, "Emergency stop requires managing devices in this tenant.");
+            }
+            await Repo.TenantEmergencyStopSetAsync(targetTenantId, true);
+            await WriteAuditAsync("Tenant.EmergencyStopActivated", targetTenantId, "Tenant", targetTenantId.ToString(), null);
+            return Ok();
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("EmergencyStop/Clear")]
+        public async Task<ActionResult> EmergencyStopClear(int? idTenant = null)
+        {
+            int targetTenantId = idTenant ?? CallerTenantId ?? -1;
+            if (!CallerManagesDevices(targetTenantId))
+            {
+                return StatusCode(403, "Emergency stop requires managing devices in this tenant.");
+            }
+            await Repo.TenantEmergencyStopSetAsync(targetTenantId, false);
+            await WriteAuditAsync("Tenant.EmergencyStopCleared", targetTenantId, "Tenant", targetTenantId.ToString(), null);
+            return Ok();
+        }
+
+        /// Lets the Web layout show a persistent banner without needing the wider TenantReaders role TenantGet requires.
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpGet("EmergencyStop")]
+        public async Task<ActionResult<bool>> EmergencyStopStatus(int? idTenant = null)
+        {
+            int targetTenantId = idTenant ?? CallerTenantId ?? -1;
+            if (!CallerManagesDevices(targetTenantId))
+            {
+                return StatusCode(403, "Emergency stop requires managing devices in this tenant.");
+            }
+            Tenant? tenant = await Repo.TenantGetByIdAsync(targetTenantId);
+            return Ok(tenant?.EmergencyStopActive ?? false);
+        }
+
         // ---- Export/Import --------------------------------------------------
 
         /// SENSITIVE: carries every exported user's password hash/salt and device's ApiKey (treat like a credential bundle, never persisted server-side, built in memory and streamed straight back) - a TenantAdmin exports only their OWN tenant, Global admin any.

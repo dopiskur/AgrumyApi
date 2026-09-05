@@ -32,14 +32,14 @@ namespace api.Dal
         {
             return await db.Tenants.AsNoTracking()
                 .OrderBy(t => t.TenantName)
-                .Select(t => new Tenant { IDTenant = t.IDTenant, TenantName = t.TenantName, ScheduleTimeZone = t.ScheduleTimeZone })
+                .Select(t => new Tenant { IDTenant = t.IDTenant, TenantName = t.TenantName, ScheduleTimeZone = t.ScheduleTimeZone, EmergencyStopActive = t.EmergencyStopActive })
                 .ToListAsync();
         }
 
         public async Task<Tenant?> TenantGetByIdAsync(int idTenant)
         {
             var row = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.IDTenant == idTenant);
-            return row == null ? null : new Tenant { IDTenant = row.IDTenant, TenantName = row.TenantName, ScheduleTimeZone = row.ScheduleTimeZone };
+            return row == null ? null : new Tenant { IDTenant = row.IDTenant, TenantName = row.TenantName, ScheduleTimeZone = row.ScheduleTimeZone, EmergencyStopActive = row.EmergencyStopActive };
         }
 
         public async Task TenantUpdateAsync(Tenant tenant)
@@ -51,7 +51,23 @@ namespace api.Dal
             }
             row.TenantName = tenant.TenantName ?? row.TenantName;
             row.ScheduleTimeZone = tenant.ScheduleTimeZone;
+            // EmergencyStopActive deliberately NOT written here - TenantEmergencyStopSetAsync is its only writer, so a stale rename/timezone form post can't silently clear or set it.
             await db.SaveChangesAsync();
+        }
+
+        /// The only writer of EmergencyStopActive - also bumps ConfigVersion for every device in the tenant so the change reaches them on their VERY NEXT poll instead of waiting for ConfigHeartbeatHours, since a fail-closed safety switch can't tolerate that latency.
+        public async Task TenantEmergencyStopSetAsync(int idTenant, bool active)
+        {
+            var row = await db.Tenants.FirstOrDefaultAsync(t => t.IDTenant == idTenant);
+            if (row == null)
+            {
+                return;
+            }
+            row.EmergencyStopActive = active;
+            await db.SaveChangesAsync();
+
+            await db.Devices.Where(d => d.TenantID == idTenant)
+                .ExecuteUpdateAsync(s => s.SetProperty(d => d.ConfigVersion, d => (d.ConfigVersion ?? 0) + 1));
         }
 
         public async Task<bool> TenantZeroIsEmptyAsync()

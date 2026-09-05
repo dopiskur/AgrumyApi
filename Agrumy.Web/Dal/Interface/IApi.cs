@@ -290,6 +290,15 @@ namespace api.Dal.Interface
         [Put("/api/Tenant")]
         Task TenantUpdate([Body] Tenant tenant);
 
+        [Get("/api/Tenant/EmergencyStop")]
+        Task<bool> EmergencyStopStatus(int? idTenant = null);
+
+        [Post("/api/Tenant/EmergencyStop")]
+        Task EmergencyStopActivate(int? idTenant = null);
+
+        [Post("/api/Tenant/EmergencyStop/Clear")]
+        Task EmergencyStopClear(int? idTenant = null);
+
         /// SENSITIVE (password hashes, device ApiKeys - see TenantApiController.Export) - the Web controller streams this straight to the browser, never writing it to disk.
         [Get("/api/Tenant/Export")]
         Task<TenantExport> TenantExport(int idTenant, bool includeSensorData = false, DateTime? sensorDataSinceUtc = null);

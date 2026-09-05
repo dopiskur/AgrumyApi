@@ -283,6 +283,8 @@ namespace api.Models
         // DeviceFirmware.Sha256 for the offered build; firmware verifies it against the streamed .bin (Update.abort() on mismatch). Null skips the check rather than failing closed.
         public string? FirmwareSha256 { get; set; }
         public bool? Enabled { get; set; }
+        // Tenant-wide fail-closed switch (roadmap #230), from Tenant.EmergencyStopActive - ActuatorController forces every relay off ahead of any rule when set, independent of DeviceConfigController.RelayEnabled.
+        public bool? EmergencyStop { get; set; }
         public DeviceConfigSensor? DeviceConfigSensor { get; set; }
         public DeviceConfigController? DeviceConfigController { get; set; }
 
