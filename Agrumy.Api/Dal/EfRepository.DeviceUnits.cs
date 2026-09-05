@@ -371,15 +371,19 @@ namespace api.Dal
             // Bumped (unlike Unassign below) - the device learns its new assignment on its next poll.
             device.ConfigVersion = (device.ConfigVersion ?? 0) + 1;
             await db.SaveChangesAsync();
+            await InvalidateFleetCacheAsync(device.TenantID);
         }
 
         public async Task DeviceUnassignFromZoneAsync(int idDevice)
         {
+            int? tenantID = await db.Devices.AsNoTracking()
+                .Where(d => d.IDDevice == idDevice).Select(d => (int?)d.TenantID).FirstOrDefaultAsync();
             // No ConfigVersion bump - the device is not notified, it just stops counting toward any zone's aggregation.
             await db.Devices.Where(d => d.IDDevice == idDevice)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(d => d.DeviceUnitID, (int?)null)
                     .SetProperty(d => d.DeviceUnitZoneID, (int?)null));
+            await InvalidateFleetCacheAsync(tenantID);
         }
 
         // ---- Dashboard aggregation -------------------------------------

@@ -16,5 +16,8 @@ namespace api.Dal.Interface
 
         /// Fixed absolute expiration, not sliding like SetItemAsync - a cached dashboard result must go stale after <paramref name="ttl"/> regardless of poll frequency.
         Task SetAsync<T>(string key, T value, TimeSpan ttl) where T : class;
+
+        /// Drops a GetAsync/SetAsync entry early - for a write that must be visible before its TTL would otherwise expire.
+        Task RemoveAsync(string key);
     }
 }

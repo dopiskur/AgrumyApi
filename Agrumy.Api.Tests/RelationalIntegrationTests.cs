@@ -119,6 +119,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         public Task SetItemAsync(string key, DeviceCache deviceCache, TimeSpan? ttl = null) => Task.CompletedTask;
         public Task<T?> GetAsync<T>(string key) where T : class => Task.FromResult<T?>(null);
         public Task SetAsync<T>(string key, T value, TimeSpan ttl) where T : class => Task.CompletedTask;
+        public Task RemoveAsync(string key) => Task.CompletedTask;
     }
 
     private static string U() => Guid.NewGuid().ToString("N")[..12];

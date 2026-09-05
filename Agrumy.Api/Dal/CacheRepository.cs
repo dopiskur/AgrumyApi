@@ -75,5 +75,18 @@ namespace api.Dal
                 LogBackendUnavailable(logger, ex, nameof(SetAsync), key);
             }
         }
+
+        public async Task RemoveAsync(string key)
+        {
+            try
+            {
+                await cache.RemoveAsync(key);
+            }
+            catch (Exception ex)
+            {
+                // A dropped removal just leaves the stale entry to expire on its own TTL instead of going stale forever.
+                LogBackendUnavailable(logger, ex, nameof(RemoveAsync), key);
+            }
+        }
     }
 }

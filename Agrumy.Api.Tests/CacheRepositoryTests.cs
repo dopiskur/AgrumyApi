@@ -162,4 +162,23 @@ public class CacheRepositoryTests
 
         await repo.SetAsync("fleet:1", new List<FleetSnapshot> { new(1, true) }, TimeSpan.FromSeconds(6));
     }
+
+    [Fact]
+    public async Task SetAsync_Then_RemoveAsync_ThenGetAsync_ReturnsNull()
+    {
+        var repo = NewRepository(NewBackingStore());
+        await repo.SetAsync("fleet:1", new List<FleetSnapshot> { new(1, true) }, TimeSpan.FromSeconds(6));
+
+        await repo.RemoveAsync("fleet:1");
+
+        Assert.Null(await repo.GetAsync<List<FleetSnapshot>>("fleet:1"));
+    }
+
+    [Fact]
+    public async Task RemoveAsync_BackendThrows_CompletesWithoutPropagating()
+    {
+        var repo = NewRepository(new ThrowingCache());
+
+        await repo.RemoveAsync("fleet:1");
+    }
 }
