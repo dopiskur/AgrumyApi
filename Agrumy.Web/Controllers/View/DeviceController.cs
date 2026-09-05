@@ -11,9 +11,40 @@ namespace api.Controllers.View
     [Authorize]
     public class DeviceController(IApi api) : Controller
     {
-        public async Task<ActionResult> Fleet() => View(await GetFleetForDisplayAsync());
+        public async Task<ActionResult> Fleet()
+        {
+            IList<DeviceUnit> units = await api.DeviceUnitsGet();
+            var zones = new List<DeviceUnitZone>();
+            foreach (var unit in units)
+            {
+                zones.AddRange(await api.DeviceUnitZonesGet(unit.IDDeviceUnit));
+            }
+
+            return View(new FleetViewModel
+            {
+                Devices = await GetFleetForDisplayAsync(),
+                Units = units,
+                Zones = zones,
+            });
+        }
 
         public async Task<ActionResult> FleetRows() => PartialView("_FleetRows", await GetFleetForDisplayAsync());
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> AssignToZone(int idDevice, int idDeviceUnitZone)
+        {
+            try
+            {
+                await api.DeviceAssign(new DeviceZoneAssignment { IDDevice = idDevice, IDDeviceUnitZone = idDeviceUnitZone });
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Fleet));
+        }
 
         private async Task<IList<DeviceFleetStatus>> GetFleetForDisplayAsync()
         {

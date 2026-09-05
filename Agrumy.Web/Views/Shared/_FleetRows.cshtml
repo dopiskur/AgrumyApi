@@ -26,6 +26,20 @@
     var (signalLabel, signalCss) = SignalQuality(item.RssiDbm);
     <tr>
         <td>@item.DeviceName</td>
+        @if (!zoneScoped)
+        {
+            <td>
+                @if (item.DeviceUnitID is null or 0)
+                {
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignZoneModal" data-device-id="@item.IDDevice">Assign</button>
+                }
+                else
+                {
+                    @item.DeviceUnitName
+                }
+            </td>
+            <td>@(item.DeviceUnitZoneName ?? "-")</td>
+        }
         <td>
             @if (item.Online)
             {

@@ -1,4 +1,4 @@
-@model IList<api.Models.DeviceFleetStatus>
+@model api.ViewModels.FleetViewModel
 
 @{
     ViewData["Title"] = "Fleet";
@@ -15,10 +15,16 @@
         </div>
     </div>
     <div class="card-body table-responsive p-0">
+        @if (TempData["Error"] is string error)
+        {
+            <div class="alert alert-warning m-3">@error</div>
+        }
         <table id="fleetTable" class="table table-hover">
             <thead>
                 <tr>
                     <th>Device</th>
+                    <th>Unit</th>
+                    <th>Zone</th>
                     <th>Status</th>
                     <th class="d-none d-md-table-cell">Last seen</th>
                     <th class="d-none d-md-table-cell">Signal</th>
@@ -29,11 +35,52 @@
                 </tr>
             </thead>
             <tbody>
-                <partial name="_FleetRows" model="Model" />
+                <partial name="_FleetRows" model="Model.Devices" />
             </tbody>
         </table>
     </div>
 </div>
+
+<div class="modal fade" id="assignZoneModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-controller="Device" asp-action="AssignToZone" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title">Assign to zone</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="idDevice" id="assignDeviceId" />
+                    @if (Model.Units.Count == 0)
+                    {
+                        <p class="text-secondary mb-0">No units created yet - add one from the Units page first.</p>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label class="form-label" for="assignUnitSelect">Unit</label>
+                            <select class="form-select" id="assignUnitSelect">
+                                @foreach (var unit in Model.Units)
+                                {
+                                    <option value="@unit.IDDeviceUnit">@unit.DeviceUnitName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="assignZoneSelect">Zone</label>
+                            <select class="form-select" name="idDeviceUnitZone" id="assignZoneSelect"></select>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" @(Model.Units.Count == 0 ? "disabled" : "")>Confirm</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script type="application/json" id="assignZonesData">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Zones.Select(z => new { id = z.IDDeviceUnitZone, unitId = z.DeviceUnitID, name = z.DeviceUnitZoneName })))</script>
 
 @section Scripts {
     <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.min.js"></script>
@@ -46,7 +93,7 @@
             return new DataTable(document.getElementById('fleetTable'), {
                 paging: true,
                 searching: true,
-                order: [[0, 'asc']],
+                order: [], // server already sorts unassigned-first / IDDevice desc - keep that as the initial view
                 columnDefs: [{ orderable: false, targets: -1 }]
             });
         }
@@ -61,6 +108,33 @@
                     fleetTable.destroy();
                     document.querySelector('#fleetTable tbody').innerHTML = html;
                     fleetTable = initFleetTable();
+                }
+            });
+
+            var zones = JSON.parse(document.getElementById('assignZonesData').textContent);
+            var unitSelect = document.getElementById('assignUnitSelect');
+            var zoneSelect = document.getElementById('assignZoneSelect');
+
+            function populateZones(unitId) {
+                zoneSelect.innerHTML = '';
+                zones.filter(function (z) { return String(z.unitId) === String(unitId); }).forEach(function (z) {
+                    var opt = document.createElement('option');
+                    opt.value = z.id;
+                    opt.textContent = z.name;
+                    zoneSelect.appendChild(opt);
+                });
+            }
+
+            if (unitSelect)
+            {
+                unitSelect.addEventListener('change', function () { populateZones(unitSelect.value); });
+            }
+
+            document.getElementById('assignZoneModal').addEventListener('show.bs.modal', function (event) {
+                document.getElementById('assignDeviceId').value = event.relatedTarget.getAttribute('data-device-id');
+                if (unitSelect)
+                {
+                    populateZones(unitSelect.value);
                 }
             });
         });

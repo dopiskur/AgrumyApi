@@ -71,6 +71,12 @@ namespace api.Dal
             Dictionary<string, bool> kitCapability = await db.DeviceTypeKits.AsNoTracking()
                 .ToDictionaryAsync(k => k.Kit, k => k.ControllerCapable);
 
+            // Units/Zones are a small admin-managed set - same in-memory-lookup reasoning as kitCapability above.
+            Dictionary<int, string?> unitNames = await db.DeviceUnits.AsNoTracking()
+                .ToDictionaryAsync(u => u.IDDeviceUnit, u => u.DeviceUnitName);
+            Dictionary<int, string?> zoneNames = await db.DeviceUnitZones.AsNoTracking()
+                .ToDictionaryAsync(z => z.IDDeviceUnitZone, z => z.DeviceUnitZoneName);
+
             // One catalog read for the whole fleet, newest version per board picked in memory by semver (not DateAdded).
             FirmwareSource activeSource = (await ServerConfigGetAsync()).FirmwareSource;
             var visible = new HashSet<int> { (int)activeSource, (int)FirmwareSource.Local };
@@ -111,8 +117,14 @@ namespace api.Dal
                     Online = DeviceFleetStatus.ComputeOnline(r.Diag?.LastSeenAt, r.Device.SleepSeconds, utcNow),
                     DeviceUnitID = r.Device.DeviceUnitID,
                     DeviceUnitZoneID = r.Device.DeviceUnitZoneID,
+                    DeviceUnitName = r.Device.DeviceUnitID is int uid ? unitNames.GetValueOrDefault(uid) : null,
+                    DeviceUnitZoneName = r.Device.DeviceUnitZoneID is int zid ? zoneNames.GetValueOrDefault(zid) : null,
                 };
-            }).ToList();
+            })
+            // Fleet page default view: unassigned devices surfaced first, newest device first within each group.
+            .OrderBy(d => (d.DeviceUnitID ?? 0) == 0 ? 0 : 1)
+            .ThenByDescending(d => d.IDDevice)
+            .ToList();
 
             await cache.SetAsync(cacheKey, result, FleetCacheTtl);
             return result;

@@ -169,6 +169,8 @@ namespace api.Models
         // Lets the Web layer filter one shared DeviceFleetGet() response down to a single zone's devices (DeviceUnitController.ZoneDetails) instead of a second endpoint.
         public int? DeviceUnitID { get; set; }
         public int? DeviceUnitZoneID { get; set; }
+        public string? DeviceUnitName { get; set; }
+        public string? DeviceUnitZoneName { get; set; }
 
         // 3 missed polls + fixed grace, not a bare SleepSeconds multiple - a cycle also costs work time (TLS/sensor reads), and grace floors the window when SleepSeconds=0.
         public const int OfflineMissedPolls = 3;
