@@ -82,7 +82,7 @@ public class SensorReportShaperTests
         using var doc = JsonDocument.Parse(json);
         var rec = doc.RootElement.GetProperty("sensorData")[0];
 
-        foreach (var key in new[] { "battery", "temperature", "soilTemperature", "humidity", "moisture",
+        foreach (var key in new[] { "battery", "temperature", "soilTemperature", "humidity", "vpd", "moisture",
                                     "light", "co2", "tvoc", "barometer", "liquidPH", "rainLevel",
                                     "waterLevel", "wind", "dateCreated" })
         {
@@ -92,6 +92,27 @@ public class SensorReportShaperTests
         Assert.Equal("2026-08-29 09:50:00", rec.GetProperty("dateCreated").GetString());
     }
 
+
+    [Fact]
+    public void Build_Vpd_NullWhenHumidityMissing()
+    {
+        var json = SensorReportShaper.Build(new[] { Row("2026-08-29 09:50:00", temp: 20) }, 0);
+        var rec = JsonDocument.Parse(json).RootElement.GetProperty("sensorData")[0];
+
+        Assert.Equal(JsonValueKind.Null, rec.GetProperty("vpd").ValueKind);
+    }
+
+    [Fact]
+    public void Build_Vpd_ComputedWhenTemperatureAndHumidityBothPresent()
+    {
+        var row = Row("2026-08-29 09:50:00", temp: 20);
+        row.Humidity = 60;
+
+        var json = SensorReportShaper.Build(new[] { row }, 0);
+        var rec = JsonDocument.Parse(json).RootElement.GetProperty("sensorData")[0];
+
+        Assert.True(Math.Abs(rec.GetProperty("vpd").GetDouble() - 0.9353) < 0.001);
+    }
 
     [Fact]
     public void BuildAveraged_NoRows_ReturnsEmptyString()
@@ -152,6 +173,25 @@ public class SensorReportShaperTests
 
         Assert.Equal(2, JsonDocument.Parse(SensorReportShaper.BuildAveraged(rows, 1))
             .RootElement.GetProperty("sensorData").GetArrayLength());
+    }
+}
+
+public class VpdCalculatorTests
+{
+    [Fact]
+    public void Compute_TemperatureMissing_ReturnsNull() =>
+        Assert.Null(api.Utils.VpdCalculator.Compute(null, 60));
+
+    [Fact]
+    public void Compute_HumidityMissing_ReturnsNull() =>
+        Assert.Null(api.Utils.VpdCalculator.Compute(20, null));
+
+    [Fact]
+    public void Compute_20C_60Percent_MatchesTetensFormula()
+    {
+        double? vpd = api.Utils.VpdCalculator.Compute(20, 60);
+        Assert.True(vpd.HasValue);
+        Assert.True(Math.Abs(vpd!.Value - 0.9353) < 0.001);
     }
 }
 

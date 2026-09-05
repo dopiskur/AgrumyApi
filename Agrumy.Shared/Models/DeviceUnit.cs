@@ -114,6 +114,8 @@ namespace api.Models
         public double? Temperature { get; set; }
         public double? SoilTemperature { get; set; }
         public double? Humidity { get; set; }
+        /// <summary>Derived from Temperature+Humidity (api.Utils.VpdCalculator) - null whenever either is, never computed from a stale pairing.</summary>
+        public double? Vpd { get; set; }
         public double? Moisture { get; set; }
         public double? Light { get; set; }
         public double? Co2 { get; set; }
@@ -145,6 +147,7 @@ namespace api.Models
         public double?[] Temperature { get; set; } = new double?[HourBuckets];
         public double?[] SoilTemperature { get; set; } = new double?[HourBuckets];
         public double?[] Humidity { get; set; } = new double?[HourBuckets];
+        public double?[] Vpd { get; set; } = new double?[HourBuckets];
         public double?[] Moisture { get; set; } = new double?[HourBuckets];
         public double?[] Light { get; set; } = new double?[HourBuckets];
         public double?[] Co2 { get; set; } = new double?[HourBuckets];

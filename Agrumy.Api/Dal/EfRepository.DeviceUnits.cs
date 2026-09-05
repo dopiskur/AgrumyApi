@@ -1,6 +1,7 @@
 using api.Dal.Entities;
 using api.Dal.Interface;
 using api.Models;
+using api.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
@@ -13,7 +14,11 @@ namespace api.Dal
         private sealed record UnitZoneDeviceSnapshot(
             int? DeviceUnitID, int? DeviceUnitZoneID, bool Enabled, bool Online, bool HasRecentProblemEvent,
             double? Temperature, double? SoilTemperature, double? Humidity, int? Moisture, int? Light,
-            int? Co2, int? Tvoc, double? Barometer, double? LiquidPH, int? RainLevel, int? WaterLevel, double? Wind);
+            int? Co2, int? Tvoc, double? Barometer, double? LiquidPH, int? RainLevel, int? WaterLevel, double? Wind)
+        {
+            /// <summary>Derived from this SAME snapshot's own Temperature+Humidity, never mixed across devices/readings.</summary>
+            public double? Vpd => VpdCalculator.Compute(Temperature, Humidity);
+        }
 
         /// <summary>Event types that make a zone/unit Orange (unless it's already Red).</summary>
         private static readonly int[] ProblemEventTypeIds =
@@ -537,6 +542,7 @@ namespace api.Dal
                 trend.Temperature[bucket.Key] = rowsInBucket.Select(r => r.Temperature).Average();
                 trend.SoilTemperature[bucket.Key] = rowsInBucket.Select(r => r.SoilTemperature).Average();
                 trend.Humidity[bucket.Key] = rowsInBucket.Select(r => r.Humidity).Average();
+                trend.Vpd[bucket.Key] = rowsInBucket.Select(r => VpdCalculator.Compute(r.Temperature, r.Humidity)).Average();
                 trend.Moisture[bucket.Key] = rowsInBucket.Select(r => r.Moisture).Average();
                 trend.Light[bucket.Key] = rowsInBucket.Select(r => r.Light).Average();
                 trend.Co2[bucket.Key] = rowsInBucket.Select(r => r.Co2).Average();
@@ -564,6 +570,7 @@ namespace api.Dal
             Temperature = snapshots.Select(s => s.Temperature).Average(),
             SoilTemperature = snapshots.Select(s => s.SoilTemperature).Average(),
             Humidity = snapshots.Select(s => s.Humidity).Average(),
+            Vpd = snapshots.Select(s => s.Vpd).Average(),
             Moisture = snapshots.Select(s => s.Moisture).Average(),
             Light = snapshots.Select(s => s.Light).Average(),
             Co2 = snapshots.Select(s => s.Co2).Average(),

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using api.Dal.Entities;
+using api.Utils;
 
 namespace api.Dal
 {
@@ -32,6 +33,7 @@ namespace api.Dal
                 ["temperature"] = r.Temperature,
                 ["soilTemperature"] = r.SoilTemperature,
                 ["humidity"] = r.Humidity,
+                ["vpd"] = VpdCalculator.Compute(r.Temperature, r.Humidity),
                 ["moisture"] = r.Moisture,
                 ["light"] = r.Light,
                 ["co2"] = r.Co2,
@@ -81,6 +83,7 @@ namespace api.Dal
                 ["temperature"] = g.Average(r => r.Temperature),
                 ["soilTemperature"] = g.Average(r => r.SoilTemperature),
                 ["humidity"] = g.Average(r => r.Humidity),
+                ["vpd"] = g.Average(r => VpdCalculator.Compute(r.Temperature, r.Humidity)),
                 ["moisture"] = g.Average(r => r.Moisture),
                 ["light"] = g.Average(r => r.Light),
                 ["co2"] = g.Average(r => r.Co2),
