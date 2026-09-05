@@ -22,7 +22,8 @@ namespace api.Security
             ApplyBearer(request, accessToken);
 
             var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode != HttpStatusCode.Unauthorized || http is null)
+            // WWW-Authenticate is set only by the JWT bearer challenge itself (missing/invalid/expired/revoked token) - an [Authorize]'d action returning 401 for its own business reason (e.g. a wrong old-password check) never sets it, so this alone should not burn a refresh-token rotation.
+            if (response.StatusCode != HttpStatusCode.Unauthorized || http is null || response.Headers.WwwAuthenticate.Count == 0)
             {
                 return response;
             }
