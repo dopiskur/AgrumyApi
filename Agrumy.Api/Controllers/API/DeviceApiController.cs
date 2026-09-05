@@ -24,8 +24,7 @@ namespace api.Controllers.API
         [HttpGet]
         public async Task<ActionResult<Device>> DeviceGet(int? idDevice)
         {
-            // A Global reader/Device/admin sees any tenant's device - DeviceGetAsync's tenant
-            // filter would hide it, so use the unfiltered by-id lookup for them.
+            // A Global reader/Device/admin sees any tenant's device - DeviceGetAsync's tenant filter would hide it, so use the unfiltered by-id lookup for them.
             Device? device = CallerReadsDevicesGlobally
                 ? await Repo.DeviceGetByIdAsync(idDevice)
                 : await Repo.DeviceGetAsync(CallerTenantId, idDevice, null, null);
@@ -60,8 +59,7 @@ namespace api.Controllers.API
                 return error;
             }
 
-            // The device's OWN tenant, not the caller's - a Global admin/Device deleting a foreign
-            // tenant's device would otherwise silently match zero rows.
+            // The device's OWN tenant, not the caller's - a Global admin/Device deleting a foreign tenant's device would otherwise silently match zero rows.
             await Repo.DeviceDeleteAsync(idDevice, device!.TenantID);
             return true;
         }
@@ -94,16 +92,13 @@ namespace api.Controllers.API
             return Ok(await Repo.DeviceConfigControllerGetAsync(deviceConfigControllerID));
         }
 
-        /// <summary>Read-only status of every device at once, open to any authenticated caller;
-        /// tenant scoping mirrors DevicesGet, with global readers seeing all tenants.</summary>
+        /// Read-only status of every device at once, open to any authenticated caller; tenant scoping mirrors DevicesGet, with global readers seeing all tenants.
         [Authorize]
         [HttpGet("Fleet")]
         public async Task<ActionResult<IList<DeviceFleetStatus>>> DeviceFleetGet() =>
             Ok(await Repo.DeviceFleetGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
 
-        /// <summary>Diagnostic event log - open to any authenticated caller (a Tenant reader may
-        /// look at their tenant's log); tenant ownership enforced the same way as every other
-        /// Device sub-resource GET.</summary>
+        /// Diagnostic event log, open to any authenticated caller (a Tenant reader sees their own tenant's log); tenant ownership enforced the same way as every other Device sub-resource GET.
         [Authorize]
         [HttpGet("Events")]
         public async Task<ActionResult<IList<DeviceEvent>>> DeviceEventsGet(int? idDevice)
@@ -115,14 +110,11 @@ namespace api.Controllers.API
                 return error;
             }
 
-            // The device's own tenant (== the caller's for a tenant-scoped caller; the ensure call
-            // above already authorized a cross-tenant global reader).
+            // The device's own tenant (== the caller's for a tenant-scoped caller; the ensure call above already authorized a cross-tenant global reader).
             return Ok(await Repo.EventDeviceGetAsync(device!.IDDevice, device.TenantID));
         }
 
-        /// <summary>Dismisses one non-critical problem alert (see api.Dal.EfRepository.ComputeStatus)
-        /// so it stops keeping its device's Unit/Zone Orange - the event row itself stays for history,
-        /// only its EventDeviceRow.AcknowledgedAt is set.</summary>
+        /// Dismisses one non-critical problem alert (see api.Dal.EfRepository.ComputeStatus) so it stops keeping its device's Unit/Zone Orange - only EventDeviceRow.AcknowledgedAt is set, the event row itself stays for history.
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPut("Event/{idEventDevice}/Acknowledge")]
         public async Task<ActionResult<bool>> DeviceEventAcknowledge(int idEventDevice)
@@ -155,9 +147,7 @@ namespace api.Controllers.API
             return true;
         }
 
-        /// <summary>Only relay-pin mapping is left on the per-device Controller row - thresholds,
-        /// schedule and safety limits live on the device's assigned zone instead
-        /// (DeviceUnitApiController's Zone/Rule endpoints).</summary>
+        /// Only relay-pin mapping is left on the per-device Controller row - thresholds, schedule and safety limits live on the device's assigned zone instead (DeviceUnitApiController's Zone/Rule endpoints).
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPut("Controller")]
         public async Task<ActionResult<bool>> DeviceConfigControllerUpdate(DeviceUpdate? deviceUpdate)
@@ -178,7 +168,7 @@ namespace api.Controllers.API
             return true;
         }
 
-        /// <summary>Looks a device up and checks the caller may touch it - see ApiControllerBase.EnsureOwnedDeviceEntityAsync for the shared 404/403 logic.</summary>
+        /// Looks a device up and checks the caller may touch it - see ApiControllerBase.EnsureOwnedDeviceEntityAsync for the shared 404/403 logic.
         private Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(
             Func<Task<Device?>> lookup, string ownerLabel, bool forWrite) =>
             EnsureOwnedDeviceEntityAsync(lookup, d => d.TenantID, ownerLabel, forWrite);
@@ -188,8 +178,7 @@ namespace api.Controllers.API
 
         #region Device communication
 
-        /// <summary>The poll itself is the heartbeat - diagnostics are recorded before the version
-        /// check so an up-to-date device still bumps LastSeenAt, which offline detection stands on.</summary>
+        /// The poll itself is the heartbeat - diagnostics are recorded before the version check so an up-to-date device still bumps LastSeenAt, which offline detection stands on.
         [HttpPost("Config")]
         [EnableRateLimiting("device-auth")]
         [Authorize(Policy = DeviceAuth.SessionPolicy)]
@@ -205,8 +194,7 @@ namespace api.Controllers.API
 
             await Repo.DeviceDiagnosticUpsertAsync(device.IDDevice!.Value, device.TenantID, value);
 
-            // The heartbeat is also how the server learns an OTA actually took - the first poll
-            // reporting the requested version fulfils the request (flags cleared, event logged).
+            // The heartbeat is also how the server learns an OTA actually took - the first poll reporting the requested version fulfils the request (flags cleared, event logged).
             if (await firmwareCatalog.NoteHeartbeatAsync(device, value.FirmwareVersion, value.Board))
             {
                 device.FirmwareUpdate = false;
@@ -214,12 +202,7 @@ namespace api.Controllers.API
                 await Repo.EventDevicePushAsync(device.IDDevice.Value, device.TenantID, DeviceEventType.FirmwareUpdated, "version=" + value.FirmwareVersion);
             }
 
-            // Compared against the device row just read above, not a session-cache copy - the cache
-            // entry can be stale/absent or written by a different instance, and this DB read
-            // already happens unconditionally for the diagnostics upsert above.
-            //
-            // A pending command must ride along on this SAME poll (no separate endpoint, no extra
-            // TLS handshake), so config being unchanged alone is no longer enough to skip the response.
+            // Compared against the device row read above (not a stale/absent session-cache copy) - config-unchanged alone is no longer enough to skip the response, since a pending command must ride along on this same poll.
             PendingCommand? pendingCommand = await commandQueue.GetPendingCommandAsync(device.IDDevice.Value);
             if (value.ConfigVersion == device.ConfigVersion && pendingCommand == null)
             {
@@ -229,10 +212,7 @@ namespace api.Controllers.API
             return Ok(await configBuilder.BuildAsync(device, pendingCommand, value.Board));
         }
 
-        /// <summary>Arms an OTA for one device - Version null = latest catalog build for its board
-        /// (one-click), a specific version = install exactly that (rollback/downgrade). The
-        /// firmware's own "offered version != running" gate (ServiceController::apiConfig) makes a
-        /// redundant request harmless; GetConfig clears it once the heartbeat confirms.</summary>
+        /// Arms an OTA for one device - Version null means latest catalog build for its board (one-click), a specific version installs exactly that (rollback/downgrade); the firmware's own offered-vs-running gate (ServiceController::apiConfig) makes a redundant request harmless, GetConfig clears it once the heartbeat confirms.
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost("FirmwareUpdate")]
         public async Task<ActionResult> FirmwareUpdateRequest([FromBody] DeviceFirmwareUpdateRequest request)
@@ -261,8 +241,7 @@ namespace api.Controllers.API
             return Ok();
         }
 
-        /// <summary>No identity field in the body by design - deviceID/tenantID come exclusively
-        /// from the authenticated apiId, same rule as SensorDataApiController.Post.</summary>
+        /// No identity field in the body by design - deviceID/tenantID come exclusively from the authenticated apiId, same rule as SensorDataApiController.Post.
         [HttpPost("Event")]
         [EnableRateLimiting("device-data")]
         [Authorize(Policy = DeviceAuth.SessionPolicy)]
@@ -282,8 +261,7 @@ namespace api.Controllers.API
 
             await Repo.EventDevicePushAsync(device.IDDevice!.Value, device.TenantID, eventType, value.Message);
 
-            // The device's post-execution confirmation rides on this same event-push endpoint -
-            // CommandId links it back to the specific command row.
+            // The device's post-execution confirmation rides on this same event-push endpoint - CommandId links it back to the specific command row.
             if (eventType == DeviceEventType.CommandExecuted && value.CommandId is int commandId)
             {
                 await commandQueue.MarkExecutedAsync(commandId, device.IDDevice!.Value);
@@ -292,9 +270,7 @@ namespace api.Controllers.API
             return Ok();
         }
 
-        /// <summary>The device confirms receipt of the PendingCommand it just got in its last
-        /// Config poll response, BEFORE executing it - a Reboot has nothing to report from
-        /// afterward on that connection, so ack-after-execute is not an option.</summary>
+        /// The device confirms receipt of the PendingCommand from its last Config poll response BEFORE executing it - a Reboot has nothing to report afterward on that connection, so ack-after-execute isn't an option.
         [HttpPost("Command/Ack")]
         [EnableRateLimiting("device-data")]
         [Authorize(Policy = DeviceAuth.SessionPolicy)]
@@ -320,8 +296,7 @@ namespace api.Controllers.API
                 return BadRequest("macAddress is required.");
             }
 
-            // Expiry and match failures share one generic 401 - a distinct "pin expired" reply
-            // would confirm the email exists to an unauthenticated caller.
+            // Expiry and match failures share one generic 401 - a distinct "pin expired" reply would confirm the email exists to an unauthenticated caller.
             User? user = await Repo.UserGetAsync(null, value.Email, null);
             if (user is null || !AuthenticationProvider.VerifyPin(user.DevicePin, user.DevicePinExpires, value.DevicePin))
             {
@@ -342,19 +317,14 @@ namespace api.Controllers.API
                     ServicePoint = value.ServicePoint,
                     DeviceSensorEnabled = false,
                     DeviceControllerEnabled = false,
-                    // Only Agrumy.Relay's own registration ever sets these - normal
-                    // AgrumyFirmware devices leave both null/false, matching the DTO's defaults.
+                    // Only Agrumy.Relay's own registration ever sets these - normal AgrumyFirmware devices leave both null/false, matching the DTO's defaults.
                     IsRelay = value.IsRelay,
                     RelayProfile = value.RelayProfile,
                 });
             }
 
-            // The PIN is deliberately NOT consumed here - it stays valid for repeated registrations
-            // (multiple sensors in one session) until its own 24h expiry.
-            //
-            // A genuinely new device never has one, but Register also handles the "device row
-            // already exists" re-registration path (factory reset, etc.), where a command could
-            // legitimately still be queued.
+            // The PIN is deliberately NOT consumed here - it stays valid for repeated registrations (multiple sensors in one session) until its own 24h expiry.
+            // A genuinely new device never has a pending command, but Register also handles re-registration (factory reset, etc.), where one could legitimately still be queued.
             PendingCommand? pendingCommand = await commandQueue.GetPendingCommandAsync(device.IDDevice!.Value);
             // Register carries no Board - null falls back to the legacy per-type lookup.
             return Ok(await configBuilder.BuildAsync(device, pendingCommand, board: null));
@@ -379,10 +349,7 @@ namespace api.Controllers.API
             return Ok(deviceAuthentication);
         }
 
-        /// <summary>2x sleepSeconds absorbs a late wake without needing a session past the device's
-        /// own next scheduled contact - avoids two TLS handshakes (Authenticate+Config) per wake on
-        /// long-sleep solar/battery nodes. The 30-min floor keeps short-poll devices on the same
-        /// cadence as before. Safe to extend since the cache entry holds only apiAuth, nothing that goes stale.</summary>
+        /// 2x sleepSeconds absorbs a late wake without a second TLS handshake (Authenticate+Config) on long-sleep nodes, with a 30-min floor for short-poll devices - safe to extend since the cache entry holds only apiAuth, nothing that goes stale.
         private static TimeSpan SessionTtlFor(int? sleepSeconds) =>
             TimeSpan.FromSeconds(Math.Max((sleepSeconds ?? 0) * 2, 1800));
 
