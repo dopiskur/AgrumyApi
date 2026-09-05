@@ -3,17 +3,17 @@ using Refit;
 
 namespace api.Utils
 {
-    /// <summary>Raised when Agrumy.Api answers a call from the web app with a non-success status.</summary>
+    /// Raised when Agrumy.Api answers a call from the web app with a non-success status.
     public sealed class ApiException(int statusCode, string body)
         : Exception(string.IsNullOrWhiteSpace(body) ? $"API call failed ({statusCode})." : body)
     {
         public int StatusCode { get; } = statusCode;
 
-        /// <summary>The raw response body - often the API's <c>{ reason, message }</c> shape or a plain string.</summary>
+        /// The raw response body - often the API's <c>{ reason, message }</c> shape or a plain string.
         public string Body { get; } = body ?? "";
     }
 
-    /// <summary>Refit configuration for the <see cref="api.Dal.Interface.IApi"/> client.</summary>
+    /// Refit configuration for the <see cref="api.Dal.Interface.IApi"/> client.
     public static class RefitConfig
     {
         public static readonly RefitSettings Settings = new()

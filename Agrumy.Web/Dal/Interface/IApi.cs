@@ -3,12 +3,7 @@ using Refit;
 
 namespace api.Dal.Interface
 {
-    /// <summary>Declarative client for Agrumy.Api. Implemented at runtime by Refit
-    /// (<c>AddRefitClient&lt;IApi&gt;</c> in Program.cs). The caller's JWT is attached by
-    /// <see cref="api.Security.BearerTokenHandler"/>, so no method takes a token parameter.
-    /// Nullable query parameters are omitted when null. Non-success responses raise
-    /// <see cref="api.Utils.ApiException"/> carrying the response body (see
-    /// <see cref="api.Utils.RefitConfig"/>).</summary>
+    /// Declarative Refit client for Agrumy.Api (AddRefitClient in Program.cs) - BearerTokenHandler attaches the JWT so no method takes a token param, and non-success responses raise ApiException (RefitConfig) carrying the response body.
     public interface IApi
     {
         // ---- User ----------------------------------------------------------
@@ -16,25 +11,19 @@ namespace api.Dal.Interface
         [Post("/api/User/Login")]
         Task<UserLoginResult?> UserLogin([Body] UserLogin userLogin);
 
-        /// <summary>Tenant-import counterpart to Login - proves identity with the OLD (imported)
-        /// password since MustChangePassword blocks Login itself (428). See
-        /// api.Models.User.MustChangePassword.</summary>
+        /// Tenant-import counterpart to Login - proves identity with the old (imported) password since MustChangePassword blocks Login itself (428, api.Models.User.MustChangePassword).
         [Post("/api/User/ForceChangePassword")]
         Task<UserLoginResult?> UserForceChangePassword([Body] UserForceChangePassword value);
 
-        /// <summary>Whether the fresh-install bootstrap Global Admin still has no password -
-        /// LoginController checks this on every anonymous page load to decide whether to show the
-        /// normal login form or the first-run "set password" screen.</summary>
+        /// Whether the bootstrap Global Admin still has no password - LoginController checks this on every anonymous page load to pick the login form or the first-run "set password" screen.
         [Get("/api/User/BootstrapPending")]
         Task<bool> BootstrapPending();
 
-        /// <summary>The one-shot call that gives the bootstrap Global Admin a real password - see
-        /// api.Models.BootstrapAdminSetPassword for why it takes no login/email.</summary>
+        /// The one-shot call that gives the bootstrap Global Admin a real password - see api.Models.BootstrapAdminSetPassword for why it takes no login/email.
         [Post("/api/User/BootstrapSetPassword")]
         Task BootstrapSetPassword([Body] BootstrapAdminSetPassword value);
 
-        // Task (not Task<User>) on purpose: no caller reads the created record, same convention
-        // as the other write endpoints whose response bodies nobody consumed.
+        // Task (not Task<User>) on purpose: no caller reads the created record, same convention as the other write endpoints.
         [Post("/api/User/Register")]
         Task UserRegister([Body] UserRegistration registration);
 
@@ -53,31 +42,26 @@ namespace api.Dal.Interface
         [Get("/api/User/All")]
         Task<IEnumerable<User>> UsersGet();
 
-        /// <summary>The caller's own record (self-scoped by the JWT server-side) - profile page
-        /// prefill and the display time zone for UTC-to-local conversion.</summary>
+        /// The caller's own record (self-scoped by the JWT server-side) - profile page prefill and the display time zone for UTC-to-local conversion.
         [Get("/api/User/Self")]
         Task<User> UserGetSelf();
 
-        /// <summary>Self-service profile write - FirstName/LastName/TimeZone only, identity from
-        /// the attached JWT (see Agrumy.Api's UserApiController.UserProfileSet).</summary>
+        /// Self-service profile write - FirstName/LastName/TimeZone only, identity from the attached JWT (see UserApiController.UserProfileSet).
         [Put("/api/User/Profile")]
         Task UserProfileSet([Body] UserProfileUpdate value);
 
-        /// <summary>Password-change flow: proves the caller still knows the old password, identity
-        /// otherwise comes from the attached JWT - reused by the profile page rather than a
-        /// parallel mechanism.</summary>
+        /// Password-change flow - proves the caller still knows the old password, identity otherwise comes from the attached JWT.
         [Post("/api/User/ChangePassword")]
         Task ChangePassword([Body] UserSetPassword value);
 
-        /// <summary>Rotates the caller's device-registration PIN (24h validity, multi-use - not
-        /// consumed by the first successful device registration).</summary>
+        /// Rotates the caller's device-registration PIN (24h validity, multi-use - not consumed by the first successful registration).
         [Post("/api/User/DevicePin")]
         Task<DevicePinResult> DevicePinGenerate();
 
         [Get("/api/User/Roles")]
         Task<IEnumerable<UserRole>> UserRoleGet();
 
-        /// <summary>The given user's composable role set (a user can hold several).</summary>
+        /// The given user's composable role set (a user can hold several).
         [Get("/api/User/UserRoles")]
         Task<List<string>> UserRolesGet(int idUser);
 
@@ -236,8 +220,7 @@ namespace api.Dal.Interface
         [Get("/api/Firmware/Manifest")]
         Task<FirmwareManifest> FirmwareManifest();
 
-        /// <summary>Raw .bin bytes of one catalog entry, streamed through the API whatever its source
-        /// - the browser "Build offline repo" tool's same-origin path to a GitHub asset.</summary>
+        /// Raw .bin bytes of one catalog entry, streamed through the API whatever its source - the browser "Build offline repo" tool's same-origin path to a GitHub asset.
         [Get("/api/Firmware/Fetch")]
         Task<HttpResponseMessage> FirmwareFetch(string fileName);
 
@@ -252,7 +235,7 @@ namespace api.Dal.Interface
         [Get("/api/SensorData")]
         Task<string> SensorDataGet(int? deviceID, int? timeRange, int? timeMDMY, int? buildReport);
 
-        /// <summary>Same JSON shape as SensorDataGet, time-bucket averaged across every device in the zone/unit.</summary>
+        /// Same JSON shape as SensorDataGet, time-bucket averaged across every device in the zone/unit.
         [Get("/api/SensorData/ZoneAverage")]
         Task<string> SensorDataZoneAverageGet(int deviceUnitZoneID, int? timeRange, int? timeMDMY);
 
@@ -276,17 +259,14 @@ namespace api.Dal.Interface
         [Put("/api/Tenant")]
         Task TenantUpdate([Body] Tenant tenant);
 
-        /// <summary>SENSITIVE - see TenantApiController.Export's remarks (password hashes, device
-        /// ApiKeys). The Web controller streams this straight to the browser as a download,
-        /// never writing it to disk itself.</summary>
+        /// SENSITIVE (password hashes, device ApiKeys - see TenantApiController.Export) - the Web controller streams this straight to the browser, never writing it to disk.
         [Get("/api/Tenant/Export")]
         Task<TenantExport> TenantExport(int idTenant, bool includeSensorData = false, DateTime? sensorDataSinceUtc = null);
 
         [Post("/api/Tenant/Import")]
         Task<TenantImportResult> TenantImport([Body] TenantImportRequest value);
 
-        /// <summary>Anonymous - see TenantApiController.ImportAsSentinel's remarks. Reachable from
-        /// the same SetupAdmin screen BootstrapPending/BootstrapSetPassword already use.</summary>
+        /// Anonymous (see TenantApiController.ImportAsSentinel) - reachable from the same SetupAdmin screen BootstrapPending/BootstrapSetPassword already use.
         [Post("/api/Tenant/ImportAsSentinel")]
         Task<TenantImportResult> TenantImportAsSentinel([Body] TenantExport value);
 
@@ -298,15 +278,13 @@ namespace api.Dal.Interface
         [Put("/api/ServerConfig")]
         Task ServerConfigUpdate([Body] ServerConfig config);
 
-        /// <summary>The one ServerConfig field an anonymous page (Register) is allowed to read -
-        /// whether to show the "create a new tenant" option at all.</summary>
+        /// The one ServerConfig field an anonymous page (Register) is allowed to read - whether to show the "create a new tenant" option at all.
         [Get("/api/ServerConfig/Public")]
         Task<PublicServerConfig> ServerConfigGetPublic();
 
         // ---- Data maintenance -----------------------------
 
-        /// <summary>Whether the current DB provider is MariaDB/MySQL - decides whether the Purge
-        /// confirmation flow needs the extra "shrink files on disk?" dialog at all.</summary>
+        /// Whether the current DB provider is MariaDB/MySQL - decides whether the Purge confirmation flow needs the extra "shrink files on disk?" dialog at all.
         [Get("/api/DataMaintenance/Provider")]
         Task<DataMaintenanceProviderInfo> DataMaintenanceProviderGet();
 
