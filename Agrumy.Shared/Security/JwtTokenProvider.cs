@@ -75,6 +75,20 @@ namespace api.Security
         /// Every role claim on a valid token, or null if the token is invalid/expired/wrongly-signed. An empty (non-null) list means the token validated but carried no roles — callers must treat that as "no roles", not "check failed".
         public static IReadOnlyList<string>? ValidateToken(string token) => ValidateToken(token, Config.secureKey);
 
+        /// The one place TokenValidationParameters is built - Agrumy.Api's AddJwtBearer (Program.cs) uses this too, so the #218 ClockSkew-mismatch bug class (two independently hand-written parameter sets drifting apart) is now structurally impossible rather than merely tested for.
+        public static TokenValidationParameters BuildValidationParameters(string secureKey, string? issuer, string? audience) => new()
+        {
+            ValidateIssuerSigningKey = true,
+            // MUST be the same encoding CreateToken uses to derive key bytes, or a SecureKey character above U+007F silently produces two different keys.
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secureKey)),
+            ValidateIssuer = true,
+            ValidIssuer = issuer,
+            ValidateAudience = true,
+            ValidAudience = audience,
+            // Default ClockSkew is 5 minutes; zero here means tokens expire exactly at their stated expiration.
+            ClockSkew = TimeSpan.Zero,
+        };
+
         /// Key-parameterized overload for tests driving the real validation path with a chosen key; production callers never pass a key (the single-arg overload reads Config.secureKey live rather than a cached field, since it must reflect Config.Init() having run at host startup).
         public static IReadOnlyList<string>? ValidateToken(string token, string? secureKey)
         {
@@ -82,22 +96,10 @@ namespace api.Security
                 return null;
 
             var tokenHandler = new JwtSecurityTokenHandler();
-            // MUST be the same encoding CreateToken (and Agrumy.Api's AddJwtBearer) uses to derive key bytes, or a SecureKey character above U+007F silently produces two different keys.
-            var key = Encoding.UTF8.GetBytes(secureKey);
             try
             {
-                tokenHandler.ValidateToken(token, new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(key),
-                    // Reads Config.jwtIssuer/jwtAudience directly (not builder.Configuration) since this also runs inside Agrumy.Web, a separate assembly with its own appsettings.json.
-                    ValidateIssuer = true,
-                    ValidIssuer = Config.jwtIssuer,
-                    ValidateAudience = true,
-                    ValidAudience = Config.jwtAudience,
-                    // Default ClockSkew is 5 minutes; zero here means tokens expire exactly at their stated expiration.
-                    ClockSkew = TimeSpan.Zero
-                }, out SecurityToken validatedToken);
+                // Reads Config.jwtIssuer/jwtAudience directly (not builder.Configuration) - this overload also runs from unit tests that never call Config.Init() through a host.
+                tokenHandler.ValidateToken(token, BuildValidationParameters(secureKey, Config.jwtIssuer, Config.jwtAudience), out SecurityToken validatedToken);
 
                 var jwtToken = (JwtSecurityToken)validatedToken;
                 return jwtToken.Claims.Where(x => x.Type == "role").Select(x => x.Value).ToList();

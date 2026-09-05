@@ -16,11 +16,9 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using OpenTelemetry.Metrics;
 using System.Net;
-using System.Text;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -62,17 +60,8 @@ if (string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience))
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o => {
-        var Key = Encoding.UTF8.GetBytes(secureKey);
-        o.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidIssuer = jwtIssuer,
-            ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(Key),
-            // Matches JwtTokenProvider.ValidateToken's explicit choice - same expiry boundary enforced by both validators.
-            ClockSkew = TimeSpan.Zero
-        };
+        // Same factory JwtTokenProvider.ValidateToken uses - see its BuildValidationParameters for why.
+        o.TokenValidationParameters = JwtTokenProvider.BuildValidationParameters(secureKey, jwtIssuer, jwtAudience);
         // A JWT is self-validating and cannot be un-issued before its own expiry, so a password
         // change or Enabled->false only takes effect immediately via this extra per-request check.
         o.Events = new JwtBearerEvents { OnTokenValidated = TokenRevocationValidator.ValidateAsync };

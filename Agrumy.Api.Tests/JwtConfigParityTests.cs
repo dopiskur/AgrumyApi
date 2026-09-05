@@ -1,4 +1,6 @@
 using System.Text.Json;
+using api.Security;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Agrumy.Api.Tests;
 
@@ -35,5 +37,31 @@ public class JwtConfigParityTests
         Assert.Equal(apiJwt.GetProperty("SecureKey").GetString(), webJwt.GetProperty("SecureKey").GetString());
         Assert.Equal(apiJwt.GetProperty("Issuer").GetString(), webJwt.GetProperty("Issuer").GetString());
         Assert.Equal(apiJwt.GetProperty("Audience").GetString(), webJwt.GetProperty("Audience").GetString());
+    }
+
+    /// #218's actual bug was two hand-written TokenValidationParameters (Program.cs's AddJwtBearer and JwtTokenProvider.ValidateToken) drifting apart in a field appsettings.json never covers (ClockSkew). Both now build from JwtTokenProvider.BuildValidationParameters, so this locks in that single factory's contract rather than comparing two copies.
+    [Fact]
+    public void BuildValidationParameters_HasTheExpectedValidationFlags()
+    {
+        TokenValidationParameters parameters = JwtTokenProvider.BuildValidationParameters("some-signing-key-0123456789ABCDEF", "https://api.agrumy.com", "agrumy-api");
+
+        Assert.True(parameters.ValidateIssuerSigningKey);
+        Assert.True(parameters.ValidateIssuer);
+        Assert.Equal("https://api.agrumy.com", parameters.ValidIssuer);
+        Assert.True(parameters.ValidateAudience);
+        Assert.Equal("agrumy-api", parameters.ValidAudience);
+        Assert.Equal(TimeSpan.Zero, parameters.ClockSkew);
+    }
+
+    /// Guards against a future edit reintroducing a second, independent TokenValidationParameters construction in Program.cs instead of going through the shared factory above.
+    [Fact]
+    public void Program_AddJwtBearer_UsesTheSharedValidationParametersFactory()
+    {
+        string? root = FindRepoRoot();
+        if (root is null) return;
+        string programPath = Path.Combine(root, "Agrumy.Api", "Program.cs");
+        if (!File.Exists(programPath)) return;
+
+        Assert.Contains("JwtTokenProvider.BuildValidationParameters(", File.ReadAllText(programPath));
     }
 }
