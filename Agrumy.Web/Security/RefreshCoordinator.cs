@@ -1,36 +1,31 @@
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+
 namespace api.Security
 {
-    // Serializes concurrent refreshes: the API's refresh token is single-use, so a second caller presenting an already-spent token gets every session revoked as theft.
+    /// Deduplicates concurrent refreshes per stale-refresh-token (not one global lock/slot) - the API's refresh token is single-use, so two callers presenting the same spent token must share one in-flight call, without serializing behind or evicting unrelated users' entries; in-process only, a multi-instance Web deployment would need a distributed lock instead.
     public sealed class RefreshCoordinator
     {
-        private readonly SemaphoreSlim _lock = new(1, 1);
-        private (string StaleRefreshToken, string AccessToken, string RefreshToken)? _lastResult;
+        private readonly ConcurrentDictionary<string, Lazy<Task<(string AccessToken, string RefreshToken)?>>> _inFlight = new();
 
         public async Task<(string AccessToken, string RefreshToken)?> RefreshAsync(
             string staleRefreshToken,
             Func<string, Task<(string AccessToken, string RefreshToken)?>> callApi,
             CancellationToken ct = default)
         {
-            await _lock.WaitAsync(ct).ConfigureAwait(false);
+            var lazy = _inFlight.GetOrAdd(staleRefreshToken,
+                key => new Lazy<Task<(string AccessToken, string RefreshToken)?>>(
+                    () => callApi(key), LazyThreadSafetyMode.ExecutionAndPublication));
+
             try
             {
-                if (_lastResult is { } cached && cached.StaleRefreshToken == staleRefreshToken)
-                {
-                    return (cached.AccessToken, cached.RefreshToken);
-                }
-
-                var result = await callApi(staleRefreshToken).ConfigureAwait(false);
-                if (result is null)
-                {
-                    return null;
-                }
-
-                _lastResult = (staleRefreshToken, result.Value.AccessToken, result.Value.RefreshToken);
-                return result;
+                return await lazy.Value.ConfigureAwait(false);
             }
             finally
             {
-                _lock.Release();
+                // Compare-and-remove: only drops this entry if it's still ours, never a concurrent awaiter's.
+                ((ICollection<KeyValuePair<string, Lazy<Task<(string AccessToken, string RefreshToken)?>>>>)_inFlight)
+                    .Remove(new KeyValuePair<string, Lazy<Task<(string AccessToken, string RefreshToken)?>>>(staleRefreshToken, lazy));
             }
         }
     }
