@@ -3,18 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>
-    /// EF Core context for the Agrumy database, replacing the old Dapper + stored-procedure SqlRepository.
-    ///
-    /// Provider-neutral: MySQL/MariaDB (Pomelo) or PostgreSQL (Npgsql), chosen at runtime by
-    /// <c>Database:Provider</c>. No vendor-specific <c>HasColumnType</c> - EF maps each CLR type per
-    /// provider; only portable <c>HasMaxLength</c> and <c>CURRENT_TIMESTAMP</c> defaults are used.
-    ///
-    /// Mapped against the legacy schema (camelCase tables, <c>IDXxx</c> keys, mixed id strategies).
-    /// Relationships are intentionally not configured - EfRepository does every join in LINQ - so the
-    /// baseline migration creates tables without the legacy NO-ACTION FKs (fine for a fresh database,
-    /// irrelevant to one that already has tables).
-    /// </summary>
+    /// Provider-neutral EF Core context (MySQL/MariaDB via Pomelo or PostgreSQL via Npgsql, chosen at runtime) mapped against the legacy camelCase/IDXxx schema - relationships are deliberately unconfigured since EfRepository does every join in LINQ.
     public class AgrumyDbContext : DbContext
     {
         public AgrumyDbContext(DbContextOptions<AgrumyDbContext> options) : base(options) { }

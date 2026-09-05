@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IUserRepository members: the fixed role list and composable roles.</summary>
+    /// IUserRepository members: the fixed role list and composable roles.
     internal partial class EfRepository
     {
         public async Task<IList<UserRole>> UserRoleGetAsync()

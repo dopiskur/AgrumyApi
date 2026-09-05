@@ -5,13 +5,7 @@ namespace api.Dal
 {
     internal static class NpgsqlCompat
     {
-        /// <summary>
-        /// Runs when Agrumy.Dal loads, before any Npgsql type mapping is initialised. The Agrumy
-        /// schema stores naive local datetimes everywhere (legacy MySQL <c>datetime</c>), so opt
-        /// back into Npgsql's pre-6.0 behaviour: <c>DateTime</c> maps to
-        /// <c>timestamp without time zone</c> and any <see cref="System.DateTimeKind"/> is accepted,
-        /// instead of the UTC-only <c>timestamp with time zone</c> default.
-        /// </summary>
+        /// Runs before any Npgsql type mapping is initialised - opts back into pre-6.0 behavior (DateTime maps to timestamp without time zone, any DateTimeKind accepted) since Agrumy stores naive local datetimes everywhere (legacy MySQL datetime).
         [ModuleInitializer]
         [SuppressMessage("Usage", "CA2255", Justification = "Deliberate: Agrumy.Dal is a library, but this switch must be set before any Npgsql type mapping runs, and there is no earlier library-safe hook than a module initializer.")]
         internal static void Init()

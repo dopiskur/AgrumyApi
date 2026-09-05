@@ -10,7 +10,7 @@ namespace api.Dal
     /// hierarchical dashboard aggregation.</summary>
     internal partial class EfRepository
     {
-        /// <summary>A record, not the SensorData DTO - carries only what dashboard aggregation needs.</summary>
+        /// A record, not the SensorData DTO - carries only what dashboard aggregation needs.
         private sealed record UnitZoneDeviceSnapshot(
             int? DeviceUnitID, int? DeviceUnitZoneID, bool Enabled, bool Online, bool HasRecentProblemEvent,
             double? Temperature, double? SoilTemperature, double? Humidity, int? Moisture, int? Light,
@@ -20,7 +20,7 @@ namespace api.Dal
             public double? Vpd => VpdCalculator.Compute(Temperature, Humidity);
         }
 
-        /// <summary>Event types that make a zone/unit Orange (unless it's already Red).</summary>
+        /// Event types that make a zone/unit Orange (unless it's already Red).
         private static readonly int[] ProblemEventTypeIds =
         [
             (int)DeviceEventType.AuthFailed,
@@ -408,7 +408,7 @@ namespace api.Dal
             };
         }
 
-        /// <summary>Single ServerConfig read shared by every dashboard aggregation call this request needs it in.</summary>
+        /// Single ServerConfig read shared by every dashboard aggregation call this request needs it in.
         private async Task<(int ExpiryHours, bool AlertsEnabled)> ProblemEventSettingsAsync()
         {
             ServerConfig config = await ServerConfigGetAsync();

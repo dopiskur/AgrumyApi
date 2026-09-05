@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IRelayRepository members.</summary>
+    /// IRelayRepository members.
     internal partial class EfRepository
     {
         public async Task<IList<Device>> RelayDevicesGetAllAsync()

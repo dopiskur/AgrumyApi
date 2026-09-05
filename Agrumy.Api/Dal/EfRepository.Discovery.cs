@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IDiscoveryRepository members.</summary>
+    /// IDiscoveryRepository members.
     internal partial class EfRepository
     {
         public async Task DiscoveryReportAddAsync(int scanningDeviceId, string discoveredApMac, int? rssi)

@@ -6,9 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace api.Dal
 {
-    /// <summary>IDistributedCache-backed device apiAuth session cache - still in-process today
-    /// (AddDistributedMemoryCache in Program.cs), but swapping to a real backend like Redis later
-    /// is a one-line Program.cs change, not a rewrite of this class or its callers.</summary>
+    /// IDistributedCache-backed device apiAuth session cache - still in-process today (AddDistributedMemoryCache in Program.cs), but swapping to Redis later is a one-line Program.cs change.
     internal sealed partial class CacheRepository(IDistributedCache cache, ILogger<CacheRepository> logger) : ICache
     {
         private static readonly TimeSpan DefaultTtl = TimeSpan.FromMinutes(5);

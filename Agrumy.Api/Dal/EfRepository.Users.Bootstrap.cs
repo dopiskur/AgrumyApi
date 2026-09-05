@@ -14,7 +14,7 @@ namespace api.Dal
             return await db.Users.AsNoTracking().AnyAsync(u => u.PwdHash == null);
         }
 
-        /// <summary>Fetch-then-verify-then-write (verification needs C#), but still race-safe since the final write stays gated by WHERE PwdHash IS NULL.</summary>
+        /// Fetch-then-verify-then-write (verification needs C#), but still race-safe since the final write stays gated by WHERE PwdHash IS NULL.
         public async Task<bool> BootstrapAdminSetPasswordAsync(UserSecret secret, string setupSecret)
         {
             UserRow? pending = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.PwdHash == null);

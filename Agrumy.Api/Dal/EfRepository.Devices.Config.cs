@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IDeviceRepository members: per-device sensor and controller config reads/writes.</summary>
+    /// IDeviceRepository members: per-device sensor and controller config reads/writes.
     internal partial class EfRepository
     {
         public async Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID)

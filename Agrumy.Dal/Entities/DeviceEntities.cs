@@ -1,7 +1,6 @@
 namespace api.Dal.Entities
 {
-    /// <summary>TenantID null means the shared global sentinel row (IDDeviceUnit=0 "Default", see
-    /// EfRepository.SeedDeviceUnitSentinelsAsync), not a real per-tenant Unit.</summary>
+    /// TenantID null means the shared global sentinel row (IDDeviceUnit=0 "Default", see EfRepository.SeedDeviceUnitSentinelsAsync), not a real per-tenant Unit.
     public class DeviceUnitRow
     {
         public int IDDeviceUnit { get; set; }
@@ -10,10 +9,7 @@ namespace api.Dal.Entities
         public bool? ZoneEnabled { get; set; }
     }
 
-    /// <summary>DeviceUnitID is the real "Unit contains many Zones" FK - see the containment
-    /// migration comment in db/migrations/2026-09-02-deviceunit-zone-containment.sql. TenantID
-    /// null means the shared global sentinel row (IDDeviceUnitZone=0 "Disabled"), same convention
-    /// as DeviceUnitRow.</summary>
+    /// DeviceUnitID is the real "Unit contains many Zones" FK (see db/migrations/2026-09-02-deviceunit-zone-containment.sql) - TenantID null means the shared global sentinel row (IDDeviceUnitZone=0 "Disabled"), same convention as DeviceUnitRow.
     public class DeviceUnitZoneRow
     {
         public int IDDeviceUnitZone { get; set; }
@@ -29,9 +25,7 @@ namespace api.Dal.Entities
         public bool SkipWaterPumpWhenRainPredicted { get; set; }
     }
 
-    /// <summary>See api.Models.DeviceUnitZoneRule for the full explanation. ConditionConfig is
-    /// stored as plain text (JSON), matching AgrumyDbContext's provider-neutral "no vendor-specific
-    /// HasColumnType" principle - (de)serialized at the application layer, not a native JSON column type.</summary>
+    /// See api.Models.DeviceUnitZoneRule - ConditionConfig is stored as plain JSON text, (de)serialized at the application layer, not a native JSON column type.
     public class DeviceUnitZoneRuleRow
     {
         public int IDDeviceUnitZoneRule { get; set; }
@@ -130,11 +124,7 @@ namespace api.Dal.Entities
         public int? Relay8 { get; set; }
     }
 
-    /// <summary>One wall-clock window for one relay function on one deviceConfigController (see
-    /// api.Models.DeviceConfigController for the wire-shape story). RelayFunction matches
-    /// deviceTypeRelay's seed IDs (1=Ventilation, 2=Light, 3=Heating, 4=Water pump), same
-    /// convention as ActuatorController::RelayFunctionType on the device side. A row's mere
-    /// presence means it is active - there is no separate Enabled column.</summary>
+    /// One wall-clock window for one relay function (RelayFunction = deviceTypeRelay's seed IDs, same convention as ActuatorController::RelayFunctionType) - a row's mere presence means it is active, there is no separate Enabled column.
     public class DeviceScheduleSlotRow
     {
         public int IDDeviceScheduleSlot { get; set; }
@@ -206,9 +196,7 @@ namespace api.Dal.Entities
         public int? RelayProfile { get; set; }
     }
 
-    /// <summary>One LoRaWAN end-device's DevEUI mapped to the Agrumy device (by
-    /// ApiId/ApiKey) a RelayProfile.LoRaGateway relay should act on behalf of for that DevEUI's
-    /// uplinks - only ever populated for a relay whose own profile is LoRaGateway.</summary>
+    /// One LoRaWAN end-device's DevEUI mapped to the Agrumy device (ApiId/ApiKey) a LoRaGateway relay acts on behalf of for that DevEUI's uplinks.
     public class RelayDeviceMappingRow
     {
         public int IDRelayDeviceMapping { get; set; }
@@ -218,9 +206,7 @@ namespace api.Dal.Entities
         public DateTime? DateCreated { get; set; }
     }
 
-    /// <summary>One scanning device's sighting of one nearby Agrumy_ AP during a roadmap #268
-    /// discovery scan - raw reports, not yet deduplicated/best-picked (that lives in the repository
-    /// query layer, not here).</summary>
+    /// One scanning device's sighting of one nearby Agrumy_ AP during a discovery scan - raw reports, not yet deduplicated/best-picked (that lives in the repository query layer).
     public class DeviceDiscoveryReportRow
     {
         public int IDReport { get; set; }
@@ -230,8 +216,7 @@ namespace api.Dal.Entities
         public DateTime DateReported { get; set; }
     }
 
-    /// <summary>One discrete, one-shot device action - see api.Models.CommandStatus for why
-    /// Acknowledged is a real, persisted state and not just an implementation detail.</summary>
+    /// One discrete, one-shot device action - see api.Models.CommandStatus for why Acknowledged is a real, persisted state.
     public class DeviceCommandRow
     {
         public int IDDeviceCommand { get; set; }
@@ -245,9 +230,7 @@ namespace api.Dal.Entities
         public int? ActiveKey { get; set; }
     }
 
-    /// <summary>One row per device, upserted on every config poll - the poll itself is the
-    /// heartbeat, so LastSeenAt needs no extra endpoint or firmware request. Keyed by DeviceID
-    /// (1:1 with device) rather than an identity column so the upsert is a plain read-or-insert.</summary>
+    /// One row per device, upserted on every config poll (the poll itself is the heartbeat) - keyed by DeviceID (1:1 with device), not an identity column, so the upsert is a plain read-or-insert.
     public class DeviceDiagnosticRow
     {
         public int DeviceID { get; set; }
@@ -271,10 +254,7 @@ namespace api.Dal.Entities
         public string? Kit { get; set; }
     }
 
-    /// <summary>Catalog of recognized commercial kits (physical boards) and whether each one is
-    /// known to have real, wired relay hardware - Kit itself is the key (a build-flag string, e.g.
-    /// "KC868-A6"), not an auto-increment id. No admin UI yet to add more - a new kit needs a code
-    /// change either way (a new PlatformIO environment) before its Kit string could ever appear.</summary>
+    /// Catalog of recognized commercial kits and whether each has real wired relay hardware - Kit itself is the key (a build-flag string, e.g. "KC868-A6"), not an auto-increment id.
     public class DeviceTypeKitRow
     {
         public string Kit { get; set; } = "";
