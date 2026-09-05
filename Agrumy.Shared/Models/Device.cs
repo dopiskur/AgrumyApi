@@ -79,6 +79,8 @@ namespace api.Models
         public string? DevicePin { get; set; }
         public string? ServicePoint { get; set; } = "api.agrumy.com";
         public int? ServiceType { get; set; } = 1;
+        // Entered on the captive portal at first setup - only used as DeviceName when a new device has no Discovery-provisioned name already queued.
+        public string? DisplayName { get; set; }
 
         // Agrumy.Relay sends these on its own first registration so IsRelay/RelayProfile come back set; null/false for ordinary firmware, and only consulted when the MacAddress is genuinely new. Honored only if RelayRegistrationSecret matches the server's configured Relay:RegistrationSecret - any other caller's IsRelay:true is silently dropped, registering an ordinary device instead.
         public bool IsRelay { get; set; }

@@ -330,7 +330,10 @@ namespace api.Controllers.API
                 {
                     ConfigVersion = 1,
                     TenantID = user.TenantID ?? 0,
-                    DeviceName = string.IsNullOrWhiteSpace(provision?.DeviceName) ? "Agrumy_" + value.MacAddress.ToUpper() : provision.DeviceName,
+                    // Discovery-provisioned name (admin, pre-registration) beats the captive-portal one (device owner, at setup) beats the generic default.
+                    DeviceName = !string.IsNullOrWhiteSpace(provision?.DeviceName) ? provision.DeviceName
+                        : !string.IsNullOrWhiteSpace(value.DisplayName) ? value.DisplayName
+                        : "Agrumy_" + value.MacAddress.ToUpper(),
                     MacAddress = value.MacAddress,
                     ApiId = Guid.NewGuid().ToString(), // identifier, not a secret - Guid is fine
                     ApiKey = AuthenticationProvider.GetSecureToken(), // credential - needs a CSPRNG source, not Guid

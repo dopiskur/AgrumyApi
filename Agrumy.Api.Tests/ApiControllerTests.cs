@@ -515,6 +515,84 @@ public class ApiControllerTests
         Assert.False(captured!.IsRelay);
     }
 
+    private void StubNewDeviceRegistration(out Func<Device?> captured)
+    {
+        _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF")).ReturnsAsync((Device?)null);
+        Device? c = null;
+        _repo.Setup(r => r.DeviceAddAsync(It.IsAny<Device>()))
+             .Callback<Device>(d => c = d)
+             .ReturnsAsync((Device d) => { d.IDDevice = 900; return d; });
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
+        _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
+        captured = () => c;
+    }
+
+    [Fact]
+    public async Task DeviceRegistration_NewDevice_UsesCaptivePortalDisplayName_WhenNoProvisionQueued()
+    {
+        StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
+        StubNewDeviceRegistration(out var captured);
+        _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
+
+        var result = await NewDeviceController().DeviceRegistration(new DeviceRegistration
+        {
+            Email = "owner@example.com",
+            DevicePin = "ABC234",
+            MacAddress = "AABBCCDDEEFF",
+            DisplayName = "My Greenhouse",
+        });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal("My Greenhouse", captured()!.DeviceName);
+    }
+
+    [Fact]
+    public async Task DeviceRegistration_NewDevice_FallsBackToGenericName_WhenDisplayNameBlank()
+    {
+        StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
+        StubNewDeviceRegistration(out var captured);
+        _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
+
+        var result = await NewDeviceController().DeviceRegistration(PinRegistration("ABC234")); // no DisplayName set
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal("Agrumy_AABBCCDDEEFF", captured()!.DeviceName);
+    }
+
+    [Fact]
+    public async Task DeviceRegistration_NewDevice_ProvisionedNameWins_OverCaptivePortalDisplayName()
+    {
+        StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
+        StubNewDeviceRegistration(out var captured);
+        var provisionCommand = new DeviceCommand
+        {
+            IDDeviceCommand = 55,
+            Status = CommandStatus.Acknowledged,
+            Payload = System.Text.Json.JsonSerializer.Serialize(new DiscoveryProvisionPayload
+            {
+                Username = "owner@example.com",
+                Pin = "ABC234",
+                DiscoveredApMac = "AABBCCDDEEFF",
+                Ssid = "TestWifi",
+                WifiPassword = "pw",
+                DeviceName = "Provisioned Greenhouse",
+            }),
+        };
+        _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand> { provisionCommand });
+        _repo.Setup(r => r.SetCommandStatusAsync(55, CommandStatus.Executed, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+
+        var result = await NewDeviceController().DeviceRegistration(new DeviceRegistration
+        {
+            Email = "owner@example.com",
+            DevicePin = "ABC234",
+            MacAddress = "AABBCCDDEEFF",
+            DisplayName = "Ignored Captive-Portal Name",
+        });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal("Provisioned Greenhouse", captured()!.DeviceName);
+    }
+
     /// Common post-UserAddAsync plumbing every UserRegistration call goes through: recovers the freshly-inserted IDUser, writes an activation token, and assigns a starting role. Stubbed permissively here since it isn't the point of most of these tests.
     private void StubActivationPlumbing(string email, int idUser)
     {
