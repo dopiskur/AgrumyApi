@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// Provider-neutral EF Core context (MySQL/MariaDB via Pomelo or PostgreSQL via Npgsql, chosen at runtime) mapped against the legacy camelCase/IDXxx schema - relationships are deliberately unconfigured since EfRepository does every join in LINQ.
+    /// Provider-neutral EF Core context (MySQL/MariaDB via Pomelo or PostgreSQL via Npgsql, chosen at runtime) mapped against the legacy camelCase/IDXxx schema - relationship NAVIGATION properties are deliberately not exposed (no .Include()-based traversal), EfRepository does every join in LINQ; the HasOne() calls below configure FK constraints/cascade behavior only, not C# navigation.
     public class AgrumyDbContext : DbContext
     {
         public AgrumyDbContext(DbContextOptions<AgrumyDbContext> options) : base(options) { }
