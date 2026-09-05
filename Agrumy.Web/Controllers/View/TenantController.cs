@@ -13,8 +13,7 @@ namespace api.Controllers.View
     [Authorize(Roles = RoleNames.GlobalAdminOrReader)]
     public class TenantController(IApi api) : Controller
     {
-        // Human-readable, matches the codebase's other JSON-in-a-form-field conventions
-        // (e.g. DeviceUnitZoneRule.ConditionConfig) - a migration file an admin might open to sanity-check before importing it elsewhere.
+        // Human-readable, same convention as DeviceUnitZoneRule.ConditionConfig - an admin may open this JSON to sanity-check it before importing elsewhere.
         private static readonly JsonSerializerOptions ExportJsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
         public async Task<ActionResult> Index() => View(await api.TenantsGet());
@@ -53,10 +52,7 @@ namespace api.Controllers.View
 
         // ---- Export/Import --------------------------------------------------
 
-        /// <summary>Streams the export directly as a browser download - never written to this
-        /// server's own disk (see TenantApiController.Export's SENSITIVE remarks: password
-        /// hashes, device ApiKeys). GlobalAdminOrReader class-level auth is too wide for this
-        /// specific action (a Global reader must not pull credentials out) - narrowed here.</summary>
+        /// Streams the export as a browser download, never written to this server's disk (see TenantApiController.Export - contains password hashes, device ApiKeys); narrowed to GlobalAdmin since a Global reader must not pull credentials out.
         [Authorize(Roles = RoleNames.GlobalAdmin)]
         public async Task<ActionResult> Export(int idTenant, bool includeSensorData = false)
         {

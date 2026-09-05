@@ -6,7 +6,7 @@ using System.Globalization;
 
 namespace api.Controllers.View
 {
-    /// <summary>Sets the UI-language cookie read by Program.cs's RequestLocalizationOptions - reachable pre-login (_AuthLayout) as well as from the main app shell, so it must stay anonymous.</summary>
+    /// Sets the UI-language cookie read by Program.cs's RequestLocalizationOptions - reachable pre-login (_AuthLayout) as well as from the main app shell, so it must stay anonymous.
     [AllowAnonymous]
     public class LanguageController : Controller
     {

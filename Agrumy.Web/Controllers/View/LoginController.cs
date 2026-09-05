@@ -44,10 +44,7 @@ namespace api.Controllers.View
             }
             catch (ApiException ex)
             {
-                // 428 = MustChangePassword (tenant import) - a distinct status
-                // specifically so this branches without parsing message text, unlike the
-                // wrong-credentials/not-verified/not-enabled cases below, which all still just
-                // show the same generic error.
+                // 428 = MustChangePassword (tenant import) - a distinct status so this branches without parsing message text, unlike the other cases below.
                 if (ex.StatusCode == 428)
                 {
                     TempData["ForceChangePasswordLogin"] = userLogin.Login;
@@ -76,9 +73,7 @@ namespace api.Controllers.View
             return RedirectToAction("Index", "DeviceUnit");
         }
 
-        /// <summary>Tenant-import counterpart to the login form - reached only via the 428 redirect
-        /// above (see api.Models.User.MustChangePassword). GET pre-fills Login from TempData when
-        /// the redirect carried it; a direct visit still works, just with an empty field.</summary>
+        /// Tenant-import counterpart to the login form, reached via the 428 redirect (api.Models.User.MustChangePassword); GET pre-fills Login from TempData when present.
         public ActionResult ForceChangePassword()
         {
             return View(new UserForceChangePassword { Login = TempData["ForceChangePasswordLogin"] as string });
@@ -116,8 +111,7 @@ namespace api.Controllers.View
             return RedirectToAction("Index", "DeviceUnit");
         }
 
-        /// <summary>Shared by Index(POST) and ForceChangePassword(POST) - both end with the exact
-        /// same cookie sign-in once Agrumy.Api hands back a token.</summary>
+        /// Shared by Index(POST) and ForceChangePassword(POST) - both end with the same cookie sign-in once Agrumy.Api hands back a token.
         private async Task SignInAsync(UserLoginResult result, IReadOnlyList<string> roles)
         {
             // HttpOnly, SameSite=Strict cookie; the raw JWT/refresh token are stored tokens for BearerTokenHandler, never exposed to page script.
@@ -196,11 +190,7 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Index));
         }
 
-        /// <summary>Imports a TenantExport as TenantID=0 (this server's sole
-        /// tenant), replacing the unclaimed bootstrap admin. Same "re-check BootstrapPending on
-        /// every load" fail-closed rule as SetupAdmin - the server-side TenantZeroIsEmptyAsync
-        /// gate is the REAL guard (see TenantApiController.ImportAsSentinel), this is just so the
-        /// form does not sit there invitingly once someone HAS signed in.</summary>
+        /// Imports a TenantExport as TenantID=0, replacing the unclaimed bootstrap admin; the real guard is server-side (TenantApiController.ImportAsSentinel's TenantZeroIsEmptyAsync), this GET just hides the form once someone has already signed in.
         public async Task<ActionResult> ImportSentinel()
         {
             if (!await BootstrapPendingSafeAsync())

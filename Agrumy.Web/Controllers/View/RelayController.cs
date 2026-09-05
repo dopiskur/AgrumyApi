@@ -7,10 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.View
 {
-    /// <summary>Lists registered Agrumy.Relay devices and, for a LoRaGateway
-    /// profile, manages its DevEUI-&gt;device mapping table. Relays are install-wide infrastructure
-    /// (see IRelayRepository's remarks), so this is Global-Admin-only like Firmware/ServerConfig,
-    /// not tenant-scoped like the ordinary Device pages.</summary>
+    /// Lists registered relays and manages a LoRaGateway's DevEUI-&gt;device mapping; relays are install-wide infrastructure (IRelayRepository), so this is Global-Admin-only, not tenant-scoped.
     [Authorize(Roles = RoleNames.GlobalAdmin)]
     public class RelayController(IApi api) : Controller
     {

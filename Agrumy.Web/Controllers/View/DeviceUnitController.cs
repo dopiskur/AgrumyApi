@@ -40,8 +40,7 @@ namespace api.Controllers.View
         public async Task<ActionResult> Zone(int idDeviceUnitZone)
         {
             ZoneViewModel model = await BuildZoneViewAsync(idDeviceUnitZone);
-            // Last 24h, hourly buckets - same window the sparkline trend uses. Only fetched here, not
-            // in ZoneDetails (the 10s-polled fragment) - the chart lives outside that fragment.
+            // Last 24h hourly buckets, only fetched here (not in the 10s-polled ZoneDetails fragment) - the chart lives outside that fragment.
             model.SensorDataJson = await api.SensorDataZoneAverageGet(idDeviceUnitZone, 24, 1);
             return View(model);
         }
@@ -244,10 +243,7 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
         }
 
-        // returnUrl is read client-side from window.location by _ZoneStatusBadge's inline onsubmit -
-        // Context.Request.Path server-side would be wrong whenever the badge last rendered inside a
-        // live-refresh AJAX fragment (that request's path is the polling endpoint, not the page the
-        // browser is actually showing). Falls back to the Units index if it's ever missing/unsafe.
+        // returnUrl comes from window.location client-side (_ZoneStatusBadge) since Request.Path server-side would be the AJAX poll endpoint, not the visible page; falls back to Index if missing/unsafe.
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
