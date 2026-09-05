@@ -14,5 +14,8 @@ namespace api.ViewModels
         // Null/empty when the zone has no controller-capable device assigned; the automation section is not shown at all in that case.
         public DeviceUnitZone? Zone { get; init; }
         public IList<DeviceUnitZoneRule> Rules { get; init; } = [];
+
+        public IList<DiscoveryResult> DiscoveredDevices { get; set; } = [];
+        public IList<TenantWifiConfig> WifiConfigs { get; set; } = [];
     }
 }

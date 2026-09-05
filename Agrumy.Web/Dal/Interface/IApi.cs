@@ -199,6 +199,20 @@ namespace api.Dal.Interface
         [Post("/api/DeviceCommand")]
         Task<IReadOnlyList<int>> DeviceCommandIssue([Body] IssueCommandRequest request);
 
+        // ---- Discovery (roadmap #268) ----------------
+
+        [Post("/api/Discovery/Scan")]
+        Task<IReadOnlyList<int>> DiscoveryScan([Body] DiscoveryScanRequest request);
+
+        [Get("/api/Discovery/Results")]
+        Task<IList<DiscoveryResult>> DiscoveryResultsGet(int? unitID, int? zoneID);
+
+        [Get("/api/Discovery/WifiConfigs")]
+        Task<IList<TenantWifiConfig>> DiscoveryWifiConfigsGet();
+
+        [Post("/api/Discovery/Register")]
+        Task<DiscoveryRegisterResult> DiscoveryRegister([Body] DiscoveryRegisterRequest request);
+
         // ---- Firmware catalog + per-device update ----
 
         [Get("/api/Firmware")]

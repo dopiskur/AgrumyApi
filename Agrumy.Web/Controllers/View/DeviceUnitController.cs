@@ -31,7 +31,45 @@ namespace api.Controllers.View
                 DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone,
                 // Last 24h, hourly buckets - same window _ZoneDetails' sparkline trend already uses.
                 SensorDataJson = await api.SensorDataUnitAverageGet(idDeviceUnit, 24, 1),
+                DiscoveredDevices = await api.DiscoveryResultsGet(idDeviceUnit, null),
+                WifiConfigs = await api.DiscoveryWifiConfigsGet(),
             });
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> ScanUnit(DiscoveryScanRequest request)
+        {
+            try
+            {
+                await api.DiscoveryScan(request);
+                TempData["Message"] = "Scan started - discovered devices will appear here shortly.";
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Zones), new { idDeviceUnit = request.UnitID });
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> RegisterDiscoveredDeviceUnit(DiscoveryRegisterRequest request)
+        {
+            try
+            {
+                DiscoveryRegisterResult result = await api.DiscoveryRegister(request);
+                var (message, error) = DiscoveryRegisterOutcomeMessage.For(result.Outcome);
+                TempData["Message"] = message;
+                TempData["Error"] = error;
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Zones), new { idDeviceUnit = request.UnitID });
         }
 
         public async Task<ActionResult> ZonesCubes(int idDeviceUnit) =>
@@ -81,7 +119,45 @@ namespace api.Controllers.View
                 DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone,
                 Zone = zone,
                 Rules = rules,
+                DiscoveredDevices = await api.DiscoveryResultsGet(null, idDeviceUnitZone),
+                WifiConfigs = await api.DiscoveryWifiConfigsGet(),
             };
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> ScanZone(DiscoveryScanRequest request)
+        {
+            try
+            {
+                await api.DiscoveryScan(request);
+                TempData["Message"] = "Scan started - discovered devices will appear here shortly.";
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone = request.ZoneID });
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> RegisterDiscoveredDeviceZone(DiscoveryRegisterRequest request)
+        {
+            try
+            {
+                DiscoveryRegisterResult result = await api.DiscoveryRegister(request);
+                var (message, error) = DiscoveryRegisterOutcomeMessage.For(result.Outcome);
+                TempData["Message"] = message;
+                TempData["Error"] = error;
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone = request.ZoneID });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]

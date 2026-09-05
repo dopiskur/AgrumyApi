@@ -28,6 +28,33 @@
     <div class="alert alert-danger" asp-validation-summary="ModelOnly"></div>
 }
 
+@if (hasAnyRole(RoleNames.DeviceManagers))
+{
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Discovered devices</h3>
+            <div class="float-end">
+                <form asp-action="ScanZone" method="post">
+                    <input type="hidden" name="UnitID" value="@zone.IDDeviceUnit" />
+                    <input type="hidden" name="ZoneID" value="@zone.IDDeviceUnitZone" />
+                    <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-broadcast"></i> Scan</button>
+                </form>
+            </div>
+        </div>
+        <div class="card-body">
+            @if (TempData["Message"] is string message)
+            {
+                <div class="alert alert-success">@message</div>
+            }
+            @if (TempData["Error"] is string discoveryError)
+            {
+                <div class="alert alert-warning">@discoveryError</div>
+            }
+            <partial name="_DiscoveredDevicesRows" model="Model.DiscoveredDevices" />
+        </div>
+    </div>
+}
+
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">
@@ -90,6 +117,33 @@
     </div>
 </div>
 
+<div class="modal fade" id="registerDeviceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="RegisterDiscoveredDeviceZone" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title">Register discovered device</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="DiscoveredApMac" id="registerApMac" />
+                    <input type="hidden" name="UnitID" value="@zone.IDDeviceUnit" />
+                    <input type="hidden" name="ZoneID" value="@zone.IDDeviceUnitZone" />
+                    <div class="mb-3">
+                        <label class="form-label" for="registerDeviceName">Name (optional)</label>
+                        <input type="text" name="DeviceName" id="registerDeviceName" class="form-control" maxlength="128" />
+                    </div>
+                    <partial name="_WifiConfigFields" model="Model.WifiConfigs" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Confirm</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script src="~/js/live-refresh.js"></script>
     <script>
@@ -100,6 +154,14 @@
                     document.getElementById('zoneDetails').innerHTML = html;
                 }
             });
+
+            var registerModal = document.getElementById('registerDeviceModal');
+            if (registerModal)
+            {
+                registerModal.addEventListener('show.bs.modal', function (event) {
+                    document.getElementById('registerApMac').value = event.relatedTarget.getAttribute('data-ap-mac');
+                });
+            }
         });
     </script>
 }

@@ -25,6 +25,8 @@ namespace api.Controllers.View
                 Devices = await GetFleetForDisplayAsync(),
                 Units = units,
                 Zones = zones,
+                DiscoveredDevices = await api.DiscoveryResultsGet(null, null),
+                WifiConfigs = await api.DiscoveryWifiConfigsGet(),
             });
         }
 
@@ -38,6 +40,42 @@ namespace api.Controllers.View
             try
             {
                 await api.DeviceAssign(new DeviceZoneAssignment { IDDevice = idDevice, IDDeviceUnitZone = idDeviceUnitZone });
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Fleet));
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> ScanFleet()
+        {
+            try
+            {
+                await api.DiscoveryScan(new DiscoveryScanRequest());
+                TempData["Message"] = "Fleet-wide scan started - discovered devices will appear here shortly.";
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Fleet));
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> RegisterDiscoveredDevice(DiscoveryRegisterRequest request)
+        {
+            try
+            {
+                DiscoveryRegisterResult result = await api.DiscoveryRegister(request);
+                var (message, error) = DiscoveryRegisterOutcomeMessage.For(result.Outcome);
+                TempData["Message"] = message;
+                TempData["Error"] = error;
             }
             catch (ApiException ex)
             {

@@ -1,0 +1,29 @@
+@model IList<api.Models.TenantWifiConfig>
+
+@if (Model.Count == 0)
+{
+    <div class="mb-3">
+        <label class="form-label">WiFi SSID</label>
+        <input type="text" name="Ssid" class="form-control" required maxlength="32" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">WiFi password</label>
+        <input type="password" name="WifiPassword" class="form-control" maxlength="64" />
+    </div>
+    <div class="form-check mb-3">
+        <input type="checkbox" class="form-check-input" name="SaveWifiForLater" value="true" id="saveWifiForLater" />
+        <label class="form-check-label" for="saveWifiForLater">Save this network for future registrations</label>
+    </div>
+}
+else if (Model.Count > 1)
+{
+    <div class="mb-3">
+        <label class="form-label">WiFi network</label>
+        <select name="WifiConfigId" class="form-select">
+            @foreach (var config in Model)
+            {
+                <option value="@config.IDTenantWifiConfig">@config.Ssid</option>
+            }
+        </select>
+    </div>
+}

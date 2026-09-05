@@ -1,0 +1,36 @@
+@model IList<api.Models.DiscoveryResult>
+
+@if (Model.Count == 0)
+{
+    <p class="text-secondary mb-0">No new devices found yet - run a scan to look for nearby unregistered devices.</p>
+}
+else
+{
+    <table class="table table-hover table-sm mb-0">
+        <thead>
+            <tr>
+                <th>Discovered AP</th>
+                <th>Signal</th>
+                <th>Seen by</th>
+                <th class="d-none d-md-table-cell">Last seen</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td>@item.DiscoveredApMac</td>
+                    <td>@(item.Rssi is int rssi ? $"{rssi} dBm" : "-")</td>
+                    <td>@item.ScanningDeviceName</td>
+                    <td class="d-none d-md-table-cell">@item.DateReported.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#registerDeviceModal" data-ap-mac="@item.DiscoveredApMac">
+                            Register
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

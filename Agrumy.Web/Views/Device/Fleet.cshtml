@@ -6,6 +6,28 @@
 
 <div class="card">
     <div class="card-header">
+        <h3 class="card-title">Discovered devices</h3>
+        <div class="float-end">
+            <form asp-action="ScanFleet" method="post" onsubmit="return confirm('This runs a full scan of every sensor in your fleet - it may take a while. Continue?');">
+                <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-broadcast"></i> Scan for new devices</button>
+            </form>
+        </div>
+    </div>
+    <div class="card-body">
+        @if (TempData["Message"] is string message)
+        {
+            <div class="alert alert-success">@message</div>
+        }
+        @if (TempData["Error"] is string discoveryError)
+        {
+            <div class="alert alert-warning">@discoveryError</div>
+        }
+        <partial name="_DiscoveredDevicesRows" model="Model.DiscoveredDevices" />
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
         <h3 class="card-title">Fleet status</h3>
         <div class="float-end d-flex align-items-center gap-3">
             <span class="text-secondary small">Times shown in @(ViewBag.DisplayTimeZone ?? "UTC")</span>
@@ -15,10 +37,6 @@
         </div>
     </div>
     <div class="card-body table-responsive p-0">
-        @if (TempData["Error"] is string error)
-        {
-            <div class="alert alert-warning m-3">@error</div>
-        }
         <table id="fleetTable" class="table table-hover">
             <thead>
                 <tr>
@@ -80,6 +98,48 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="registerDeviceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-controller="Device" asp-action="RegisterDiscoveredDevice" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title">Register discovered device</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="DiscoveredApMac" id="registerApMac" />
+                    <div class="mb-3">
+                        <label class="form-label" for="registerDeviceName">Name (optional)</label>
+                        <input type="text" name="DeviceName" id="registerDeviceName" class="form-control" maxlength="128" />
+                    </div>
+                    @if (Model.Units.Count > 0)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label" for="registerUnitSelect">Unit (optional)</label>
+                            <select class="form-select" id="registerUnitSelect">
+                                <option value="">-- none --</option>
+                                @foreach (var unit in Model.Units)
+                                {
+                                    <option value="@unit.IDDeviceUnit">@unit.DeviceUnitName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="registerZoneSelect">Zone</label>
+                            <select class="form-select" name="ZoneID" id="registerZoneSelect"></select>
+                        </div>
+                    }
+                    <partial name="_WifiConfigFields" model="Model.WifiConfigs" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Confirm</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 <script type="application/json" id="assignZonesData">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Zones.Select(z => new { id = z.IDDeviceUnitZone, unitId = z.DeviceUnitID, name = z.DeviceUnitZoneName })))</script>
 
 @section Scripts {
@@ -112,29 +172,42 @@
             });
 
             var zones = JSON.parse(document.getElementById('assignZonesData').textContent);
-            var unitSelect = document.getElementById('assignUnitSelect');
-            var zoneSelect = document.getElementById('assignZoneSelect');
-
-            function populateZones(unitId) {
-                zoneSelect.innerHTML = '';
+            function populateZonesInto(select, unitId) {
+                select.innerHTML = '';
                 zones.filter(function (z) { return String(z.unitId) === String(unitId); }).forEach(function (z) {
                     var opt = document.createElement('option');
                     opt.value = z.id;
                     opt.textContent = z.name;
-                    zoneSelect.appendChild(opt);
+                    select.appendChild(opt);
                 });
             }
 
-            if (unitSelect)
+            var assignUnitSelect = document.getElementById('assignUnitSelect');
+            var assignZoneSelect = document.getElementById('assignZoneSelect');
+            if (assignUnitSelect)
             {
-                unitSelect.addEventListener('change', function () { populateZones(unitSelect.value); });
+                assignUnitSelect.addEventListener('change', function () { populateZonesInto(assignZoneSelect, assignUnitSelect.value); });
             }
-
             document.getElementById('assignZoneModal').addEventListener('show.bs.modal', function (event) {
                 document.getElementById('assignDeviceId').value = event.relatedTarget.getAttribute('data-device-id');
-                if (unitSelect)
+                if (assignUnitSelect)
                 {
-                    populateZones(unitSelect.value);
+                    populateZonesInto(assignZoneSelect, assignUnitSelect.value);
+                }
+            });
+
+            var registerUnitSelect = document.getElementById('registerUnitSelect');
+            var registerZoneSelect = document.getElementById('registerZoneSelect');
+            if (registerUnitSelect)
+            {
+                registerUnitSelect.addEventListener('change', function () { populateZonesInto(registerZoneSelect, registerUnitSelect.value); });
+            }
+            document.getElementById('registerDeviceModal').addEventListener('show.bs.modal', function (event) {
+                document.getElementById('registerApMac').value = event.relatedTarget.getAttribute('data-ap-mac');
+                if (registerUnitSelect)
+                {
+                    registerUnitSelect.value = '';
+                    populateZonesInto(registerZoneSelect, '');
                 }
             });
         });

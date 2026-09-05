@@ -68,7 +68,21 @@ namespace api.Controllers.API
             };
         }
 
-        [Authorize(Roles = RoleNames.DeviceManagers)]
+        /// Lets the Web layer decide the Register modal's shape (free-text SSID/password, a dropdown, or nothing) before the admin ever submits - Password is always stripped, same as Register's WifiChoices. Open to any authenticated caller, same rule as DeviceApiController.DeviceFleetGet - the Register modal itself is still gated to DeviceManagers in the Web UI.
+        [Authorize]
+        [HttpGet("WifiConfigs")]
+        public async Task<ActionResult<IList<TenantWifiConfig>>> WifiConfigs()
+        {
+            if (CallerTenantId is not int tenantId)
+            {
+                return Ok(new List<TenantWifiConfig>());
+            }
+            IList<TenantWifiConfig> configs = await Repo.TenantWifiConfigsGetAsync(tenantId);
+            return Ok(configs.Select(c => new TenantWifiConfig { IDTenantWifiConfig = c.IDTenantWifiConfig, TenantID = c.TenantID, Ssid = c.Ssid }).ToList());
+        }
+
+        /// Open to any authenticated caller, same rule as DeviceApiController.DeviceFleetGet - the Register modal that acts on these results is still gated to DeviceManagers in the Web UI.
+        [Authorize]
         [HttpGet("Results")]
         public async Task<ActionResult<IList<DiscoveryResult>>> Results(int? unitID, int? zoneID)
         {
