@@ -695,12 +695,17 @@ public class ApiControllerTests
         Assert.Equal("Provisioned Greenhouse", captured()!.DeviceName);
     }
 
-    /// Common post-UserAddAsync plumbing every UserRegistration call goes through: recovers the freshly-inserted IDUser, writes an activation token, and assigns a starting role. Stubbed permissively here since it isn't the point of most of these tests.
-    private void StubActivationPlumbing(string email, int idUser)
+    /// UserRegistration now delegates tenant-create + user-add + activation-token + starting-role to one transactional Repo.RegisterUserAsync (roadmap #293) - this stubs it to capture what a test needs and mutate `user.TenantID` the same way the real method does, since UserRegistration's own `return Ok(user)` reflects that mutation.
+    private void StubRegisterUser(int idUser, Action<User, int?, string?, IReadOnlyList<string>>? capture = null)
     {
-        _repo.Setup(r => r.UserGetAsync(null, email, null)).ReturnsAsync(new User { IDUser = idUser, Email = email });
-        _repo.Setup(r => r.UserSetActivationTokenAsync(idUser, It.IsAny<string>(), It.IsAny<DateTime>())).Returns(Task.CompletedTask);
-        _repo.Setup(r => r.UserRolesSetAsync(idUser, It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.RegisterUserAsync(It.IsAny<User>(), It.IsAny<UserSecret>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<IEnumerable<string>>()))
+             .Callback<User, UserSecret, int?, string?, string, DateTime, IEnumerable<string>>((u, _, existingTenantId, newTenantName, _, _, roles) =>
+             {
+                 var roleList = roles.ToList();
+                 u.TenantID = existingTenantId ?? 42; // 42 stands in for a freshly created tenant's id
+                 capture?.Invoke(u, existingTenantId, newTenantName, roleList);
+             })
+             .ReturnsAsync(idUser);
     }
 
     [Fact]
@@ -708,17 +713,18 @@ public class ApiControllerTests
     {
         _repo.Setup(r => r.TenantGetAsync("AcmeCorp")).ReturnsAsync(false);
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { AllowSelfServiceTenantCreation = true });
-        _repo.Setup(r => r.TenantAddAsync("AcmeCorp")).ReturnsAsync(42);
-        StubActivationPlumbing("owner@acme.local", 1);
-        List<string>? seededRoles = null;
-        _repo.Setup(r => r.UserRolesSetAsync(1, It.IsAny<IEnumerable<string>>()))
-             .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
-             .Returns(Task.CompletedTask);
 
         User? capturedUser = null;
-        _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>()))
-             .Callback<User, UserSecret>((u, s) => capturedUser = u)
-             .Returns(Task.CompletedTask);
+        int? capturedExistingTenantId = null;
+        string? capturedNewTenantName = null;
+        List<string>? seededRoles = null;
+        StubRegisterUser(1, (u, existingTenantId, newTenantName, roles) =>
+        {
+            capturedUser = u;
+            capturedExistingTenantId = existingTenantId;
+            capturedNewTenantName = newTenantName;
+            seededRoles = roles.ToList();
+        });
 
         var controller = NewUserController();
         var value = new UserRegistration { Email = "owner@acme.local", Username = "owner", Password = "TestPass123!", TenantName = "AcmeCorp" };
@@ -726,6 +732,8 @@ public class ApiControllerTests
 
         Assert.IsType<OkObjectResult>(result.Result);
         Assert.NotNull(capturedUser);
+        Assert.Null(capturedExistingTenantId); // a brand new tenant, not an existing one
+        Assert.Equal("AcmeCorp", capturedNewTenantName);
         Assert.Equal(42, capturedUser!.TenantID);
         Assert.Equal(new[] { RoleNames.TenantAdmin }, seededRoles); // admin on a brand new tenant
         Assert.False(capturedUser.Enabled);         // Activate() is what enables, not registration
@@ -782,16 +790,16 @@ public class ApiControllerTests
         _repo.Setup(r => r.TenantGetAsync("Acme")).ReturnsAsync(true);
         _repo.Setup(r => r.TenantGetIdAsync("Acme")).ReturnsAsync(42);
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
-        StubActivationPlumbing("member@acme.local", 2);
-        List<string>? seededRoles = null;
-        _repo.Setup(r => r.UserRolesSetAsync(2, It.IsAny<IEnumerable<string>>()))
-             .Callback<int, IEnumerable<string>>((_, roles) => seededRoles = roles.ToList())
-             .Returns(Task.CompletedTask);
 
         User? capturedUser = null;
-        _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>()))
-             .Callback<User, UserSecret>((u, s) => capturedUser = u)
-             .Returns(Task.CompletedTask);
+        int? capturedExistingTenantId = null;
+        List<string>? seededRoles = null;
+        StubRegisterUser(2, (u, existingTenantId, newTenantName, roles) =>
+        {
+            capturedUser = u;
+            capturedExistingTenantId = existingTenantId;
+            seededRoles = roles.ToList();
+        });
 
         var controller = NewUserController();
         var value = new UserRegistration { Email = "member@acme.local", Username = "member", Password = "TestPass123!", TenantName = "Acme" };
@@ -799,7 +807,8 @@ public class ApiControllerTests
 
         Assert.IsType<OkObjectResult>(result.Result);
         Assert.NotNull(capturedUser);
-        Assert.Equal(42, capturedUser!.TenantID); // joins the existing tenant, no new one created
+        Assert.Equal(42, capturedExistingTenantId); // joins the existing tenant, no new one created
+        Assert.Equal(42, capturedUser!.TenantID);
         Assert.Equal(new[] { RoleNames.TenantReader }, seededRoles); // regular user, not admin
         Assert.False(capturedUser.Enabled);        // waits for that tenant's admin to enable them
     }
@@ -811,12 +820,9 @@ public class ApiControllerTests
         _repo.Setup(r => r.TenantGetAsync("default")).ReturnsAsync(true);
         _repo.Setup(r => r.TenantGetIdAsync("default")).ReturnsAsync(0);
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
-        StubActivationPlumbing("newbie@example.com", 3);
 
         User? capturedUser = null;
-        _repo.Setup(r => r.UserAddAsync(It.IsAny<User>(), It.IsAny<UserSecret>()))
-             .Callback<User, UserSecret>((u, s) => capturedUser = u)
-             .Returns(Task.CompletedTask);
+        StubRegisterUser(3, (u, _, _, _) => capturedUser = u);
 
         var controller = NewUserController();
         var value = new UserRegistration { Email = "newbie@example.com", Username = "newbie", Password = "TestPass123!", TenantName = "default" };

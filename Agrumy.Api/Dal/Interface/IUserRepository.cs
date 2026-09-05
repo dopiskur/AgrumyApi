@@ -8,6 +8,10 @@ namespace api.Dal.Interface
         Task UserAddAsync(User user, UserSecret userHash);
         Task UserUpdateAsync(User user);
 
+        /// Registration, atomically: optionally creates a new tenant, adds the user (with TenantID set from whichever tenant applies), issues its first activation token, and seeds its starting role - one transaction, so a crash partway can never leave a user row with no role (roadmap #293). Returns the new IDUser.
+        Task<int> RegisterUserAsync(User user, UserSecret userSecret, int? existingTenantId, string? newTenantName,
+            string activationTokenHash, DateTime activationTokenExpiresAtUtc, IEnumerable<string> startingRoles);
+
         /// Self-service profile write - only FirstName/LastName/TimeZone, never any authorization-bearing column. False if no such user.
         Task<bool> UserProfileSetAsync(string email, string? firstName, string? lastName, string? timeZone);
 

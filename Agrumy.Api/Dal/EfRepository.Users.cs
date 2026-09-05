@@ -29,6 +29,24 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
+        public async Task<int> RegisterUserAsync(User user, UserSecret userSecret, int? existingTenantId, string? newTenantName,
+            string activationTokenHash, DateTime activationTokenExpiresAtUtc, IEnumerable<string> startingRoles)
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync();
+
+            user.TenantID = existingTenantId ?? await TenantAddAsync(newTenantName!);
+            await UserAddAsync(user, userSecret);
+
+            // UserAddAsync doesn't return the new IDUser - re-fetch by the just-inserted unique email.
+            User added = await UserGetAsync(null, user.Email, null)
+                ?? throw new InvalidOperationException("UserAddAsync did not persist the expected row.");
+            await UserSetActivationTokenAsync(added.IDUser!.Value, activationTokenHash, activationTokenExpiresAtUtc);
+            await UserRolesSetAsync(added.IDUser.Value, startingRoles);
+
+            await transaction.CommitAsync();
+            return added.IDUser.Value;
+        }
+
         public async Task UserUpdateAsync(User user)
         {
             var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == user.IDUser);

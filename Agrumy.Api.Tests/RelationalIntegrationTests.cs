@@ -188,6 +188,48 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(DbErrorResponse.MentionsConstraint(exUsername, "Username_UNIQUE"), "Username_UNIQUE no longer matches the real schema's index name.");
     }
 
+    // Roadmap #293: registration (tenant create + user add + activation token + starting role) is one transaction - a crash/failure partway must never leave a user with no role, or a tenant with no admin.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task RegisterUser_NewTenant_CreatesTenantUserTokenAndRole_Atomically(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        string tag = U();
+        var user = new User { Email = tag + "@ex.com", Username = "u_" + tag, FirstName = "F", LastName = "L", Phone = "123", Enabled = false };
+        var secret = new UserSecret { PwdHash = "h", PwdSalt = "s" };
+        string newTenantName = "T_" + tag;
+
+        int idUser = await _repo.RegisterUserAsync(user, secret, existingTenantId: null, newTenantName: newTenantName,
+            activationTokenHash: "hash_" + tag, activationTokenExpiresAtUtc: DateTime.UtcNow.AddHours(24),
+            startingRoles: new[] { RoleNames.TenantAdmin });
+
+        User? saved = await _repo.UserGetAsync(idUser, null, null);
+        Assert.NotNull(saved);
+        Assert.True(saved!.TenantID > 0);
+        Assert.True(await _repo.TenantGetAsync(newTenantName));
+        Assert.Equal(new[] { RoleNames.TenantAdmin }, await _repo.UserRoleNamesGetAsync(idUser));
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task RegisterUser_FailurePartway_RollsBackTheWholeTransaction(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        string tag = U();
+        var (_, _, existingEmail) = await MakeUser(t);
+
+        // Duplicate email - UserAddAsync's own SaveChangesAsync throws partway through the transaction.
+        var dupeUser = new User { Email = existingEmail, Username = "u_" + tag, FirstName = "F", LastName = "L", Phone = "123", Enabled = false };
+        var secret = new UserSecret { PwdHash = "h", PwdSalt = "s" };
+        string newTenantName = "T_" + tag;
+
+        await Assert.ThrowsAnyAsync<Exception>(() => _repo.RegisterUserAsync(dupeUser, secret, existingTenantId: null, newTenantName: newTenantName,
+            activationTokenHash: "hash_" + tag, activationTokenExpiresAtUtc: DateTime.UtcNow.AddHours(24),
+            startingRoles: new[] { RoleNames.TenantAdmin }));
+
+        // A failed SaveChangesAsync leaves the poisoned entity tracked - Use() hands back a fresh context/repo, same as a new HTTP request would get.
+        Use(provider);
+        Assert.False(await _repo.TenantGetAsync(newTenantName)); // the tenant the failed registration would have created must not exist either
+    }
+
     // Roadmap #310: user.TenantID and eventDevice(DeviceID, Date) had no index - every tenant-scoped user list and every device-events/problem-alert scan filtered these columns with a full table scan.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task MissingIndexes_310_NowExist(DbProviderKind provider)

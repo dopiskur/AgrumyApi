@@ -81,33 +81,22 @@ namespace api.Controllers.API
             var userSecret = new UserSecret { PwdSalt = AuthenticationProvider.GetSalt() };
             userSecret.PwdHash = AuthenticationProvider.GetHash(value.Password!, userSecret.PwdSalt); // [Required], guaranteed by ModelState.IsValid above
 
-            if (isNewTenant)
-            {
-                // Brand-new tenant: the registrant becomes its admin - nobody else exists yet to approve them.
-                user.TenantID = await Repo.TenantAddAsync(value.TenantName!);
-            }
-            else
-            {
-                user.TenantID = await Repo.TenantGetIdAsync(value.TenantName!);
-            }
-
             // Always starts disabled - Activate() enables it once email ownership is proven and (for anyone but a tenant's own creator) an admin approves it.
             user.Enabled = false;
 
-            await Repo.UserAddAsync(user, userSecret);
+            var (plaintext, hash) = GenerateOpaqueToken();
+            // A new tenant's creator starts as its admin; everyone else starts as a read-only Tenant reader until granted more via PUT /api/User/UserRoles.
+            string startingRole = isNewTenant ? RoleNames.TenantAdmin : RoleNames.TenantReader;
 
-            // UserAddAsync doesn't return the new IDUser; re-fetch by the just-inserted unique email.
-            User? added = await Repo.UserGetAsync(null, value.Email, null);
-            if (added?.IDUser is int idUser)
-            {
-                var (plaintext, hash) = GenerateOpaqueToken();
-                await Repo.UserSetActivationTokenAsync(idUser, hash, DateTime.UtcNow.AddHours(ActivationTokenValidHours));
-                SendActivationEmail(user.Email, plaintext);
+            // One transaction (tenant create + user add + activation token + starting role) - a crash partway must never leave a user row with no role (roadmap #293). Sets user.TenantID on the same object this method returns.
+            await Repo.RegisterUserAsync(user, userSecret,
+                existingTenantId: isNewTenant ? null : await Repo.TenantGetIdAsync(value.TenantName!),
+                newTenantName: isNewTenant ? value.TenantName : null,
+                activationTokenHash: hash,
+                activationTokenExpiresAtUtc: DateTime.UtcNow.AddHours(ActivationTokenValidHours),
+                startingRoles: new[] { startingRole });
 
-                // A new tenant's creator starts as its admin; everyone else starts as a read-only Tenant reader until granted more via PUT /api/User/UserRoles.
-                string startingRole = isNewTenant ? RoleNames.TenantAdmin : RoleNames.TenantReader;
-                await Repo.UserRolesSetAsync(idUser, new[] { startingRole });
-            }
+            SendActivationEmail(user.Email, plaintext);
 
             return Ok(user);
         }
