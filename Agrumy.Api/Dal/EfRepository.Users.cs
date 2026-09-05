@@ -5,10 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IUserRepository core members: user CRUD/lookup/password reset and
-    /// TenantAdminsGetAsync here; bootstrap admin in EfRepository.Users.Bootstrap.cs, composable
-    /// roles in EfRepository.Users.Roles.cs, email activation in EfRepository.Users.Activation.cs,
-    /// tenant CRUD (ITenantRepository) in EfRepository.Tenants.cs.</summary>
+    /// IUserRepository core members: user CRUD/lookup/password reset and TenantAdminsGetAsync - bootstrap admin, roles, and activation live in the other EfRepository.Users.*.cs partials.
     internal partial class EfRepository
     {
         public async Task UserAddAsync(User user, UserSecret userSecret)
@@ -42,9 +39,7 @@ namespace api.Dal
 
             row.TenantID = user.TenantID ?? 0;
             row.Email = user.Email ?? "";
-            // DevicePin deliberately NOT written here - the PIN lifecycle (generate/expire) lives
-            // exclusively in UserSetDevicePinAsync below, so an admin edit can never resurrect an
-            // expired PIN or hand-craft a weak one.
+            // DevicePin deliberately NOT written here - the PIN lifecycle lives exclusively in UserSetDevicePinAsync, so an admin edit can never resurrect an expired PIN or hand-craft a weak one.
             row.Username = user.Username;
             row.FirstName = user.FirstName;
             row.LastName = user.LastName;
@@ -54,9 +49,7 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
-        /// <summary>Self-service profile write: deliberately touches ONLY the three profile columns
-        /// so the endpoint can never alter Enabled/TenantID even if the controller mis-binds - the
-        /// column list here IS the authorization boundary.</summary>
+        /// Self-service profile write - deliberately touches only the three profile columns, so the endpoint can't alter Enabled/TenantID even if the controller mis-binds.
         public async Task<bool> UserProfileSetAsync(string email, string? firstName, string? lastName, string? timeZone)
         {
             var row = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
@@ -72,9 +65,7 @@ namespace api.Dal
             return true;
         }
 
-        /// <summary>The ONLY writer of DevicePin/DevicePinExpires - a value+expiry to (re)issue a
-        /// PIN, nulls to explicitly clear one. A successful device registration does NOT call this
-        /// (the PIN is multi-use within its 24h window, not consumed on first use).</summary>
+        /// The only writer of DevicePin/DevicePinExpires - a successful device registration does NOT call this, since the PIN is multi-use within its 24h window, not consumed on first use.
         public async Task<bool> UserSetDevicePinAsync(int idUser, string? devicePin, DateTime? expiresAtUtc)
         {
             var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == idUser);
@@ -171,16 +162,12 @@ namespace api.Dal
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(u => u.PwdHash, userSecret.PwdHash ?? "")
                     .SetProperty(u => u.PwdSalt, userSecret.PwdSalt ?? "")
-                    // Any successful password change - forced or self-service - satisfies "you
-                    // changed your password", so this is the one place that clears the flag rather
-                    // than duplicating the write in every caller.
+                    // Any successful password change satisfies "you changed your password" - clearing the flag here avoids duplicating the write in every caller.
                     .SetProperty(u => u.MustChangePassword, false));
             return rows > 0;
         }
 
-        // A tenant can never have zero admins - its creator becomes one at registration - so this
-        // is never empty for a real tenant. TenantID 0 (the shared default tenant) has no owning
-        // admin of its own, so Global admin is the equivalent role there instead.
+        // Never empty for a real tenant since its creator becomes an admin at registration - TenantID 0 has no owning admin, so Global admin is the equivalent role there.
         public async Task<IList<User>> TenantAdminsGetAsync(int tenantId)
         {
             string adminRoleName = tenantId == 0 ? RoleNames.GlobalAdmin : RoleNames.TenantAdmin;

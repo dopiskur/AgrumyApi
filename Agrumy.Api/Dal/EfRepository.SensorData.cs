@@ -7,8 +7,7 @@ using Npgsql;
 
 namespace api.Dal
 {
-    /// <summary>ISensorDataRepository members, plus the JSON value coercion helpers only the
-    /// telemetry push uses (firmware sends measurements as strings or null).</summary>
+    /// ISensorDataRepository members, plus the JSON value coercion helpers the telemetry push uses (firmware sends measurements as strings or null).
     internal partial class EfRepository
     {
         public async Task SensorDataPushAsync(JsonArray jsonArray, int deviceID, int tenantID, int? deviceUnitID, int? deviceUnitZoneID)
@@ -24,9 +23,7 @@ namespace api.Dal
                 DateTime? dc = ReadDateTime(o, "dateCreated");
                 rows.Add(new SensorDataRow
                 {
-                    // Identity is server-authoritative (from the authenticated device) - the
-                    // deviceID/tenantID/deviceUnitID/deviceUnitZoneID keys in the JSON payload are
-                    // deliberately ignored.
+                    // Identity is server-authoritative - the matching keys in the JSON payload are deliberately ignored.
                     DeviceID = deviceID,
                     TenantID = tenantID,
                     DeviceUnitID = deviceUnitID ?? 0,
@@ -105,9 +102,7 @@ namespace api.Dal
         public Task<string> SensorDataUnitAverageGetAsync(int? tenantID, int deviceUnitID, int? timeRange, int? timeMDMY) =>
             AveragedSensorJsonAsync(tenantID, q => q.Where(r => r.DeviceUnitID == deviceUnitID), timeRange, timeMDMY);
 
-        /// <summary>Shared by the zone/unit averaged-chart endpoints - same time-cutoff/bucket logic as
-        /// SensorDataGetAsync, but scoped by whichever predicate the caller supplies (zone or unit) instead
-        /// of a single device, and shaped by SensorReportShaper.BuildAveraged instead of Build.</summary>
+        /// Shared by the zone/unit averaged-chart endpoints - same time-cutoff/bucket logic as SensorDataGetAsync, scoped by the caller's predicate instead of a single device, shaped by BuildAveraged instead of Build.
         private async Task<string> AveragedSensorJsonAsync(int? tenantID, Func<IQueryable<SensorDataRow>, IQueryable<SensorDataRow>> scope, int? timeRange, int? timeMDMY)
         {
             if (timeMDMY is not (0 or 1 or 2 or 3) || timeRange == null)
@@ -194,9 +189,7 @@ namespace api.Dal
 
         public async Task OptimizeOldSensorDataAsync(DateTime cutoffUtc, CancellationToken ct)
         {
-            // Per-device, not one giant query - bounds each transaction's row count and lets a
-            // failure partway through leave already-processed devices genuinely optimized instead
-            // of rolling back the entire run.
+            // Per-device, not one giant query - bounds each transaction's row count and lets a mid-run failure leave already-processed devices genuinely optimized instead of rolling everything back.
             List<int> deviceIds = await db.SensorData.AsNoTracking()
                 .Where(r => r.DateCreated < cutoffUtc)
                 .Select(r => r.DeviceID)
@@ -222,8 +215,7 @@ namespace api.Dal
                     .Select(bucket => BuildOptimizedRow(deviceId, bucket.Key, bucket.ToList()))
                     .ToList();
 
-                // Delete-then-insert in one transaction - a crash between the two would otherwise
-                // duplicate or silently lose the bucket.
+                // Delete-then-insert in one transaction - a crash between the two would otherwise duplicate or silently lose the bucket.
                 await using var transaction = await db.Database.BeginTransactionAsync(ct);
                 await db.SensorData
                     .Where(r => r.DeviceID == deviceId && r.DateCreated < cutoffUtc)
@@ -247,16 +239,13 @@ namespace api.Dal
                 }
                 catch (PostgresException)
                 {
-                    // TimescaleDB extension not installed - sensorData is a plain table here (like
-                    // MariaDB, minus the OPTIMIZE-TABLE shrink step below).
+                    // TimescaleDB extension not installed - sensorData is a plain table here (like MariaDB, minus the OPTIMIZE-TABLE shrink step below).
                     isHypertable = false;
                 }
 
                 if (isHypertable)
                 {
-                    // drop_chunks deletes whole chunk files (space returned immediately, unlike
-                    // DELETE below) - the embedded double-quotes in the regclass literal keep the
-                    // cast from lowercasing this mixed-case table name.
+                    // drop_chunks deletes whole chunk files (space returned immediately, unlike DELETE) - the embedded double-quotes keep the regclass cast from lowercasing this mixed-case table name.
                     await db.Database.ExecuteSqlInterpolatedAsync(
                         $"""SELECT drop_chunks('"sensorData"'::regclass, older_than => {cutoffUtc});""", ct);
                     return;
@@ -269,9 +258,7 @@ namespace api.Dal
             await db.SensorData.Where(r => r.DateCreated < cutoffUtc).ExecuteDeleteAsync(ct);
             if (shrinkAfterPurge)
             {
-                // InnoDB never shrinks its .ibd file on a plain DELETE - OPTIMIZE TABLE is the
-                // locking rebuild that actually returns space to the OS; only run when the admin
-                // explicitly opts in since it can take a long time on a large table.
+                // InnoDB never shrinks its .ibd file on a plain DELETE - OPTIMIZE TABLE is the locking rebuild that actually returns space, only run when the admin opts in since it can take a long time.
                 await db.Database.ExecuteSqlRawAsync("OPTIMIZE TABLE `sensorData`;", ct);
             }
         }
@@ -279,9 +266,7 @@ namespace api.Dal
         private static DateTime BucketStart(DateTime timestamp) =>
             new(timestamp.Ticks - (timestamp.Ticks % OptimizeBucketSize.Ticks), DateTimeKind.Utc);
 
-        /// <summary>One replacement row for a 5-minute bucket: TenantID/DeviceUnitID/DeviceUnitZoneID
-        /// come from the bucket's most recent raw row, every sensor column is the
-        /// average-without-outliers of whatever raw values that bucket has (nulls excluded).</summary>
+        /// One replacement row for a 5-minute bucket: TenantID/DeviceUnitID/DeviceUnitZoneID come from the most recent raw row, every sensor column is the average-without-outliers of that bucket's values.
         private static SensorDataRow BuildOptimizedRow(int deviceId, DateTime bucketStart, List<SensorDataRow> rows)
         {
             SensorDataRow mostRecent = rows[^1]; // rows arrive pre-sorted by DateCreated ascending
@@ -308,8 +293,7 @@ namespace api.Dal
             };
         }
 
-        /// <summary>IQR outlier rule (exclude anything outside 1.5x the interquartile range), falling
-        /// back to a plain average under 4 points or when every value gets flagged as an outlier.</summary>
+        /// IQR outlier rule (exclude anything outside 1.5x the interquartile range), falling back to a plain average under 4 points or when every value is flagged.
         private static double? TrimmedMean(IEnumerable<double?> source)
         {
             List<double> values = source.Where(v => v.HasValue).Select(v => v!.Value).OrderBy(v => v).ToList();

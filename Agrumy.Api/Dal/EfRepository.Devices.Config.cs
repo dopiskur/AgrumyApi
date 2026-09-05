@@ -43,9 +43,7 @@ namespace api.Dal
                 return;
             }
 
-            // Resolve from idDevice's OWN DeviceConfigControllerID, not cfg.IDDeviceConfigController -
-            // trusting a client-supplied id would let a tampered value overwrite another device's
-            // (or tenant's) controller config.
+            // Resolve from idDevice's OWN DeviceConfigControllerID, not cfg.IDDeviceConfigController - a client-supplied id could otherwise overwrite another device's controller config.
             int? ownConfigControllerId = await db.Devices.AsNoTracking()
                 .Where(d => d.IDDevice == idDevice)
                 .Select(d => d.DeviceConfigControllerID)
@@ -55,9 +53,7 @@ namespace api.Dal
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigController == ownConfigControllerId);
             if (row != null)
             {
-                // Only the relay-pin mapping lives here now - threshold/hysteresis/interval/schedule
-                // config moved to the device's assigned DeviceUnitZone (EfRepository.DeviceUnits.cs),
-                // edited from the Zone page instead.
+                // Only the relay-pin mapping lives here now - threshold/hysteresis/interval/schedule config moved to the device's assigned DeviceUnitZone, edited from the Zone page instead.
                 row.RelayEnabled = cfg.RelayEnabled;
                 row.Relay1 = cfg.Relay1;
                 row.Relay2 = cfg.Relay2;
@@ -141,8 +137,7 @@ namespace api.Dal
             SensorWind = c.SensorWind,
         };
 
-        // Relay-pin mapping only - Rules/WaterPumpMaxRunSeconds/WaterPumpCooldownSeconds on the DTO
-        // are populated by DeviceApiController.BuildDeviceConfigAsync from the assigned zone, not this row.
+        // Relay-pin mapping only - Rules/WaterPumpMaxRunSeconds/WaterPumpCooldownSeconds on the DTO come from the assigned zone via DeviceApiController.BuildDeviceConfigAsync, not this row.
         private static DeviceConfigController ToDto(DeviceConfigControllerRow c) => new()
         {
             IDDeviceConfigController = c.IDDeviceConfigController,

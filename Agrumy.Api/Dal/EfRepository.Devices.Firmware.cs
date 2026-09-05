@@ -5,8 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IDeviceRepository members: legacy OTA lookup - still the fallback for a device whose
-    /// firmware has never reported a Board; the board-keyed catalog lives in EfRepository.Firmware.cs.</summary>
+    /// IDeviceRepository members: legacy OTA lookup, the fallback for a device whose firmware never reported a Board - the board-keyed catalog lives in EfRepository.Firmware.cs.
     internal partial class EfRepository
     {
         public async Task<DeviceFirmware?> DeviceFirmwareLatestGetAsync(int? deviceTypeID)

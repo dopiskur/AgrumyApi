@@ -5,18 +5,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IDeviceRepository members: device CRUD - configs live in
-    /// EfRepository.Devices.Config.cs, fixed type lists in EfRepository.Devices.Types.cs, firmware
-    /// in EfRepository.Devices.Firmware.cs, and diagnostics/fleet/events in
-    /// EfRepository.Devices.Diagnostics.cs.</summary>
+    /// IDeviceRepository members: device CRUD - configs, type lists, firmware, and diagnostics/fleet/events live in the other EfRepository.Devices.*.cs partials.
     internal partial class EfRepository
     {
         public async Task<Device> DeviceAddAsync(Device device)
         {
-            // Read (and possibly auto-generate on a brand-new install) BEFORE the transaction below
-            // starts - ServerConfigGetAsync's own SaveChangesAsync (if it seeds a row) auto-commits
-            // on the shared context before BeginTransactionAsync opens this method's own explicit
-            // transaction, so the two never nest.
+            // Read (and possibly auto-generate) BEFORE the transaction below starts - ServerConfigGetAsync's own seed SaveChangesAsync must auto-commit before this method's explicit transaction opens, so the two never nest.
             ServerConfig serverConfig = await ServerConfigGetAsync();
 
             await using var tx = await db.Database.BeginTransactionAsync();
@@ -24,8 +18,7 @@ namespace api.Dal
             var sensorCfg = new DeviceConfigSensorRow();
             var controllerCfg = new DeviceConfigControllerRow
             {
-                // Hysteresis starts at the server-wide default; admin can override per device
-                // afterwards under Device -> Controller. WaterPump limits below follow the same rule.
+                // Hysteresis starts at the server-wide default, overridable per device under Device -> Controller - WaterPump limits below follow the same rule.
                 WaterLevelHysteresis = serverConfig.WaterLevelHysteresis,
                 TemperatureHysteresis = serverConfig.TemperatureHysteresis,
                 HumidityHysteresis = serverConfig.HumidityHysteresis,
@@ -175,11 +168,7 @@ namespace api.Dal
                 return;
             }
 
-            // Does not set MacAddress, the config-id columns, or DeviceUnitID/DeviceUnitZoneID - the
-            // unit/zone pair is written exclusively by DeviceAssignToZoneAsync/
-            // DeviceUnassignFromZoneAsync, which keep it consistent with the zone's own DeviceUnitID;
-            // touching just one of them here could silently desync a device's Unit from its Zone.
-            // Also skips ApiId/ApiKey - omitting them used to default to "", silently wiping a device's real credential.
+            // Does not set MacAddress, config-id columns, DeviceUnitID/DeviceUnitZoneID (written exclusively by DeviceAssignToZoneAsync/DeviceUnassignFromZoneAsync to stay consistent), or ApiId/ApiKey (omitting them used to wipe a device's real credential).
             row.TenantID = device.TenantID;
             row.DeviceTypeID = device.DeviceTypeID;
             row.DeviceTypeServiceID = device.DeviceTypeServiceID;

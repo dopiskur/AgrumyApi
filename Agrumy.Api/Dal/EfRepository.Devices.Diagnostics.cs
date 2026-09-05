@@ -6,8 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IDeviceRepository members: device diagnostics/fleet, device events, and the
-    /// offline/low-battery alert background workers.</summary>
+    /// IDeviceRepository members: device diagnostics/fleet, device events, and the offline/low-battery alert background workers.
     internal partial class EfRepository
     {
         // ---- Device diagnostics / fleet --------------------------
@@ -23,8 +22,7 @@ namespace api.Dal
 
             row.TenantID = tenantID;
             row.LastSeenAt = DateTime.UtcNow; // server clock - device clocks drift and may lack NTP, same rule as EventDevicePushAsync
-            // Keep the last known value when a field is missing so upgrading the server alone
-            // doesn't blank existing diagnostics.
+            // Keep the last known value when a field is missing so upgrading the server alone doesn't blank existing diagnostics.
             row.UptimeSeconds = poll.Uptime ?? row.UptimeSeconds;
             row.RssiDbm = poll.Rssi ?? row.RssiDbm;
             row.FreeHeapBytes = poll.FreeHeap ?? row.FreeHeapBytes;
@@ -53,9 +51,7 @@ namespace api.Dal
                 devices = devices.Where(d => d.TenantID == tenantID);
             }
 
-            // Left-join diagnostics (a never-seen device still shows on the dashboard); battery is a
-            // correlated scalar subquery - a plain ORDER BY ... LIMIT 1 on both providers, no LATERAL
-            // needed (MariaDB lacks it).
+            // Left-join diagnostics (a never-seen device still shows on the dashboard) - Battery is a correlated scalar subquery (plain ORDER BY...LIMIT 1, no LATERAL needed since MariaDB lacks it).
             var rows = await devices
                 .Select(d => new
                 {
@@ -71,13 +67,11 @@ namespace api.Dal
                 })
                 .ToListAsync();
 
-            // Kit is a small fixed set of strings - cheap to pull entire and check in memory below
-            // rather than a per-device join.
+            // Kit is a small fixed set of strings - cheap to pull entire and check in memory rather than a per-device join.
             Dictionary<string, bool> kitCapability = await db.DeviceTypeKits.AsNoTracking()
                 .ToDictionaryAsync(k => k.Kit, k => k.ControllerCapable);
 
-            // One catalog read for the whole fleet, newest version per board picked in memory
-            // (semver, not DateAdded) - see FirmwareCatalogService.VisibleSources for why Local always counts.
+            // One catalog read for the whole fleet, newest version per board picked in memory by semver (not DateAdded).
             FirmwareSource activeSource = (await ServerConfigGetAsync()).FirmwareSource;
             var visible = new HashSet<int> { (int)activeSource, (int)FirmwareSource.Local };
             var catalog = await db.DeviceFirmwares.AsNoTracking()
@@ -106,8 +100,7 @@ namespace api.Dal
                     FirmwareVersion = r.Diag?.FirmwareVersion,
                     Board = r.Diag?.Board,
                     Kit = r.Diag?.Kit,
-                    // Admin's explicit DeviceType choice (DeviceControllerEnabled) always wins if set -
-                    // a recognized Kit only ADDS capability, never takes it away.
+                    // Admin's explicit DeviceControllerEnabled choice always wins if set - a recognized Kit only adds capability, never takes it away.
                     ControllerCapable = r.Device.DeviceControllerEnabled == true
                         || (r.Diag?.Kit is { Length: > 0 } kit && kitCapability.GetValueOrDefault(kit)),
                     LatestFirmwareVersion = latest,
@@ -129,8 +122,7 @@ namespace api.Dal
 
         public async Task<bool> EventDevicePushAsync(int deviceID, int tenantID, DeviceEventType eventType, string? message)
         {
-            // ServerConfigGetAsync may auto-generate the row (and its EventDedupeMinutes default) on
-            // a brand-new install - same reasoning as DeviceAddAsync's own call to it.
+            // ServerConfigGetAsync may auto-generate the row (and its EventDedupeMinutes default) on a brand-new install, same as DeviceAddAsync's own call.
             int dedupeMinutes = (await ServerConfigGetAsync()).EventDedupeMinutes ?? settings.EventDedupeMinutes;
             DateTime cutoff = DateTime.UtcNow.AddMinutes(-dedupeMinutes);
 
@@ -165,9 +157,7 @@ namespace api.Dal
 
         public async Task<bool> EventDeviceAcknowledgeAsync(int idEventDevice, int? tenantID)
         {
-            // tenantID is the same value used to authorize the call (null only for a Global caller) -
-            // applied straight to the update's WHERE clause, so a foreign tenant's event id can never
-            // be acknowledged even if the id itself is guessable.
+            // tenantID is the same value used to authorize the call, applied straight to the WHERE clause - a foreign tenant's event id can never be acknowledged even if guessable.
             IQueryable<EventDeviceRow> q = db.EventDevices.Where(e => e.IDEventDevice == idEventDevice);
             if (tenantID != null)
             {
@@ -195,8 +185,7 @@ namespace api.Dal
 
         public async Task DeviceOfflineNotifiedSetAsync(int deviceID, DateTime? notifiedAt)
         {
-            // A device with no diagnostic row has never polled, so it cannot have just transitioned
-            // to offline - nothing to set.
+            // A device with no diagnostic row has never polled, so it can't have just transitioned to offline - nothing to set.
             await db.DeviceDiagnostics
                 .Where(x => x.DeviceID == deviceID)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.OfflineNotifiedAt, notifiedAt));
@@ -234,8 +223,7 @@ namespace api.Dal
         {
             IDEventDevice = e.IDEventDevice,
             DeviceID = e.DeviceID,
-            // Guards against a row written by a future/older enum definition - never throws, just
-            // surfaces the raw number so it's still visible in the admin list.
+            // Guards against a row written by a future/older enum definition - never throws, just surfaces the raw number.
             EventType = Enum.IsDefined(typeof(DeviceEventType), e.EventID)
                 ? ((DeviceEventType)e.EventID).ToString()
                 : $"Unknown({e.EventID})",
