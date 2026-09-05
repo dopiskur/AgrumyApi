@@ -44,6 +44,12 @@ namespace api.Dal.Interface
 
         /// <summary>Every device in every tenant - callers must check CallerReadsDevicesGlobally themselves.</summary>
         Task<IList<Device>> DevicesGetAllAsync();
+
+        /// <summary>Every sensor-only device (DeviceSensorEnabled, not DeviceControllerEnabled) in the
+        /// tenant, or across every tenant when tenantID is null - the roadmap #268 Fleet-wide scan
+        /// scope. Excludes controller-capable devices since those have real-time relay duties a scan's
+        /// WiFi.scanNetworks() pause would disrupt.</summary>
+        Task<IList<Device>> DevicesSensorOnlyGetAsync(int? tenantID);
         Task<bool> DeviceCheckMacAddressAsync(int? tenantID, string? macAddress);
         Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID);
         Task<DeviceConfigController?> DeviceConfigControllerGetAsync(int? deviceConfigControllerID);

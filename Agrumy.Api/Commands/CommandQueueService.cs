@@ -49,6 +49,44 @@ namespace api.Commands
                 return new IssueCommandResult(IssueCommandOutcome.TargetNotFound, [], notFoundMessage);
             }
 
+            return await IssueToTargetsAsync(targets, actionType);
+        }
+
+        /// <summary>Fans ScanForDevices out to every sensor-only device in scope - Zone if zoneId is
+        /// given, else Unit if unitId is given, else every sensor-only device in the tenant
+        /// (Fleet-wide). A different target-resolution rule than IssueCommandAsync's (many devices,
+        /// not one controller per zone/unit), but the same dedup/fan-out tail via IssueToTargetsAsync.</summary>
+        public async Task<IssueCommandResult> IssueScanCommandAsync(int? tenantId, int? unitId, int? zoneId)
+        {
+            IList<Device> targets;
+            string notFoundMessage;
+            if (zoneId is int zid)
+            {
+                targets = await unitRepo.DeviceUnitZoneGetSensorsAsync(zid);
+                notFoundMessage = $"Zone {zid} has no sensor-only devices.";
+            }
+            else if (unitId is int uid)
+            {
+                targets = await unitRepo.DeviceUnitGetSensorsAsync(uid);
+                notFoundMessage = $"Unit {uid} has no sensor-only devices across any of its zones.";
+            }
+            else
+            {
+                targets = await deviceRepo.DevicesSensorOnlyGetAsync(tenantId);
+                notFoundMessage = "No sensor-only devices found.";
+            }
+
+            if (targets.Count == 0)
+            {
+                return new IssueCommandResult(IssueCommandOutcome.TargetNotFound, [], notFoundMessage);
+            }
+
+            return await IssueToTargetsAsync(targets, CommandActionType.ScanForDevices);
+        }
+
+        /// <summary>Per-(device, ActionType) dedup then insert, shared by every fan-out entry point above.</summary>
+        private async Task<IssueCommandResult> IssueToTargetsAsync(IList<Device> targets, CommandActionType actionType)
+        {
             DateTime utcNow = DateTime.UtcNow;
             DateTime expiresAt = utcNow + DefaultExpiry;
             var created = new List<int>();

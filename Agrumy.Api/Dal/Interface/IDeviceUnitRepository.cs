@@ -58,6 +58,14 @@ namespace api.Dal.Interface
         /// controller are simply absent from the result, not an error).</summary>
         Task<IList<Device>> DeviceUnitGetControllersAsync(int idDeviceUnit);
 
+        /// <summary>Every sensor-only device (DeviceSensorEnabled, not DeviceControllerEnabled) in
+        /// this zone - the roadmap #268 Zone-scoped scan target list.</summary>
+        Task<IList<Device>> DeviceUnitZoneGetSensorsAsync(int idDeviceUnitZone);
+
+        /// <summary>Every sensor-only device across every zone under this unit - the roadmap #268
+        /// Unit-scoped scan target list.</summary>
+        Task<IList<Device>> DeviceUnitGetSensorsAsync(int idDeviceUnit);
+
         // ---- Device assignment -----------------------------------------
 
         /// <summary>Every device in the tenant with no current Unit/Zone - the "Add Controller"/"Add

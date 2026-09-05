@@ -242,6 +242,22 @@ namespace api.Dal
             return rows.Select(ToDto).ToList();
         }
 
+        public async Task<IList<Device>> DeviceUnitZoneGetSensorsAsync(int idDeviceUnitZone)
+        {
+            var rows = await db.Devices.AsNoTracking()
+                .Where(d => d.DeviceUnitZoneID == idDeviceUnitZone && d.DeviceSensorEnabled == true && d.DeviceControllerEnabled != true)
+                .ToListAsync();
+            return rows.Select(ToDto).ToList();
+        }
+
+        public async Task<IList<Device>> DeviceUnitGetSensorsAsync(int idDeviceUnit)
+        {
+            var rows = await db.Devices.AsNoTracking()
+                .Where(d => d.DeviceUnitID == idDeviceUnit && d.DeviceSensorEnabled == true && d.DeviceControllerEnabled != true)
+                .ToListAsync();
+            return rows.Select(ToDto).ToList();
+        }
+
         // ---- Device assignment -----------------------------------------
 
         public async Task<IList<Device>> DeviceUnassignedGetAsync(int? tenantID, bool controllerCapable)

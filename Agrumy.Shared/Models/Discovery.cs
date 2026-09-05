@@ -7,4 +7,13 @@ namespace api.Models
         public string DiscoveredApMac { get; set; } = "";
         public int? Rssi { get; set; }
     }
+
+    /// <summary>Body of POST /api/Discovery/Scan - both null means Fleet-wide; ZoneID takes
+    /// precedence over UnitID when both are given (the Zone page's scan passes both for context,
+    /// but the zone alone already pins the scope down).</summary>
+    public class DiscoveryScanRequest
+    {
+        public int? UnitID { get; set; }
+        public int? ZoneID { get; set; }
+    }
 }

@@ -1,3 +1,4 @@
+using api.Commands;
 using api.Dal.Interface;
 using api.Models;
 using api.Security;
@@ -7,10 +8,10 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace api.Controllers.API
 {
-    /// <summary>Roadmap #268 "Scan for new devices" - device-facing report intake only; the scan
-    /// trigger and result-aggregation endpoints land in later steps, on this same controller.</summary>
+    /// <summary>Roadmap #268 "Scan for new devices" - device-facing report intake plus the admin
+    /// scan trigger; result-aggregation lands in a later step, on this same controller.</summary>
     [Route("/api/Discovery")]
-    public class DiscoveryApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
+    public class DiscoveryApiController(IRepository repo, ICache cache, CommandQueueService commandQueue) : ApiControllerBase(repo, cache)
     {
         /// <summary>No identity field in the body by design - the scanning device comes exclusively
         /// from the authenticated apiId, same rule as DeviceApiController.PushEvent.</summary>
@@ -34,5 +35,48 @@ namespace api.Controllers.API
             await Repo.DiscoveryReportAddAsync(device.IDDevice!.Value, value.DiscoveredApMac, value.Rssi);
             return Ok();
         }
+
+        /// <summary>Fans ScanForDevices out to every sensor-only device in the given scope - see
+        /// CommandQueueService.IssueScanCommandAsync for the Zone/Unit/Fleet-wide resolution rule.
+        /// ZoneID/UnitID ownership is checked the same way DeviceCommandApiController checks its
+        /// Zone/Unit command targets; Fleet-wide has no entity to check, so it scopes by the
+        /// caller's own tenant instead (null only for a caller who manages devices globally).</summary>
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("Scan")]
+        public async Task<ActionResult<IReadOnlyList<int>>> Scan([FromBody] DiscoveryScanRequest request)
+        {
+            if (request.ZoneID is int zoneId)
+            {
+                var (_, error) = await EnsureOwnedZoneAsync(zoneId);
+                if (error != null)
+                {
+                    return error;
+                }
+            }
+            else if (request.UnitID is int unitId)
+            {
+                var (_, error) = await EnsureOwnedUnitAsync(unitId);
+                if (error != null)
+                {
+                    return error;
+                }
+            }
+
+            int? tenantId = CallerManagesDevicesGlobally ? null : CallerTenantId;
+            IssueCommandResult result = await commandQueue.IssueScanCommandAsync(tenantId, request.UnitID, request.ZoneID);
+            return result.Outcome switch
+            {
+                IssueCommandOutcome.Success => Ok(result.CreatedCommandIds),
+                IssueCommandOutcome.AllDuplicates => Conflict(result.Message),
+                IssueCommandOutcome.TargetNotFound => NotFound(result.Message),
+                _ => StatusCode(500),
+            };
+        }
+
+        private Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int idDeviceUnitZone) =>
+            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone), z => z.TenantID, "Zone", forWrite: true);
+
+        private Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int idDeviceUnit) =>
+            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite: true);
     }
 }

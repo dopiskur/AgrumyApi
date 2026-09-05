@@ -144,6 +144,18 @@ namespace api.Dal
             return rows.Select(ToDto).ToList();
         }
 
+        public async Task<IList<Device>> DevicesSensorOnlyGetAsync(int? tenantID)
+        {
+            IQueryable<DeviceRow> devices = db.Devices.AsNoTracking()
+                .Where(d => d.DeviceSensorEnabled == true && d.DeviceControllerEnabled != true);
+            if (tenantID != null)
+            {
+                devices = devices.Where(d => d.TenantID == tenantID);
+            }
+            var rows = await devices.ToListAsync();
+            return rows.Select(ToDto).ToList();
+        }
+
         public async Task<bool> DeviceCheckMacAddressAsync(int? tenantID, string? macAddress)
         {
             return await db.Devices.AsNoTracking()
