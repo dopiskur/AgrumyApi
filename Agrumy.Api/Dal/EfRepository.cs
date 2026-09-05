@@ -1,5 +1,6 @@
 using api.Dal.Entities;
 using api.Dal.Interface;
+using api.Models;
 using api.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -190,17 +191,19 @@ namespace api.Dal
             if (!await db.DeviceTypeSensors.AnyAsync())
             {
                 db.DeviceTypeSensors.AddRange(
-                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 0, SensorName = "Disabled", Battery = 1, Temperature = 1, TemperatureSoil = 1, Humidity = 1, Moisture = 1, Light = 1, Co2 = 1, Tvoc = 1, Barometer = 1, WaterPH = 1, WaterTankLevel = 1, RainLevel = 1, Wind = 1 },
-                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1001, SensorName = "DHT11", Temperature = 1, Humidity = 1 },
-                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1002, SensorName = "DHT22", Temperature = 1, Humidity = 1 },
-                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1003, SensorName = "BMP180", Temperature = 1, Barometer = 1 },
-                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1004, SensorName = "BMP280", Temperature = 1, Barometer = 1 },
-                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1005, SensorName = "BME280", Temperature = 1, Humidity = 1, Barometer = 1 },
-                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1006, SensorName = "CCS811", Co2 = 1, Tvoc = 1 },
-                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1007, SensorName = "DS18B20", TemperatureSoil = 1 },
-                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 1008, SensorName = "BH1750", Light = 1 },
-                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 2001, SensorName = "Analog voltage", Battery = 1 },
-                    new DeviceTypeSensorRow { IDDeviceTypeSensor = 2002, SensorName = "Analog moisture", Moisture = 1 });
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.Disabled, SensorName = "Disabled", Battery = 1, Temperature = 1, TemperatureSoil = 1, Humidity = 1, Moisture = 1, Light = 1, Co2 = 1, Tvoc = 1, Barometer = 1, WaterPH = 1, WaterTankLevel = 1, RainLevel = 1, Wind = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.Dht11, SensorName = "DHT11", Temperature = 1, Humidity = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.Dht22, SensorName = "DHT22", Temperature = 1, Humidity = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.Bmp180, SensorName = "BMP180", Temperature = 1, Barometer = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.Bmp280, SensorName = "BMP280", Temperature = 1, Barometer = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.Bme280, SensorName = "BME280", Temperature = 1, Humidity = 1, Barometer = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.Ccs811, SensorName = "CCS811", Co2 = 1, Tvoc = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.Ds18B20, SensorName = "DS18B20", TemperatureSoil = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.Bh1750, SensorName = "BH1750", Light = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.Max17048, SensorName = "MAX17048", SensorDescription = "I2C fuel gauge (coulomb counting), address 0x36 - recommended, more precise than a voltage divider", Battery = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.AnalogVoltage, SensorName = "Analog voltage", Battery = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.AnalogMoisture, SensorName = "Analog moisture", Moisture = 1 },
+                    new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.AnalogWaterLevel, SensorName = "Analog water tank", WaterTankLevel = 1 });
             }
 
             // Any Kit string not in this table falls back to the existing, admin-controlled

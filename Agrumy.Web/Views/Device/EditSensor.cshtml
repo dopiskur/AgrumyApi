@@ -67,7 +67,7 @@
                 <div class="tab-pane fade" id="tab-other" role="tabpanel">
                     @foreach (var slot in sensorSlots.Where(s => s.Tab == "Other")) { @await RenderSlot(slot) }
 
-                    @* R1/R2 only apply when Battery = Analog voltage (deviceTypeSensor 2001); MAX17048 (1009) ignores them - shown/hidden by battery-divider-designer.js, not a toggle here. *@
+                    @* R1/R2 only apply when Battery = Analog voltage (api.Models.SensorTypeIds.AnalogVoltage); MAX17048 ignores them - shown/hidden by battery-divider-designer.js, not a toggle here. *@
                     <div id="battery-divider-fields">
                         <hr />
                         <h6>Voltage divider calibration</h6>
@@ -139,5 +139,5 @@
         string sensorBatterySelectId = SensorField(nameof(sensorCfg.SensorBattery)).Replace(".", "_");
     }
     <script src="~/js/battery-divider-designer.js"
-            data-voltage-divider-id="2001" data-sensor-battery-select-id="@sensorBatterySelectId"></script>
+            data-voltage-divider-id="@api.Models.SensorTypeIds.AnalogVoltage" data-sensor-battery-select-id="@sensorBatterySelectId"></script>
 }
