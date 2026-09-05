@@ -359,9 +359,11 @@ Device endpoints use the separate apiId/apiKey/apiAuth scheme described in
 | `GET /api/Firmware` | DeviceManagers | List catalog entries, optionally filtered by board |
 | `POST /api/Firmware/Sync` | Global admin | Refresh the catalog from the configured source (GitHub / Custom repository) |
 | `POST /api/Firmware/Import` | Global admin | Pull one release's files into the **Local** repository |
-| `POST /api/Firmware/Upload` | Global admin | Manually add a `.bin` to the Local repository |
+| `POST /api/Firmware/Upload`, `POST /api/Firmware/UploadZip` | Global admin | Manually add a `.bin`, or extract+import a ZIP, into the Local repository |
 | `DELETE /api/Firmware` | Global admin | Remove a catalog entry |
-| `GET /api/Firmware/Manifest`, `GET /api/Firmware/Fetch` | DeviceManagers | Offline-USB-repository preparation (`tools/offline-repo/*`) |
+| `GET /api/Firmware/Manifest` | DeviceManagers | This install's catalog as manifest.json, for another install's Custom repository |
+| `GET /api/Firmware/Fetch` | DeviceManagers | Streams one catalog file through the API (Flash Device tab) |
+| `GET /api/Firmware/DownloadZip` | DeviceManagers | Visible catalog + manifest.json packaged as a ZIP |
 | `GET /api/Firmware/Download/{fileName}` | no auth | Serves a `.bin` from the Local store (device OTA download) |
 
 **`Download` is anonymous by design** (roadmap #245) - a device's OTA fetch is a bare HTTP GET
@@ -399,45 +401,49 @@ next step - not required today.
 ## Self-hosted install (roadmap #30)
 
 For anyone standing up their own instance (not the maintainer's own alpha
-deployment - see "Deployment" below for that):
+deployment - see "Deployment" below for that), one command handles
+prerequisites, secrets and startup - no config file to hand-write, no database
+to prepare first:
 
 ```
 curl -fsSL https://raw.githubusercontent.com/dopiskur/AgrumyService/master/install.sh | bash
 ```
 
-`install.sh` asks two independent questions - a deployment preset (Simple/Small:
-MariaDB, no Redis; Large/Scaled: PostgreSQL+TimescaleDB, Redis; or Custom: pick
-each option individually) and a deployment mode:
+Hitting Enter at every prompt is a complete install: `1` (Quick install) ->
+`1.1` (Simple/Small) -> `c` (Container). `install.sh` only asks two things:
 
-- **Container** (Docker or Podman) - builds and runs `docker-compose.yml`
-  (Small preset) or `docker-compose.large.yml` (Large/Scaled preset;
-  `--profile redis` toggles the Redis container within it). `appsettings.json`
-  is never touched here - config arrives as environment variables in the
-  compose file instead, already fully populated before either container starts.
-- **Bare-metal/standalone** - downloads the latest tagged release (see
-  `.github/workflows/release.yml`) as self-contained `linux-x64` binaries, no
-  .NET runtime needed on the target. Installs them as systemd services
-  (`deploy/agrumy-api.service.template`, `deploy/agrumy-web.service.template`) behind nginx or Apache
-  (`deploy/nginx.conf.template` / `apache.conf.template`) with a certbot TLS
-  cert. This path never asks about the database up front - `Agrumy.Api` boots
-  into a minimal setup wizard the first time `appsettings.json` has no
-  `ConnectionStrings:DefaultConnection` (`Agrumy.Api/Setup/SetupWizard.cs`);
-  saving a connection there restarts the service, and the existing bootstrap
-  Global Admin wizard (roadmap #91) takes over from there unchanged.
+1. **Quick or Custom.** Quick just picks Simple/Small (MariaDB, no Redis) or
+   Large/Scaled (PostgreSQL+TimescaleDB, Redis) - the roadmap #14 deployment
+   tiers. Custom asks each option individually (DB provider, TimescaleDB,
+   Redis) for combinations neither preset covers.
+2. **Container or bare-metal.**
+   - **Container** (Docker or Podman - installed automatically if neither is
+     found) builds and runs `docker-compose.yml` (Small) or
+     `docker-compose.large.yml` (Large/Scaled), generating a `.env` with the DB
+     password and JWT secret on first run. `appsettings.json` is never
+     touched here - config arrives as environment variables, already fully
+     populated before either container starts.
+   - **Bare-metal/standalone** downloads the latest tagged release (see
+     `.github/workflows/release.yml`) as self-contained `linux-x64` binaries -
+     no .NET runtime needed on the target - and installs them as systemd
+     services behind nginx or Apache with a certbot TLS cert. This path never
+     asks about the database up front - `Agrumy.Api` boots into a minimal
+     setup wizard the first time `appsettings.json` has no
+     `ConnectionStrings:DefaultConnection` (`Agrumy.Api/Setup/SetupWizard.cs`);
+     saving a connection there restarts the service, and the existing
+     bootstrap Global Admin wizard (roadmap #91) takes over from there
+     unchanged.
 
 **Bare-metal first boot: keep the port firewalled off until setup completes**
-(roadmap #248). The setup wizard is protected against CSRF, not against
-network access - unlike the Container path, a bare-metal box's port is
-reachable from the LAN (or the internet, if opened early) the moment the
-service starts. Anyone who reaches the wizard before the box's actual owner
-can submit the database connection first. `install.sh`'s bare-metal path
-does not open the firewall for you; keep it closed (or restrict it to your
-own IP) until you've completed the wizard and the bootstrap Global Admin
-step, then open it up for real traffic.
+(roadmap #248) - the setup wizard is protected against CSRF, not against
+network access, so whoever reaches it first can submit the database
+connection. `install.sh` doesn't open the firewall for you; leave it closed
+(or restricted to your own IP) until the wizard and bootstrap Global Admin
+step are both done.
 
-Safe to re-run - each step checks whether it's already done before acting, so
-re-running to add a component later (e.g. turn on Redis) doesn't repeat
-completed steps or overwrite existing secrets.
+Safe to re-run - every step checks whether it's already done before acting, so
+re-running later (e.g. to turn on Redis) doesn't repeat completed steps or
+overwrite existing secrets.
 
 ## Deployment
 
