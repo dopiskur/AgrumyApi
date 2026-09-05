@@ -202,7 +202,7 @@ namespace api.Dal.Interface
         [Post("/api/DeviceCommand")]
         Task<IReadOnlyList<int>> DeviceCommandIssue([Body] IssueCommandRequest request);
 
-        // ---- Discovery (roadmap #268) ----------------
+        // ---- Discovery ----------------
 
         [Post("/api/Discovery/Scan")]
         Task<IReadOnlyList<int>> DiscoveryScan([Body] DiscoveryScanRequest request);
