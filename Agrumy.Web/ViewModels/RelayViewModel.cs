@@ -11,8 +11,7 @@ namespace api.ViewModels
     {
         public required Device Relay { get; init; }
         public required IList<RelayDeviceMapping> Mappings { get; init; }
-        // Every non-relay device, for the "map this DevEUI to..." picker - a relay mapping itself
-        // (Relay-to-Relay) would make no sense, so relays are excluded from the list.
+        // Every non-relay device, for the "map this DevEUI to..." picker - a relay-to-relay mapping would make no sense.
         public required IList<Device> AvailableDevices { get; init; }
     }
 }
