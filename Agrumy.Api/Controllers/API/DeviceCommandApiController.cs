@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.API
 {
-    /// <summary>Issues a device command, resolved/fanned-out server-side by CommandQueueService. Ownership checks reuse ApiControllerBase.EnsureOwnedDeviceEntityAsync, always as a write (forWrite: true) since issuing a command is never a read-only action.</summary>
+    /// Issues a device command, resolved/fanned-out server-side by CommandQueueService - ownership checks reuse ApiControllerBase.EnsureOwnedDeviceEntityAsync, always as a write since issuing a command is never a read-only action.
     [Route("/api/DeviceCommand")]
     public class DeviceCommandApiController(IRepository repo, ICache cache, CommandQueueService commandQueue) : ApiControllerBase(repo, cache)
     {

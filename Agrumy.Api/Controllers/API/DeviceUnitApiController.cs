@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 
 namespace api.Controllers.API
 {
-    /// <summary>Unit/Zone CRUD, device assignment, and hierarchical dashboard aggregation. Ownership checks mirror DeviceApiController.EnsureOwnedDeviceAsync - a tenant-scoped caller only sees/writes its own tenant's Units/Zones, a Global admin/Device/reader crosses tenants per the same CallerReadsDevicesGlobally/CallerManagesDevicesGlobally rules as the rest of the Device domain.</summary>
+    /// Unit/Zone CRUD, device assignment, and hierarchical dashboard aggregation - ownership checks mirror DeviceApiController.EnsureOwnedDeviceAsync, same CallerReadsDevicesGlobally/CallerManagesDevicesGlobally rules as the rest of the Device domain.
     [Route("/api/DeviceUnit")]
     public class DeviceUnitApiController(IRepository repo, ICache cache, IOptions<AgrumySettings> settingsOptions) : ApiControllerBase(repo, cache)
     {
@@ -73,7 +73,7 @@ namespace api.Controllers.API
 
         #region Zone CRUD
 
-        /// <summary>Every Zone within one Unit - ownership is checked on the Unit, not per-zone, since a zone always belongs to exactly one unit.</summary>
+        /// Every Zone within one Unit - ownership is checked on the Unit, not per-zone, since a zone always belongs to exactly one unit.
         [Authorize]
         [HttpGet("Zone")]
         public async Task<ActionResult<IList<DeviceUnitZone>>> DeviceUnitZonesGet(int? idDeviceUnit)
@@ -86,7 +86,7 @@ namespace api.Controllers.API
             return Ok(await Repo.DeviceUnitZonesGetAsync(unit!.IDDeviceUnit!.Value));
         }
 
-        /// <summary>Single zone by id, so a caller that needs to patch one field can fetch-then-resubmit the whole object - DeviceUnitZoneUpdateAsync overwrites unconditionally, it does not merge.</summary>
+        /// Single zone by id, so a caller that needs to patch one field can fetch-then-resubmit the whole object - DeviceUnitZoneUpdateAsync overwrites unconditionally, it does not merge.
         [Authorize]
         [HttpGet("ZoneById")]
         public async Task<ActionResult<DeviceUnitZone>> DeviceUnitZoneGetById(int? idDeviceUnitZone)
@@ -204,7 +204,7 @@ namespace api.Controllers.API
             return true;
         }
 
-        /// <summary>Shape+bound check per ConditionType - the firmware would otherwise silently treat a malformed rule as inert (AgrumyFirmware's ConfigParser/evaluateRule), a confusing way to discover a typo. Threshold's own value is deliberately unbounded (sane ranges differ per sensor/unit); only Hysteresis has a universal "must not be negative" rule.</summary>
+        /// Shape+bound check per ConditionType - the firmware would otherwise silently treat a malformed rule as inert (ConfigParser/evaluateRule), a confusing way to discover a typo; Threshold's own value is deliberately unbounded, only Hysteresis has a universal "must not be negative" rule.
         private static string? RuleConditionConfigError(ConditionType type, JsonNode? config)
         {
             try
@@ -262,7 +262,7 @@ namespace api.Controllers.API
 
         #region Device assignment
 
-        /// <summary>Devices with no current zone, filtered to controller- or sensor-capable - the "Add Controller"/"Add Sensor" picker list.</summary>
+        /// Devices with no current zone, filtered to controller- or sensor-capable - the "Add Controller"/"Add Sensor" picker list.
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpGet("Unassigned")]
         public async Task<ActionResult<IList<Device>>> DeviceUnassignedGet(bool controllerCapable) =>
@@ -313,8 +313,7 @@ namespace api.Controllers.API
 
         #region Dashboard
 
-        /// <summary>Top-level Unit cubes - read-only, open to any authenticated caller (same
-        /// reasoning as DeviceApiController.DeviceFleetGet).</summary>
+        /// Top-level Unit cubes - read-only, open to any authenticated caller (same reasoning as DeviceApiController.DeviceFleetGet).
         [Authorize]
         [HttpGet("Dashboard")]
         public async Task<ActionResult<IList<DeviceUnitDashboard>>> DeviceUnitDashboardGet() =>
@@ -347,15 +346,15 @@ namespace api.Controllers.API
 
         #endregion
 
-        /// <summary>Same shape as DeviceApiController.EnsureOwnedDeviceAsync, for DeviceUnit - see ApiControllerBase.EnsureOwnedDeviceEntityAsync for the shared 404/403 logic.</summary>
+        /// Same shape as DeviceApiController.EnsureOwnedDeviceAsync, for DeviceUnit - see ApiControllerBase.EnsureOwnedDeviceEntityAsync for the shared 404/403 logic.
         private Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int? idDeviceUnit, bool forWrite) =>
             EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite);
 
-        /// <summary>Same shape as EnsureOwnedUnitAsync, for DeviceUnitZone.</summary>
+        /// Same shape as EnsureOwnedUnitAsync, for DeviceUnitZone.
         private Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int? idDeviceUnitZone, bool forWrite) =>
             EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone), z => z.TenantID, "Zone", forWrite);
 
-        /// <summary>Same shape as EnsureOwnedUnitAsync, for Device.</summary>
+        /// Same shape as EnsureOwnedUnitAsync, for Device.
         private Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(
             Func<Task<Device?>> lookup, string ownerLabel, bool forWrite) =>
             EnsureOwnedDeviceEntityAsync(lookup, d => d.TenantID, ownerLabel, forWrite);

@@ -12,19 +12,14 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace api.Controllers.API
 {
-    /// <summary>Agrumy.Relay's own endpoints. A relay is a device row like any
-    /// other (see api.Models.Device.IsRelay) - it authenticates the SAME way a device does
-    /// (DeviceAuth.ApiKeyPolicy, its own permanent apiId/apiKey), it just forwards OTHER devices'
-    /// traffic through Batch instead of reporting its own sensors.</summary>
+    /// Agrumy.Relay's own endpoints - a relay is a device row like any other (see api.Models.Device.IsRelay) that authenticates the same way (DeviceAuth.ApiKeyPolicy, its own apiId/apiKey), just forwarding OTHER devices' traffic through Batch instead of reporting its own sensors.
     [Route("/api/Relay")]
     public class RelayApiController(
         IRepository repo, ICache cache, CommandQueueService commandQueue,
         FirmwareCatalogService firmwareCatalog, DeviceConfigBuilder configBuilder)
         : ApiControllerBase(repo, cache)
     {
-        /// <summary>The caller's own device row, already confirmed to be a relay - null (with the
-        /// ActionResult already set) covers every way that can fail, so every action below is one
-        /// guard clause instead of repeating the same three checks.</summary>
+        /// The caller's own device row, already confirmed to be a relay - null (with the ActionResult already set) covers every failure mode, so every action below is one guard clause instead of repeating the same checks.
         private async Task<(Device? relay, ActionResult? error)> GetCallerRelayAsync()
         {
             string apiId = HttpContext.DeviceApiId()!;
@@ -45,16 +40,10 @@ namespace api.Controllers.API
             return (relay, null);
         }
 
-        // A LoRa uplink batch is naturally small (one gateway's worth of devices in one aggregation
-        // window); a WiFi-repeater batch could in principle be large, but still bounded by however
-        // many devices physically sit behind one relay - 500 gives generous headroom either way
-        // without letting a malformed/hostile batch force unbounded server-side work.
+        // 500 gives generous headroom for either a small LoRa aggregation batch or a larger WiFi-repeater one, while still bounding a malformed/hostile batch's server-side work.
         private const int MaxBatchEntries = 500;
 
-        /// <summary>Iterates a relay's batched entries, running each through the SAME logic its
-        /// wrapped single-device endpoint (Config/SensorData/Event/Command.Ack) already uses - see
-        /// api.Devices.DeviceConfigBuilder and the per-type handlers below, none of it duplicated.
-        /// One entry failing (wrong apiKey, unknown apiId) never fails the rest of the batch.</summary>
+        /// Iterates a relay's batched entries, running each through the SAME logic its wrapped single-device endpoint (Config/SensorData/Event/Command.Ack) already uses (see the per-type handlers below) - one entry failing never fails the rest of the batch.
         [HttpPost("Batch")]
         [EnableRateLimiting("device-data")]
         [Authorize(Policy = DeviceAuth.ApiKeyPolicy)]
@@ -117,9 +106,7 @@ namespace api.Controllers.API
             }
         }
 
-        /// <summary>Same steps as DeviceApiController.GetConfig, in the same order (diagnostics
-        /// upsert before the version check, so a batched device still bumps LastSeenAt even when
-        /// nothing changed).</summary>
+        /// Same steps as DeviceApiController.GetConfig, in the same order - diagnostics upsert before the version check, so a batched device still bumps LastSeenAt even when nothing changed.
         private async Task<RelayBatchEntryResult> RunConfigAsync(Device device, JsonElement payload)
         {
             DeviceConfigPoll poll = payload.Deserialize<DeviceConfigPoll>() ?? new DeviceConfigPoll();
@@ -143,7 +130,7 @@ namespace api.Controllers.API
             return new RelayBatchEntryResult { Success = true, StatusCode = 200, Config = config };
         }
 
-        /// <summary>Same steps as SensorDataController.Post.</summary>
+        /// Same steps as SensorDataController.Post.
         private async Task<RelayBatchEntryResult> RunSensorDataAsync(Device device, JsonElement payload)
         {
             JsonArray jsonArray = JsonNode.Parse(payload.GetRawText()) as JsonArray
@@ -155,7 +142,7 @@ namespace api.Controllers.API
             return new RelayBatchEntryResult { Success = true, StatusCode = 200 };
         }
 
-        /// <summary>Same steps as DeviceApiController.PushEvent.</summary>
+        /// Same steps as DeviceApiController.PushEvent.
         private async Task<RelayBatchEntryResult> RunEventAsync(Device device, JsonElement payload)
         {
             DeviceEventPush push = payload.Deserialize<DeviceEventPush>() ?? new DeviceEventPush();
@@ -174,7 +161,7 @@ namespace api.Controllers.API
             return new RelayBatchEntryResult { Success = true, StatusCode = 200 };
         }
 
-        /// <summary>Same steps as DeviceApiController.AckCommand.</summary>
+        /// Same steps as DeviceApiController.AckCommand.
         private async Task<RelayBatchEntryResult> RunCommandAckAsync(Device device, JsonElement payload)
         {
             CommandAckRequest ack = payload.Deserialize<CommandAckRequest>() ?? new CommandAckRequest();
@@ -182,9 +169,7 @@ namespace api.Controllers.API
             return new RelayBatchEntryResult { Success = true, StatusCode = 200 };
         }
 
-        /// <summary>What the OWNING relay itself fetches to build its DevEUI-&gt;apiId/apiKey
-        /// forwarding cache (RelayProfile.LoRaGateway) - includes ApiKey, unlike the admin list
-        /// below, since Relay must reconstruct each mapped device's own request.</summary>
+        /// What the OWNING relay itself fetches to build its DevEUI-&gt;apiId/apiKey forwarding cache (RelayProfile.LoRaGateway) - includes ApiKey, unlike the admin list below, since Relay must reconstruct each mapped device's own request.
         [HttpGet("DeviceMapping")]
         [EnableRateLimiting("device-data")]
         [Authorize(Policy = DeviceAuth.ApiKeyPolicy)]
