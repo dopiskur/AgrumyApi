@@ -77,7 +77,10 @@ namespace api.Devices
                 DeviceConfigController? controller = await repo.DeviceConfigControllerGetAsync(device.DeviceConfigControllerID);
                 if (controller != null && device.DeviceUnitZoneID is int idZone)
                 {
-                    IList<DeviceUnitZoneRule> rules = await repo.DeviceUnitZoneRulesGetAsync(idZone);
+                    IList<DeviceUnitZoneRule> zoneRules = await repo.RulesGetForZoneAsync(idZone);
+                    IList<DeviceUnitZoneRule> unitRules = device.DeviceUnitID is int idUnit ? await repo.RulesGetForUnitAsync(idUnit) : [];
+                    IList<DeviceUnitZoneRule> globalRules = await repo.RulesGetForTenantGlobalAsync(device.TenantID);
+                    IList<DeviceUnitZoneRule> rules = RuleHierarchyResolver.ResolveRelayRules(zoneRules, unitRules, globalRules);
                     DateOnly localDate = DateOnly.FromDateTime(DateTime.UtcNow.AddSeconds(utcOffsetSeconds));
                     controller.Rules = AstronomicalRuleResolver.Resolve(rules, serverConfig, localDate, utcOffsetSeconds);
                     DeviceUnitZone? zone = await repo.DeviceUnitZoneGetByIdAsync(idZone);
