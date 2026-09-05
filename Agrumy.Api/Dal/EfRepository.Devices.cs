@@ -182,7 +182,8 @@ namespace api.Dal
             row.BatteryEnabled = device.BatteryEnabled;
             row.Enabled = device.Enabled;
             row.Debug = device.Debug;
-            row.ConfigVersion = (device.ConfigVersion ?? 0) + 1;
+            // row's own value, not the payload's - the payload can be stale under two concurrent edits, which would otherwise let ConfigVersion regress or collide instead of growing monotonically.
+            row.ConfigVersion = (row.ConfigVersion ?? 0) + 1;
             await db.SaveChangesAsync();
         }
 

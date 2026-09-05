@@ -759,20 +759,22 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUpdate_Sets_ConfigVersion_To_Payload_Plus_One(DbProviderKind provider)
+    public async Task DeviceUpdate_BumpsRowsOwnConfigVersion_IgnoringStalePayloadValue(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
-        var d = await MakeDevice(t, tenantId);
+        var d = await MakeDevice(t, tenantId); // ConfigVersion == 1
 
         d.DeviceName = "renamed";
-        d.ConfigVersion = 40;
+        // A stale/forged payload value - two concurrent edits could both submit this same number, so
+        // it must never be the base DeviceUpdateAsync increments from, only the freshly-read row's own.
+        d.ConfigVersion = 999;
         await _repo.DeviceUpdateAsync(d);
 
         var back = await _repo.DeviceGetByIdAsync(d.IDDevice);
         Assert.NotNull(back);
         Assert.Equal("renamed", back.DeviceName);
-        Assert.Equal(41, back.ConfigVersion);
+        Assert.Equal(2, back.ConfigVersion);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
