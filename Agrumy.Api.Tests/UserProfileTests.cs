@@ -268,7 +268,7 @@ public class UserProfileTests
     }
 
     [Fact]
-    public async Task ChangePassword_WrongOldPassword_Returns401_And_WritesNothing()
+    public async Task ChangePassword_WrongOldPassword_Returns403_And_WritesNothing()
     {
         string salt = AuthenticationProvider.GetSalt();
         string hash = AuthenticationProvider.GetHash("the-real-old-pw", salt);
@@ -281,7 +281,8 @@ public class UserProfileTests
             new UserSetPassword { OldPassword = "wrong-pw", NewPassword = "New-Password-123" });
 
         var obj = Assert.IsType<ObjectResult>(result.Result);
-        Assert.Equal(401, obj.StatusCode);
+        // 403, not 401 - a wrong OldPassword is a business check, not an auth-pipeline failure (roadmap #278/#279).
+        Assert.Equal(403, obj.StatusCode);
         // MockBehavior.Strict: an un-set-up UserSetPasswordAsync call would already have thrown.
 
     }

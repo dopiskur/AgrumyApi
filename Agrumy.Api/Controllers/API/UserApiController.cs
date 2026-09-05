@@ -398,7 +398,8 @@ namespace api.Controllers.API
             if (user is null || secret is null ||
                 !AuthenticationProvider.VerifyHash(secret.PwdHash, secret.PwdSalt, value.OldPassword))
             {
-                return StatusCode(401, "Wrong password");
+                // 403, not 401 - caller is already authenticated, this is a failed OldPassword check, not an auth-pipeline failure.
+                return StatusCode(403, "Wrong password");
             }
 
             secret.PwdSalt = AuthenticationProvider.GetSalt();

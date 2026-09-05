@@ -11,7 +11,7 @@ namespace api.Filters
     {
         public async Task OnExceptionAsync(ExceptionContext context)
         {
-            if (context.Exception is not ApiException { StatusCode: 401 })
+            if (context.Exception is not ApiException { StatusCode: 401, IsAuthChallenge: true })
             {
                 return;
             }

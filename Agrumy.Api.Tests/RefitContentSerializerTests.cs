@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using api.Models;
@@ -51,5 +53,36 @@ public class RefitContentSerializerTests
         Assert.NotNull(parsed);
         Assert.Equal(CommandTargetType.Zone, parsed!.TargetType);
         Assert.Equal(CommandActionType.ForceOTA, parsed.ActionType);
+    }
+
+    [Fact]
+    public async Task ExceptionFactory_SuccessStatus_ReturnsNull()
+    {
+        using var response = new HttpResponseMessage(HttpStatusCode.OK);
+        Assert.Null(await RefitConfig.Settings.ExceptionFactory!(response));
+    }
+
+    [Fact]
+    public async Task ExceptionFactory_401WithWwwAuthenticate_IsAuthChallenge()
+    {
+        using var response = new HttpResponseMessage(HttpStatusCode.Unauthorized) { Content = new StringContent("token expired") };
+        response.Headers.WwwAuthenticate.Add(new AuthenticationHeaderValue("Bearer"));
+
+        var ex = Assert.IsType<ApiException>(await RefitConfig.Settings.ExceptionFactory!(response));
+
+        Assert.Equal(401, ex.StatusCode);
+        Assert.True(ex.IsAuthChallenge);
+    }
+
+    [Fact]
+    public async Task ExceptionFactory_401WithoutWwwAuthenticate_IsNotAuthChallenge()
+    {
+        // Same status code as a genuine auth-pipeline failure, but this is how an [Authorize]'d action's own StatusCode(401, ...) looks - no challenge header.
+        using var response = new HttpResponseMessage(HttpStatusCode.Unauthorized) { Content = new StringContent("Wrong password") };
+
+        var ex = Assert.IsType<ApiException>(await RefitConfig.Settings.ExceptionFactory!(response));
+
+        Assert.Equal(401, ex.StatusCode);
+        Assert.False(ex.IsAuthChallenge);
     }
 }
