@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>IsPrivateOrReserved is tested directly as a pure function; EnsureAllowedAsync's scheme check needs no real DNS since it short-circuits first.</summary>
+/// IsPrivateOrReserved is tested directly as a pure function; EnsureAllowedAsync's scheme check needs no real DNS since it short-circuits first.
 public class SsrfGuardTests
 {
     [Theory]
@@ -46,8 +46,7 @@ public class SsrfGuardTests
     [Fact]
     public async Task EnsureAllowedAsync_RejectsNonHttpsScheme_WithoutResolvingHost()
     {
-        // If this reached DNS resolution for a bogus host, it would throw a different exception
-        // (or hang) - reaching SsrfBlockedException here proves the scheme check runs first.
+        // A bogus host that reached DNS resolution would throw/hang differently - this proves the scheme check runs first.
         var ex = await Assert.ThrowsAsync<SsrfBlockedException>(
             () => SsrfGuard.EnsureAllowedAsync(new Uri("http://this-host-does-not-resolve.invalid/manifest.json"), CancellationToken.None));
 

@@ -5,7 +5,7 @@ using api.Utils;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Refit's default ContentSerializer silently registers a global JsonStringEnumConverter, so a request DTO enum without its own [JsonConverter] (RelayFunction, ConditionType, CommandActionType/CommandTargetType) serialized as a camelCase string - but the API's [FromBody] binder expects these as plain numeric enums, so every such call 400'd. Serializes with the exact <see cref="RefitConfig.Settings"/> Agrumy.Web uses and deserializes with the same Web-defaults options ContractTests.cs uses, so a regression here fails the same way the live bug did.</summary>
+/// A request DTO enum without its own [JsonConverter] must still serialize as a plain number, matching what the API's [FromBody] binder expects - uses the exact <see cref="RefitConfig.Settings"/> Agrumy.Web sends with.
 public class RefitContentSerializerTests
 {
     private static readonly JsonSerializerOptions Mvc = new(JsonSerializerDefaults.Web);

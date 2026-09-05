@@ -13,7 +13,7 @@ using Xunit;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Runs against every real database engine configured via AGRUMY_TEST_MYSQL/AGRUMY_TEST_POSTGRES; skipped when unset.</summary>
+/// Runs against every real database engine configured via AGRUMY_TEST_MYSQL/AGRUMY_TEST_POSTGRES; skipped when unset.
 public sealed class RelationalIntegrationFixture
 {
     public sealed record Target(DbProviderKind Provider, string ConnectionString, int DeviceTypeId);
@@ -90,7 +90,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
     public void Dispose() => _db?.Dispose();
 
-    /// <summary>One row per configured engine, or a sentinel that makes every test skip.</summary>
+    /// One row per configured engine, or a sentinel that makes every test skip.
     public static IEnumerable<object[]> Providers()
     {
         var rows = new List<object[]>();
@@ -374,7 +374,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.NotNull(stillRevoked!.RevokedAt);
     }
 
-    /// <summary>Two concurrent rotations of the same token - only one may win; uses two independent DbContext instances since a shared one isn't thread-safe.</summary>
+    /// Two concurrent rotations of the same token - only one may win; uses two independent DbContext instances since a shared one isn't thread-safe.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task RefreshToken_ConcurrentRotateOfSameToken_OnlyOneWins(DbProviderKind provider)
     {
@@ -547,7 +547,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal("h", normalSecret!.PwdHash);
     }
 
-    /// <summary>UserProfileSetAsync must write ONLY FirstName/LastName/TimeZone, never authorization fields.</summary>
+    /// UserProfileSetAsync must write ONLY FirstName/LastName/TimeZone, never authorization fields.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task UserProfileSet_Writes_Only_Profile_Fields(DbProviderKind provider)
     {
@@ -1472,9 +1472,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(ZoneStatus.Orange, dashboard.Status);
     }
 
-    // The whole feature can be switched off - DeviceUnitDashboardGetAsync reads the default (id=1)
-    // ServerConfig row, so this flips it for the test and restores it in finally to avoid leaking
-    // state into any other test that runs against the same row.
+    // Flips the shared default ServerConfig row for the test and restores it in finally, so no other test sees the change.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitDashboard_Status_GreenWhenProblemAlertsDisabled(DbProviderKind provider)
     {
@@ -1503,8 +1501,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         }
     }
 
-    // ProblemEventExpiryHours is configurable - an event older than the configured window stops
-    // counting even though it would still be inside the default 24h.
+    // An event older than the configured ProblemEventExpiryHours stops counting, even inside the default 24h.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceUnitDashboard_Status_GreenWhenProblemEventOlderThanConfiguredExpiry(DbProviderKind provider)
     {
@@ -1770,7 +1767,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Empty(await _repo.SensorDataReportGetAsync(tenantId, -1, d.IDDevice, null));
     }
 
-    /// <summary>DB UTC rows shaped to JSON, then dateCreated localized for display: chart payload shifts by the user's zone, or passes UTC through untouched if null.</summary>
+    /// DB UTC rows shaped to JSON, then dateCreated localized for display: chart payload shifts by the user's zone, or passes UTC through untouched if null.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task SensorDataGet_Then_Localize_Shifts_Chart_Dates_By_User_Zone(DbProviderKind provider)
     {

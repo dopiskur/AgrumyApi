@@ -6,7 +6,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Exercises OfflineAlertEvaluator directly - no database, repositories/dispatcher are mocked.</summary>
+/// Exercises OfflineAlertEvaluator directly - no database, repositories/dispatcher are mocked.
 public class OfflineAlertEvaluatorTests
 {
     private readonly Mock<IDeviceRepository> _devices = new(MockBehavior.Strict);

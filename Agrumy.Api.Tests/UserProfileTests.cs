@@ -13,7 +13,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>TimeZoneHelper display conversion (UTC stays the only stored format) and the self-scoped PUT /api/User/Profile endpoint. No database - the write-only-profile-columns guarantee is proven against real engines in <see cref="RelationalIntegrationTests.UserProfileSet_Writes_Only_Profile_Fields"/>.</summary>
+/// TimeZoneHelper display conversion (UTC stays the only stored format) and the self-scoped PUT /api/User/Profile endpoint. No database - the write-only-profile-columns guarantee is proven against real engines in <see cref="RelationalIntegrationTests.UserProfileSet_Writes_Only_Profile_Fields"/>.
 public class UserProfileTests
 {
 
@@ -209,7 +209,7 @@ public class UserProfileTests
         Assert.IsType<UnauthorizedResult>(result.Result);
     }
 
-    /// <summary>The payload type itself is the containment: if someone adds an authorization-bearing property to UserProfileUpdate, this fails and forces a conscious look.</summary>
+    /// The payload type itself is the containment: if someone adds an authorization-bearing property to UserProfileUpdate, this fails and forces a conscious look.
     [Fact]
     public void UserProfileUpdate_Carries_No_Authorization_Fields()
     {
@@ -295,7 +295,7 @@ public class UserProfileTests
         _repo.Verify(r => r.UserGetAsync(It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>()), Times.Never);
     }
 
-    /// <summary>Previously identity came from a Login field in the body, letting an unauthenticated caller use this endpoint as a password-guessing oracle. Proves the action's own no-identity fallback (defense in depth beyond [Authorize]) also refuses, and never touches the repository.</summary>
+    /// Previously identity came from a Login field in the body, letting an unauthenticated caller use this endpoint as a password-guessing oracle. Proves the action's own no-identity fallback (defense in depth beyond [Authorize]) also refuses, and never touches the repository.
     [Fact]
     public async Task ChangePassword_NoIdentity_Returns401_And_NeverTouchesRepo()
     {
@@ -305,7 +305,7 @@ public class UserProfileTests
         Assert.IsType<UnauthorizedResult>(result.Result);
     }
 
-    /// <summary>Same reasoning as UserProfileUpdate_Carries_No_Authorization_Fields: the payload type itself is the containment - a reintroduced Login property would reopen the same bug.</summary>
+    /// Same reasoning as UserProfileUpdate_Carries_No_Authorization_Fields: the payload type itself is the containment - a reintroduced Login property would reopen the same bug.
     [Fact]
     public void UserSetPassword_Carries_No_Login_Field()
     {
