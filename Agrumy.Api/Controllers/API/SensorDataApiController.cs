@@ -30,7 +30,7 @@ namespace api.Controllers.API
                 return BadRequest($"timeRange {range} exceeds the maximum allowed for this unit.");
             }
 
-            // Was always tenant-scoped even for a Global reader, unlike DevicesGet/DeviceFleetGet.
+            // Stays tenant-scoped even for a Global reader, unlike DevicesGet/DeviceFleetGet.
             return Ok(await Repo.SensorDataGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, deviceID, timeRange, timeMDMY, buildReport));
         }
 
@@ -62,7 +62,7 @@ namespace api.Controllers.API
             return Ok(device.ConfigVersion);
         }
 
-        /// <summary>Deleting telemetry is device management, gated to the device-manager roles; the target device's own tenant is resolved and checked explicitly.</summary>
+        /// Deleting telemetry is device management, gated to the device-manager roles; the target device's own tenant is resolved and checked explicitly.
         [HttpDelete]
         [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> Delete(int deviceID, int timeMDMY = 0, int timeRange = 0)
@@ -84,7 +84,7 @@ namespace api.Controllers.API
         [HttpGet("Report")]
         [Authorize]
         public async Task<ActionResult<IEnumerable<SensorDataReport>>> ReportGet(int? getData, int? idDevice, int? iDSensorDataReport) =>
-            // Same fix as Get above.
+            // Same tenant-scoping as Get above.
             Ok(await Repo.SensorDataReportGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, getData, idDevice, iDSensorDataReport));
 
         [HttpGet("ZoneAverage")]

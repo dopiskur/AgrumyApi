@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.API
 {
-    /// <summary>Read-only view of the admin-action trail written by AuditLogRepository.AuditLogAddAsync. A Global admin sees every tenant's history; a Tenant admin sees only their own.</summary>
+    /// Read-only view of the admin-action trail written by AuditLogRepository.AuditLogAddAsync - a Global admin sees every tenant's history, a Tenant admin only their own.
     [Route("api/AuditLog")]
     public class AuditLogApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
     {

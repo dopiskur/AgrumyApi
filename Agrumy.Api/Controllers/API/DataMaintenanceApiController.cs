@@ -8,14 +8,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Controllers.API
 {
-    /// <summary>"Optimize Old Data" / "Purge Old Data" - Global admin only, same rule as ServerConfigApiController since this affects every tenant's telemetry. Both actions dispatch to BackgroundJobQueue and return 202 immediately rather than holding the request open for however long a large table takes to process.</summary>
+    /// "Optimize Old Data" / "Purge Old Data", Global admin only (affects every tenant's telemetry) - both dispatch to BackgroundJobQueue and return 202 immediately instead of holding the request open for a large table's processing time.
     [Route("api/DataMaintenance")]
     [Authorize(Roles = "admin")]
     public class DataMaintenanceApiController(
         IRepository repo, ICache cache, AgrumyDbContext db, BackgroundJobQueue jobQueue, ILogger<DataMaintenanceApiController> logger)
         : ApiControllerBase(repo, cache)
     {
-        /// <summary>Lets Agrumy.Web decide whether to show the MariaDB-only "shrink files on disk?" dialog before confirming a Purge - Postgres/TimescaleDB reclaims disk space automatically.</summary>
+        /// Lets Agrumy.Web decide whether to show the MariaDB-only "shrink files on disk?" dialog before confirming a Purge - Postgres/TimescaleDB reclaims disk space automatically.
         [HttpGet("Provider")]
         public ActionResult<DataMaintenanceProviderInfo> GetProvider()
         {

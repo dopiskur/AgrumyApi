@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.API
 {
-    /// <summary>Server-wide settings. Admin-only; there is exactly one row (id 1), auto-created on first read.</summary>
+    /// Server-wide settings, admin-only; there is exactly one row (id 1), auto-created on first read.
     [Route("api/ServerConfig")]
     public class ServerConfigApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
     {
@@ -32,7 +32,7 @@ namespace api.Controllers.API
                 return StatusCode(403, "Server-wide settings require the Global admin role");
             }
 
-            // A bad id would silently degrade every device's schedule mode to UTC (TimeZoneHelper.GetUtcOffsetSeconds' fallback) rather than fail loudly at save time. Blank/null clears it back to "not configured".
+            // A bad id would silently degrade every device's schedule mode to UTC (TimeZoneHelper.GetUtcOffsetSeconds' fallback) instead of failing at save time; blank/null clears it back to "not configured".
             if (!string.IsNullOrWhiteSpace(config.ScheduleTimeZone))
             {
                 if (!TimeZoneHelper.TryNormalizeToIana(config.ScheduleTimeZone, out string iana))
@@ -113,8 +113,7 @@ namespace api.Controllers.API
                 return BadRequest("Firmware auto-refresh interval must be 0/empty (disabled) or a positive number of hours.");
             }
 
-            // Matches the 10s/5min bounds the Relay design settled on (short enough
-            // a LoRa device's own retry loop stays reasonable, long enough to actually batch).
+            // Matches the 10s/5min bounds the Relay design settled on - short enough a LoRa device's own retry loop stays reasonable, long enough to actually batch.
             if (config.RelayWaitWindowSeconds is < 10 or > 300)
             {
                 return BadRequest("Relay wait window must be between 10 and 300 seconds.");
@@ -135,7 +134,7 @@ namespace api.Controllers.API
             return Ok();
         }
 
-        /// <summary>The Register page is anonymous and must not call the admin-only Get() above just to know whether to show a "create a new tenant" field - this exposes only that one flag.</summary>
+        /// The Register page is anonymous and must not call the admin-only Get() above just to know whether to show a "create a new tenant" field - this exposes only that one flag.
         [HttpGet("Public")]
         [AllowAnonymous]
         public async Task<ActionResult<PublicServerConfig>> GetPublic()

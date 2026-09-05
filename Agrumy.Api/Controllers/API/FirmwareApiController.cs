@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace api.Controllers.API
 {
-    /// <summary>The firmware catalog and its population paths. Every write is Global admin only (the catalog is install-wide, same rule as ServerConfigApiController); reads are open to device managers so the per-device update UI can list versions. Download is anonymous on purpose - see the action's own comment.</summary>
+    /// The firmware catalog and its population paths - every write is Global admin only (install-wide, same rule as ServerConfigApiController), reads are open to device managers for the per-device update UI, Download is anonymous on purpose (see its own comment).
     [Route("/api/Firmware")]
     public class FirmwareApiController(IRepository repo, ICache cache, FirmwareCatalogService catalog, IOptions<AgrumySettings> settings) : ApiControllerBase(repo, cache)
     {
@@ -40,7 +40,7 @@ namespace api.Controllers.API
             return Ok(await catalog.ImportFromDirectoryAsync(request.Path, PublicBaseUrl, cancellationToken));
         }
 
-        /// <summary>Multipart upload of one release-convention .bin. 4 MB is well above any ESP32 app partition (esp32dev's is 1.28 MB), so a wrong file is rejected before it is even read.</summary>
+        /// Multipart upload of one release-convention .bin - 4 MB is well above any ESP32 app partition (esp32dev's is 1.28 MB), so a wrong file is rejected before it is even read.
         [Authorize(Roles = RoleNames.GlobalAdmin)]
         [HttpPost("Upload")]
         [RequestSizeLimit(4 * 1024 * 1024)]
@@ -74,7 +74,7 @@ namespace api.Controllers.API
         [HttpGet("Manifest")]
         public async Task<ActionResult<FirmwareManifest>> Manifest() => Ok(await catalog.BuildManifestAsync(PublicBaseUrl));
 
-        /// <summary>The browser "Build offline repo" tool reads every catalog file through here (same-origin via Agrumy.Web's proxy) instead of hitting GitHub directly - a release asset's redirect target does not answer cross-origin fetches from a page.</summary>
+        /// The browser "Build offline repo" tool reads every catalog file through here (same-origin via Agrumy.Web's proxy) instead of hitting GitHub directly - a release asset's redirect target does not answer cross-origin fetches from a page.
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [EnableRateLimiting("device-data")]
         [HttpGet("Fetch")]
@@ -88,7 +88,7 @@ namespace api.Controllers.API
             return File(opened.Value.Content, "application/octet-stream", opened.Value.FileName);
         }
 
-        /// <summary>The Local repository's OTA download. Anonymous because the firmware's OTA download (DeviceController::firmwareUpdate) is a bare HTTP GET with no auth headers - exactly like a GitHub release asset, which is public too; a .bin is not a secret. The file name is validated against the release convention (FirmwareStorage.PathFor) so the path can never leave the storage directory.</summary>
+        /// The Local repository's OTA download, anonymous because DeviceController::firmwareUpdate's OTA GET carries no auth headers (a .bin is public, like a GitHub release asset) - the file name is validated against the release convention (FirmwareStorage.PathFor) so the path can never leave the storage directory.
         [AllowAnonymous]
         [EnableRateLimiting("device-data")]
         [HttpGet("Download/{fileName}")]
@@ -109,8 +109,7 @@ namespace api.Controllers.API
             return PhysicalFile(storage.PathFor(fileName), "application/octet-stream", fileName);
         }
 
-        /// <summary>Base URL devices reach this API on - WebView:ApiService when configured
-        /// (api.agrumy.com in the known deployment), else whatever host this request came in on.</summary>
+        /// Base URL devices reach this API on - WebView:ApiService when configured, else whatever host this request came in on.
         private string PublicBaseUrl =>
             string.IsNullOrWhiteSpace(settings.Value.ApiService) ? $"{Request.Scheme}://{Request.Host}" : settings.Value.ApiService;
     }
