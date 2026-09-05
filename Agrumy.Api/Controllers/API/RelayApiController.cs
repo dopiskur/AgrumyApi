@@ -75,7 +75,7 @@ namespace api.Controllers.API
             var results = new List<RelayBatchEntryResult>(request.Entries.Count);
             foreach (RelayBatchEntry entry in request.Entries)
             {
-                results.Add(await RunEntryAsync(entry));
+                results.Add(await RunEntryAsync(entry, relay!.TenantID));
             }
 
             return Ok(new RelayBatchResponse
@@ -86,12 +86,17 @@ namespace api.Controllers.API
             });
         }
 
-        private async Task<RelayBatchEntryResult> RunEntryAsync(RelayBatchEntry entry)
+        private async Task<RelayBatchEntryResult> RunEntryAsync(RelayBatchEntry entry, int relayTenantId)
         {
             Device? device = await Repo.DeviceGetByApiIdAsync(entry.DeviceApiId);
             if (device is null || !DeviceAuth.ConstantTimeEquals(entry.DeviceApiKey, device.ApiKey))
             {
                 return new RelayBatchEntryResult { Success = false, StatusCode = 401, Error = "Unknown device or apiKey mismatch." };
+            }
+            if (device.TenantID != relayTenantId)
+            {
+                // A relay belongs to one tenant - forwarding for another tenant's device would let a stolen/misconfigured relay cross tenant boundaries.
+                return new RelayBatchEntryResult { Success = false, StatusCode = 403, Error = "Device belongs to a different tenant than this relay." };
             }
 
             try
