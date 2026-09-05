@@ -63,8 +63,18 @@ services:
       # only in the sense that AddStackExchangeRedisCache itself would fail to connect, so keep the
       # profile and this var in sync (both on, or both off).
       Cache__Redis__ConnectionString: redis:6379
+    volumes:
+      # Roadmap #318: same reasoning as docker-compose.yml - without this, a rebuild wipes the Local
+      # firmware repository's .bin files while the DB keeps referencing the now-deleted paths.
+      - firmware-store:/app/firmware-store
     ports:
       - "5000:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
   web:
     build:
@@ -79,12 +89,21 @@ services:
       JWT__Issuer: ${AGRUMY_JWT_ISSUER:-https://api.agrumy.local}
       JWT__Audience: agrumy-api
       DataProtection__KeyPath: /keys
+      # Roadmap #317: same reasoning as docker-compose.yml's web service.
+      Security__EnforceHttps: "false"
     volumes:
       - web-keys:/keys
     ports:
       - "5001:5001"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5001/Login"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
 volumes:
   db-data:
   redis-data:
   web-keys:
+  firmware-store:

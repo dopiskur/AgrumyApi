@@ -47,8 +47,19 @@ services:
       # standalone/bare-metal path for the nginx/Apache+certbot setup), so the app itself stays on
       # plain HTTP behind it.
       Security__EnforceHttps: "false"
+    volumes:
+      # Roadmap #318: without this, `docker compose up --build` wipes Firmware/FirmwareCatalogService's
+      # Local-repository .bin files (container filesystem is ephemeral) while the DB keeps referencing
+      # the now-deleted paths.
+      - firmware-store:/app/firmware-store
     ports:
       - "5000:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
   web:
     build:
@@ -63,11 +74,22 @@ services:
       JWT__Issuer: ${AGRUMY_JWT_ISSUER:-https://api.agrumy.local}
       JWT__Audience: agrumy-api
       DataProtection__KeyPath: /keys
+      # Roadmap #317: same reverse-proxy-terminates-TLS reasoning as the api service's
+      # Security__EnforceHttps above - without this, CookieSecurePolicy.Always never sets the auth
+      # cookie over this stack's own plain-HTTP ports, and login silently never completes.
+      Security__EnforceHttps: "false"
     volumes:
       - web-keys:/keys
     ports:
       - "5001:5001"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5001/Login"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
 volumes:
   db-data:
   web-keys:
+  firmware-store:

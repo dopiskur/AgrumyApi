@@ -39,6 +39,11 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
     options.RequestCultureProviders = [new CookieRequestCultureProvider()];
 });
 
+// Opt-out via Security:EnforceHttps=false (default true) - same flag name/default as Agrumy.Api's.
+// A Small/Pi deployment with no reverse proxy in front of it never sees an HTTPS request, so
+// CookieSecurePolicy.Always would silently never set the auth cookie at all (roadmap #317).
+bool enforceHttps = !bool.TryParse(builder.Configuration["Security:EnforceHttps"], out var eh) || eh;
+
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -46,8 +51,8 @@ builder.Services
         options.Cookie.Name = "authorization";
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Strict;
-        // Deployed behind a TLS-terminating proxy, Kestrel itself only sees plain HTTP - SameAsRequest would never mark the cookie Secure; Always is safe for local dev too.
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        // Deployed behind a TLS-terminating proxy, Kestrel itself only sees plain HTTP - SameAsRequest would never mark the cookie Secure in that case, so Always is still the default.
+        options.Cookie.SecurePolicy = enforceHttps ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
         options.LoginPath = "/Login";
         options.LogoutPath = "/Login/Logout";
         options.AccessDeniedPath = "/Device"; // non-admin hitting an admin page -> back to devices

@@ -18,4 +18,15 @@ COPY --from=build /app .
 # a named volume at this path so cookie-auth/antiforgery keys outlive a new image pull.
 ENV ASPNETCORE_URLS=http://+:5001
 EXPOSE 5001
+
+# Same reasoning as Agrumy.Api/Dockerfile (roadmap #319): curl for docker-compose.yml's
+# healthcheck, non-root service account, /keys pre-chowned so the web-keys named volume mounted
+# over it inherits that ownership on first run instead of root's.
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --no-create-home --shell /usr/sbin/nologin agrumy \
+    && mkdir -p /keys \
+    && chown -R agrumy:agrumy /app /keys
+USER agrumy
+
 ENTRYPOINT ["dotnet", "Agrumy.Web.dll"]
