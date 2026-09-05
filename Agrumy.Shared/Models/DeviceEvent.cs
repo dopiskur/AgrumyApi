@@ -21,16 +21,16 @@ namespace api.Models
         Crash = 13,
     }
 
-    /// <summary>Body of POST /api/Device/Event; deliberately has no device/tenant identity field — the caller's apiId (see api.Security.DeviceAuth) is the only trusted source for that.</summary>
+    /// Body of POST /api/Device/Event; deliberately has no device/tenant identity field — the caller's apiId (see api.Security.DeviceAuth) is the only trusted source for that.
     public class DeviceEventPush
     {
         public string? EventType { get; set; }
         public string? Message { get; set; }
-        /// <summary>Set only when EventType=CommandExecuted; identifies which pending command this confirms.</summary>
+        /// Set only when EventType=CommandExecuted; identifies which pending command this confirms.
         public int? CommandId { get; set; }
     }
 
-    /// <summary>CreatedAt is server-side, not device-reported — a device mid-NoInternet event may not have NTP sync yet.</summary>
+    /// CreatedAt is server-side, not device-reported — a device mid-NoInternet event may not have NTP sync yet.
     public class DeviceEvent
     {
         public int? IDEventDevice { get; set; }

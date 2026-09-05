@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace api.Models
 {
-    /// <summary>DAL-facing view of a stored refresh token — never the plaintext, only its hash lives in the DB.</summary>
+    /// DAL-facing view of a stored refresh token — never the plaintext, only its hash lives in the DB.
     public class RefreshTokenInfo
     {
         public int UserID { get; set; }
