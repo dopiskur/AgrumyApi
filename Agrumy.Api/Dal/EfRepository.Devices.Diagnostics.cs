@@ -51,7 +51,31 @@ namespace api.Dal
                 devices = devices.Where(d => d.TenantID == tenantID);
             }
 
-            // Left-join diagnostics (a never-seen device still shows on the dashboard) - Battery is a correlated scalar subquery (plain ORDER BY...LIMIT 1, no LATERAL needed since MariaDB lacks it).
+            List<DeviceFleetStatus> result = (await BuildFleetStatusesAsync(devices))
+                // Fleet page default view: unassigned devices surfaced first, newest device first within each group.
+                .OrderBy(d => d.DeviceUnitID == null ? 0 : 1)
+                .ThenByDescending(d => d.IDDevice)
+                .ToList();
+
+            await cache.SetAsync(cacheKey, result, FleetCacheTtl);
+            return result;
+        }
+
+        /// Same status one row of DeviceFleetGetAsync would carry, without loading the rest of the fleet - for a single-device detail page. Not cached (DeviceFleetGetAsync's cache exists to share one whole-fleet scan across concurrent Fleet page tabs, not relevant to a one-row lookup).
+        public async Task<DeviceFleetStatus?> DeviceFleetStatusGetAsync(int deviceID, int? tenantID)
+        {
+            IQueryable<DeviceRow> devices = db.Devices.AsNoTracking().Where(d => d.IDDevice == deviceID);
+            if (tenantID != null)
+            {
+                devices = devices.Where(d => d.TenantID == tenantID);
+            }
+
+            return (await BuildFleetStatusesAsync(devices)).FirstOrDefault();
+        }
+
+        // Left-join diagnostics (a never-seen device still shows on the dashboard) - Battery is a correlated scalar subquery (plain ORDER BY...LIMIT 1, no LATERAL needed since MariaDB lacks it).
+        private async Task<List<DeviceFleetStatus>> BuildFleetStatusesAsync(IQueryable<DeviceRow> devices)
+        {
             var rows = await devices
                 .Select(d => new
                 {
@@ -77,7 +101,7 @@ namespace api.Dal
             Dictionary<int, string?> zoneNames = await db.DeviceUnitZones.AsNoTracking()
                 .ToDictionaryAsync(z => z.IDDeviceUnitZone, z => z.DeviceUnitZoneName);
 
-            // One catalog read for the whole fleet, newest version per board picked in memory by semver (not DateAdded).
+            // One catalog read, newest version per board picked in memory by semver (not DateAdded).
             FirmwareSource activeSource = (await ServerConfigGetAsync()).FirmwareSource;
             var visible = new HashSet<int> { (int)activeSource, (int)FirmwareSource.Local };
             var catalog = await db.DeviceFirmwares.AsNoTracking()
@@ -89,7 +113,7 @@ namespace api.Dal
                 .ToDictionary(g => g.Key, g => g.Select(f => f.Version).Where(FirmwareVersion.IsValid).OrderByDescending(v => FirmwareVersion.Parse(v!)).FirstOrDefault());
 
             DateTime utcNow = DateTime.UtcNow;
-            List<DeviceFleetStatus> result = rows.Select(r =>
+            return rows.Select(r =>
             {
                 string? latest = r.Diag?.Board != null && latestPerBoard.TryGetValue(r.Diag.Board, out var v) ? v : null;
                 return new DeviceFleetStatus
@@ -120,14 +144,7 @@ namespace api.Dal
                     DeviceUnitName = r.Device.DeviceUnitID is int uid ? unitNames.GetValueOrDefault(uid) : null,
                     DeviceUnitZoneName = r.Device.DeviceUnitZoneID is int zid ? zoneNames.GetValueOrDefault(zid) : null,
                 };
-            })
-            // Fleet page default view: unassigned devices surfaced first, newest device first within each group.
-            .OrderBy(d => d.DeviceUnitID == null ? 0 : 1)
-            .ThenByDescending(d => d.IDDevice)
-            .ToList();
-
-            await cache.SetAsync(cacheKey, result, FleetCacheTtl);
-            return result;
+            }).ToList();
         }
 
         // ---- Device events -------------------------------------------

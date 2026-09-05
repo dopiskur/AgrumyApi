@@ -131,8 +131,7 @@ namespace api.Controllers.View
         {
             DeviceDto device = await api.DeviceGet(idDevice);
 
-            IList<DeviceFleetStatus> fleet = await api.DeviceFleetGet();
-            DeviceFleetStatus? status = fleet.FirstOrDefault(f => f.IDDevice == idDevice);
+            DeviceFleetStatus? status = await api.DeviceFleetStatusGet(idDevice!.Value);
             ViewBag.FreeHeapBytes = status?.FreeHeapBytes;
             ViewBag.ControllerCapable = status?.ControllerCapable ?? true;
             ViewBag.Kit = status?.Kit;

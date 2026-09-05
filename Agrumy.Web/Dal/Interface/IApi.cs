@@ -119,6 +119,9 @@ namespace api.Dal.Interface
         [Get("/api/Device/Fleet")]
         Task<IList<DeviceFleetStatus>> DeviceFleetGet();
 
+        [Get("/api/Device/FleetStatus")]
+        Task<DeviceFleetStatus> DeviceFleetStatusGet(int idDevice);
+
         // ---- Relay ------------------------------------------
 
         [Get("/api/Relay/All")]

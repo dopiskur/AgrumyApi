@@ -75,6 +75,9 @@ namespace api.Dal.Interface
         /// Fleet status for every device in the tenant, or everywhere when tenantID is null (caller must check CallerReadsDevicesGlobally first) - Online comes from DeviceFleetStatus.ComputeOnline.
         Task<IList<DeviceFleetStatus>> DeviceFleetGetAsync(int? tenantID);
 
+        /// Same shape as one DeviceFleetGetAsync row, scoped to a single device - null if deviceID doesn't exist or (when tenantID is set) belongs to another tenant.
+        Task<DeviceFleetStatus?> DeviceFleetStatusGetAsync(int deviceID, int? tenantID);
+
         // Device events
 
         /// Skips (returns false) an identical eventType for the same device within ServerConfig.EventDedupeMinutes - a flapping "NoInternet" every loop cycle must not flood the table.

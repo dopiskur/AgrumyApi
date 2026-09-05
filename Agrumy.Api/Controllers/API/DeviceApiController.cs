@@ -113,6 +113,15 @@ namespace api.Controllers.API
         public async Task<ActionResult<IList<DeviceFleetStatus>>> DeviceFleetGet() =>
             Ok(await Repo.DeviceFleetGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
 
+        /// Same status DeviceFleetGet carries for one device, without scanning the whole fleet - for a single-device detail page (roadmap #295).
+        [Authorize]
+        [HttpGet("FleetStatus")]
+        public async Task<ActionResult<DeviceFleetStatus>> DeviceFleetStatusGet(int idDevice)
+        {
+            DeviceFleetStatus? status = await Repo.DeviceFleetStatusGetAsync(idDevice, CallerReadsDevicesGlobally ? null : CallerTenantId);
+            return status is null ? NotFound() : Ok(status);
+        }
+
         /// Diagnostic event log, open to any authenticated caller (a Tenant reader sees their own tenant's log); tenant ownership enforced the same way as every other Device sub-resource GET.
         [Authorize]
         [HttpGet("Events")]
