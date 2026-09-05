@@ -6,7 +6,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Exercises LowBatteryAlertEvaluator directly - no database, repositories/dispatcher are mocked.</summary>
+/// Exercises LowBatteryAlertEvaluator directly - no database, repositories/dispatcher are mocked.
 public class LowBatteryAlertEvaluatorTests
 {
     private readonly Mock<IDeviceRepository> _devices = new(MockBehavior.Strict);

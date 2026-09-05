@@ -2,7 +2,7 @@ using api.Firmware;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Semver ordering + the release file naming convention (pure, no I/O).</summary>
+/// Semver ordering + the release file naming convention (pure, no I/O).
 public class FirmwareVersionTests
 {
     [Theory]
@@ -40,9 +40,7 @@ public class FirmwareVersionTests
         Assert.False(FirmwareVersion.IsNewer("1.2.0-rc1", "1.2.0"));
     }
 
-    /// <summary>A dev board flashed straight from a commit past the last tag (firmware_version.py's
-    /// `git describe --tags --dirty` fallback) must NOT look older than that tag - it is actually
-    /// ahead of it, unlike a true pre-release such as "-rc1" above.</summary>
+    /// A `git describe` commit-suffix build must sort AFTER its base tag, unlike a true pre-release such as "-rc1" above.
     [Fact]
     public void GitDescribeCommitSuffix_Sorts_After_The_Tag_It_Is_Built_From()
     {
@@ -109,7 +107,7 @@ public class FirmwareVersionTests
     public void BuildFullImageFileName_RoundTrips() =>
         Assert.Equal("agrumy-esp32dev-full-v1.2.0.bin", FirmwareVersion.BuildFullImageFileName("esp32dev", "v1.2.0"));
 
-    /// <summary>The "-full-" marker sits BEFORE "v", not after the version, because an after-the-version suffix would collide with FileNameRegex's own pre-release grammar and get silently parsed as e.g. "1.2.3-full". Each convention's regex must reject the other's file names outright.</summary>
+    /// The "-full-" marker sits BEFORE "v", not after the version, because an after-the-version suffix would collide with FileNameRegex's own pre-release grammar and get silently parsed as e.g. "1.2.3-full". Each convention's regex must reject the other's file names outright.
     [Fact]
     public void OtaAndFullImage_Conventions_Never_Match_Each_Others_FileName()
     {

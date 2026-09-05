@@ -3,8 +3,7 @@ using Xunit;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>The one piece of the LoRa design testable without real hardware: the
-/// SF-&gt;interval curve is pure math, no ChirpStack/gateway involved.</summary>
+/// The SF-&gt;interval curve is pure math, no ChirpStack/gateway needed - the one piece of the LoRa design testable without hardware.
 public class LoRaIntervalTests
 {
     [Theory]
@@ -46,10 +45,7 @@ public class LoRaIntervalTests
         Assert.True(at < above, $"SF{sf} ({at}s) should be shorter than SF{sf + 1} ({above}s)");
     }
 
-    // EU868's ~1% duty-cycle budget over a 5-minute window is 3s of airtime; a single uplink+
-    // downlink at any of these anchor SFs is well under a second of airtime, so even the tightest
-    // (SF7, most frequent) retry interval leaves huge margin - this just guards against the curve
-    // ever being edited back down near/under the 1% line.
+    // Guards against the interval curve ever being edited down near EU868's ~1% duty-cycle line.
     [Fact]
     public void ForSpreadingFactor_Sf7Interval_LeavesDutyCycleMargin()
     {

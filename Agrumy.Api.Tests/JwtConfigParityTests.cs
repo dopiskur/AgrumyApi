@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Regression guard for the JWT SecureKey/Issuer/Audience mismatch that once made Agrumy.Web logins silently fail (JwtTokenProvider.ValidateToken returns null on mismatch) - runs the comparison only when both gitignored appsettings.json files are present on disk, and no-ops on a checkout without deploy secrets (e.g. CI).</summary>
+/// Regression guard for the JWT SecureKey/Issuer/Audience mismatch that once made Agrumy.Web logins silently fail (JwtTokenProvider.ValidateToken returns null on mismatch) - runs the comparison only when both gitignored appsettings.json files are present on disk, and no-ops on a checkout without deploy secrets (e.g. CI).
 public class JwtConfigParityTests
 {
     private static string? FindRepoRoot()
