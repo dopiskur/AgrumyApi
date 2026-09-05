@@ -71,13 +71,13 @@ namespace api.Dal.Interface
         // ---- Device --------------------------------------------------------
 
         [Get("/api/Device/All")]
-        Task<IEnumerable<Device>> DevicesGet();
+        Task<IEnumerable<DeviceDto>> DevicesGet();
 
         [Get("/api/Device")]
-        Task<Device> DeviceGet(int? idDevice);
+        Task<DeviceDto> DeviceGet(int? idDevice);
 
         [Put("/api/Device")]
-        Task DeviceUpdate([Body] Device? device);
+        Task DeviceUpdate([Body] DeviceDto? device);
 
         [Delete("/api/Device")]
         Task DeviceDelete(int? idDevice);
@@ -122,7 +122,7 @@ namespace api.Dal.Interface
         // ---- Relay ------------------------------------------
 
         [Get("/api/Relay/All")]
-        Task<IList<Device>> RelaysGetAll();
+        Task<IList<DeviceDto>> RelaysGetAll();
 
         [Get("/api/Relay/DeviceMapping/All")]
         Task<IList<RelayDeviceMapping>> RelayDeviceMappingGetAll(int idRelayDevice);
@@ -177,7 +177,7 @@ namespace api.Dal.Interface
         Task DeviceUnitZoneRuleDelete(int? idDeviceUnitZoneRule);
 
         [Get("/api/DeviceUnit/Unassigned")]
-        Task<IList<Device>> DeviceUnassignedGet(bool controllerCapable);
+        Task<IList<DeviceDto>> DeviceUnassignedGet(bool controllerCapable);
 
         [Post("/api/DeviceUnit/Assign")]
         Task DeviceAssign([Body] DeviceZoneAssignment body);

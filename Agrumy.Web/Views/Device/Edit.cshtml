@@ -3,18 +3,19 @@
 @{
     ViewData["Title"] = "Edit";
     var device = Model.Device!;
-    string DeviceField(string name) => $"{nameof(Model.Device)}.{name}";
+    var form = Model.DeviceEdit!;
+    string EditField(string name) => $"{nameof(Model.DeviceEdit)}.{name}";
 
-    var deviceTypeItems = new SelectList(Model.DeviceType, nameof(DeviceType.IDDeviceType), nameof(DeviceType.DeviceTypeName), device.DeviceTypeID);
-    var deviceTypeSelect = new SelectFieldViewModel { Name = DeviceField(nameof(device.DeviceTypeID)), Label = "Device type", Items = deviceTypeItems };
+    var deviceTypeItems = new SelectList(Model.DeviceType, nameof(DeviceType.IDDeviceType), nameof(DeviceType.DeviceTypeName), form.DeviceTypeID);
+    var deviceTypeSelect = new SelectFieldViewModel { Name = EditField(nameof(form.DeviceTypeID)), Label = "Device type", Items = deviceTypeItems };
 
-    var deviceTypeServiceItems = new SelectList(Model.DeviceTypeService, nameof(DeviceTypeService.IDDeviceTypeService), nameof(DeviceTypeService.ServiceType), device.DeviceTypeServiceID);
-    var deviceTypeServiceSelect = new SelectFieldViewModel { Name = DeviceField(nameof(device.DeviceTypeServiceID)), Label = "Service type", Items = deviceTypeServiceItems };
+    var deviceTypeServiceItems = new SelectList(Model.DeviceTypeService, nameof(DeviceTypeService.IDDeviceTypeService), nameof(DeviceTypeService.ServiceType), form.DeviceTypeServiceID);
+    var deviceTypeServiceSelect = new SelectFieldViewModel { Name = EditField(nameof(form.DeviceTypeServiceID)), Label = "Service type", Items = deviceTypeServiceItems };
 
-    var sleepDeepToggle = new EnabledToggleFieldViewModel { Name = DeviceField(nameof(device.SleepDeepEnabled)), Label = "SleepDeep", Value = device.SleepDeepEnabled };
-    var batteryToggle = new EnabledToggleFieldViewModel { Name = DeviceField(nameof(device.BatteryEnabled)), Label = "Device battery", Value = device.BatteryEnabled };
-    var debugToggle = new EnabledToggleFieldViewModel { Name = DeviceField(nameof(device.Debug)), Label = nameof(device.Debug), Value = device.Debug };
-    var enabledToggle = new EnabledToggleFieldViewModel { Name = DeviceField(nameof(device.Enabled)), Label = "Device", Value = device.Enabled };
+    var sleepDeepToggle = new EnabledToggleFieldViewModel { Name = EditField(nameof(form.SleepDeepEnabled)), Label = "SleepDeep", Value = form.SleepDeepEnabled };
+    var batteryToggle = new EnabledToggleFieldViewModel { Name = EditField(nameof(form.BatteryEnabled)), Label = "Device battery", Value = form.BatteryEnabled };
+    var debugToggle = new EnabledToggleFieldViewModel { Name = EditField(nameof(form.Debug)), Label = nameof(form.Debug), Value = form.Debug };
+    var enabledToggle = new EnabledToggleFieldViewModel { Name = EditField(nameof(form.Enabled)), Label = "Device", Value = form.Enabled };
 }
 
 <div class="card">
@@ -27,7 +28,7 @@
             <div class="mb-3">
                 <label asp-for="Device.IDDevice" class="form-label"></label>
                 <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.IDDevice)</p>
-                @Html.HiddenFor(m => m.Device!.IDDevice)
+                @Html.HiddenFor(m => m.DeviceEdit!.IDDevice)
             </div>
             <div class="mb-3">
                 <label asp-for="Device.TenantID" class="form-label"></label>
@@ -52,8 +53,6 @@
                         <a asp-controller="DeviceUnit" asp-action="Index">Dashboard</a>.
                     </p>
                 }
-                @Html.HiddenFor(m => m.Device!.DeviceUnitID)
-                @Html.HiddenFor(m => m.Device!.DeviceUnitZoneID)
             </div>
             <div class="mb-3">
                 <label asp-for="Device.DeviceConfigSensorID" class="form-label"></label>
@@ -65,43 +64,43 @@
             </div>
 
             <div class="mb-3">
-                <label asp-for="Device.DeviceName" class="form-label"></label>
-                <input asp-for="Device.DeviceName" class="form-control" />
-                <span asp-validation-for="Device.DeviceName" class="text-danger"></span>
+                <label asp-for="DeviceEdit.DeviceName" class="form-label"></label>
+                <input asp-for="DeviceEdit.DeviceName" class="form-control" />
+                <span asp-validation-for="DeviceEdit.DeviceName" class="text-danger"></span>
             </div>
             <div class="mb-3">
                 <label asp-for="Device.MacAddress" class="form-label"></label>
                 <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.MacAddress)</p>
             </div>
             <div class="mb-3">
-                <label asp-for="Device.ServicePoint" class="form-label"></label>
-                <input asp-for="Device.ServicePoint" class="form-control" />
-                <span asp-validation-for="Device.ServicePoint" class="text-danger"></span>
+                <label asp-for="DeviceEdit.ServicePoint" class="form-label"></label>
+                <input asp-for="DeviceEdit.ServicePoint" class="form-control" />
+                <span asp-validation-for="DeviceEdit.ServicePoint" class="text-danger"></span>
             </div>
 
             <partial name="_SelectField" model="deviceTypeServiceSelect" />
 
             <div class="mb-3">
-                <label asp-for="Device.ServicePublicKey" class="form-label"></label>
-                <input asp-for="Device.ServicePublicKey" class="form-control" />
-                <span asp-validation-for="Device.ServicePublicKey" class="text-danger"></span>
+                <label asp-for="DeviceEdit.ServicePublicKey" class="form-label"></label>
+                <input asp-for="DeviceEdit.ServicePublicKey" class="form-control" />
+                <span asp-validation-for="DeviceEdit.ServicePublicKey" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="Device.SleepSeconds" class="form-label"></label>
-                <input asp-for="Device.SleepSeconds" class="form-control" />
-                <span asp-validation-for="Device.SleepSeconds" class="text-danger"></span>
+                <label asp-for="DeviceEdit.SleepSeconds" class="form-label"></label>
+                <input asp-for="DeviceEdit.SleepSeconds" class="form-control" />
+                <span asp-validation-for="DeviceEdit.SleepSeconds" class="text-danger"></span>
             </div>
 
             @* Recomputed from DeviceTypeID in DeviceController.Edit POST for every known type - shown for transparency, but edits only survive for unknown type ids. *@
             <div class="mb-3">
-                <label asp-for="Device.DeviceSensorEnabled" class="form-label"></label>
-                <input asp-for="Device.DeviceSensorEnabled" class="form-control" />
-                <span asp-validation-for="Device.DeviceSensorEnabled" class="text-danger"></span>
+                <label asp-for="DeviceEdit.DeviceSensorEnabled" class="form-label"></label>
+                <input asp-for="DeviceEdit.DeviceSensorEnabled" class="form-control" />
+                <span asp-validation-for="DeviceEdit.DeviceSensorEnabled" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="Device.DeviceControllerEnabled" class="form-label"></label>
-                <input asp-for="Device.DeviceControllerEnabled" class="form-control" />
-                <span asp-validation-for="Device.DeviceControllerEnabled" class="text-danger"></span>
+                <label asp-for="DeviceEdit.DeviceControllerEnabled" class="form-label"></label>
+                <input asp-for="DeviceEdit.DeviceControllerEnabled" class="form-control" />
+                <span asp-validation-for="DeviceEdit.DeviceControllerEnabled" class="text-danger"></span>
             </div>
 
             <partial name="_EnabledToggleField" model="sleepDeepToggle" />
@@ -109,9 +108,6 @@
             <partial name="_EnabledToggleField" model="debugToggle" />
             <partial name="_EnabledToggleField" model="enabledToggle" />
 
-            <div class="mb-3">
-                @Html.HiddenFor(model => model.Device!.ConfigVersion)
-            </div>
             <div class="mb-0">
                 <input type="submit" value="Save" class="btn btn-primary" />
                 <a asp-action="Fleet" class="btn btn-outline-secondary">Back to List</a>

@@ -129,7 +129,7 @@ namespace api.Controllers.View
 
         public async Task<ActionResult> Details(int? idDevice)
         {
-            Device device = await api.DeviceGet(idDevice);
+            DeviceDto device = await api.DeviceGet(idDevice);
 
             IList<DeviceFleetStatus> fleet = await api.DeviceFleetGet();
             DeviceFleetStatus? status = fleet.FirstOrDefault(f => f.IDDevice == idDevice);
@@ -179,27 +179,35 @@ namespace api.Controllers.View
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
-        public async Task<ActionResult> Edit(int? idDevice) =>
-            View(new DeviceView
+        public async Task<ActionResult> Edit(int? idDevice)
+        {
+            DeviceDto device = await api.DeviceGet(idDevice);
+            return View(new DeviceView
             {
                 DeviceType = await api.DeviceTypeGet(),
                 DeviceTypeService = await api.DeviceTypeServiceGet(),
-                Device = await api.DeviceGet(idDevice),
+                Device = device,
+                DeviceEdit = device.ToEditForm(),
             });
+        }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> Edit(DeviceView deviceView)
         {
+            DeviceEditForm form = deviceView.DeviceEdit!;
             if (!ModelState.IsValid)
             {
                 deviceView.DeviceType = await api.DeviceTypeGet();
                 deviceView.DeviceTypeService = await api.DeviceTypeServiceGet();
+                deviceView.Device = await api.DeviceGet(form.IDDevice);
                 return View(deviceView);
             }
 
-            var device = deviceView.Device!;
+            // Start from the server's own current copy - TenantID/MacAddress/IsRelay/ApiId/ApiKey never come from the form at all, by construction (DeviceEditForm has no property for them).
+            DeviceDto device = await api.DeviceGet(form.IDDevice);
+            form.ApplyTo(device);
             (device.DeviceSensorEnabled, device.DeviceControllerEnabled) = device.DeviceTypeID switch
             {
                 0 => (false, false),

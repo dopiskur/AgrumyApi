@@ -18,14 +18,14 @@ namespace api.Controllers.View
 
         public async Task<ActionResult> Mapping(int idRelayDevice)
         {
-            Device relay = await api.DeviceGet(idRelayDevice);
+            DeviceDto relay = await api.DeviceGet(idRelayDevice);
             if (relay?.IsRelay != true)
             {
                 return NotFound();
             }
 
             IList<RelayDeviceMapping> mappings = await api.RelayDeviceMappingGetAll(idRelayDevice);
-            IList<Device> availableDevices = (await api.DevicesGet()).Where(d => d.IsRelay != true).ToList();
+            IList<DeviceDto> availableDevices = (await api.DevicesGet()).Where(d => d.IsRelay != true).ToList();
 
             return View(new RelayMappingViewModel
             {

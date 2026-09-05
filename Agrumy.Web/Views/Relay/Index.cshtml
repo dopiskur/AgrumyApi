@@ -27,7 +27,7 @@
                         <tr>
                             <th>Name</th>
                             <th>Profile</th>
-                            <th>ApiId</th>
+                            <th>MacAddress</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -37,7 +37,7 @@
                         <tr>
                             <td>@relay.DeviceName</td>
                             <td>@(relay.RelayProfile?.ToString() ?? "-")</td>
-                            <td class="text-secondary small">@relay.ApiId</td>
+                            <td class="text-secondary small">@relay.MacAddress</td>
                             <td>
                                 @if (relay.RelayProfile == api.Models.RelayProfile.LoRaGateway)
                                 {

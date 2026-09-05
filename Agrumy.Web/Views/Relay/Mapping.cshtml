@@ -69,7 +69,7 @@
                     <option value="">Select a device...</option>
 @foreach (var d in Model.AvailableDevices)
 {
-                    <option value="@d.IDDevice">@d.DeviceName (@d.ApiId)</option>
+                    <option value="@d.IDDevice">@d.DeviceName (@d.MacAddress)</option>
 }
                 </select>
             </div>

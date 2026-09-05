@@ -65,7 +65,9 @@ public class ApiControllerTests
         var result = await controller.DeviceGet(42);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        Assert.Same(device, ok.Value);
+        var dto = Assert.IsType<DeviceDto>(ok.Value);
+        Assert.Equal(device.IDDevice, dto.IDDevice);
+        Assert.Equal(device.DeviceName, dto.DeviceName);
     }
 
     [Fact]
@@ -89,7 +91,7 @@ public class ApiControllerTests
 
         var controller = NewDeviceController();
         SetCaller(controller, "admin", 1);
-        var result = await controller.DeviceUpdate(new Device { IDDevice = 99 });
+        var result = await controller.DeviceUpdate(new DeviceDto { IDDevice = 99 });
 
         Assert.IsType<NotFoundResult>(result.Result);
         _repo.Verify(r => r.DeviceUpdateAsync(It.IsAny<Device>()), Times.Never);
@@ -1545,7 +1547,7 @@ public class ApiControllerTests
 
         var controller = NewDeviceController();
         SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.TenantDevice);
-        var result = await controller.DeviceUpdate(new Device { IDDevice = 8 });
+        var result = await controller.DeviceUpdate(new DeviceDto { IDDevice = 8 });
 
         Assert.True(result.Value);
         _repo.Verify(r => r.DeviceUpdateAsync(It.IsAny<Device>()), Times.Once);
@@ -1560,7 +1562,7 @@ public class ApiControllerTests
 
         var controller = NewDeviceController();
         SetCallerRoles(controller, 0, "user", RoleNames.TenantReader, RoleNames.TenantDevice);
-        var result = await controller.DeviceUpdate(new Device { IDDevice = 8 });
+        var result = await controller.DeviceUpdate(new DeviceDto { IDDevice = 8 });
 
         Assert.True(result.Value);
         _repo.Verify(r => r.DeviceUpdateAsync(It.IsAny<Device>()), Times.Once);
@@ -1573,7 +1575,7 @@ public class ApiControllerTests
 
         var controller = NewDeviceController();
         SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.TenantDevice);
-        var result = await controller.DeviceUpdate(new Device { IDDevice = 8 });
+        var result = await controller.DeviceUpdate(new DeviceDto { IDDevice = 8 });
 
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(403, obj.StatusCode);
@@ -1588,7 +1590,7 @@ public class ApiControllerTests
 
         var controller = NewDeviceController();
         SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.GlobalDevice);
-        var result = await controller.DeviceUpdate(new Device { IDDevice = 8 });
+        var result = await controller.DeviceUpdate(new DeviceDto { IDDevice = 8 });
 
         Assert.True(result.Value);
     }
@@ -1600,7 +1602,7 @@ public class ApiControllerTests
 
         var controller = NewDeviceController();
         SetCallerRoles(controller, 1, "user", RoleNames.GlobalReader);
-        var result = await controller.DeviceUpdate(new Device { IDDevice = 8 });
+        var result = await controller.DeviceUpdate(new DeviceDto { IDDevice = 8 });
 
         var obj = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(403, obj.StatusCode);
@@ -1618,7 +1620,7 @@ public class ApiControllerTests
 
         var result = await controller.DeviceConfigControllerUpdate(new DeviceUpdate
         {
-            Device = new Device { IDDevice = 8 },
+            Device = new DeviceDto { IDDevice = 8 },
             Controller = new DeviceConfigController { RelayEnabled = true, Relay1 = 16 },
         });
 
@@ -1769,7 +1771,7 @@ public class ApiControllerTests
         var result = await controller.DevicesGet();
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        Assert.Equal(2, Assert.IsAssignableFrom<IEnumerable<Device>>(ok.Value).Count());
+        Assert.Equal(2, Assert.IsAssignableFrom<IEnumerable<DeviceDto>>(ok.Value).Count());
     }
 
     [Fact]
@@ -1782,7 +1784,7 @@ public class ApiControllerTests
         var result = await controller.DevicesGet();
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        Assert.Single(Assert.IsAssignableFrom<IEnumerable<Device>>(ok.Value));
+        Assert.Single(Assert.IsAssignableFrom<IEnumerable<DeviceDto>>(ok.Value));
     }
 
     [Fact]
@@ -1795,7 +1797,7 @@ public class ApiControllerTests
         var result = await controller.DeviceGet(42);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        Assert.Equal(42, ((Device)ok.Value!).IDDevice);
+        Assert.Equal(42, ((DeviceDto)ok.Value!).IDDevice);
     }
 
     [Fact]

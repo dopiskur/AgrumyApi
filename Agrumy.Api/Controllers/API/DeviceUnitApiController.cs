@@ -269,8 +269,9 @@ namespace api.Controllers.API
         /// Devices with no current zone, filtered to controller- or sensor-capable - the "Add Controller"/"Add Sensor" picker list.
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpGet("Unassigned")]
-        public async Task<ActionResult<IList<Device>>> DeviceUnassignedGet(bool controllerCapable) =>
-            Ok(await Repo.DeviceUnassignedGetAsync(CallerManagesDevicesGlobally ? null : CallerTenantId, controllerCapable));
+        public async Task<ActionResult<IList<DeviceDto>>> DeviceUnassignedGet(bool controllerCapable) =>
+            Ok((await Repo.DeviceUnassignedGetAsync(CallerManagesDevicesGlobally ? null : CallerTenantId, controllerCapable))
+                .Select(d => d.ToDto()).ToList());
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost("Assign")]

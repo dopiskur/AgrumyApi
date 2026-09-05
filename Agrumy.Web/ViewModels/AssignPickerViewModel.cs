@@ -6,6 +6,6 @@ namespace api.ViewModels
     {
         public int IDDeviceUnitZone { get; set; }
         public bool ControllerCapable { get; set; }
-        public IList<Device> Devices { get; set; } = new List<Device>();
+        public IList<DeviceDto> Devices { get; set; } = new List<DeviceDto>();
     }
 }

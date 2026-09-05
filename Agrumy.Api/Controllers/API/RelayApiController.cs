@@ -187,8 +187,8 @@ namespace api.Controllers.API
 
         [HttpGet("All")]
         [Authorize(Roles = RoleNames.DeviceManagers)]
-        public async Task<ActionResult<IList<Device>>> RelaysGetAll() =>
-            Ok(await Repo.RelayDevicesGetAllAsync());
+        public async Task<ActionResult<IList<DeviceDto>>> RelaysGetAll() =>
+            Ok((await Repo.RelayDevicesGetAllAsync()).Select(d => d.ToDto()).ToList());
 
         [HttpGet("DeviceMapping/All")]
         [Authorize(Roles = RoleNames.DeviceManagers)]

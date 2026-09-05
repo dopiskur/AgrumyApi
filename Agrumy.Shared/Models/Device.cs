@@ -71,6 +71,166 @@ namespace api.Models
 
     }
 
+    /// The only shape of a device that ever crosses the HTTP boundary in either direction (GET responses, PUT /api/Device body) - identical to Device minus ApiId/ApiKey, which stay internal to EfRepository/DeviceConfigBuilder no matter what future fields get added here.
+    public class DeviceDto
+    {
+        public int? ConfigVersion { get; set; } = 1;
+        public int? CommandVersion { get; set; }
+        public int? IDDevice { get; set; }
+        public int TenantID { get; set; } = 0;
+        public int? DeviceTypeID { get; set; } = 0;
+        // No default (unlike DeviceTypeID above) - null means genuinely unassigned, see Device.DeviceUnitID.
+        public int? DeviceUnitID { get; set; }
+        public int? DeviceUnitZoneID { get; set; }
+        public int? DeviceConfigSensorID { get; set; }
+        public int? DeviceConfigControllerID { get; set; }
+        public int? DeviceTypeServiceID { get; set; } = 0;
+        public string? DeviceName { get; set; }
+        public string? MacAddress { get; set; }
+        public bool IsRelay { get; set; }
+        public RelayProfile? RelayProfile { get; set; }
+        public string? ServicePoint { get; set; }
+        public string? ServiceType { get; set; }
+        public string? ServicePublicKey { get; set; }
+        public int? SleepSeconds { get; set; } = 60;
+        public bool? SleepDeepEnabled { get; set; } = false;
+        public bool? DeviceSensorEnabled { get; set; } = false;
+        public bool? DeviceControllerEnabled { get; set; } = false;
+        public bool? BatteryEnabled { get; set; } = false;
+        public bool? Debug { get; set; } = true;
+        public bool? Reboot { get; set; }
+        public bool? Reset { get; set; } = false;
+        public bool? FirmwareUpdate { get; set; }
+        public string? FirmwareTargetVersion { get; set; }
+        public bool? Enabled { get; set; } = false;
+        public DateTime? DateCreated { get; set; }
+        public DateTime? DateModified { get; set; }
+    }
+
+    /// The Web Edit form's ONLY binding target - deliberately carries just what EfRepository.DeviceUpdateAsync's own whitelist actually writes, so MacAddress/TenantID/IsRelay/RelayProfile/ApiId/ApiKey/ConfigVersion have no property for an over-posted form value to land on, by construction rather than by remembering to filter them out downstream.
+    public class DeviceEditForm
+    {
+        public int? IDDevice { get; set; }
+        public int? DeviceTypeID { get; set; }
+        public int? DeviceTypeServiceID { get; set; }
+        public string? DeviceName { get; set; }
+        public string? ServicePoint { get; set; }
+        public string? ServicePublicKey { get; set; }
+        public int? SleepSeconds { get; set; }
+        public bool? SleepDeepEnabled { get; set; }
+        public bool? DeviceSensorEnabled { get; set; }
+        public bool? DeviceControllerEnabled { get; set; }
+        public bool? BatteryEnabled { get; set; }
+        public bool? Debug { get; set; }
+        public bool? Enabled { get; set; }
+    }
+
+    public static class DeviceMappingExtensions
+    {
+        public static DeviceDto ToDto(this Device d) => new()
+        {
+            ConfigVersion = d.ConfigVersion,
+            CommandVersion = d.CommandVersion,
+            IDDevice = d.IDDevice,
+            TenantID = d.TenantID,
+            DeviceTypeID = d.DeviceTypeID,
+            DeviceUnitID = d.DeviceUnitID,
+            DeviceUnitZoneID = d.DeviceUnitZoneID,
+            DeviceConfigSensorID = d.DeviceConfigSensorID,
+            DeviceConfigControllerID = d.DeviceConfigControllerID,
+            DeviceTypeServiceID = d.DeviceTypeServiceID,
+            DeviceName = d.DeviceName,
+            MacAddress = d.MacAddress,
+            IsRelay = d.IsRelay,
+            RelayProfile = d.RelayProfile,
+            ServicePoint = d.ServicePoint,
+            ServiceType = d.ServiceType,
+            ServicePublicKey = d.ServicePublicKey,
+            SleepSeconds = d.SleepSeconds,
+            SleepDeepEnabled = d.SleepDeepEnabled,
+            DeviceSensorEnabled = d.DeviceSensorEnabled,
+            DeviceControllerEnabled = d.DeviceControllerEnabled,
+            BatteryEnabled = d.BatteryEnabled,
+            Debug = d.Debug,
+            Reboot = d.Reboot,
+            Reset = d.Reset,
+            FirmwareUpdate = d.FirmwareUpdate,
+            FirmwareTargetVersion = d.FirmwareTargetVersion,
+            Enabled = d.Enabled,
+            DateCreated = d.DateCreated,
+            DateModified = d.DateModified,
+        };
+
+        /// The internal round-trip shape EfRepository/IRepository speak - ApiId/ApiKey are left unset here on purpose; DeviceUpdateAsync's own whitelist never reads them off the payload anyway, only off the freshly-loaded row.
+        public static Device ToDevice(this DeviceDto dto) => new()
+        {
+            ConfigVersion = dto.ConfigVersion,
+            CommandVersion = dto.CommandVersion,
+            IDDevice = dto.IDDevice,
+            TenantID = dto.TenantID,
+            DeviceTypeID = dto.DeviceTypeID,
+            DeviceUnitID = dto.DeviceUnitID,
+            DeviceUnitZoneID = dto.DeviceUnitZoneID,
+            DeviceConfigSensorID = dto.DeviceConfigSensorID,
+            DeviceConfigControllerID = dto.DeviceConfigControllerID,
+            DeviceTypeServiceID = dto.DeviceTypeServiceID,
+            DeviceName = dto.DeviceName,
+            MacAddress = dto.MacAddress,
+            IsRelay = dto.IsRelay,
+            RelayProfile = dto.RelayProfile,
+            ServicePoint = dto.ServicePoint,
+            ServiceType = dto.ServiceType,
+            ServicePublicKey = dto.ServicePublicKey,
+            SleepSeconds = dto.SleepSeconds,
+            SleepDeepEnabled = dto.SleepDeepEnabled,
+            DeviceSensorEnabled = dto.DeviceSensorEnabled,
+            DeviceControllerEnabled = dto.DeviceControllerEnabled,
+            BatteryEnabled = dto.BatteryEnabled,
+            Debug = dto.Debug,
+            Reboot = dto.Reboot,
+            Reset = dto.Reset,
+            FirmwareUpdate = dto.FirmwareUpdate,
+            FirmwareTargetVersion = dto.FirmwareTargetVersion,
+            Enabled = dto.Enabled,
+            DateCreated = dto.DateCreated,
+            DateModified = dto.DateModified,
+        };
+
+        /// Copies exactly the fields DeviceEditForm exposes onto an existing DeviceDto (fetched fresh from the API, never from client input) - every field the form can't carry (TenantID, MacAddress, IsRelay, ...) is left as whatever that fresh copy already had.
+        public static void ApplyTo(this DeviceEditForm form, DeviceDto target)
+        {
+            target.DeviceTypeID = form.DeviceTypeID;
+            target.DeviceTypeServiceID = form.DeviceTypeServiceID;
+            target.DeviceName = form.DeviceName;
+            target.ServicePoint = form.ServicePoint;
+            target.ServicePublicKey = form.ServicePublicKey;
+            target.SleepSeconds = form.SleepSeconds;
+            target.SleepDeepEnabled = form.SleepDeepEnabled;
+            target.DeviceSensorEnabled = form.DeviceSensorEnabled;
+            target.DeviceControllerEnabled = form.DeviceControllerEnabled;
+            target.BatteryEnabled = form.BatteryEnabled;
+            target.Debug = form.Debug;
+            target.Enabled = form.Enabled;
+        }
+
+        public static DeviceEditForm ToEditForm(this DeviceDto d) => new()
+        {
+            IDDevice = d.IDDevice,
+            DeviceTypeID = d.DeviceTypeID,
+            DeviceTypeServiceID = d.DeviceTypeServiceID,
+            DeviceName = d.DeviceName,
+            ServicePoint = d.ServicePoint,
+            ServicePublicKey = d.ServicePublicKey,
+            SleepSeconds = d.SleepSeconds,
+            SleepDeepEnabled = d.SleepDeepEnabled,
+            DeviceSensorEnabled = d.DeviceSensorEnabled,
+            DeviceControllerEnabled = d.DeviceControllerEnabled,
+            BatteryEnabled = d.BatteryEnabled,
+            Debug = d.Debug,
+            Enabled = d.Enabled,
+        };
+    }
+
     public class DeviceRegistration()
     {
         public string? MacAddress { get; set; }
@@ -193,7 +353,7 @@ namespace api.Models
 
     public class DeviceUpdate()
     {
-        public Device? Device {  get; set; }
+        public DeviceDto? Device {  get; set; }
         public DeviceConfigSensor? Sensor { get; set; }
         public DeviceConfigController? Controller { get; set; }
     }

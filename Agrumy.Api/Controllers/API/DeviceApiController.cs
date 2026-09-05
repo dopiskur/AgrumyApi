@@ -20,23 +20,24 @@ namespace api.Controllers.API
 
         [Authorize]
         [HttpGet("All")]
-        public async Task<ActionResult<IEnumerable<Device>>> DevicesGet() =>
-            Ok(CallerReadsDevicesGlobally ? await Repo.DevicesGetAllAsync() : await Repo.DevicesGetAsync(CallerTenantId));
+        public async Task<ActionResult<IEnumerable<DeviceDto>>> DevicesGet() =>
+            Ok((CallerReadsDevicesGlobally ? await Repo.DevicesGetAllAsync() : await Repo.DevicesGetAsync(CallerTenantId))
+                .Select(d => d.ToDto()));
 
         [Authorize]
         [HttpGet]
-        public async Task<ActionResult<Device>> DeviceGet(int? idDevice)
+        public async Task<ActionResult<DeviceDto>> DeviceGet(int? idDevice)
         {
             // A Global reader/Device/admin sees any tenant's device - DeviceGetAsync's tenant filter would hide it, so use the unfiltered by-id lookup for them.
             Device? device = CallerReadsDevicesGlobally
                 ? await Repo.DeviceGetByIdAsync(idDevice)
                 : await Repo.DeviceGetAsync(CallerTenantId, idDevice, null, null);
-            return device is null ? NotFound() : Ok(device);
+            return device is null ? NotFound() : Ok(device.ToDto());
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPut]
-        public async Task<ActionResult<bool>> DeviceUpdate([FromBody] Device device)
+        public async Task<ActionResult<bool>> DeviceUpdate([FromBody] DeviceDto device)
         {
             var (existing, error) = await EnsureOwnedDeviceAsync(
                 () => Repo.DeviceGetByIdAsync(device.IDDevice), "Device", forWrite: true);
@@ -45,9 +46,10 @@ namespace api.Controllers.API
                 return error;
             }
 
-            device.TenantID = existing!.TenantID; // payload cannot move a device to another tenant
+            Device internalDevice = device.ToDevice();
+            internalDevice.TenantID = existing!.TenantID; // payload cannot move a device to another tenant
 
-            await Repo.DeviceUpdateAsync(device);
+            await Repo.DeviceUpdateAsync(internalDevice);
             return true;
         }
 
