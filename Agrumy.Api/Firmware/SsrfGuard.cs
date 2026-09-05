@@ -3,7 +3,7 @@ using System.Net.Sockets;
 
 namespace api.Firmware
 {
-    /// <summary>Blocks HttpFirmwareFetcher from fetching a private/loopback address, since an admin-configured Custom repository URL is otherwise trusted outright.</summary>
+    /// Blocks HttpFirmwareFetcher from fetching a private/loopback address, since an admin-configured Custom repository URL is otherwise trusted outright.
     public static class SsrfGuard
     {
         public static async Task EnsureAllowedAsync(Uri uri, CancellationToken cancellationToken)
@@ -32,9 +32,7 @@ namespace api.Firmware
             }
         }
 
-        /// <summary>RFC 1918/5735/4193 etc. ranges plus loopback/link-local/multicast - internal, not
-        /// just "obviously internal-looking hostnames", since a public hostname can still resolve to
-        /// one of these (DNS rebinding, or simply a misconfigured record).</summary>
+        /// RFC 1918/5735/4193 etc. ranges plus loopback/link-local/multicast - checked against the resolved IP, since a public-looking hostname can still resolve to one of these (DNS rebinding, or a misconfigured record).
         internal static bool IsPrivateOrReserved(IPAddress address)
         {
             if (address.IsIPv4MappedToIPv6)
@@ -77,10 +75,7 @@ namespace api.Firmware
         }
     }
 
-    /// <summary>Thrown by SsrfGuard - deliberately distinct from HttpRequestException/generic
-    /// exceptions so a caller (FirmwareApiController) can tell "this URL was rejected as unsafe"
-    /// apart from "the remote server errored" and surface an admin-actionable message instead of a
-    /// generic 500.</summary>
+    /// Thrown by SsrfGuard, distinct from HttpRequestException, so FirmwareApiController can tell "URL rejected as unsafe" apart from "remote server errored" and surface an admin-actionable message.
     public sealed class SsrfBlockedException : Exception
     {
         public SsrfBlockedException(string reason) : base($"Blocked outbound request: {reason}") { }

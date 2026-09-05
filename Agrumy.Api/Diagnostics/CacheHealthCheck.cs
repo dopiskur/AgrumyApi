@@ -3,7 +3,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace api.Diagnostics
 {
-    /// <summary>Probes the raw <see cref="IDistributedCache"/> directly rather than through <see cref="api.Dal.Interface.ICache"/>, because CacheRepository deliberately swallows every backend exception - probing through it would hide the failure from this check. A failed round-trip reports Degraded, not Unhealthy: the API stays fully functional with a dead cache.</summary>
+    /// Probes the raw <see cref="IDistributedCache"/> directly, not through <see cref="api.Dal.Interface.ICache"/> which swallows backend exceptions and would hide the failure; a failed round-trip reports Degraded, not Unhealthy.
     internal sealed class CacheHealthCheck(IDistributedCache cache) : IHealthCheck
     {
         private const string ProbeKey = "healthcheck:cache-probe";

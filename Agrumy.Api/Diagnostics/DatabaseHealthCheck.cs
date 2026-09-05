@@ -3,7 +3,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace api.Diagnostics
 {
-    /// <summary>Reuses <see cref="ISystemRepository.TestConnectionAsync"/>, the same check Program.cs runs at startup, so this reflects whichever provider (MySQL/MariaDB or PostgreSQL) is actually configured, not a provider-specific probe.</summary>
+    /// Reuses <see cref="ISystemRepository.TestConnectionAsync"/>, the same check Program.cs runs at startup, so this reflects whichever provider is actually configured.
     internal sealed class DatabaseHealthCheck(ISystemRepository repository) : IHealthCheck
     {
         public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)

@@ -2,16 +2,13 @@ using System.Net.Http.Headers;
 
 namespace api.Firmware
 {
-    /// <summary>The only thing in the firmware code that touches the network, behind an interface so FirmwareCatalogService is unit-testable with canned GitHub/manifest responses.</summary>
+    /// The only thing in the firmware code that touches the network, behind an interface so FirmwareCatalogService is unit-testable with canned GitHub/manifest responses.
     public interface IFirmwareFetcher
     {
-        /// <summary>GET a JSON/text document. <paramref name="gitHubApi"/> adds the GitHub REST
-        /// headers (Accept, User-Agent, optional token) - api.github.com rejects requests without a
-        /// User-Agent outright.</summary>
+        /// GET a JSON/text document; <paramref name="gitHubApi"/> adds the GitHub REST headers (Accept, User-Agent, optional token) since api.github.com rejects requests without a User-Agent.
         Task<string> GetStringAsync(string url, bool gitHubApi, CancellationToken cancellationToken = default);
 
-        /// <summary>Streams a binary (a .bin asset) - follows redirects, since a GitHub release asset
-        /// URL 302s to objects.githubusercontent.com.</summary>
+        /// Streams a binary (a .bin asset) - follows redirects, since a GitHub release asset URL 302s to objects.githubusercontent.com.
         Task<Stream> GetStreamAsync(string url, CancellationToken cancellationToken = default);
     }
 
@@ -30,8 +27,7 @@ namespace api.Firmware
 
         public async Task<Stream> GetStreamAsync(string url, CancellationToken cancellationToken = default)
         {
-            // Not wrapped in `using` on purpose - the returned Stream is backed by this response and
-            // must outlive it; the caller owns disposing the stream (same contract as before this change).
+            // Not wrapped in `using` - the returned Stream is backed by this response and must outlive it; the caller owns disposing it.
             HttpResponseMessage response = await SendAsync(url, gitHubApi: false, cancellationToken);
             return await response.Content.ReadAsStreamAsync(cancellationToken);
         }

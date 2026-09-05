@@ -3,7 +3,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace api.Diagnostics
 {
-    /// <summary>Default MapHealthChecks() output is a bare status string - replaced with per-check detail (name/status/description/duration) so a monitor can tell WHICH dependency is degraded.</summary>
+    /// Replaces MapHealthChecks()'s bare status string with per-check detail so a monitor can tell WHICH dependency is degraded.
     internal static class HealthCheckResponseWriter
     {
         public static Task WriteResponse(HttpContext context, HealthReport report)

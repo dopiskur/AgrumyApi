@@ -1,6 +1,6 @@
 namespace api.Diagnostics
 {
-    /// <summary>Sets response headers with no per-route variation, so plain response mutation (not endpoint-specific) is enough - runs early, before routing.</summary>
+    /// Sets response headers with no per-route variation, so plain response mutation is enough - runs early, before routing.
     internal sealed class SecurityHeadersMiddleware(RequestDelegate next)
     {
         public async Task InvokeAsync(HttpContext context)

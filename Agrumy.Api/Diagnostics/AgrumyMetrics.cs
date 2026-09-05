@@ -7,7 +7,7 @@ namespace api.Diagnostics
 
     public sealed record MetricsSnapshot(DateTimeOffset GeneratedAt, IReadOnlyList<RouteMetricsSnapshot> Routes);
 
-    /// <summary>Emits through a real <see cref="Meter"/> (name "Agrumy.Api") so a future OpenTelemetry exporter can attach with no code change. The in-memory per-route/method aggregate is what GET /metrics actually reads, independent of whether anything is listening to the Meter.</summary>
+    /// Emits through a real <see cref="Meter"/> so a future OpenTelemetry exporter can attach with no code change; the in-memory per-route/method aggregate below is what GET /metrics actually reads.
     public sealed class AgrumyMetrics
     {
         public const string MeterName = "Agrumy.Api";
