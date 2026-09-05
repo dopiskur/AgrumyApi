@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>ICommandRepository members: raw deviceCommand CRUD.</summary>
+    /// ICommandRepository members: raw deviceCommand CRUD.
     internal partial class EfRepository
     {
         public async Task<bool> HasActiveCommandAsync(int deviceId, CommandActionType actionType, DateTime utcNow)

@@ -2,11 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>
-    /// Builds <see cref="DbContextOptions{AgrumyDbContext}"/> for the selected provider.
-    /// Pre-beta: no EF migrations - a fresh database is provisioned with <c>EnsureCreatedAsync()</c>
-    /// straight from the model.
-    /// </summary>
+    /// Builds DbContextOptions for the selected provider - pre-beta, so a fresh database is provisioned via EnsureCreatedAsync() straight from the model, no EF migrations.
     public static class DbOptionsFactory
     {
         public static DbContextOptions<AgrumyDbContext> Build(DbProviderKind provider, string connectionString)

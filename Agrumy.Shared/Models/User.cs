@@ -28,11 +28,7 @@ namespace api.Models
         // IANA time zone id (e.g. "Europe/Zagreb") for display conversion of stored-UTC timestamps; null = show UTC.
         public string? TimeZone { get; set; }
 
-        // Set only by tenant import - the imported password hash is portable
-        // (same PBKDF2 algorithm everywhere) but nobody has proven they still know it on THIS
-        // server, so login is blocked until they do (see UserApiController.UserLogin's 428 gate
-        // and ForceChangePassword). Any successful password change (forced or self-service)
-        // clears it - see EfRepository.UserSetPasswordAsync.
+        // Set only by tenant import - the imported hash is portable but unproven on this server, so login is blocked (UserApiController.UserLogin's 428 gate) until ForceChangePassword clears it.
         public bool MustChangePassword { get; set; }
     }
 
@@ -116,12 +112,12 @@ namespace api.Models
     {
         public int? IDUser { get; set; }
         public string? Email { get; set; }
-        /// <summary>Long-lived opaque token that redeems a new <see cref="Token"/> once this JWT expires. Single-use - rotated on every redemption.</summary>
+        /// Long-lived opaque token that redeems a new <see cref="Token"/> once this JWT expires. Single-use - rotated on every redemption.
         public string? RefreshToken { get; set; }
         public string? Token { get; set; }
     }
 
-    /// <summary>Body of POST /api/User/ChangePassword - no Login field on purpose, identity comes only from the caller's JWT, so this can never be used as an unauthenticated password-guessing oracle.</summary>
+    /// Body of POST /api/User/ChangePassword - no Login field on purpose, identity comes only from the caller's JWT, so this can never be used as an unauthenticated password-guessing oracle.
     public class UserSetPassword
     {
         [Required(ErrorMessage = "Old password is required")]
@@ -130,8 +126,7 @@ namespace api.Models
         public string? NewPassword { get; set; }
     }
 
-    /// <summary>Body of POST /api/User/ForceChangePassword - same shape as UserSetPassword plus
-    /// Login, since this is reachable before a normal JWT exists (see User.MustChangePassword).</summary>
+    /// Body of POST /api/User/ForceChangePassword - same shape as UserSetPassword plus Login, since this is reachable before a normal JWT exists (see User.MustChangePassword).
     public class UserForceChangePassword
     {
         [Required(ErrorMessage = "Email or username is required")]
@@ -142,7 +137,7 @@ namespace api.Models
         public string? NewPassword { get; set; }
     }
 
-    /// <summary>Body of POST /api/User/BootstrapSetPassword - SetupSecret (logged server-side at first startup) is required so this anonymous endpoint isn't just a rate-limit-only race to claim the Global Admin account.</summary>
+    /// Body of POST /api/User/BootstrapSetPassword - SetupSecret (logged server-side at first startup) is required so this anonymous endpoint isn't just a rate-limit-only race to claim the Global Admin account.
     public class BootstrapAdminSetPassword
     {
         [Required(ErrorMessage = "New password is required")]
@@ -151,7 +146,7 @@ namespace api.Models
         public string? SetupSecret { get; set; }
     }
 
-    /// <summary>Body of PUT /api/User/Profile - the only fields a user may change on their own account (identity comes from the JWT, never from here). Deliberately has no Enabled/TenantID so self-service can never touch authorization.</summary>
+    /// Body of PUT /api/User/Profile - the only fields a user may change on their own account (identity comes from the JWT, never from here). Deliberately has no Enabled/TenantID so self-service can never touch authorization.
     public class UserProfileUpdate
     {
         public string? FirstName { get; set; }
@@ -160,14 +155,14 @@ namespace api.Models
         public string? TimeZone { get; set; }
     }
 
-    /// <summary>Response of POST /api/User/DevicePin - the freshly generated PIN and when it stops being accepted. Valid for repeated registrations until that expiry (not consumed by the first one), so bulk sensor setup needs only one PIN.</summary>
+    /// Response of POST /api/User/DevicePin - the freshly generated PIN and when it stops being accepted. Valid for repeated registrations until that expiry (not consumed by the first one), so bulk sensor setup needs only one PIN.
     public class DevicePinResult
     {
         public string? DevicePin { get; set; }
         public DateTime? ExpiresAt { get; set; }
     }
 
-    /// <summary>Deliberately the same shape as <see cref="UserLogin"/>'s Login field (email or username) - a user who forgot which one they registered with shouldn't have to guess.</summary>
+    /// Deliberately the same shape as <see cref="UserLogin"/>'s Login field (email or username) - a user who forgot which one they registered with shouldn't have to guess.
     public class ResendActivationRequest
     {
         [Required(ErrorMessage = "Email or username is required")]
@@ -186,7 +181,7 @@ namespace api.Models
         public int? RoleScopeID { get; set; }
     }
 
-    /// <summary>Replaces a user's entire composable role set (not incremental) - see api.Security.RoleNames for the valid values.</summary>
+    /// Replaces a user's entire composable role set (not incremental) - see api.Security.RoleNames for the valid values.
     public class UserRolesUpdate
     {
         public int IDUser { get; set; }

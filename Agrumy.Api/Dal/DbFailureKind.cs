@@ -1,23 +1,21 @@
 namespace api.Dal
 {
-    /// <summary>
     /// Coarse classification of a database-layer failure, used to shape a consistent API response.
-    /// </summary>
     public enum DbFailureKind
     {
-        /// <summary>The database could not be reached / the connection failed.</summary>
+        /// The database could not be reached / the connection failed.
         ConnectionFailure,
 
-        /// <summary>The database is reachable but a required table or stored routine is missing.</summary>
+        /// The database is reachable but a required table or stored routine is missing.
         SchemaMissing,
 
-        /// <summary>A FK / check / unique constraint was violated (and DbExceptionFilter did not name it specifically).</summary>
+        /// A FK / check / unique constraint was violated (and DbExceptionFilter did not name it specifically).
         ConstraintViolation,
 
-        /// <summary>A deadlock or lock-wait timeout - transient, the caller can retry.</summary>
+        /// A deadlock or lock-wait timeout - transient, the caller can retry.
         Contention,
 
-        /// <summary>Not a recognised database failure - an unexpected server-side error (HTTP 500, not 503).</summary>
+        /// Not a recognised database failure - an unexpected server-side error (HTTP 500, not 503).
         Unknown
     }
 }

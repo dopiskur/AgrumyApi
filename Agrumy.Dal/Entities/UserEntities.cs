@@ -1,11 +1,6 @@
 namespace api.Dal.Entities
 {
-    // Persistence entities - mapped 1:1 to table columns. Kept separate from the api.Models DTOs,
-    // which carry flattened join columns, MVC attributes and (for SensorData) no key. EfRepository
-    // projects these rows onto the DTOs so the IRepository contract is unchanged.
-    //
-    // Column/type/nullability spec: this used to live in Schema/SchemaScripts.cs (deleted with the
-    // stored-procedure DAL); the EF baseline migration is now the source of truth.
+    // Persistence entities mapped 1:1 to table columns, kept separate from the api.Models DTOs (flattened joins, MVC attributes) - EfRepository projects these onto the DTOs.
 
     public class TenantRow
     {
@@ -37,8 +32,7 @@ namespace api.Dal.Entities
         public int? RoleScopeID { get; set; }
     }
 
-    /// <summary>A user can hold several roles at once - this many-to-many junction is the sole
-    /// source of truth for authorization (the legacy single-group model was removed by #206).</summary>
+    /// A user can hold several roles at once - this many-to-many junction is the sole source of truth for authorization.
     public class UserUserRoleRow
     {
         public int UserID { get; set; }
@@ -88,9 +82,7 @@ namespace api.Dal.Entities
         public bool MustChangePassword { get; set; }
     }
 
-    /// <summary>One issued JWT refresh token. Single-use: a rotation marks the row revoked and
-    /// points ReplacedByTokenHash at the row that superseded it, so a reused (already-rotated)
-    /// token is detectable. Only the hash is stored, never the plaintext token.</summary>
+    /// One issued JWT refresh token - single-use, a rotation marks the row revoked and points ReplacedByTokenHash at its successor so a reused token is detectable; only the hash is stored.
     public class RefreshTokenRow
     {
         public int IDRefreshToken { get; set; }

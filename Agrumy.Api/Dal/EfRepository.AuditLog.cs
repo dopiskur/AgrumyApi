@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IAuditLogRepository members.</summary>
+    /// IAuditLogRepository members.
     internal partial class EfRepository
     {
         public async Task AuditLogAddAsync(AuditLogEntry entry)

@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IRefreshTokenRepository members.</summary>
+    /// IRefreshTokenRepository members.
     internal partial class EfRepository
     {
         public async Task<int> RefreshTokenAddAsync(int userID, string tokenHash, DateTime expiresAt)

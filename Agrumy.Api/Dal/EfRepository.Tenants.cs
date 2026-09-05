@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>ITenantRepository members.</summary>
+    /// ITenantRepository members.
     internal partial class EfRepository
     {
         public async Task<bool> TenantGetAsync(string tenantName)

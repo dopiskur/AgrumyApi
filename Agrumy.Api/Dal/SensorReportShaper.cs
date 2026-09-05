@@ -49,7 +49,7 @@ namespace api.Dal
             return JsonSerializer.Serialize(new Dictionary<string, object?> { ["sensorData"] = records });
         }
 
-        /// <summary>Truncates a timestamp to the bucket boundary for the given range mode.</summary>
+        /// Truncates a timestamp to the bucket boundary for the given range mode.
         private static DateTime BucketKey(DateTime? dt, int timeMDMY)
         {
             DateTime d = dt ?? DateTime.MinValue;

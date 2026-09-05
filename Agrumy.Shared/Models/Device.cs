@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using System.Text.Json.Serialization;
 
 namespace api.Models
@@ -11,8 +11,7 @@ namespace api.Models
 
         [HiddenInput(DisplayValue = true)]
         public int? IDDevice { get; set; }
-        // Non-nullable - TenantID=0 is a real, meaningful default tenant, not a "no tenant"
-        // sentinel, so a nullable int would let an impossible third state leak into every consumer.
+        // Non-nullable - TenantID=0 is a real default tenant, not a "no tenant" sentinel; nullable would let an impossible third state leak into consumers.
         [HiddenInput(DisplayValue = true)]
         public int TenantID { get; set; } = 0;
 
@@ -31,13 +30,10 @@ namespace api.Models
         public string? DeviceName { get; set; }
         [HiddenInput(DisplayValue = true)]
         public string? MacAddress { get; set; }
-        // True only for an Agrumy.Relay instance - it registers through this same
-        // Device row/ApiId/ApiKey mechanism, just flagged so RelayApiController.Batch can tell a
-        // relay's own credential apart from an ordinary sensor device's.
+        // True only for an Agrumy.Relay instance, flagged so RelayApiController.Batch can tell a relay's own credential from an ordinary device's.
         [HiddenInput(DisplayValue = true)]
         public bool IsRelay { get; set; }
-        // Null for every non-relay device. Set once at registration (DeviceRegistration.RelayProfile
-        // below) - not editable afterward, since Profile A/B imply a different physical setup.
+        // Null for non-relay devices; set once at registration (DeviceRegistration.RelayProfile), not editable afterward since Profile A/B imply different physical setups.
         [HiddenInput(DisplayValue = true)]
         public RelayProfile? RelayProfile { get; set; }
         // The device's actual bearer credential - never serialized out; BuildDeviceConfigAsync reads it directly in C# instead.
@@ -64,9 +60,7 @@ namespace api.Models
         public bool? Reboot { get; set; }
         public bool? Reset { get; set; } = false;
         public bool? FirmwareUpdate { get; set; }
-        // Null = "latest for the board" when FirmwareUpdate is set; a specific catalog version
-        // pins a rollback/downgrade. Both cleared by DeviceApiController.GetConfig once the
-        // heartbeat reports that exact version running.
+        // Null = latest-for-board when FirmwareUpdate is set; a specific version pins rollback/downgrade. Both cleared by DeviceApiController.GetConfig once the heartbeat confirms that version.
         public string? FirmwareTargetVersion { get; set; }
         public bool? Enabled { get; set; } = false;
 
@@ -86,10 +80,7 @@ namespace api.Models
         public string? ServicePoint { get; set; } = "api.agrumy.com";
         public int? ServiceType { get; set; } = 1;
 
-        // Agrumy.Relay sends these on its own first registration so the resulting
-        // device row comes back with IsRelay/RelayProfile already set - null/false for every
-        // ordinary AgrumyFirmware device, which never populates them. Only consulted when the
-        // MacAddress is genuinely new; re-registering an existing row never changes its profile.
+        // Agrumy.Relay sends these on its own first registration so IsRelay/RelayProfile come back set; null/false for ordinary firmware, and only consulted when the MacAddress is genuinely new.
         public bool IsRelay { get; set; }
         public RelayProfile? RelayProfile { get; set; }
     }
@@ -111,9 +102,7 @@ namespace api.Models
         public int? SleepSeconds { get; set; } = 60;
         public bool? SleepDeep { get; set; } = false;
 
-        // Current UTC offset (seconds, positive east of UTC) for ServerConfig.ScheduleTimeZone,
-        // computed fresh on every config sync so the firmware needs no timezone database of its
-        // own. 0 (UTC) when no ScheduleTimeZone is configured yet.
+        // UTC offset (seconds, positive east) for ServerConfig.ScheduleTimeZone, computed fresh each sync so firmware needs no timezone database of its own; 0 when unconfigured.
         public int? UtcOffsetSeconds { get; set; }
 
         public bool? DeviceSensorEnabled { get; set; } = false;
@@ -123,31 +112,22 @@ namespace api.Models
         public bool? Reboot { get; set; }
         public bool? Reset { get; set; }
         public bool? FirmwareUpdate { get; set; }
-        // Populated by BuildDeviceConfigAsync from the newest deviceFirmware row for the device's
-        // type, but only when FirmwareUpdate == true. Null otherwise.
+        // Populated by BuildDeviceConfigAsync from the newest deviceFirmware row only when FirmwareUpdate is true; null otherwise.
         public string? FirmwareVersion { get; set; }
         public string? FirmwareUrl { get; set; }
-        // DeviceFirmware.Sha256 for the offered build, when the catalog has one - firmware verifies
-        // it against the streamed .bin, Update.abort() on mismatch. Null whenever the source had no
-        // manifest hash - the check is skipped rather than failing closed; it is not proof the .bin is bad.
+        // DeviceFirmware.Sha256 for the offered build; firmware verifies it against the streamed .bin (Update.abort() on mismatch). Null skips the check rather than failing closed.
         public string? FirmwareSha256 { get; set; }
         public bool? Enabled { get; set; }
         public DeviceConfigSensor? DeviceConfigSensor { get; set; }
         public DeviceConfigController? DeviceConfigController { get; set; }
 
-        // Deliberately separate from ConfigVersion - issuing a command must not force a full
-        // config re-apply on the firmware side, and a config change must not touch the command
-        // queue. The server's decision to send a non-empty response is driven by whether a pending
-        // command actually exists (GetConfig), not by comparing this number.
+        // Deliberately separate from ConfigVersion - a command must not force a full config re-apply, and GetConfig decides on whether a pending command exists, not by comparing this number.
         public int? CommandVersion { get; set; }
-        // Null when there is nothing to do - present only when a real, unexpired Pending command
-        // is waiting (DeviceApiController.GetConfig/BuildDeviceConfigAsync).
+        // Null when there's nothing to do - present only for a real, unexpired Pending command (DeviceApiController.GetConfig/BuildDeviceConfigAsync).
         public PendingCommand? PendingCommand { get; set; }
     }
 
-    /// <summary>Body of POST /api/Device/Config: the poll doubles as the heartbeat, so besides
-    /// ConfigVersion the firmware reports its live diagnostics every cycle. All fields are
-    /// nullable so an older firmware that sends only ConfigVersion still binds cleanly.</summary>
+    /// Body of POST /api/Device/Config - poll doubles as heartbeat, so all fields are nullable to keep older firmware sending only ConfigVersion binding cleanly.
     public class DeviceConfigPoll()
     {
         public int? ConfigVersion { get; set; }
@@ -155,18 +135,13 @@ namespace api.Models
         public int? Rssi { get; set; }
         public long? FreeHeap { get; set; }
         public string? FirmwareVersion { get; set; }
-        // PlatformIO environment the running image was built for (AGRUMY_BOARD build flag) -
-        // selects the right catalog .bin for OTA. Null from an older firmware.
+        // PlatformIO environment the image was built for (AGRUMY_BOARD flag) - selects the right catalog .bin for OTA; null from older firmware.
         public string? Board { get; set; }
-        // Which commercial physical board this image was built for (AGRUMY_KIT build flag, e.g.
-        // "KC868-A6") - separate from Board, which only selects the OTA binary. Empty string on a
-        // generic chip-target environment, null from an older firmware.
+        // Commercial board this image was built for (AGRUMY_KIT flag, e.g. "KC868-A6"), separate from Board; empty on generic chip-target, null from older firmware.
         public string? Kit { get; set; }
     }
 
-    /// <summary>One device's row on the fleet dashboard. Battery comes from the latest sensorData
-    /// row, not the heartbeat - the firmware battery sensor is a stub, and telemetry is where a
-    /// real reading will land.</summary>
+    /// One device's row on the fleet dashboard; Battery comes from the latest sensorData row, not the heartbeat, since the firmware's own battery sensor is a stub.
     public class DeviceFleetStatus()
     {
         public int? IDDevice { get; set; }
@@ -179,9 +154,7 @@ namespace api.Models
         public int? RssiDbm { get; set; }
         public long? FreeHeapBytes { get; set; }
         public string? FirmwareVersion { get; set; }
-        // Catalog state for the "Update" button - LatestFirmwareVersion is the newest catalog
-        // entry for this device's Board, FirmwareUpdateAvailable is "that is newer than what's
-        // running", and the Pending/Target pair mirrors Device.FirmwareUpdate/FirmwareTargetVersion.
+        // Catalog state for the Update button: LatestFirmwareVersion is the newest entry for this Board, FirmwareUpdateAvailable means it's newer than running, Pending/Target mirror Device.FirmwareUpdate/FirmwareTargetVersion.
         public string? Board { get; set; }
         public string? LatestFirmwareVersion { get; set; }
         public bool FirmwareUpdateAvailable { get; set; }
@@ -189,27 +162,19 @@ namespace api.Models
         public string? FirmwareTargetVersion { get; set; }
         public int? Battery { get; set; }
         public bool Online { get; set; }
-        // Which commercial physical board last reported in the heartbeat (empty = generic
-        // chip-target environment, null = never reported one).
+        // Commercial board last reported in the heartbeat; empty = generic chip-target, null = never reported.
         public string? Kit { get; set; }
-        // True when this device is treated as having real, wired relay hardware - either the admin
-        // already set DeviceType to Sensor+Controller, OR Kit names a board the deviceTypeKit
-        // lookup knows has relays. Drives whether the Web UI shows the Controller config tab.
+        // True when the device has real relay hardware - admin set DeviceType to Sensor+Controller, or Kit maps to a deviceTypeKit board with relays; drives the Web UI's Controller tab.
         public bool ControllerCapable { get; set; }
-        // Lets the Web layer filter one shared DeviceFleetGet() response down to a single zone's
-        // devices for DeviceUnitController.ZoneDetails, instead of a second endpoint.
+        // Lets the Web layer filter one shared DeviceFleetGet() response down to a single zone's devices (DeviceUnitController.ZoneDetails) instead of a second endpoint.
         public int? DeviceUnitID { get; set; }
         public int? DeviceUnitZoneID { get; set; }
 
-        // 3 missed polls + fixed grace, not a bare multiple of SleepSeconds: a cycle is sleep time
-        // PLUS work time (TLS handshakes, sensor reads), and a single dropped poll on a flaky WiFi
-        // link should not flip a device to offline. Grace also floors the window for SleepSeconds=0.
+        // 3 missed polls + fixed grace, not a bare SleepSeconds multiple - a cycle also costs work time (TLS/sensor reads), and grace floors the window when SleepSeconds=0.
         public const int OfflineMissedPolls = 3;
         public const int OfflineGraceSeconds = 90;
 
-        /// <summary>Whether a device that last polled at <paramref name="lastSeenAt"/> (UTC) should
-        /// count as online at <paramref name="utcNow"/>, given how often it is configured to poll.
-        /// Static and time-injected so the threshold rule is unit-testable without a repository.</summary>
+        /// Whether a device last seen at lastSeenAt (UTC) counts as online at utcNow, given its poll interval - static and time-injected so it's unit-testable without a repository.
         public static bool ComputeOnline(DateTime? lastSeenAt, int? sleepSeconds, DateTime utcNow)
         {
             if (lastSeenAt is not DateTime seen)
@@ -239,12 +204,9 @@ namespace api.Models
     {
         [HiddenInput(DisplayValue = true)]
         public int? IDDeviceConfigSensor { get; set; }
-        // 0/null=Disabled(None), 1009=MAX17048 (I2C fuel gauge, coulomb counting), 2001=Analog
-        // voltage (VoltageDivider) - same deviceTypeSensor-backed dropdown as every other Sensor* field here.
+        // 0/null=Disabled, 1009=MAX17048 (I2C fuel gauge), 2001=Analog VoltageDivider - same deviceTypeSensor dropdown as every other Sensor* field.
         public int? SensorBattery { get; set; }
-        // VoltageDivider calibration (sensorBattery=2001 only) - the ACTUAL resistors the user
-        // wired, in ohms, not an abstract preset ratio: V_battery = V_measured * (R1+R2)/R2.
-        // Ignored by MAX17048, which reports state-of-charge directly.
+        // VoltageDivider calibration (sensorBattery=2001 only), actual wired resistor ohms: V_battery = V_measured * (R1+R2)/R2; ignored by MAX17048.
         public double? BatteryDividerR1 { get; set; }
         public double? BatteryDividerR2 { get; set; }
         public int? SensorTemp { get; set; }
@@ -262,29 +224,20 @@ namespace api.Models
 
     }
 
-    /// <summary>What's LEFT of this per-DEVICE model after thresholds/schedule/safety-limits all
-    /// moved to the ZONE (see DeviceUnitZone/DeviceUnitZoneRule) - just the relay-pin mapping,
-    /// which stays device-side because it is a physical/hardware fact about THIS controller.
-    /// Rules/WaterPumpMaxRunSeconds/WaterPumpCooldownSeconds below are populated from the device's
-    /// ASSIGNED ZONE, not from this row, when DeviceApiController builds a config-poll response -
-    /// see BuildDeviceConfigAsync.</summary>
+    /// What's left of the per-device model after thresholds/schedule/safety-limits moved to the zone (DeviceUnitZone/DeviceUnitZoneRule) - just the relay-pin mapping; Rules/WaterPump* below are populated from the assigned zone by BuildDeviceConfigAsync, not from this row.
     public class DeviceConfigController()
     {
         [HiddenInput(DisplayValue = true)]
         public int? IDDeviceConfigController { get; set; }
 
-        // The zone's rules for whichever RelayFunction(s) this device's Relay1-8 mapping below
-        // actually wires up - empty when the device has no assigned zone, so every relay function
-        // simply stays off.
+        // The assigned zone's rules for whichever RelayFunction(s) Relay1-8 wires up; empty (all off) when the device has no zone.
         public IList<DeviceUnitZoneRule> Rules { get; set; } = [];
 
         // Copied from the assigned zone's own fields - see DeviceUnitZone's remarks for why these are not Rules.
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
 
-        // Final AND-NOT veto over WaterPump, computed server-side (BuildDeviceConfigAsync) from
-        // DeviceUnitZone.SkipWaterPumpWhenRainPredicted && ServerConfig.WeatherRainPredicted - not
-        // a Rule, since OR-combining rules could only ever ADD a reason to run, never suppress one.
+        // Final AND-NOT veto over WaterPump (BuildDeviceConfigAsync, from SkipWaterPumpWhenRainPredicted && WeatherRainPredicted) - not a Rule, since OR-combined rules can only add a run reason, never suppress one.
         public bool SkipWaterPumpForRain { get; set; }
 
         // Physical/hardware, stays per-device.
@@ -300,16 +253,14 @@ namespace api.Models
 
     }
 
-    /// <summary>One wall-clock window within one of DeviceConfigController's four per-function
-    /// schedule lists. No RelayFunction/Enabled fields here - which function it belongs to is
-    /// which list it's in, and its presence in the list IS "enabled".</summary>
+    /// One wall-clock window in one of DeviceConfigController's per-function schedule lists - no RelayFunction/Enabled fields, since list membership itself means both.
     public class DeviceScheduleSlot
     {
-        /// <summary>7-bit mask, bit 0 = Sunday .. bit 6 = Saturday (C's tm_wday convention).</summary>
+        /// 7-bit mask, bit 0 = Sunday .. bit 6 = Saturday (C's tm_wday convention).
         public int DaysOfWeek { get; set; }
-        /// <summary>Seconds since local midnight, 0-86399.</summary>
+        /// Seconds since local midnight, 0-86399.
         public int Start { get; set; }
-        /// <summary>Seconds; Start + Duration must not exceed 86400 (no crossing local midnight).</summary>
+        /// Seconds; Start + Duration must not exceed 86400 (no crossing local midnight).
         public int Duration { get; set; }
     }
 

@@ -9,7 +9,7 @@ namespace api.Models
         ProvisionDevice = 5,
     }
 
-    /// <summary>Device acknowledges before executing, so a command stuck at Acknowledged (never reaching Executed) means it took the command but crashed or lost power before confirming the outcome.</summary>
+    /// Device acknowledges before executing, so a command stuck at Acknowledged (never reaching Executed) means it took the command but crashed or lost power before confirming the outcome.
     public enum CommandStatus
     {
         Pending = 0,
@@ -18,7 +18,7 @@ namespace api.Models
         Expired = 3,
     }
 
-    /// <summary>Target resolved server-side to the device(s) implied by Zone/Unit; see CommandQueueService.IssueCommandAsync.</summary>
+    /// Target resolved server-side to the device(s) implied by Zone/Unit; see CommandQueueService.IssueCommandAsync.
     public enum CommandTargetType
     {
         Device = 1,
@@ -26,7 +26,7 @@ namespace api.Models
         Unit = 3,
     }
 
-    /// <summary>Body of POST /api/DeviceCommand.</summary>
+    /// Body of POST /api/DeviceCommand.
     public class IssueCommandRequest
     {
         public CommandTargetType TargetType { get; set; }
@@ -47,7 +47,7 @@ namespace api.Models
         public string? Payload { get; set; }
     }
 
-    /// <summary>Minimal shape returned inside DeviceConfig during a device's regular config poll — not a separate endpoint.</summary>
+    /// Minimal shape returned inside DeviceConfig during a device's regular config poll — not a separate endpoint.
     public class PendingCommand
     {
         public int IDDeviceCommand { get; set; }
@@ -56,7 +56,7 @@ namespace api.Models
         public string? Payload { get; set; }
     }
 
-    /// <summary>Body of POST /api/Device/Command/Ack.</summary>
+    /// Body of POST /api/Device/Command/Ack.
     public class CommandAckRequest
     {
         public int CommandId { get; set; }

@@ -9,7 +9,7 @@ namespace api.Security
 {
     public partial class JwtTokenProvider
     {
-        /// <summary>Static bridge into ILogger since this class has no DI reach; each host assigns it once at startup. Null (e.g. unit tests) means rejections stay silent.</summary>
+        /// Static bridge into ILogger since this class has no DI reach; each host assigns it once at startup. Null (e.g. unit tests) means rejections stay silent.
         public static ILogger? Logger { get; set; }
 
         [LoggerMessage(Level = LogLevel.Warning, Message = "JWT rejected: expired.")]
@@ -22,7 +22,7 @@ namespace api.Security
         private static partial void LogMalformedToken(ILogger logger, string exceptionType);
 
 
-        /// <summary>A user can hold several roles at once, so <paramref name="roles"/> becomes one <see cref="ClaimTypes.Role"/> claim per entry; the caller must include the legacy "admin"/"user" alias in the set for old single-role checks to keep working (see api.Security.RoleNames.ImpliesLegacyAdmin).</summary>
+        /// A user can hold several roles at once, so <paramref name="roles"/> becomes one <see cref="ClaimTypes.Role"/> claim per entry; the caller must include the legacy "admin"/"user" alias in the set for old single-role checks to keep working (see api.Security.RoleNames.ImpliesLegacyAdmin).
         public static string CreateToken(string secureKey, int expiration, string subject, IEnumerable<string> roles, string tenantID)
         {
             var tokenKey = Encoding.UTF8.GetBytes(secureKey);
@@ -58,10 +58,10 @@ namespace api.Security
 
 
 
-        /// <summary>Every role claim on a valid token, or null if the token is invalid/expired/wrongly-signed. An empty (non-null) list means the token validated but carried no roles — callers must treat that as "no roles", not "check failed".</summary>
+        /// Every role claim on a valid token, or null if the token is invalid/expired/wrongly-signed. An empty (non-null) list means the token validated but carried no roles — callers must treat that as "no roles", not "check failed".
         public static IReadOnlyList<string>? ValidateToken(string token) => ValidateToken(token, Config.secureKey);
 
-        /// <summary>Key-parameterized overload for tests driving the real validation path with a chosen key; production callers never pass a key (the single-arg overload reads Config.secureKey live rather than a cached field, since it must reflect Config.Init() having run at host startup).</summary>
+        /// Key-parameterized overload for tests driving the real validation path with a chosen key; production callers never pass a key (the single-arg overload reads Config.secureKey live rather than a cached field, since it must reflect Config.Init() having run at host startup).
         public static IReadOnlyList<string>? ValidateToken(string token, string? secureKey)
         {
             if (token == null || secureKey == null)

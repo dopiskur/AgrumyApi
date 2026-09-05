@@ -2,9 +2,7 @@ using api.Models;
 
 namespace api.Dal.Interface
 {
-    /// <summary>The minimal shape OfflineAlertBackgroundService needs to decide whether a
-    /// notification is due - not the full Fleet dashboard DTO (DeviceFleetStatus), since
-    /// OfflineNotifiedAt is alert-bookkeeping state the Web UI has no business displaying.</summary>
+    /// The minimal shape OfflineAlertBackgroundService needs - not the full DeviceFleetStatus, since OfflineNotifiedAt is alert-bookkeeping the Web UI has no business displaying.
     public sealed record OfflineAlertCandidate(
         int IDDevice,
         int TenantID,
@@ -13,9 +11,7 @@ namespace api.Dal.Interface
         DateTime? LastSeenAt,
         DateTime? OfflineNotifiedAt);
 
-    /// <summary>The minimal shape LowBatteryAlertEvaluator needs - Battery is the latest
-    /// sensorData row's reading (telemetry, not the heartbeat - see DeviceFleetStatus's class
-    /// comment for why), null when the device has never reported one.</summary>
+    /// The minimal shape LowBatteryAlertEvaluator needs - Battery is the latest telemetry reading (not the heartbeat, see DeviceFleetStatus), null when never reported.
     public sealed record LowBatteryAlertCandidate(
         int IDDevice,
         int TenantID,
@@ -23,42 +19,38 @@ namespace api.Dal.Interface
         int? Battery,
         DateTime? LowBatteryNotifiedAt);
 
-    /// <summary>Device facet of the data layer: device CRUD, sensor/controller configs, firmware
-    /// (OTA), the fixed type lists, and device events.</summary>
+    /// Device facet of the data layer: device CRUD, sensor/controller configs, firmware (OTA), the fixed type lists, and device events.
     public interface IDeviceRepository
     {
-        /// <summary>Returns the created device (with its generated IDDevice) directly - callers don't need a follow-up DeviceGetAsync.</summary>
+        /// Returns the created device (with its generated IDDevice) directly - callers don't need a follow-up DeviceGetAsync.
         Task<Device> DeviceAddAsync(Device device);
 
         Task DeviceDeleteAsync(int? idDevice, int? tenantID);
 
-        /// <summary>The device matched by id / apiId / macAddress within the tenant, or null if none matches (or no key was given).</summary>
+        /// The device matched by id / apiId / macAddress within the tenant, or null if none matches (or no key was given).
         Task<Device?> DeviceGetAsync(int? tenantID, int? idDevice, string? apiId, string? macAddress);
 
-        /// <summary>The device with this id (no tenant filter) - used only for ownership checks before an authorized write - or null if none.</summary>
+        /// The device with this id (no tenant filter) - used only for ownership checks before an authorized write - or null if none.
         Task<Device?> DeviceGetByIdAsync(int? idDevice);
 
-        /// <summary>The device with this globally unique ApiId (no tenant filter), or null if none. Device-comm endpoints authenticate by ApiId/ApiKey and have no tenant context.</summary>
+        /// The device with this globally unique ApiId (no tenant filter), or null if none. Device-comm endpoints authenticate by ApiId/ApiKey and have no tenant context.
         Task<Device?> DeviceGetByApiIdAsync(string? apiId);
         Task<IList<Device>> DevicesGetAsync(int? tenantID);
 
-        /// <summary>Every device in every tenant - callers must check CallerReadsDevicesGlobally themselves.</summary>
+        /// Every device in every tenant - callers must check CallerReadsDevicesGlobally themselves.
         Task<IList<Device>> DevicesGetAllAsync();
 
-        /// <summary>Every sensor-only device (DeviceSensorEnabled, not DeviceControllerEnabled) in the
-        /// tenant, or across every tenant when tenantID is null - the roadmap #268 Fleet-wide scan
-        /// scope. Excludes controller-capable devices since those have real-time relay duties a scan's
-        /// WiFi.scanNetworks() pause would disrupt.</summary>
+        /// Every sensor-only device (DeviceSensorEnabled, not DeviceControllerEnabled) in the tenant, or every tenant when null - excludes controller-capable devices since a WiFi.scanNetworks() pause would disrupt their real-time relay duties.
         Task<IList<Device>> DevicesSensorOnlyGetAsync(int? tenantID);
         Task<bool> DeviceCheckMacAddressAsync(int? tenantID, string? macAddress);
         Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID);
         Task<DeviceConfigController?> DeviceConfigControllerGetAsync(int? deviceConfigControllerID);
 
-        /// <summary>The device owning this sensor/controller config id (no tenant filter) - for ownership checks before returning config data - or null if none.</summary>
+        /// The device owning this sensor/controller config id (no tenant filter) - for ownership checks before returning config data - or null if none.
         Task<Device?> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID);
         Task<Device?> DeviceGetByDeviceConfigControllerIdAsync(int? deviceConfigControllerID);
 
-        /// <summary>Newest published firmware for a device type (by DateAdded), or null if none.</summary>
+        /// Newest published firmware for a device type (by DateAdded), or null if none.
         Task<DeviceFirmware?> DeviceFirmwareLatestGetAsync(int? deviceTypeID);
 
         // Device UPDATE
@@ -74,53 +66,37 @@ namespace api.Dal.Interface
 
         // Device diagnostics / fleet
 
-        /// <summary>Records the diagnostics a device reported with its config poll - LastSeenAt is
-        /// set to the server clock, making the poll itself the heartbeat. deviceID/tenantID come
-        /// from the authenticated device identity, same rule as SensorDataPushAsync. Null
-        /// diagnostic fields still bump LastSeenAt without erasing earlier values.</summary>
+        /// Records the diagnostics from a device's config poll - LastSeenAt is set to the server clock, making the poll itself the heartbeat; null fields still bump LastSeenAt without erasing earlier values.
         Task DeviceDiagnosticUpsertAsync(int deviceID, int tenantID, DeviceConfigPoll poll);
 
-        /// <summary>Fleet status for every device in the tenant, or every device everywhere when
-        /// tenantID is null - callers must check CallerReadsDevicesGlobally before passing null.
-        /// Online is computed against the server clock via DeviceFleetStatus.ComputeOnline.</summary>
+        /// Fleet status for every device in the tenant, or everywhere when tenantID is null (caller must check CallerReadsDevicesGlobally first) - Online comes from DeviceFleetStatus.ComputeOnline.
         Task<IList<DeviceFleetStatus>> DeviceFleetGetAsync(int? tenantID);
 
         // Device events
 
-        /// <summary>Records one device event, unless an identical eventType for the same device was
-        /// already recorded within the last ServerConfig.EventDedupeMinutes (default 10) - a
-        /// flapping "NoInternet" every loop cycle should not flood the table. Returns false when the
-        /// push was deduped (nothing written), true when it was actually inserted.</summary>
+        /// Skips (returns false) an identical eventType for the same device within ServerConfig.EventDedupeMinutes - a flapping "NoInternet" every loop cycle must not flood the table.
         Task<bool> EventDevicePushAsync(int deviceID, int tenantID, DeviceEventType eventType, string? message);
 
-        /// <summary>Most recent events for one device, newest first, capped at <paramref name="limit"/>.
-        /// tenantID is the caller's own tenant, not trusted from the request - a device belonging to
-        /// another tenant simply matches zero rows rather than leaking another tenant's events.</summary>
+        /// Most recent events for one device, newest first, capped at <paramref name="limit"/> - tenantID is the caller's own, so a cross-tenant device just matches zero rows rather than leaking events.
         Task<IList<DeviceEvent>> EventDeviceGetAsync(int? deviceID, int? tenantID, int limit = 100);
 
-        /// <summary>Marks one event acknowledged so it stops counting toward Unit/Zone Orange status,
-        /// scoped by tenantID the same way EventDeviceGetAsync is (null only for a Global caller) -
-        /// returns false rather than throwing when the id doesn't match (wrong tenant or already gone).</summary>
+        /// Marks one event acknowledged so it stops counting toward Unit/Zone Orange status - returns false rather than throwing when the id doesn't match (wrong tenant or already gone).
         Task<bool> EventDeviceAcknowledgeAsync(int idEventDevice, int? tenantID);
 
         // Offline alert background worker
 
-        /// <summary>Every enabled device, across every tenant - the worker is not tenant-scoped,
-        /// it runs once for the whole install.</summary>
+        /// Every enabled device across every tenant - the worker is not tenant-scoped, it runs once for the whole install.
         Task<IList<OfflineAlertCandidate>> OfflineAlertCandidatesGetAsync();
 
-        /// <summary>Sets (or clears, notifiedAt: null) OfflineNotifiedAt on one device's diagnostic
-        /// row - see OfflineAlertCandidate for what that field means.</summary>
+        /// Sets (or clears, notifiedAt: null) OfflineNotifiedAt on one device's diagnostic row.
         Task DeviceOfflineNotifiedSetAsync(int deviceID, DateTime? notifiedAt);
 
         // Low-battery alert background worker
 
-        /// <summary>Every enabled device, across every tenant, with its latest telemetry battery
-        /// reading - the worker is not tenant-scoped, it runs once for the whole install.</summary>
+        /// Every enabled device across every tenant with its latest battery reading - not tenant-scoped, runs once for the whole install.
         Task<IList<LowBatteryAlertCandidate>> LowBatteryAlertCandidatesGetAsync();
 
-        /// <summary>Sets (or clears, notifiedAt: null) LowBatteryNotifiedAt on one device's
-        /// diagnostic row - see LowBatteryAlertCandidate for what that field means.</summary>
+        /// Sets (or clears, notifiedAt: null) LowBatteryNotifiedAt on one device's diagnostic row.
         Task DeviceLowBatteryNotifiedSetAsync(int deviceID, DateTime? notifiedAt);
     }
 }

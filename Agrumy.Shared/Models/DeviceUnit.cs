@@ -2,10 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Models
 {
-    /// <summary>A physical/logical space (e.g. a greenhouse) an admin creates, containing one or
-    /// more <see cref="DeviceUnitZone"/>. TenantID null only ever means the shared IDDeviceUnit=0
-    /// "Default" sentinel row every not-yet-zoned device points at - real, admin-created Units
-    /// always carry the creator's tenant.</summary>
+    /// A physical/logical space (e.g. a greenhouse) containing DeviceUnitZones; TenantID null only means the shared IDDeviceUnit=0 "Default" sentinel every unzoned device points at.
     public class DeviceUnit
     {
         [HiddenInput(DisplayValue = true)]
@@ -14,9 +11,7 @@ namespace api.Models
         public string? DeviceUnitName { get; set; }
     }
 
-    /// <summary>A growing zone within one <see cref="DeviceUnit"/> - "one zone = one controller" at
-    /// most; a zone may be sensor-only. TenantID mirrors DeviceUnit.TenantID (denormalized so a
-    /// zone-scoped query needs no join back to Unit just to check tenant ownership).</summary>
+    /// A growing zone within one DeviceUnit - "one zone = one controller" at most, may be sensor-only; TenantID is denormalized from DeviceUnit so a zone query needs no join to check ownership.
     public class DeviceUnitZone
     {
         [HiddenInput(DisplayValue = true)]
@@ -25,23 +20,15 @@ namespace api.Models
         public int DeviceUnitID { get; set; }
         public string? DeviceUnitZoneName { get; set; }
 
-        // WaterPump-only device-side hard safety limits - NOT a Rule (see DeviceUnitZoneRule
-        // below), an override ceiling applied by the device AFTER any rule has already decided
-        // WaterPump should be on. Seeded from AgrumySettings.WaterPumpMaxRunSeconds/CooldownSeconds when created.
+        // WaterPump-only hard safety ceiling, not a Rule - applied by the device after a rule already decided WaterPump should run; seeded from AgrumySettings on creation.
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
 
-        // Per-zone opt-in - not every zone waters something rain makes redundant, so this is a
-        // deliberate admin choice, not a global switch. Combined server-side with
-        // ServerConfig.WeatherRainPredicted into DeviceConfigController.SkipWaterPumpForRain.
+        // Per-zone opt-in, not a global switch; combined server-side with ServerConfig.WeatherRainPredicted into DeviceConfigController.SkipWaterPumpForRain.
         public bool SkipWaterPumpWhenRainPredicted { get; set; }
     }
 
-    /// <summary>Which relay function a <see cref="DeviceUnitZoneRule"/> targets - same numeric
-    /// convention as DeviceScheduleSlot.RelayFunction and the deviceTypeRelay seed rows
-    /// (1=Ventilation, 2=Light, 3=Heating, 4=WaterPump). Kept as a plain int on the DTO/entity
-    /// rather than this enum, to avoid a JsonStringEnumConverter dependency on a wire field the
-    /// firmware also has to parse as a number.</summary>
+    /// Relay function a DeviceUnitZoneRule targets, same numeric convention as deviceTypeRelay seed rows; kept as a plain int on the wire (not this enum) so firmware can parse it as a number without JsonStringEnumConverter.
     public enum RelayFunction
     {
         Ventilation = 1,
@@ -50,10 +37,7 @@ namespace api.Models
         WaterPump = 4,
     }
 
-    /// <summary>Which kind of condition a <see cref="DeviceUnitZoneRule"/> evaluates - see
-    /// ThresholdConditionConfig/IntervalConditionConfig/ScheduleConditionConfig below for each
-    /// type's ConditionConfig shape. Composite (AND/OR across different condition types) is
-    /// deliberately out of scope.</summary>
+    /// Which condition a DeviceUnitZoneRule evaluates - see ThresholdConditionConfig/IntervalConditionConfig/ScheduleConditionConfig for each type's shape; composite AND/OR across types is deliberately out of scope.
     public enum ConditionType
     {
         Threshold = 1,
@@ -61,23 +45,13 @@ namespace api.Models
         Schedule = 3,
     }
 
-    /// <summary>A plain System.Text.Json.Nodes.JsonNode has no C# property metadata to re-key
-    /// against - once built, its keys are frozen exactly as whatever options constructed it, and an
-    /// OUTER JsonSerializer.Serialize(..., camelCaseOptions) call does NOT walk into an
-    /// already-materialized JsonNode to re-apply that policy. Every place that builds or reads a
-    /// DeviceUnitZoneRule.ConditionConfig must use these exact options, not the parameterless
-    /// JsonSerializer overloads, or camelCase drifts to PascalCase on the wire.</summary>
+    /// A materialized JsonNode's keys are frozen by whatever options built it - an outer JsonSerializer.Serialize(camelCaseOptions) does NOT re-key it, so every DeviceUnitZoneRule.ConditionConfig read/write must use these exact Options or camelCase drifts to PascalCase.
     public static class ConditionConfigJson
     {
         public static readonly System.Text.Json.JsonSerializerOptions Options = new(System.Text.Json.JsonSerializerDefaults.Web);
     }
 
-    /// <summary>One automation rule, living on the ZONE (not the device) so a controller-replacement
-    /// device assigned to the same zone immediately runs the zone's existing rules with no extra
-    /// step. A zone may hold several rules for the SAME RelayFunction - OR semantics, any rule that
-    /// evaluates "on" wins; there is no AND/composite combination. ConditionConfig is a JSON blob
-    /// whose shape depends on ConditionType - see the three ConditionConfig-suffixed records below,
-    /// which are ONLY (de)serialization helpers for that JSON, not additional wire fields.</summary>
+    /// One automation rule living on the zone (not the device), so a replacement controller inherits it immediately; several rules for the same RelayFunction OR together (any "on" wins, no AND/composite). ConditionConfig's shape depends on ConditionType - see the ConditionConfig-suffixed records below.
     public class DeviceUnitZoneRule
     {
         [HiddenInput(DisplayValue = true)]
@@ -88,33 +62,22 @@ namespace api.Models
         public System.Text.Json.Nodes.JsonNode? ConditionConfig { get; set; }
     }
 
-    /// <summary>Threshold+hysteresis for whichever single metric/direction is already implicit in
-    /// the rule's RelayFunction (Ventilation=humidity/above, Light=light/below,
-    /// Heating=temperature/below, WaterPump=waterLevel/below - see AgrumyFirmware's
-    /// ActuatorController::evaluateRule). Deliberately ONE threshold value, not a low/high pair -
-    /// the dispatch switch only ever reads one bound per function.</summary>
+    /// Threshold+hysteresis for the metric/direction implicit in the rule's RelayFunction (see AgrumyFirmware's ActuatorController::evaluateRule) - deliberately one value, not a low/high pair, since the dispatch switch only reads one bound per function.
     public record ThresholdConditionConfig(double Threshold, double Hysteresis);
 
-    /// <summary>On for IntervalLength seconds out of every Interval-second period, grid-aligned to
-    /// epoch - see AgrumyFirmware's computeIntervalState.</summary>
+    /// On for IntervalLength seconds out of every Interval-second period, grid-aligned to epoch - see AgrumyFirmware's computeIntervalState.
     public record IntervalConditionConfig(int Interval, int IntervalLength);
 
-    /// <summary>ONE wall-clock window - multiple windows for the same function are multiple
-    /// Schedule-type rules, OR'd together like any other pair of rules for that function.
-    /// DaysOfWeek: 7-bit mask, bit 0 = Sunday .. bit 6 = Saturday. Start: seconds since local
-    /// midnight, 0-86399. Duration: seconds; Start+Duration must not exceed 86400 (no crossing
-    /// local midnight).</summary>
+    /// One wall-clock window - multiple windows for the same function are multiple Schedule rules, OR'd together. DaysOfWeek: 7-bit mask (bit0=Sunday). Start/Duration: seconds since local midnight, must not cross midnight.
     public record ScheduleConditionConfig(int DaysOfWeek, int Start, int Duration);
 
-    /// <summary>Per-sensor-type average, each type kept independent and computed only from the
-    /// latest reading of each device in scope - not a historical average, which would skew by poll
-    /// frequency. A null field means no device in scope has ever reported that type.</summary>
+    /// Per-sensor-type average from each device's LATEST reading only, not a historical average (which would skew by poll frequency); null means nothing in scope has reported that type.
     public class SensorAverages
     {
         public double? Temperature { get; set; }
         public double? SoilTemperature { get; set; }
         public double? Humidity { get; set; }
-        /// <summary>Derived from Temperature+Humidity (api.Utils.VpdCalculator) - null whenever either is, never computed from a stale pairing.</summary>
+        /// Derived from Temperature+Humidity (api.Utils.VpdCalculator) - null whenever either is, never computed from a stale pairing.
         public double? Vpd { get; set; }
         public double? Moisture { get; set; }
         public double? Light { get; set; }
@@ -127,8 +90,7 @@ namespace api.Models
         public double? Wind { get; set; }
     }
 
-    /// <summary>Traffic-light health summary for a Unit/Zone cube. Priority Red > Orange > Green
-    /// (a single offline device makes the whole cube Red even if nothing else is wrong).</summary>
+    /// Traffic-light health for a Unit/Zone cube; Red beats Orange beats Green, so one offline device reddens the whole cube.
     public enum ZoneStatus
     {
         Green = 0,
@@ -136,10 +98,7 @@ namespace api.Models
         Red = 2,
     }
 
-    /// <summary>Last-24h hourly average per sensor type, for the cube's mini sparklines - same
-    /// field set/semantics as SensorAverages, but each is 24 buckets instead of one number. Index 0
-    /// = the bucket ending 24h ago (oldest), index 23 = the bucket ending now (current hour, may be
-    /// partial). A null bucket is rendered as a gap in the sparkline, not a zero.</summary>
+    /// Last-24h hourly average per sensor type for the cube's sparklines - index 0 is the oldest bucket (24h ago), index 23 is the current (possibly partial) hour; a null bucket renders as a gap, not zero.
     public class SensorTrend
     {
         public const int HourBuckets = 24;
@@ -159,8 +118,7 @@ namespace api.Models
         public double?[] Wind { get; set; } = new double?[HourBuckets];
     }
 
-    /// <summary>One non-critical problem alert in scope for a Unit/Zone's Orange status - shown in
-    /// _ZoneStatusBadge's dropdown, dismissable via DeviceApiController.DeviceEventAcknowledge.</summary>
+    /// One non-critical problem alert behind a Unit/Zone's Orange status - shown in _ZoneStatusBadge's dropdown, dismissable via DeviceApiController.DeviceEventAcknowledge.
     public class UnitZoneProblemAlert
     {
         public int IDEventDevice { get; set; }
@@ -171,8 +129,7 @@ namespace api.Models
         public string? Message { get; set; }
     }
 
-    /// <summary>One Unit cube on the top-level dashboard - name plus a roll-up over every sensor in
-    /// every zone of this unit.</summary>
+    /// One Unit cube on the top-level dashboard - name plus a roll-up over every sensor in every zone of this unit.
     public class DeviceUnitDashboard
     {
         public int IDDeviceUnit { get; set; }
@@ -185,10 +142,7 @@ namespace api.Models
         public IList<UnitZoneProblemAlert> ProblemAlerts { get; set; } = new List<UnitZoneProblemAlert>();
     }
 
-    /// <summary>One Zone cube inside a Unit's drill-down - same shape as DeviceUnitDashboard,
-    /// narrowed to this zone's own devices. <see cref="Devices"/> is populated only by the
-    /// single-zone detail view, left empty on the zone-list-within-a-unit view where only the
-    /// roll-up numbers are shown.</summary>
+    /// One Zone cube inside a Unit's drill-down, same shape as DeviceUnitDashboard narrowed to this zone; Devices is populated only by the single-zone detail view, left empty on the zone-list view.
     public class DeviceUnitZoneDashboard
     {
         public int IDDeviceUnitZone { get; set; }
@@ -202,9 +156,7 @@ namespace api.Models
         public IList<UnitZoneProblemAlert> ProblemAlerts { get; set; } = new List<UnitZoneProblemAlert>();
     }
 
-    /// <summary>Body of the Add Controller/Add Sensor action - assigns one already-unassigned
-    /// device to one zone. The zone's own DeviceUnitID resolves the Unit, so the caller does not
-    /// also pass a unit id.</summary>
+    /// Body of the Add Controller/Add Sensor action - assigns an unassigned device to a zone; the zone's own DeviceUnitID resolves the Unit, so no separate unit id is needed.
     public class DeviceZoneAssignment
     {
         public int IDDevice { get; set; }

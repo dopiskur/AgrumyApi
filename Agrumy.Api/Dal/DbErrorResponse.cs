@@ -1,9 +1,6 @@
 namespace api.Dal
 {
-    /// <summary>
-    /// Builds a consistent response body for database failures, so controllers can return the same
-    /// shape ({ reason, message }) instead of a bare <c>false</c> / raw exception message.
-    /// </summary>
+    /// Builds a consistent { reason, message } response body for database failures instead of a bare false / raw exception message.
     public static class DbErrorResponse
     {
         public static object For(DbFailureKind kind) => kind switch
@@ -35,7 +32,7 @@ namespace api.Dal
             }
         };
 
-        /// <summary>HTTP status for a failure kind: 409 for a constraint violation, 500 for an unknown/unexpected error, otherwise 503.</summary>
+        /// HTTP status for a failure kind: 409 for a constraint violation, 500 for an unknown/unexpected error, otherwise 503.
         public static int StatusCodeFor(DbFailureKind kind) => kind switch
         {
             DbFailureKind.ConstraintViolation => 409,
@@ -43,12 +40,7 @@ namespace api.Dal
             _ => 503
         };
 
-        /// <summary>
-        /// True if <paramref name="needle"/> appears in the message of <paramref name="ex"/> or any
-        /// of its inner exceptions. EF wraps provider errors in <see cref="System.Data.Common.DbException"/>
-        /// / DbUpdateException, so the useful text (unique-key names, "doesn't exist", ...) is usually
-        /// on an inner exception, not the outer one.
-        /// </summary>
+        /// True if <paramref name="needle"/> appears in <paramref name="ex"/> or any inner exception - EF's DbException/DbUpdateException wrapping usually puts the useful text on an inner exception.
         public static bool Mentions(Exception? ex, string needle)
         {
             for (Exception? e = ex; e != null; e = e.InnerException)
