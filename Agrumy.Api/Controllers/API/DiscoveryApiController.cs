@@ -8,8 +8,8 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace api.Controllers.API
 {
-    /// <summary>Roadmap #268 "Scan for new devices" - device-facing report intake plus the admin
-    /// scan trigger; result-aggregation lands in a later step, on this same controller.</summary>
+    /// <summary>Roadmap #268 "Scan for new devices" - device-facing report intake, the admin scan
+    /// trigger, and the aggregated results list.</summary>
     [Route("/api/Discovery")]
     public class DiscoveryApiController(IRepository repo, ICache cache, CommandQueueService commandQueue) : ApiControllerBase(repo, cache)
     {
@@ -47,7 +47,7 @@ namespace api.Controllers.API
         {
             if (request.ZoneID is int zoneId)
             {
-                var (_, error) = await EnsureOwnedZoneAsync(zoneId);
+                var (_, error) = await EnsureOwnedZoneAsync(zoneId, forWrite: true);
                 if (error != null)
                 {
                     return error;
@@ -55,7 +55,7 @@ namespace api.Controllers.API
             }
             else if (request.UnitID is int unitId)
             {
-                var (_, error) = await EnsureOwnedUnitAsync(unitId);
+                var (_, error) = await EnsureOwnedUnitAsync(unitId, forWrite: true);
                 if (error != null)
                 {
                     return error;
@@ -73,10 +73,35 @@ namespace api.Controllers.API
             };
         }
 
-        private Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int idDeviceUnitZone) =>
-            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone), z => z.TenantID, "Zone", forWrite: true);
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpGet("Results")]
+        public async Task<ActionResult<IList<DiscoveryResult>>> Results(int? unitID, int? zoneID)
+        {
+            if (zoneID is int zoneId)
+            {
+                var (_, error) = await EnsureOwnedZoneAsync(zoneId, forWrite: false);
+                if (error != null)
+                {
+                    return error;
+                }
+            }
+            else if (unitID is int unitId)
+            {
+                var (_, error) = await EnsureOwnedUnitAsync(unitId, forWrite: false);
+                if (error != null)
+                {
+                    return error;
+                }
+            }
 
-        private Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int idDeviceUnit) =>
-            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite: true);
+            int? tenantId = CallerReadsDevicesGlobally ? null : CallerTenantId;
+            return Ok(await Repo.DiscoveryResultsGetAsync(tenantId, unitID, zoneID));
+        }
+
+        private Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int idDeviceUnitZone, bool forWrite) =>
+            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone), z => z.TenantID, "Zone", forWrite);
+
+        private Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int idDeviceUnit, bool forWrite) =>
+            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite);
     }
 }

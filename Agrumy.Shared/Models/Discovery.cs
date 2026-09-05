@@ -16,4 +16,15 @@ namespace api.Models
         public int? UnitID { get; set; }
         public int? ZoneID { get; set; }
     }
+
+    /// <summary>One row per unique DiscoveredApMac in GET /api/Discovery/Results - see
+    /// api.Utils.DiscoveryResultPicker for the best-report/tiebreak rule.</summary>
+    public class DiscoveryResult
+    {
+        public string DiscoveredApMac { get; set; } = "";
+        public int? Rssi { get; set; }
+        public int ScanningDeviceID { get; set; }
+        public string? ScanningDeviceName { get; set; }
+        public DateTime DateReported { get; set; }
+    }
 }
