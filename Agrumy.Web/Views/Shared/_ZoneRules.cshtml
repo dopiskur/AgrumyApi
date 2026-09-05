@@ -1,7 +1,12 @@
 @using System.Text.Json
 @model api.ViewModels.ZoneViewModel
 @{
-    var rulesByFunction = Model.Rules.GroupBy(r => r.RelayFunction).ToDictionary(g => g.Key, g => g.ToList());
+    // Stage 1 of #212: Relay-action rules only, one condition per rule (Operator always null) - matches
+    // what RuleAdd below still produces. AND/OR multi-condition building and the Notification-action
+    // section land in a follow-up pass; DeviceUnitZoneRule.Conditions[0] is always present for a
+    // Relay rule created through this form.
+    var relayRules = Model.Rules.Where(r => r.ActionType == ActionType.Relay).ToList();
+    var rulesByFunction = relayRules.GroupBy(r => r.RelayFunction!.Value).ToDictionary(g => g.Key, g => g.ToList());
     (RelayFunction Value, string Label)[] functions =
     [
         (RelayFunction.Ventilation, "Ventilation"),
@@ -14,20 +19,21 @@
     // overload fails to bind against the camelCase JSON these Add forms produce.
     string Summarize(DeviceUnitZoneRule rule)
     {
-        switch (rule.ConditionType)
+        RuleCondition condition = rule.Conditions[0];
+        switch (condition.ConditionType)
         {
             case ConditionType.Threshold:
-                var t = rule.ConditionConfig?.Deserialize<ThresholdConditionConfig>(ConditionConfigJson.Options);
+                var t = condition.ConditionConfig?.Deserialize<ThresholdConditionConfig>(ConditionConfigJson.Options);
                 return $"threshold {t?.Threshold:0.##}, hysteresis {t?.Hysteresis:0.##}";
             case ConditionType.Interval:
-                var iv = rule.ConditionConfig?.Deserialize<IntervalConditionConfig>(ConditionConfigJson.Options);
+                var iv = condition.ConditionConfig?.Deserialize<IntervalConditionConfig>(ConditionConfigJson.Options);
                 return $"on {iv?.IntervalLength}s out of every {iv?.Interval}s";
             case ConditionType.Schedule:
-                var s = rule.ConditionConfig?.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options);
+                var s = condition.ConditionConfig?.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options);
                 int start = s?.Start ?? 0, end = start + (s?.Duration ?? 0);
                 return $"{start / 3600:00}:{start % 3600 / 60:00}-{end / 3600:00}:{end % 3600 / 60:00}, days 0b{Convert.ToString(s?.DaysOfWeek ?? 0, 2).PadLeft(7, '0')}";
             case ConditionType.Astronomical:
-                var a = rule.ConditionConfig?.Deserialize<AstronomicalConditionConfig>(ConditionConfigJson.Options);
+                var a = condition.ConditionConfig?.Deserialize<AstronomicalConditionConfig>(ConditionConfigJson.Options);
                 return $"sunrise {a?.SunriseOffsetMinutes:+#;-#;0}min to sunset {a?.SunsetOffsetMinutes:+#;-#;0}min, days 0b{Convert.ToString(a?.DaysOfWeek ?? 0, 2).PadLeft(7, '0')}";
             default:
                 return "?";
@@ -60,7 +66,7 @@
                         @foreach (var rule in rules)
                         {
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                                <span><span class="badge text-bg-secondary me-2">@rule.ConditionType</span>@Summarize(rule)</span>
+                                <span><span class="badge text-bg-secondary me-2">@rule.Conditions[0].ConditionType</span>@Summarize(rule)</span>
                                 <form asp-action="RuleDelete" method="post" onsubmit="return confirm('Remove this rule?');">
                                     <input type="hidden" name="idDeviceUnitZoneRule" value="@rule.IDDeviceUnitZoneRule" />
                                     <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />

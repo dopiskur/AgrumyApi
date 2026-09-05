@@ -67,8 +67,9 @@ public class AstronomicalScheduleTests
         IList<DeviceUnitZoneRule> resolved = AstronomicalRuleResolver.Resolve(rules, serverConfig, new DateOnly(2026, 6, 21), utcOffsetSeconds: 7200);
 
         DeviceUnitZoneRule rule = Assert.Single(resolved);
-        Assert.Equal(ConditionType.Schedule, rule.ConditionType);
-        var schedule = rule.ConditionConfig!.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options)!;
+        RuleCondition condition = Assert.Single(rule.Conditions);
+        Assert.Equal(ConditionType.Schedule, condition.ConditionType);
+        var schedule = condition.ConditionConfig!.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options)!;
         Assert.Equal(127, schedule.DaysOfWeek);
 
         var (sunrise, sunset) = SolarCalculator.Compute(new DateOnly(2026, 6, 21), 45.8, 16.0, 7200);
@@ -95,8 +96,7 @@ public class AstronomicalScheduleTests
         {
             DeviceUnitZoneID = 1,
             RelayFunction = RelayFunction.Light,
-            ConditionType = ConditionType.Schedule,
-            ConditionConfig = JsonSerializer.SerializeToNode(new ScheduleConditionConfig(127, 0, 3600), ConditionConfigJson.Options),
+            Conditions = [new RuleCondition(ConditionType.Schedule, JsonSerializer.SerializeToNode(new ScheduleConditionConfig(127, 0, 3600), ConditionConfigJson.Options), null)],
         };
 
         IList<DeviceUnitZoneRule> resolved = AstronomicalRuleResolver.Resolve([scheduleRule], new ServerConfig(), new DateOnly(2026, 6, 21), 0);
@@ -108,7 +108,6 @@ public class AstronomicalScheduleTests
     {
         DeviceUnitZoneID = 1,
         RelayFunction = RelayFunction.Light,
-        ConditionType = ConditionType.Astronomical,
-        ConditionConfig = JsonSerializer.SerializeToNode(new AstronomicalConditionConfig(daysOfWeek, sunriseOffset, sunsetOffset), ConditionConfigJson.Options),
+        Conditions = [new RuleCondition(ConditionType.Astronomical, JsonSerializer.SerializeToNode(new AstronomicalConditionConfig(daysOfWeek, sunriseOffset, sunsetOffset), ConditionConfigJson.Options), null)],
     };
 }

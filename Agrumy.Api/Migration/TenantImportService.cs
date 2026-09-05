@@ -31,7 +31,7 @@ namespace api.Migration
             Dictionary<int, int> userIdMap = await ImportUsersAsync(export, tenantId, result);
             Dictionary<int, int> unitIdMap = await ImportUnitsAsync(export, tenantId, result);
             Dictionary<int, int> zoneIdMap = await ImportZonesAsync(export, tenantId, unitIdMap, result);
-            await ImportZoneRulesAsync(export, zoneIdMap, result);
+            await ImportZoneRulesAsync(export, tenantId, zoneIdMap, result);
             Dictionary<int, int> deviceIdMap = await ImportDevicesAsync(export, tenantId, unitIdMap, zoneIdMap, result);
             await ImportSensorDataAsync(export, tenantId, deviceIdMap, unitIdMap, zoneIdMap, result);
 
@@ -134,21 +134,27 @@ namespace api.Migration
             return map;
         }
 
-        private async Task ImportZoneRulesAsync(TenantExport export, Dictionary<int, int> zoneIdMap, TenantImportResult result)
+        private async Task ImportZoneRulesAsync(TenantExport export, int tenantId, Dictionary<int, int> zoneIdMap, TenantImportResult result)
         {
-            foreach (DeviceUnitZoneRule r in export.ZoneRules)
+            // Export only ever captured Zone-scoped rules (TenantExportService predates Unit/Global scope) - r.DeviceUnitZoneID is
+            // therefore always set here, never null.
+            foreach (DeviceUnitZoneRule r in export.ZoneRules.Where(r => r.DeviceUnitZoneID != null))
             {
-                int newZoneId = RemapOrSentinel(r.DeviceUnitZoneID, zoneIdMap);
+                int newZoneId = RemapOrSentinel(r.DeviceUnitZoneID!.Value, zoneIdMap);
                 if (newZoneId == 0)
                 {
                     continue; // the zone it belonged to failed to import - an orphaned rule is worse than a dropped one
                 }
-                await repo.DeviceUnitZoneRuleAddAsync(new DeviceUnitZoneRule
+                await repo.RuleAddAsync(new DeviceUnitZoneRule
                 {
+                    TenantID = tenantId,
                     DeviceUnitZoneID = newZoneId,
+                    ActionType = r.ActionType,
                     RelayFunction = r.RelayFunction,
-                    ConditionType = r.ConditionType,
-                    ConditionConfig = r.ConditionConfig,
+                    SensorMetric = r.SensorMetric,
+                    Conditions = r.Conditions,
+                    NotificationSubject = r.NotificationSubject,
+                    NotificationBody = r.NotificationBody,
                 });
                 result.ZoneRulesImported++;
             }

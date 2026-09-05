@@ -43,7 +43,7 @@ namespace api.Migration
                 {
                     if (zone.IDDeviceUnitZone is int idZone)
                     {
-                        rules.AddRange(await repo.DeviceUnitZoneRulesGetAsync(idZone));
+                        rules.AddRange(await repo.RulesGetForZoneAsync(idZone));
                     }
                 }
             }

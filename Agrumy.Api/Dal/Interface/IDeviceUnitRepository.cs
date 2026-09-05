@@ -72,18 +72,30 @@ namespace api.Dal.Interface
         /// Single-zone detail: roll-up plus the actual device list, null if the zone id doesn't exist.
         Task<DeviceUnitZoneDashboard?> DeviceUnitZoneDashboardGetAsync(int idDeviceUnitZone);
 
-        // ---- Zone rules -------------------------------------------------
+        // ---- Rules (Zone/Unit/Global scope) ------------------------------
 
-        /// Every rule belonging to this zone, ordered by RelayFunction - several rows may share the same RelayFunction (OR semantics, resolved by the firmware, not combined server-side).
-        Task<IList<DeviceUnitZoneRule>> DeviceUnitZoneRulesGetAsync(int idDeviceUnitZone);
+        /// Every rule scoped to exactly this zone - several rows may share the same RelayFunction/SensorMetric (OR semantics; Relay-action OR is resolved by the firmware, Notification-action OR by RuleNotificationEvaluator).
+        Task<IList<DeviceUnitZoneRule>> RulesGetForZoneAsync(int idDeviceUnitZone);
 
-        /// Single rule by id (no tenant filter) - for ownership checks, resolve its DeviceUnitZoneID then check that zone's tenant - or null if none.
-        Task<DeviceUnitZoneRule?> DeviceUnitZoneRuleGetByIdAsync(int? idDeviceUnitZoneRule);
+        /// Every rule scoped to exactly this unit (Unit scope, not the union of its zones' own rules).
+        Task<IList<DeviceUnitZoneRule>> RulesGetForUnitAsync(int idDeviceUnit);
 
-        Task<int> DeviceUnitZoneRuleAddAsync(DeviceUnitZoneRule rule);
+        /// Every rule at Global (per-tenant) scope - applies to every unit/zone the tenant owns unless a more specific scope overrides it for that function/metric.
+        Task<IList<DeviceUnitZoneRule>> RulesGetForTenantGlobalAsync(int tenantId);
 
-        /// A no-op if the id does not exist.
-        Task DeviceUnitZoneRuleDeleteAsync(int idDeviceUnitZoneRule);
+        /// Every Notification-action rule for the tenant across all three scopes, unresolved (RuleNotificationEvaluator does its own per-zone Zone>Unit>Global resolution).
+        Task<IList<DeviceUnitZoneRule>> RulesGetNotificationRulesForTenantAsync(int tenantId);
+
+        /// Single rule by id (no tenant filter) - for ownership checks, resolve its scope then check that scope's tenant - or null if none.
+        Task<DeviceUnitZoneRule?> RuleGetByIdAsync(int? idRule);
+
+        Task<int> RuleAddAsync(DeviceUnitZoneRule rule);
+
+        /// Every Notification-action rule in the tenant with a RuleTriggered condition referencing ruleId.
+        Task<IList<DeviceUnitZoneRule>> RulesReferencingAsync(int ruleId, int tenantId);
+
+        /// A no-op if the id does not exist. Callers must check RulesReferencingAsync first and refuse to delete a still-referenced rule - this method itself does not guard that.
+        Task RuleDeleteAsync(int idRule);
 
         /// Bumps ConfigVersion for every device assigned to this zone - called after any rules/safety-limit change so the next poll picks it up.
         Task DeviceUnitZoneConfigVersionBumpAsync(int idDeviceUnitZone);

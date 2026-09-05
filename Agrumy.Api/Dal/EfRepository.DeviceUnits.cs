@@ -1,3 +1,4 @@
+using System.Text.Json;
 using api.Dal.Entities;
 using api.Dal.Interface;
 using api.Models;
@@ -155,64 +156,150 @@ namespace api.Dal
                 await DeviceUnassignFromZoneAsync(deviceId);
             }
 
-            // App-level cleanup, not a DB-level CASCADE - see AgrumyDbContext's DeviceUnitZoneRuleRow config, DeleteBehavior.NoAction.
+            // App-level cleanup, not a DB-level CASCADE - see AgrumyDbContext's DeviceUnitZoneRuleRow config, DeleteBehavior.NoAction. Zone-cascade deletion does not run the RulesReferencingAsync guard RuleDeleteAsync uses - a whole-zone delete already unassigns its devices unconditionally, same "cascade wins" precedent.
+            var ruleIds = await db.DeviceUnitZoneRules.AsNoTracking()
+                .Where(r => r.DeviceUnitZoneID == idDeviceUnitZone).Select(r => r.IDDeviceUnitZoneRule).ToListAsync();
+            await db.RuleNotificationStates.Where(s => ruleIds.Contains(s.RuleID) || s.DeviceUnitZoneID == idDeviceUnitZone).ExecuteDeleteAsync();
             await db.DeviceUnitZoneRules.Where(r => r.DeviceUnitZoneID == idDeviceUnitZone).ExecuteDeleteAsync();
 
             await db.DeviceUnitZones.Where(z => z.IDDeviceUnitZone == idDeviceUnitZone).ExecuteDeleteAsync();
         }
 
-        // ---- Zone rules ---------------------------------------------------------
+        // ---- Rules (Zone/Unit/Global scope) --------------------------------------
 
-        public async Task<IList<DeviceUnitZoneRule>> DeviceUnitZoneRulesGetAsync(int idDeviceUnitZone)
+        public async Task<IList<DeviceUnitZoneRule>> RulesGetForZoneAsync(int idDeviceUnitZone)
         {
             var rows = await db.DeviceUnitZoneRules.AsNoTracking()
                 .Where(r => r.DeviceUnitZoneID == idDeviceUnitZone)
-                .OrderBy(r => r.RelayFunction).ThenBy(r => r.IDDeviceUnitZoneRule)
+                .OrderBy(r => r.RelayFunction).ThenBy(r => r.SensorMetric).ThenBy(r => r.IDDeviceUnitZoneRule)
                 .ToListAsync();
             return rows.Select(ToDtoRule).ToList();
         }
 
-        public async Task<DeviceUnitZoneRule?> DeviceUnitZoneRuleGetByIdAsync(int? idDeviceUnitZoneRule)
+        public async Task<IList<DeviceUnitZoneRule>> RulesGetForUnitAsync(int idDeviceUnit)
         {
-            var row = await db.DeviceUnitZoneRules.AsNoTracking().FirstOrDefaultAsync(r => r.IDDeviceUnitZoneRule == idDeviceUnitZoneRule);
+            var rows = await db.DeviceUnitZoneRules.AsNoTracking()
+                .Where(r => r.DeviceUnitID == idDeviceUnit)
+                .OrderBy(r => r.RelayFunction).ThenBy(r => r.SensorMetric).ThenBy(r => r.IDDeviceUnitZoneRule)
+                .ToListAsync();
+            return rows.Select(ToDtoRule).ToList();
+        }
+
+        public async Task<IList<DeviceUnitZoneRule>> RulesGetForTenantGlobalAsync(int tenantId)
+        {
+            var rows = await db.DeviceUnitZoneRules.AsNoTracking()
+                .Where(r => r.TenantID == tenantId && r.DeviceUnitID == null && r.DeviceUnitZoneID == null)
+                .OrderBy(r => r.RelayFunction).ThenBy(r => r.SensorMetric).ThenBy(r => r.IDDeviceUnitZoneRule)
+                .ToListAsync();
+            return rows.Select(ToDtoRule).ToList();
+        }
+
+        /// Every Notification-action rule for the tenant across all three scopes - RuleNotificationEvaluator resolves Zone>Unit>Global itself per zone, so this deliberately returns the flat, unresolved set.
+        public async Task<IList<DeviceUnitZoneRule>> RulesGetNotificationRulesForTenantAsync(int tenantId)
+        {
+            var rows = await db.DeviceUnitZoneRules.AsNoTracking()
+                .Where(r => r.TenantID == tenantId && r.ActionType == (int)ActionType.Notification)
+                .ToListAsync();
+            return rows.Select(ToDtoRule).ToList();
+        }
+
+        public async Task<DeviceUnitZoneRule?> RuleGetByIdAsync(int? idRule)
+        {
+            var row = await db.DeviceUnitZoneRules.AsNoTracking().FirstOrDefaultAsync(r => r.IDDeviceUnitZoneRule == idRule);
             return row == null ? null : ToDtoRule(row);
         }
 
-        public async Task<int> DeviceUnitZoneRuleAddAsync(DeviceUnitZoneRule rule)
+        public async Task<int> RuleAddAsync(DeviceUnitZoneRule rule)
         {
             var row = new DeviceUnitZoneRuleRow
             {
+                TenantID = rule.TenantID,
+                DeviceUnitID = rule.DeviceUnitID,
                 DeviceUnitZoneID = rule.DeviceUnitZoneID,
-                RelayFunction = (int)rule.RelayFunction,
-                ConditionType = (int)rule.ConditionType,
-                ConditionConfig = rule.ConditionConfig?.ToJsonString() ?? "{}",
+                ActionType = (int)rule.ActionType,
+                RelayFunction = (int?)rule.RelayFunction,
+                SensorMetric = (int?)rule.SensorMetric,
+                Conditions = System.Text.Json.JsonSerializer.Serialize(rule.Conditions, ConditionConfigJson.Options),
+                NotificationSubject = rule.NotificationSubject,
+                NotificationBody = rule.NotificationBody,
             };
             db.DeviceUnitZoneRules.Add(row);
             await db.SaveChangesAsync();
-            await DeviceUnitZoneConfigVersionBumpAsync(rule.DeviceUnitZoneID);
+            if (rule.DeviceUnitZoneID is int idZone)
+            {
+                await DeviceUnitZoneConfigVersionBumpAsync(idZone);
+            }
+            else if (rule.DeviceUnitID is int idUnit)
+            {
+                await db.Devices.Where(d => d.DeviceUnitID == idUnit)
+                    .ExecuteUpdateAsync(s => s.SetProperty(d => d.ConfigVersion, d => (d.ConfigVersion ?? 0) + 1));
+            }
+            else
+            {
+                await db.Devices.Where(d => d.TenantID == rule.TenantID)
+                    .ExecuteUpdateAsync(s => s.SetProperty(d => d.ConfigVersion, d => (d.ConfigVersion ?? 0) + 1));
+            }
             return row.IDDeviceUnitZoneRule;
         }
 
-        public async Task DeviceUnitZoneRuleDeleteAsync(int idDeviceUnitZoneRule)
+        /// Every RuleTriggered condition anywhere in the tenant's rules that references ruleId - callers use this to block deleting a still-referenced rule, and RuleNotificationEvaluator uses it to find dependents of a just-fired rule.
+        public async Task<IList<DeviceUnitZoneRule>> RulesReferencingAsync(int ruleId, int tenantId)
         {
-            int idZone = await db.DeviceUnitZoneRules.AsNoTracking()
-                .Where(r => r.IDDeviceUnitZoneRule == idDeviceUnitZoneRule)
-                .Select(r => r.DeviceUnitZoneID)
-                .FirstOrDefaultAsync();
-            await db.DeviceUnitZoneRules.Where(r => r.IDDeviceUnitZoneRule == idDeviceUnitZoneRule).ExecuteDeleteAsync();
-            if (idZone != 0)
+            var candidates = await db.DeviceUnitZoneRules.AsNoTracking()
+                .Where(r => r.TenantID == tenantId && r.ActionType == (int)ActionType.Notification)
+                .ToListAsync();
+            var result = new List<DeviceUnitZoneRule>();
+            foreach (var row in candidates)
+            {
+                DeviceUnitZoneRule dto = ToDtoRule(row);
+                bool references = dto.Conditions.Any(c =>
+                    c.ConditionType == ConditionType.RuleTriggered &&
+                    c.ConditionConfig?.Deserialize<RuleTriggeredConditionConfig>(ConditionConfigJson.Options)?.ReferencedRuleId == ruleId);
+                if (references)
+                {
+                    result.Add(dto);
+                }
+            }
+            return result;
+        }
+
+        public async Task RuleDeleteAsync(int idRule)
+        {
+            var row = await db.DeviceUnitZoneRules.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.IDDeviceUnitZoneRule == idRule);
+            if (row == null) { return; }
+
+            await db.RuleNotificationStates.Where(s => s.RuleID == idRule).ExecuteDeleteAsync();
+            await db.DeviceUnitZoneRules.Where(r => r.IDDeviceUnitZoneRule == idRule).ExecuteDeleteAsync();
+
+            if (row.DeviceUnitZoneID is int idZone)
             {
                 await DeviceUnitZoneConfigVersionBumpAsync(idZone);
+            }
+            else if (row.DeviceUnitID is int idUnit)
+            {
+                await db.Devices.Where(d => d.DeviceUnitID == idUnit)
+                    .ExecuteUpdateAsync(s => s.SetProperty(d => d.ConfigVersion, d => (d.ConfigVersion ?? 0) + 1));
+            }
+            else
+            {
+                await db.Devices.Where(d => d.TenantID == row.TenantID)
+                    .ExecuteUpdateAsync(s => s.SetProperty(d => d.ConfigVersion, d => (d.ConfigVersion ?? 0) + 1));
             }
         }
 
         private static DeviceUnitZoneRule ToDtoRule(DeviceUnitZoneRuleRow r) => new()
         {
             IDDeviceUnitZoneRule = r.IDDeviceUnitZoneRule,
+            TenantID = r.TenantID,
+            DeviceUnitID = r.DeviceUnitID,
             DeviceUnitZoneID = r.DeviceUnitZoneID,
-            RelayFunction = (RelayFunction)r.RelayFunction,
-            ConditionType = (ConditionType)r.ConditionType,
-            ConditionConfig = System.Text.Json.Nodes.JsonNode.Parse(r.ConditionConfig),
+            ActionType = (ActionType)r.ActionType,
+            RelayFunction = (RelayFunction?)r.RelayFunction,
+            SensorMetric = (SensorMetric?)r.SensorMetric,
+            Conditions = System.Text.Json.JsonSerializer.Deserialize<List<RuleCondition>>(r.Conditions, ConditionConfigJson.Options) ?? [],
+            NotificationSubject = r.NotificationSubject,
+            NotificationBody = r.NotificationBody,
         };
 
         public async Task<bool> DeviceUnitZoneHasControllerAsync(int idDeviceUnitZone)

@@ -436,13 +436,18 @@
     "deviceUnitZoneRule": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Roadmap #21. camelCase serialization of api.Models.DeviceUnitZoneRule - one automation rule living on a zone.",
+      "description": "Roadmap #21/#212. camelCase serialization of api.Models.DeviceUnitZoneRule - the SAME class the DB/admin-API CRUD side uses (not split into a firmware-only DTO), so every property below is always present on the wire even though a rule reaching a device is always already resolved to Zone scope and filtered to Relay action (api.Devices.RuleHierarchyResolver) - tenantID/deviceUnitID/actionType/sensorMetric/notificationSubject/notificationBody are consequently fixed/null shapes here, never meaningfully read by firmware.",
       "required": [
         "idDeviceUnitZoneRule",
+        "tenantID",
+        "deviceUnitID",
         "deviceUnitZoneID",
+        "actionType",
         "relayFunction",
-        "conditionType",
-        "conditionConfig"
+        "sensorMetric",
+        "conditions",
+        "notificationSubject",
+        "notificationBody"
       ],
       "properties": {
         "idDeviceUnitZoneRule": {
@@ -451,13 +456,77 @@
             "null"
           ]
         },
+        "tenantID": {
+          "type": "integer",
+          "description": "Admin-API/DB concern only - firmware has no notion of tenant."
+        },
+        "deviceUnitID": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Set only for a Unit-scope rule - never seen here, since a rule reaching a device is already resolved to a specific Zone (RuleHierarchyResolver)."
+        },
         "relayFunction": {
           "type": "integer",
           "description": "1=Ventilation, 2=Light, 3=Heating, 4=WaterPump (api.Models.RelayFunction) - which of the device's relay slots this rule targets, resolved device-side against its OWN relays[] mapping above (the rule itself carries no slot number)."
         },
+        "actionType": {
+          "type": "integer",
+          "description": "1=Relay, 2=Notification (api.Models.ActionType) - always 1 here, a Notification-action rule is never sent to a device (api.BackgroundWorkers.RuleNotificationEvaluator evaluates those server-side instead)."
+        },
+        "sensorMetric": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Notification-action only - always null here."
+        },
+        "conditions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/definitions/ruleCondition"
+          },
+          "description": "Roadmap #212. Flat, left-to-right AND/OR list - folds as ((A op B) op C) op D..., never nested/parenthesized. Several RULES for the same relayFunction still OR together on top of this (AgrumyFirmware's ActuatorController::initController), unchanged from #21."
+        },
+        "notificationSubject": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Notification-action only - always null here."
+        },
+        "notificationBody": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Notification-action only - always null here."
+        },
+        "deviceUnitZoneID": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Which zone this rule belongs to - redundant with the top-level deviceConfig.deviceUnitZoneID (the device already knows its own zone). Never actually null on a rule that reached a device (a rule only reaches firmware after RuleHierarchyResolver has already pinned it to this specific zone), the type stays nullable here only because it mirrors the same always-present-class as the Unit/Global-scope rows the admin-API CRUD side also serializes with this definition."
+        }
+      }
+    },
+    "ruleCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Roadmap #212. camelCase serialization of api.Models.RuleCondition - one entry in a deviceUnitZoneRule's conditions array.",
+      "required": [
+        "conditionType",
+        "conditionConfig",
+        "operator"
+      ],
+      "properties": {
         "conditionType": {
           "type": "integer",
-          "description": "1=Threshold, 2=Interval, 3=Schedule (api.Models.ConditionType) - selects which of the three conditionConfig shapes below applies. Composite (AND/OR across different condition types) is deliberately out of scope."
+          "description": "1=Threshold, 2=Interval, 3=Schedule (api.Models.ConditionType) - selects which of the three conditionConfig shapes below applies. Astronomical(4)/RuleTriggered(5) never reach this wire shape - resolved (Astronomical) or rejected at validation time (RuleTriggered, Notification-action only) server-side first."
         },
         "conditionConfig": {
           "description": "Shape depends on conditionType - exactly one of the three definitions below.",
@@ -473,9 +542,12 @@
             }
           ]
         },
-        "deviceUnitZoneID": {
-          "type": "integer",
-          "description": "Which zone this rule belongs to - redundant with the top-level deviceConfig.deviceUnitZoneID (the device already knows its own zone), present because DeviceUnitZoneRule is the same model used for the DB/admin-API CRUD side, not split into a firmware-only DTO."
+        "operator": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "1=AND, 2=OR (api.Models.LogicalOperator) - the operator BEFORE this condition in the array; null for index 0, required for every other index."
         }
       }
     },

@@ -25,8 +25,7 @@ public class RefitContentSerializerTests
         {
             DeviceUnitZoneID = 5,
             RelayFunction = RelayFunction.Ventilation,
-            ConditionType = ConditionType.Threshold,
-            ConditionConfig = JsonSerializer.SerializeToNode(new ThresholdConditionConfig(10, 2), ConditionConfigJson.Options),
+            Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(10, 2), ConditionConfigJson.Options), null)],
         };
 
         string wire = SerializeAsWebWould(rule);
@@ -34,7 +33,7 @@ public class RefitContentSerializerTests
         var parsed = JsonSerializer.Deserialize<DeviceUnitZoneRule>(wire, Mvc);
         Assert.NotNull(parsed);
         Assert.Equal(RelayFunction.Ventilation, parsed!.RelayFunction);
-        Assert.Equal(ConditionType.Threshold, parsed.ConditionType);
+        Assert.Equal(ConditionType.Threshold, parsed.Conditions[0].ConditionType);
     }
 
     [Fact]

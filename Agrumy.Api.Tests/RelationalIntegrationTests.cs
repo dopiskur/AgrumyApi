@@ -1026,27 +1026,27 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (tenantId, _, _) = await MakeUser(t);
         var (_, zone) = await MakeUnitAndZone(tenantId);
 
-        int rule1 = await _repo.DeviceUnitZoneRuleAddAsync(new DeviceUnitZoneRule
+        int rule1 = await _repo.RuleAddAsync(new DeviceUnitZoneRule
         {
+            TenantID = tenantId,
             DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
             RelayFunction = RelayFunction.Ventilation,
-            ConditionType = ConditionType.Schedule,
-            ConditionConfig = JsonSerializer.SerializeToNode(new ScheduleConditionConfig(0b0111110, 21600, 1800), ConditionConfigJson.Options),
+            Conditions = [new RuleCondition(ConditionType.Schedule, JsonSerializer.SerializeToNode(new ScheduleConditionConfig(0b0111110, 21600, 1800), ConditionConfigJson.Options), null)],
         });
-        int rule2 = await _repo.DeviceUnitZoneRuleAddAsync(new DeviceUnitZoneRule
+        int rule2 = await _repo.RuleAddAsync(new DeviceUnitZoneRule
         {
+            TenantID = tenantId,
             DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
             RelayFunction = RelayFunction.Ventilation,
-            ConditionType = ConditionType.Schedule,
-            ConditionConfig = JsonSerializer.SerializeToNode(new ScheduleConditionConfig(0b0111110, 50400, 900), ConditionConfigJson.Options),
+            Conditions = [new RuleCondition(ConditionType.Schedule, JsonSerializer.SerializeToNode(new ScheduleConditionConfig(0b0111110, 50400, 900), ConditionConfigJson.Options), null)],
         });
-        Assert.Equal(2, (await _repo.DeviceUnitZoneRulesGetAsync(zone.IDDeviceUnitZone!.Value)).Count);
+        Assert.Equal(2, (await _repo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value)).Count);
 
-        await _repo.DeviceUnitZoneRuleDeleteAsync(rule1);
+        await _repo.RuleDeleteAsync(rule1);
 
-        var remaining = Assert.Single(await _repo.DeviceUnitZoneRulesGetAsync(zone.IDDeviceUnitZone!.Value));
+        var remaining = Assert.Single(await _repo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value));
         Assert.Equal(rule2, remaining.IDDeviceUnitZoneRule);
-        var config = remaining.ConditionConfig.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options);
+        var config = remaining.Conditions[0].ConditionConfig.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options);
         Assert.Equal(50400, config!.Start);
     }
 
@@ -1057,26 +1057,26 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (tenantId, _, _) = await MakeUser(t);
         var (_, zone) = await MakeUnitAndZone(tenantId);
 
-        await _repo.DeviceUnitZoneRuleAddAsync(new DeviceUnitZoneRule
+        await _repo.RuleAddAsync(new DeviceUnitZoneRule
         {
+            TenantID = tenantId,
             DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
             RelayFunction = RelayFunction.WaterPump,
-            ConditionType = ConditionType.Threshold,
-            ConditionConfig = JsonSerializer.SerializeToNode(new ThresholdConditionConfig(10, 5), ConditionConfigJson.Options),
+            Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(10, 5), ConditionConfigJson.Options), null)],
         });
-        await _repo.DeviceUnitZoneRuleAddAsync(new DeviceUnitZoneRule
+        await _repo.RuleAddAsync(new DeviceUnitZoneRule
         {
+            TenantID = tenantId,
             DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
             RelayFunction = RelayFunction.WaterPump,
-            ConditionType = ConditionType.Interval,
-            ConditionConfig = JsonSerializer.SerializeToNode(new IntervalConditionConfig(3600, 300), ConditionConfigJson.Options),
+            Conditions = [new RuleCondition(ConditionType.Interval, JsonSerializer.SerializeToNode(new IntervalConditionConfig(3600, 300), ConditionConfigJson.Options), null)],
         });
 
-        var rules = await _repo.DeviceUnitZoneRulesGetAsync(zone.IDDeviceUnitZone!.Value);
+        var rules = await _repo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value);
         Assert.Equal(2, rules.Count);
         Assert.All(rules, r => Assert.Equal(RelayFunction.WaterPump, r.RelayFunction));
-        Assert.Contains(rules, r => r.ConditionType == ConditionType.Threshold);
-        Assert.Contains(rules, r => r.ConditionType == ConditionType.Interval);
+        Assert.Contains(rules, r => r.Conditions[0].ConditionType == ConditionType.Threshold);
+        Assert.Contains(rules, r => r.Conditions[0].ConditionType == ConditionType.Interval);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -1087,15 +1087,15 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (_, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeDevice(t, tenantId);
         await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
-        await _repo.DeviceUnitZoneRuleAddAsync(new DeviceUnitZoneRule
+        await _repo.RuleAddAsync(new DeviceUnitZoneRule
         {
+            TenantID = tenantId,
             DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
             RelayFunction = RelayFunction.Light,
-            ConditionType = ConditionType.Threshold,
-            ConditionConfig = JsonSerializer.SerializeToNode(new ThresholdConditionConfig(200, 20), ConditionConfigJson.Options),
+            Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(200, 20), ConditionConfigJson.Options), null)],
         });
 
-        var rules = await _repo.DeviceUnitZoneRulesGetAsync(zone.IDDeviceUnitZone!.Value);
+        var rules = await _repo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value);
         var rule = Assert.Single(rules);
         Assert.Equal(RelayFunction.Light, rule.RelayFunction);
 
@@ -1112,17 +1112,17 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (_, zone) = await MakeUnitAndZone(tenantId);
-        int ruleId = await _repo.DeviceUnitZoneRuleAddAsync(new DeviceUnitZoneRule
+        int ruleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
         {
+            TenantID = tenantId,
             DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
             RelayFunction = RelayFunction.Heating,
-            ConditionType = ConditionType.Threshold,
-            ConditionConfig = JsonSerializer.SerializeToNode(new ThresholdConditionConfig(18, 1), ConditionConfigJson.Options),
+            Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(18, 1), ConditionConfigJson.Options), null)],
         });
 
         await _repo.DeviceUnitZoneDeleteAsync(zone.IDDeviceUnitZone!.Value);
 
-        Assert.Null(await _repo.DeviceUnitZoneRuleGetByIdAsync(ruleId));
+        Assert.Null(await _repo.RuleGetByIdAsync(ruleId));
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]

@@ -25,14 +25,29 @@ namespace api.Dal.Entities
         public bool SkipWaterPumpWhenRainPredicted { get; set; }
     }
 
-    /// See api.Models.DeviceUnitZoneRule - ConditionConfig is stored as plain JSON text, (de)serialized at the application layer, not a native JSON column type.
+    /// See api.Models.DeviceUnitZoneRule - Conditions is a JSON array of RuleCondition, (de)serialized at the application layer, not a native JSON column type. Exactly one of DeviceUnitZoneID/DeviceUnitID is set for Zone/Unit scope, both null for Global (per-tenant) scope.
     public class DeviceUnitZoneRuleRow
     {
         public int IDDeviceUnitZoneRule { get; set; }
+        public int TenantID { get; set; }
+        public int? DeviceUnitID { get; set; }
+        public int? DeviceUnitZoneID { get; set; }
+        public int ActionType { get; set; }
+        public int? RelayFunction { get; set; }
+        public int? SensorMetric { get; set; }
+        public string Conditions { get; set; } = "[]";
+        public string? NotificationSubject { get; set; }
+        public string? NotificationBody { get; set; }
+    }
+
+    /// Per-(rule, zone) dedup latch for api.BackgroundWorkers.RuleNotificationEvaluator - a rule scoped above Zone level is evaluated independently against every zone it reaches, so the "already notified, don't re-fire every tick" state is keyed per zone, not just per rule.
+    public class RuleNotificationStateRow
+    {
+        public int IDRuleNotificationState { get; set; }
+        public int RuleID { get; set; }
         public int DeviceUnitZoneID { get; set; }
-        public int RelayFunction { get; set; }
-        public int ConditionType { get; set; }
-        public string ConditionConfig { get; set; } = "{}";
+        public bool WasTrue { get; set; }
+        public DateTime? LastFiredAtUtc { get; set; }
     }
 
     public class DeviceTypeRow

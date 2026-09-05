@@ -19,6 +19,9 @@ namespace api.Controllers.API
         // Absolute ceiling - must match AgrumyFirmware DeviceModel.h's MAX_RULES, enforced independently of ServerConfig.MaxRulesPerZone in case a row predates that validation.
         private const int HardMaxRulesPerZone = 32;
 
+        // Absolute ceiling - must match AgrumyFirmware DeviceModel.h's MAX_CONDITIONS_PER_RULE; unlike MaxRulesPerZone this is a per-rule structural limit, not an admin-configurable soft cap.
+        private const int HardMaxConditionsPerRule = 8;
+
         #region Unit CRUD
 
         [Authorize]
@@ -157,7 +160,7 @@ namespace api.Controllers.API
 
         #endregion
 
-        #region Zone Rules
+        #region Rules (Zone/Unit/Global scope)
 
         [Authorize]
         [HttpGet("Zone/Rule")]
@@ -172,7 +175,38 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            return Ok(await Repo.DeviceUnitZoneRulesGetAsync(zone!.IDDeviceUnitZone!.Value));
+            return Ok(await Repo.RulesGetForZoneAsync(zone!.IDDeviceUnitZone!.Value));
+        }
+
+        [Authorize]
+        [HttpGet("Unit/Rule")]
+        public async Task<ActionResult<IList<DeviceUnitZoneRule>>> DeviceUnitRulesGet(int? idDeviceUnit)
+        {
+            if (CallerIsDataReaderOnly)
+            {
+                return StatusCode(403, "Data Reader role cannot view unit rules.");
+            }
+            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceUnit, forWrite: false);
+            if (error != null)
+            {
+                return error;
+            }
+            return Ok(await Repo.RulesGetForUnitAsync(unit!.IDDeviceUnit!.Value));
+        }
+
+        [Authorize]
+        [HttpGet("Global/Rule")]
+        public async Task<ActionResult<IList<DeviceUnitZoneRule>>> GlobalRulesGet()
+        {
+            if (CallerIsDataReaderOnly)
+            {
+                return StatusCode(403, "Data Reader role cannot view global rules.");
+            }
+            if (CallerTenantId is not int tenantId)
+            {
+                return StatusCode(403, "Caller has no tenant.");
+            }
+            return Ok(await Repo.RulesGetForTenantGlobalAsync(tenantId));
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -184,39 +218,162 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            if (RuleConditionConfigError(rule.ConditionType, rule.ConditionConfig) is string configError)
+            rule.DeviceUnitID = null;
+            rule.TenantID = zone!.TenantID ?? CallerTenantId ?? 0;
+            return await AddRuleAsync(rule, existingCount: (await Repo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value)).Count, scopeLabel: $"zone {rule.DeviceUnitZoneID}");
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("Unit/Rule")]
+        public async Task<ActionResult<int>> DeviceUnitRuleAdd([FromBody] DeviceUnitZoneRule rule)
+        {
+            var (unit, error) = await EnsureOwnedUnitAsync(rule.DeviceUnitID, forWrite: true);
+            if (error != null)
             {
-                return BadRequest(configError);
+                return error;
+            }
+            rule.DeviceUnitZoneID = null;
+            rule.TenantID = unit!.TenantID ?? CallerTenantId ?? 0;
+            return await AddRuleAsync(rule, existingCount: (await Repo.RulesGetForUnitAsync(unit.IDDeviceUnit!.Value)).Count, scopeLabel: $"unit {rule.DeviceUnitID}");
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("Global/Rule")]
+        public async Task<ActionResult<int>> GlobalRuleAdd([FromBody] DeviceUnitZoneRule rule)
+        {
+            if (CallerTenantId is not int tenantId)
+            {
+                return StatusCode(403, "Caller has no tenant.");
+            }
+            rule.DeviceUnitZoneID = null;
+            rule.DeviceUnitID = null;
+            rule.TenantID = tenantId;
+            return await AddRuleAsync(rule, existingCount: (await Repo.RulesGetForTenantGlobalAsync(tenantId)).Count, scopeLabel: $"tenant {tenantId} (global)");
+        }
+
+        /// Shared validate+cap+persist body for all three scopes - the only difference between them is which EnsureOwned*/existing-count call the caller already made.
+        private async Task<ActionResult<int>> AddRuleAsync(DeviceUnitZoneRule rule, int existingCount, string scopeLabel)
+        {
+            if (await RuleShapeErrorAsync(rule) is string shapeError)
+            {
+                return BadRequest(shapeError);
             }
             int configuredMax = (await Repo.ServerConfigGetAsync(1)).MaxRulesPerZone ?? settings.MaxRulesPerZone;
             int effectiveMax = Math.Min(configuredMax, HardMaxRulesPerZone);
-            int existingRuleCount = (await Repo.DeviceUnitZoneRulesGetAsync(rule.DeviceUnitZoneID)).Count;
-            if (existingRuleCount >= effectiveMax)
+            if (existingCount >= effectiveMax)
             {
-                return BadRequest($"This zone already has {existingRuleCount} rules, the configured maximum ({effectiveMax}). Remove one before adding another.");
+                return BadRequest($"This scope already has {existingCount} rules, the configured maximum ({effectiveMax}). Remove one before adding another.");
             }
-            int idRule = await Repo.DeviceUnitZoneRuleAddAsync(rule);
-            await WriteAuditAsync("DeviceUnitZoneRule.Created", zone!.TenantID, "DeviceUnitZoneRule", idRule.ToString(), $"zone {rule.DeviceUnitZoneID}, {rule.RelayFunction}/{rule.ConditionType}");
+            int idRule = await Repo.RuleAddAsync(rule);
+            await WriteAuditAsync("DeviceUnitZoneRule.Created", rule.TenantID, "DeviceUnitZoneRule", idRule.ToString(), $"{scopeLabel}, {rule.ActionType}/{rule.RelayFunction}{rule.SensorMetric}");
             return Ok(idRule);
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpDelete("Zone/Rule")]
-        public async Task<ActionResult<bool>> DeviceUnitZoneRuleDelete(int? idDeviceUnitZoneRule)
+        public Task<ActionResult<bool>> DeviceUnitZoneRuleDelete(int? idDeviceUnitZoneRule) => DeleteRuleAsync(idDeviceUnitZoneRule);
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpDelete("Unit/Rule")]
+        public Task<ActionResult<bool>> DeviceUnitRuleDelete(int? idDeviceUnitZoneRule) => DeleteRuleAsync(idDeviceUnitZoneRule);
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpDelete("Global/Rule")]
+        public Task<ActionResult<bool>> GlobalRuleDelete(int? idDeviceUnitZoneRule) => DeleteRuleAsync(idDeviceUnitZoneRule);
+
+        /// One shared delete body regardless of which scope route it came in through - ownership is resolved from the rule's OWN scope fields, not the route.
+        private async Task<ActionResult<bool>> DeleteRuleAsync(int? idRule)
         {
-            DeviceUnitZoneRule? rule = await Repo.DeviceUnitZoneRuleGetByIdAsync(idDeviceUnitZoneRule);
+            DeviceUnitZoneRule? rule = await Repo.RuleGetByIdAsync(idRule);
             if (rule == null)
             {
                 return NotFound();
             }
-            var (zone, error) = await EnsureOwnedZoneAsync(rule.DeviceUnitZoneID, forWrite: true);
+            var error = await EnsureOwnedRuleAsync(rule, forWrite: true);
             if (error != null)
             {
                 return error;
             }
-            await Repo.DeviceUnitZoneRuleDeleteAsync(idDeviceUnitZoneRule!.Value);
-            await WriteAuditAsync("DeviceUnitZoneRule.Deleted", zone!.TenantID, "DeviceUnitZoneRule", idDeviceUnitZoneRule.ToString()!, $"zone {rule.DeviceUnitZoneID}, {rule.RelayFunction}/{rule.ConditionType}");
+            var referencing = await Repo.RulesReferencingAsync(idRule!.Value, rule.TenantID);
+            if (referencing.Count > 0)
+            {
+                string names = string.Join(", ", referencing.Select(r => $"#{r.IDDeviceUnitZoneRule}"));
+                return Conflict($"Cannot delete: still referenced by another rule's \"another rule fired\" condition ({names}). Remove that condition first.");
+            }
+            await Repo.RuleDeleteAsync(idRule.Value);
+            await WriteAuditAsync("DeviceUnitZoneRule.Deleted", rule.TenantID, "DeviceUnitZoneRule", idRule.ToString()!, $"{rule.ActionType}/{rule.RelayFunction}{rule.SensorMetric}");
             return true;
+        }
+
+        /// Resolves ownership from the rule's OWN scope (Zone/Unit/Global), not the caller's route - a rule can only ever have one of those three shapes.
+        private async Task<ActionResult?> EnsureOwnedRuleAsync(DeviceUnitZoneRule rule, bool forWrite)
+        {
+            if (rule.DeviceUnitZoneID is int idZone)
+            {
+                return (await EnsureOwnedZoneAsync(idZone, forWrite)).Error;
+            }
+            if (rule.DeviceUnitID is int idUnit)
+            {
+                return (await EnsureOwnedUnitAsync(idUnit, forWrite)).Error;
+            }
+            bool crossTenantAllowed = forWrite ? CallerManagesDevicesGlobally : CallerReadsDevicesGlobally;
+            return rule.TenantID != CallerTenantId && !crossTenantAllowed
+                ? StatusCode(403, "Rule belongs to a different tenant")
+                : null;
+        }
+
+        /// Shape+bound check for the whole rule: ActionType/RelayFunction/SensorMetric consistency, condition-list bounds, per-condition shape, and (DB-dependent, hence async) RuleTriggered's cross-reference validity.
+        private async Task<string?> RuleShapeErrorAsync(DeviceUnitZoneRule rule)
+        {
+            if (rule.ActionType == ActionType.Relay)
+            {
+                if (rule.RelayFunction == null) { return "Relay rule: relayFunction is required."; }
+                if (rule.SensorMetric != null) { return "Relay rule: sensorMetric must not be set."; }
+            }
+            else
+            {
+                if (rule.SensorMetric == null) { return "Notification rule: sensorMetric is required."; }
+                if (rule.RelayFunction != null) { return "Notification rule: relayFunction must not be set."; }
+                if (string.IsNullOrWhiteSpace(rule.NotificationSubject)) { return "Notification rule: subject is required."; }
+            }
+
+            if (rule.Conditions.Count == 0)
+            {
+                return "A rule needs at least one condition.";
+            }
+            if (rule.Conditions.Count > HardMaxConditionsPerRule)
+            {
+                return $"A rule may have at most {HardMaxConditionsPerRule} conditions.";
+            }
+            for (int i = 0; i < rule.Conditions.Count; i++)
+            {
+                RuleCondition condition = rule.Conditions[i];
+                bool needsOperator = i > 0;
+                if (needsOperator != (condition.Operator != null))
+                {
+                    return needsOperator
+                        ? $"Condition {i + 1}: an AND/OR operator is required (every condition after the first)."
+                        : $"Condition {i + 1}: the first condition must not have an operator.";
+                }
+                if (condition.ConditionType == ConditionType.RuleTriggered && rule.ActionType != ActionType.Notification)
+                {
+                    return $"Condition {i + 1}: \"another rule fired\" is only valid on a Notification-action rule (a Relay rule fires on-device, invisibly to the server).";
+                }
+                if (RuleConditionConfigError(condition.ConditionType, condition.ConditionConfig) is string conditionError)
+                {
+                    return $"Condition {i + 1}: {conditionError}";
+                }
+                if (condition.ConditionType == ConditionType.RuleTriggered)
+                {
+                    var config = condition.ConditionConfig?.Deserialize<RuleTriggeredConditionConfig>(ConditionConfigJson.Options);
+                    DeviceUnitZoneRule? referenced = config == null ? null : await Repo.RuleGetByIdAsync(config.ReferencedRuleId);
+                    if (referenced == null || referenced.TenantID != rule.TenantID || referenced.ActionType != ActionType.Notification)
+                    {
+                        return $"Condition {i + 1}: referenced rule must exist, belong to the same tenant, and be a Notification-action rule.";
+                    }
+                }
+            }
+            return null;
         }
 
         /// Shape+bound check per ConditionType - the firmware would otherwise silently treat a malformed rule as inert (ConfigParser/evaluateRule), a confusing way to discover a typo; Threshold's own value is deliberately unbounded, only Hysteresis has a universal "must not be negative" rule.
@@ -231,7 +388,7 @@ namespace api.Controllers.API
                             ?? throw new JsonException("missing threshold config");
                         if (threshold.Hysteresis < 0)
                         {
-                            return "Threshold rule: hysteresis must not be negative.";
+                            return "hysteresis must not be negative.";
                         }
                         return null;
                     case ConditionType.Interval:
@@ -239,28 +396,28 @@ namespace api.Controllers.API
                             ?? throw new JsonException("missing interval config");
                         if (interval.Interval <= 0)
                         {
-                            return "Interval rule: interval must be greater than 0.";
+                            return "interval must be greater than 0.";
                         }
                         if (interval.IntervalLength <= 0 || interval.IntervalLength > interval.Interval)
                         {
-                            return "Interval rule: on-duration must be greater than 0 and not exceed the interval.";
+                            return "on-duration must be greater than 0 and not exceed the interval.";
                         }
                         return null;
                     case ConditionType.Schedule:
                         var schedule = config.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options)
                             ?? throw new JsonException("missing schedule config");
-                        // DaysOfWeek must fit the 7-bit mask AgrumyFirmware's evaluateRule expects (bit 0 = Sunday .. bit 6 = Saturday); a window crossing local midnight is not supported.
+                        // DaysOfWeek must fit the 7-bit mask AgrumyFirmware's evaluateCondition expects (bit 0 = Sunday .. bit 6 = Saturday); a window crossing local midnight is not supported.
                         if (schedule.DaysOfWeek < 0 || schedule.DaysOfWeek > 0b1111111)
                         {
-                            return "Schedule rule: days of week must be a value from 0 to 127.";
+                            return "days of week must be a value from 0 to 127.";
                         }
                         if (schedule.Start < 0 || schedule.Start > 86399)
                         {
-                            return "Schedule rule: start must be between 0 and 86399 seconds since local midnight.";
+                            return "start must be between 0 and 86399 seconds since local midnight.";
                         }
                         if (schedule.Duration < 1 || schedule.Start + schedule.Duration > 86400)
                         {
-                            return "Schedule rule: duration must be at least 1 second and not cross local midnight (start + duration <= 86400).";
+                            return "duration must be at least 1 second and not cross local midnight (start + duration <= 86400).";
                         }
                         return null;
                     case ConditionType.Astronomical:
@@ -268,21 +425,25 @@ namespace api.Controllers.API
                             ?? throw new JsonException("missing astronomical config");
                         if (astro.DaysOfWeek < 0 || astro.DaysOfWeek > 0b1111111)
                         {
-                            return "Astronomical rule: days of week must be a value from 0 to 127.";
+                            return "days of week must be a value from 0 to 127.";
                         }
                         if (astro.SunriseOffsetMinutes < -720 || astro.SunriseOffsetMinutes > 720
                             || astro.SunsetOffsetMinutes < -720 || astro.SunsetOffsetMinutes > 720)
                         {
-                            return "Astronomical rule: offsets must be between -720 and 720 minutes.";
+                            return "offsets must be between -720 and 720 minutes.";
                         }
                         return null;
+                    case ConditionType.RuleTriggered:
+                        _ = config.Deserialize<RuleTriggeredConditionConfig>(ConditionConfigJson.Options)
+                            ?? throw new JsonException("missing ruleTriggered config");
+                        return null;
                     default:
-                        return "Unknown condition type.";
+                        return "unknown condition type.";
                 }
             }
             catch (JsonException)
             {
-                return $"{type} rule: conditionConfig does not match the expected shape for this condition type.";
+                return $"conditionConfig does not match the expected shape for {type}.";
             }
         }
 

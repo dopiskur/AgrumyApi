@@ -4,7 +4,7 @@ using api.Utils;
 
 namespace api.Devices
 {
-    /// Compiles each Astronomical rule into an effective Schedule rule for today's local date so the firmware only ever has to understand ConditionType.Schedule; a rule that can't be resolved today (no location set, polar day/night, or a zero/negative window) is dropped rather than sent broken, leaving the function's other rules intact.
+    /// Compiles every Astronomical condition inside a rule's Conditions list into an effective Schedule condition for today's local date so the firmware only ever has to understand ConditionType.Schedule; a rule with a condition that can't be resolved today (no location set, polar day/night, or a zero/negative window) is dropped entirely rather than sent with a broken link in its AND/OR chain, leaving the function's other rules intact.
     public static class AstronomicalRuleResolver
     {
         public static IList<DeviceUnitZoneRule> Resolve(IList<DeviceUnitZoneRule> rules, ServerConfig serverConfig, DateOnly localDate, int utcOffsetSeconds)
@@ -12,7 +12,7 @@ namespace api.Devices
             var result = new List<DeviceUnitZoneRule>(rules.Count);
             foreach (DeviceUnitZoneRule rule in rules)
             {
-                if (rule.ConditionType != ConditionType.Astronomical)
+                if (!rule.Conditions.Any(c => c.ConditionType == ConditionType.Astronomical))
                 {
                     result.Add(rule);
                     continue;
@@ -27,11 +27,43 @@ namespace api.Devices
 
         private static DeviceUnitZoneRule? ResolveOne(DeviceUnitZoneRule rule, ServerConfig serverConfig, DateOnly localDate, int utcOffsetSeconds)
         {
+            var resolvedConditions = new List<RuleCondition>(rule.Conditions.Count);
+            foreach (RuleCondition condition in rule.Conditions)
+            {
+                if (condition.ConditionType != ConditionType.Astronomical)
+                {
+                    resolvedConditions.Add(condition);
+                    continue;
+                }
+                if (ResolveCondition(condition, serverConfig, localDate, utcOffsetSeconds) is not RuleCondition resolvedCondition)
+                {
+                    return null;
+                }
+                resolvedConditions.Add(resolvedCondition);
+            }
+
+            return new DeviceUnitZoneRule
+            {
+                IDDeviceUnitZoneRule = rule.IDDeviceUnitZoneRule,
+                TenantID = rule.TenantID,
+                DeviceUnitID = rule.DeviceUnitID,
+                DeviceUnitZoneID = rule.DeviceUnitZoneID,
+                ActionType = rule.ActionType,
+                RelayFunction = rule.RelayFunction,
+                SensorMetric = rule.SensorMetric,
+                Conditions = resolvedConditions,
+                NotificationSubject = rule.NotificationSubject,
+                NotificationBody = rule.NotificationBody,
+            };
+        }
+
+        private static RuleCondition? ResolveCondition(RuleCondition condition, ServerConfig serverConfig, DateOnly localDate, int utcOffsetSeconds)
+        {
             if (serverConfig.WeatherLocationLat is not double lat || serverConfig.WeatherLocationLon is not double lon)
             {
                 return null;
             }
-            AstronomicalConditionConfig? config = rule.ConditionConfig?.Deserialize<AstronomicalConditionConfig>(ConditionConfigJson.Options);
+            AstronomicalConditionConfig? config = condition.ConditionConfig?.Deserialize<AstronomicalConditionConfig>(ConditionConfigJson.Options);
             if (config == null)
             {
                 return null;
@@ -51,11 +83,8 @@ namespace api.Devices
             }
 
             var schedule = new ScheduleConditionConfig(config.DaysOfWeek, start, duration);
-            return new DeviceUnitZoneRule
+            return condition with
             {
-                IDDeviceUnitZoneRule = rule.IDDeviceUnitZoneRule,
-                DeviceUnitZoneID = rule.DeviceUnitZoneID,
-                RelayFunction = rule.RelayFunction,
                 ConditionType = ConditionType.Schedule,
                 ConditionConfig = JsonSerializer.SerializeToNode(schedule, ConditionConfigJson.Options),
             };

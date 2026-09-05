@@ -140,18 +140,23 @@ public class ContractTests
         [
             new DeviceUnitZoneRule
             {
-                IDDeviceUnitZoneRule = 1, RelayFunction = RelayFunction.WaterPump, ConditionType = ConditionType.Threshold,
-                ConditionConfig = JsonSerializer.SerializeToNode(new ThresholdConditionConfig(10, 5), ConditionConfigJson.Options),
+                IDDeviceUnitZoneRule = 1, RelayFunction = RelayFunction.WaterPump,
+                Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(10, 5), ConditionConfigJson.Options), null)],
             },
             new DeviceUnitZoneRule
             {
-                IDDeviceUnitZoneRule = 2, RelayFunction = RelayFunction.Heating, ConditionType = ConditionType.Interval,
-                ConditionConfig = JsonSerializer.SerializeToNode(new IntervalConditionConfig(3600, 300), ConditionConfigJson.Options),
+                IDDeviceUnitZoneRule = 2, RelayFunction = RelayFunction.Heating,
+                Conditions = [new RuleCondition(ConditionType.Interval, JsonSerializer.SerializeToNode(new IntervalConditionConfig(3600, 300), ConditionConfigJson.Options), null)],
             },
             new DeviceUnitZoneRule
             {
-                IDDeviceUnitZoneRule = 3, RelayFunction = RelayFunction.Light, ConditionType = ConditionType.Schedule,
-                ConditionConfig = JsonSerializer.SerializeToNode(new ScheduleConditionConfig(0b0111110, 21600, 1800), ConditionConfigJson.Options), // Mon-Fri 06:00-06:30
+                IDDeviceUnitZoneRule = 3, RelayFunction = RelayFunction.Light,
+                // Two-condition AND group - Mon-Fri 06:00-06:30 AND a threshold, exercising the #212 conditions array (not just the single-condition case).
+                Conditions =
+                [
+                    new RuleCondition(ConditionType.Schedule, JsonSerializer.SerializeToNode(new ScheduleConditionConfig(0b0111110, 21600, 1800), ConditionConfigJson.Options), null),
+                    new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(500, 50), ConditionConfigJson.Options), LogicalOperator.And),
+                ],
             },
         ];
 

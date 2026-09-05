@@ -259,9 +259,9 @@ namespace api.Controllers.View
                 await api.DeviceUnitZoneRuleAdd(new DeviceUnitZoneRule
                 {
                     DeviceUnitZoneID = idDeviceUnitZone,
+                    ActionType = ActionType.Relay,
                     RelayFunction = relayFunction,
-                    ConditionType = conditionType,
-                    ConditionConfig = config,
+                    Conditions = [new RuleCondition(conditionType, config, null)],
                 });
             }
             catch (ApiException ex)

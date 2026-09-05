@@ -21,6 +21,7 @@ namespace api.Dal
         public DbSet<DeviceUnitRow> DeviceUnits => Set<DeviceUnitRow>();
         public DbSet<DeviceUnitZoneRow> DeviceUnitZones => Set<DeviceUnitZoneRow>();
         public DbSet<DeviceUnitZoneRuleRow> DeviceUnitZoneRules => Set<DeviceUnitZoneRuleRow>();
+        public DbSet<RuleNotificationStateRow> RuleNotificationStates => Set<RuleNotificationStateRow>();
         public DbSet<DeviceTypeRow> DeviceTypes => Set<DeviceTypeRow>();
         public DbSet<DeviceTypeServiceRow> DeviceTypeServices => Set<DeviceTypeServiceRow>();
         public DbSet<DeviceTypeRelayRow> DeviceTypeRelays => Set<DeviceTypeRelayRow>();
@@ -157,15 +158,28 @@ namespace api.Dal
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            // Several rows may share (DeviceUnitZoneID, RelayFunction); OR semantics across them are resolved in EfRepository, not here.
+            // Several rows may share (scope, RelayFunction/SensorMetric); OR semantics across them, and Zone>Unit>Global precedence, are resolved in EfRepository/RuleHierarchyResolver, not here. Exactly one of DeviceUnitZoneID/DeviceUnitID is set (Global scope: both null) - enforced in DeviceUnitApiController, not the DB.
             modelBuilder.Entity<DeviceUnitZoneRuleRow>(e =>
             {
                 e.ToTable("deviceUnitZoneRule");
                 e.HasKey(x => x.IDDeviceUnitZoneRule);
                 e.Property(x => x.IDDeviceUnitZoneRule).ValueGeneratedOnAdd();
-                e.Property(x => x.ConditionConfig).IsRequired();
-                e.HasOne<DeviceUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceUnitZoneID).OnDelete(DeleteBehavior.NoAction);
+                e.Property(x => x.Conditions).IsRequired();
+                e.HasOne<DeviceUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceUnitZoneID).OnDelete(DeleteBehavior.NoAction).IsRequired(false);
+                e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction).IsRequired(false);
                 e.HasIndex(x => x.DeviceUnitZoneID).HasDatabaseName("ix_deviceUnitZoneRule_zone");
+                e.HasIndex(x => x.DeviceUnitID).HasDatabaseName("ix_deviceUnitZoneRule_unit");
+                e.HasIndex(x => x.TenantID).HasDatabaseName("ix_deviceUnitZoneRule_tenant");
+            });
+
+            modelBuilder.Entity<RuleNotificationStateRow>(e =>
+            {
+                e.ToTable("ruleNotificationState");
+                e.HasKey(x => x.IDRuleNotificationState);
+                e.Property(x => x.IDRuleNotificationState).ValueGeneratedOnAdd();
+                e.HasOne<DeviceUnitZoneRuleRow>().WithMany().HasForeignKey(x => x.RuleID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceUnitZoneID).OnDelete(DeleteBehavior.NoAction);
+                e.HasIndex(x => new { x.RuleID, x.DeviceUnitZoneID }).IsUnique().HasDatabaseName("ux_ruleNotificationState_rule_zone");
             });
 
             modelBuilder.Entity<DeviceTypeRow>(e =>
