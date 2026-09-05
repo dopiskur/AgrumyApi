@@ -8,11 +8,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.API
 {
-    /// Tenant Management CRUD - write is Global admin only since a tenant has no meaningful self-management of its own existence, unlike Device/User management; [Authorize] stays at the wide legacy net (same reasoning as ServerConfigApiController), the precise decision is the inline CallerIsGlobalAdmin/GlobalReader check.
+    /// Tenant Management CRUD - write is Global admin only since a tenant has no meaningful self-management of its own existence, unlike Device/User management; [Authorize] stays at the wide RoleNames.LegacyAdmin/TenantReaders net (same reasoning as ServerConfigApiController), the precise decision is the inline CallerIsGlobalAdmin/GlobalReader check.
     [Route("/api/Tenant")]
     public class TenantApiController(IRepository repo, ICache cache, TenantExportService exportService, TenantImportService importService) : ApiControllerBase(repo, cache)
     {
-        [Authorize(Roles = "admin," + RoleNames.GlobalReader)]
+        [Authorize(Roles = RoleNames.TenantReaders)]
         [HttpGet("All")]
         public async Task<ActionResult<IList<Tenant>>> TenantsGet()
         {
@@ -23,7 +23,7 @@ namespace api.Controllers.API
             return Ok(await Repo.TenantsGetAllAsync());
         }
 
-        [Authorize(Roles = "admin," + RoleNames.GlobalReader)]
+        [Authorize(Roles = RoleNames.TenantReaders)]
         [HttpGet]
         public async Task<ActionResult<Tenant>> TenantGet(int idTenant)
         {
@@ -35,7 +35,7 @@ namespace api.Controllers.API
             return tenant is null ? NotFound() : Ok(tenant);
         }
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.LegacyAdmin)]
         [HttpPost]
         public async Task<ActionResult<int>> TenantAdd([FromBody] Tenant tenant)
         {
@@ -50,7 +50,7 @@ namespace api.Controllers.API
             return Ok(await Repo.TenantAddAsync(tenant.TenantName.Trim()));
         }
 
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.LegacyAdmin)]
         [HttpPut]
         public async Task<ActionResult> TenantUpdate([FromBody] Tenant tenant)
         {
@@ -103,7 +103,7 @@ namespace api.Controllers.API
         }
 
         /// ByName only (see api.Models.TenantImportTarget), Global admin only - unlike Export this can create a brand-new tenant or add into one the caller doesn't administer, same bar as TenantAdd/TenantUpdate.
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.LegacyAdmin)]
         [HttpPost("Import")]
         public async Task<ActionResult<TenantImportResult>> Import([FromBody] TenantImportRequest value)
         {

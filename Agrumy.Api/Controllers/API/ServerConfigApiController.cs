@@ -1,5 +1,6 @@
 using api.Dal.Interface;
 using api.Models;
+using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,10 +11,10 @@ namespace api.Controllers.API
     [Route("api/ServerConfig")]
     public class ServerConfigApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
     {
-        // These are SERVER-WIDE settings, so Global admin only. The attribute stays at the wider "admin" alias so an account the multi-role migration missed reaches the inline check, where CallerIsGlobalAdmin's legacy fallback (tenant-0 admin) still lets it through.
+        // These are SERVER-WIDE settings, so Global admin only. The attribute stays at the wider RoleNames.LegacyAdmin gate so an account the multi-role migration missed reaches the inline check, where CallerIsGlobalAdmin's legacy fallback (tenant-0 admin) still lets it through.
 
         [HttpGet]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.LegacyAdmin)]
         public async Task<ActionResult<ServerConfig>> Get()
         {
             if (!CallerIsGlobalAdmin)
@@ -24,7 +25,7 @@ namespace api.Controllers.API
         }
 
         [HttpPut]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = RoleNames.LegacyAdmin)]
         public async Task<ActionResult> Update([FromBody] ServerConfig config)
         {
             if (!CallerIsGlobalAdmin)

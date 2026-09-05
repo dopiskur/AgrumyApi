@@ -48,6 +48,9 @@ namespace api.Security
         /// Tenant Management read access (list/view every tenant) - write (create/rename) stays Global admin only, checked inline via CallerIsGlobalAdmin, since a Tenant scope has no meaningful self-management of ITS OWN existence.
         public const string GlobalAdminOrReader = GlobalAdmin + "," + GlobalReader;
 
+        /// GlobalAdminOrReader plus the legacy alias, so an account the multi-role migration missed still reaches the inline check instead of being locked out at the pipeline gate.
+        public const string TenantReaders = LegacyAdmin + "," + GlobalAdminOrReader;
+
         /// May read server metrics (/metrics, /metrics/prometheus) - RequireRole takes individual names, not a comma-joined [Authorize] string.
         public static readonly string[] MetricsReaders = { GlobalAdmin, GlobalDataReader, TenantDataReader };
     }

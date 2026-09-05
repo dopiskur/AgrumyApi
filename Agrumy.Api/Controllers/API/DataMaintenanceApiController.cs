@@ -2,6 +2,7 @@ using api.BackgroundWorkers;
 using api.Dal;
 using api.Dal.Interface;
 using api.Models;
+using api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,7 @@ namespace api.Controllers.API
 {
     /// "Optimize Old Data" / "Purge Old Data", Global admin only (affects every tenant's telemetry) - both dispatch to BackgroundJobQueue and return 202 immediately instead of holding the request open for a large table's processing time.
     [Route("api/DataMaintenance")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = RoleNames.LegacyAdmin)]
     public class DataMaintenanceApiController(
         IRepository repo, ICache cache, AgrumyDbContext db, BackgroundJobQueue jobQueue, ILogger<DataMaintenanceApiController> logger)
         : ApiControllerBase(repo, cache)
