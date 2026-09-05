@@ -160,9 +160,7 @@ namespace api.Gateway.ChirpStack
                 return;
             }
 
-            // SensorData's own handler (GatewayApiController.RunSensorDataAsync) requires an array
-            // payload, unlike the other three types which deserialize the envelope object directly -
-            // the LoRa firmware nests its sensor readings under "d" for exactly this reason.
+            // SensorData needs an array payload (GatewayApiController.RunSensorDataAsync), so the LoRa firmware nests readings under "d" while other types use the envelope object directly.
             JsonElement payload = entryType == GatewayEntryType.SensorData && envelope.RootElement.TryGetProperty("d", out var sensorArray)
                 ? sensorArray.Clone()
                 : envelope.RootElement.Clone();
@@ -201,8 +199,7 @@ namespace api.Gateway.ChirpStack
             {
                 confirmed = false,
                 fPort = 1,
-                // "empty" success (Config with nothing new) needs no downlink at all - Class A
-                // downlink slots are scarce, do not spend one on nothing.
+                // "empty" success (Config with nothing new) skips the downlink - Class A slots are scarce.
                 data = result is { Success: true, Config: not null } || result is { Success: false }
                     ? Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
                     {

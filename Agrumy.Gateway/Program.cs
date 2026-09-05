@@ -23,9 +23,7 @@ if (gatewayOptions.Gateway.Profile == GatewayProfile.LoRaGateway)
     builder.Services.AddHostedService<ChirpStackUplinkService>();
 }
 
-// Profile A's own local listener port - separate from whatever port AgrumyService itself uses,
-// since a gateway and its upstream are never the same process.
-builder.WebHost.ConfigureKestrel(k => k.ListenAnyIP(gatewayOptions.Gateway.LocalPort));
+builder.WebHost.ConfigureKestrel(k => k.ListenAnyIP(gatewayOptions.Gateway.LocalPort)); // Profile A's own port, separate from whatever port AgrumyService itself uses
 
 var app = builder.Build();
 

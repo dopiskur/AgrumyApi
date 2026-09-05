@@ -64,8 +64,7 @@ namespace api.Gateway.LocalForwarding
             {
                 return Results.Text(result.Error ?? "", statusCode: result.StatusCode);
             }
-            // Config: mirrors GetConfig's own shape - a null Config body means "up to date, do
-            // nothing" (empty 200), a populated one is the full DeviceConfig JSON.
+            // Mirrors GetConfig's shape: null Config means "up to date" (empty 200), populated means full DeviceConfig JSON.
             return result.Config != null ? Results.Ok(result.Config) : Results.Ok();
         }
     }

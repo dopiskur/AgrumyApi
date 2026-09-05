@@ -60,8 +60,7 @@ namespace api.Gateway
             HttpResponseMessage response = await http.SendAsync(message, ct);
             if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
             {
-                // Same 10-300s clamp ServerConfigApiController.Update enforces for GatewayWaitWindowSeconds - a missing/malformed header falls back to that range's default rather than an unbounded wait.
-                int retryAfter = response.Headers.RetryAfter?.Delta is TimeSpan delta ? Math.Clamp((int)delta.TotalSeconds, 10, 300) : 30;
+                int retryAfter = response.Headers.RetryAfter?.Delta is TimeSpan delta ? Math.Clamp((int)delta.TotalSeconds, 10, 300) : 30; // same 10-300s clamp as ServerConfigApiController.Update
                 throw new GatewayRateLimitedException(retryAfter);
             }
             response.EnsureSuccessStatusCode();

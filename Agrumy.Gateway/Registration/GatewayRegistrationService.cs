@@ -28,8 +28,7 @@ namespace api.Gateway.Registration
             }
 
             LogRegistering(logger);
-            // No retry loop - a transient failure here leaves the gateway unregistered until the next restart, matching how AgrumyFirmware's captive portal needs a human to notice and re-trigger it.
-            var state = await client.RegisterAsync(cancellationToken);
+            var state = await client.RegisterAsync(cancellationToken); // no retry loop: a transient failure here waits for the next restart, same as AgrumyFirmware's captive portal
             store.Save(state);
             LogRegistered(logger, state.IdDevice);
         }
