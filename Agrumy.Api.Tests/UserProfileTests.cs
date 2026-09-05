@@ -3,7 +3,6 @@ using api;
 using api.Controllers.API;
 using api.Dal.Interface;
 using api.Models;
-using api.Notifications;
 using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Http;
@@ -146,13 +145,12 @@ public class UserProfileTests
 
     private readonly Mock<IRepository> _repo = new(MockBehavior.Strict);
     private readonly Mock<ICache> _cache = new();
-    private readonly Mock<INotificationDispatcher> _notifications = new();
 
     private static readonly IOptions<AgrumySettings> TestSettings = Options.Create(AgrumySettings.Bind(TestConfig.Configuration));
 
     private UserApiController NewController(string? email)
     {
-        var controller = new UserApiController(_repo.Object, _cache.Object, _notifications.Object, TestSettings);
+        var controller = new UserApiController(_repo.Object, _cache.Object, new api.BackgroundWorkers.BackgroundJobQueue(), TestSettings);
         var claims = new List<Claim> { new("TenantID", "1") };
         if (email != null)
         {

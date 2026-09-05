@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json.Nodes;
 using api;
+using api.BackgroundWorkers;
 using api.Commands;
 using api.Controllers.API;
 using api.Dal.Interface;
@@ -9,6 +10,7 @@ using api.Notifications;
 using api.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -21,6 +23,7 @@ public class ApiControllerTests
     private readonly Mock<ICache> _cache = new();
 
     private readonly Mock<INotificationDispatcher> _notifications = new();
+    private readonly BackgroundJobQueue _jobQueue = new();
 
     // Bound from the same appsettings.json TestConfig.Init() reads Config.* from, so a token signed here and JwtTokenProvider.ValidateToken use the same key/issuer/audience.
     private static readonly IOptions<AgrumySettings> TestSettings = Options.Create(AgrumySettings.Bind(TestConfig.Configuration));
@@ -33,7 +36,21 @@ public class ApiControllerTests
             new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), catalog,
             new api.Devices.DeviceConfigBuilder(_repo.Object, catalog), TestSettings);
     }
-    private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _notifications.Object, TestSettings);
+    private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _jobQueue, TestSettings);
+
+    /// UserApiController enqueues notification jobs instead of dispatching them inline (roadmap #305) - this runs the one job a test expects to have been queued against a fake scope resolving the same mocks, then lets the test assert on _notifications/_repo as before.
+    private async Task RunOneQueuedJobAsync()
+    {
+        Assert.True(_jobQueue.Reader.TryRead(out var job), "Expected a background job to have been enqueued.");
+        IServiceProvider services = new ServiceCollection()
+            .AddSingleton(_notifications.Object)
+            .AddSingleton(_repo.Object)
+            .BuildServiceProvider();
+        await job(services, CancellationToken.None);
+    }
+
+    private void AssertNoJobWasQueued() =>
+        Assert.False(_jobQueue.Reader.TryRead(out _), "Expected no background job to have been enqueued.");
     private DeviceUnitApiController NewDeviceUnitController() => new(_repo.Object, _cache.Object, TestSettings);
     private TenantApiController NewTenantController() => new(_repo.Object, _cache.Object,
         new api.Migration.TenantExportService(_repo.Object), new api.Migration.TenantImportService(_repo.Object));
@@ -712,6 +729,7 @@ public class ApiControllerTests
         Assert.Equal(new[] { RoleNames.TenantAdmin }, seededRoles); // admin on a brand new tenant
         Assert.False(capturedUser.Enabled);         // Activate() is what enables, not registration
         Assert.False(capturedUser.EmailVerified);   // still needs to click the activation link
+        await RunOneQueuedJobAsync();
         _notifications.Verify(n => n.DispatchAsync(It.Is<Notification>(msg => msg.ContainsSecret), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1367,6 +1385,7 @@ public class ApiControllerTests
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Contains("administrator has been notified", (string)ok.Value!);
+        await RunOneQueuedJobAsync();
         _notifications.Verify(n => n.DispatchAsync(
             It.Is<Notification>(msg => msg.Recipient.Email == "admin@acme.local"),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -1435,6 +1454,7 @@ public class ApiControllerTests
         var result = await controller.ResendActivation(new ResendActivationRequest { Login = "pending@example.com" });
 
         Assert.IsType<OkObjectResult>(result);
+        await RunOneQueuedJobAsync();
         _notifications.Verify(n => n.DispatchAsync(
             It.Is<Notification>(msg => msg.Recipient.Email == "pending@example.com"),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -1453,7 +1473,7 @@ public class ApiControllerTests
         var result = await controller.ResendActivation(new ResendActivationRequest { Login = "pending@example.com" });
 
         Assert.IsType<OkObjectResult>(result);
-        _notifications.Verify(n => n.DispatchAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()), Times.Never);
+        AssertNoJobWasQueued();
     }
 
 

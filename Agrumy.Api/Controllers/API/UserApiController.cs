@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using api.BackgroundWorkers;
 using api.Dal.Interface;
 using api.Models;
 using api.Notifications;
@@ -13,7 +14,7 @@ using Microsoft.Extensions.Options;
 namespace api.Controllers.API
 {
     [Route("api/User")]
-    public class UserApiController(IRepository repo, ICache cache, INotificationDispatcher notifications, IOptions<AgrumySettings> settingsOptions)
+    public class UserApiController(IRepository repo, ICache cache, BackgroundJobQueue jobQueue, IOptions<AgrumySettings> settingsOptions)
         : ApiControllerBase(repo, cache)
     {
         private const int AccessTokenMinutes = 120;
@@ -101,7 +102,7 @@ namespace api.Controllers.API
             {
                 var (plaintext, hash) = GenerateOpaqueToken();
                 await Repo.UserSetActivationTokenAsync(idUser, hash, DateTime.UtcNow.AddHours(ActivationTokenValidHours));
-                await SendActivationEmailAsync(user.Email, plaintext);
+                SendActivationEmail(user.Email, plaintext);
 
                 // A new tenant's creator starts as its admin; everyone else starts as a read-only Tenant reader until granted more via PUT /api/User/UserRoles.
                 string startingRole = isNewTenant ? RoleNames.TenantAdmin : RoleNames.TenantReader;
@@ -130,7 +131,7 @@ namespace api.Controllers.API
             // TenantID==0 has no owning admin to approve joiners, and a new tenant's own creator already holds TenantAdmin from registration - either way, proven email ownership alone is enough here.
             if (user.TenantID != 0 && !(await Repo.UserRoleNamesGetAsync(user.IDUser!.Value)).Contains(RoleNames.TenantAdmin))
             {
-                await NotifyTenantAdminsOfPendingApprovalAsync(user);
+                NotifyTenantAdminsOfPendingApproval(user);
                 return Ok("Email verified. Your tenant administrator has been notified and must approve your account before you can sign in.");
             }
 
@@ -155,36 +156,42 @@ namespace api.Controllers.API
                 bool issued = await Repo.UserIssueActivationTokenAsync(idUser, hash, DateTime.UtcNow.AddHours(ActivationTokenValidHours), cooldownMinutes);
                 if (issued)
                 {
-                    await SendActivationEmailAsync(user.Email, plaintext);
+                    SendActivationEmail(user.Email, plaintext);
                 }
             }
             return Ok("If that account exists and is not yet verified, a new activation email has been sent.");
         }
 
-        private async Task SendActivationEmailAsync(string? email, string plaintextToken)
+        /// Enqueued, not awaited - SMTP (or any other configured channel) must never hold the registration/resend request open.
+        private void SendActivationEmail(string? email, string plaintextToken)
         {
             if (string.IsNullOrWhiteSpace(email)) { return; }
 
             string link = $"{settings.JwtIssuer}/api/User/Activate?token={Uri.EscapeDataString(plaintextToken)}";
-            await notifications.DispatchAsync(new Notification(
+            var notification = new Notification(
                 "Confirm your Agrumy account",
                 $"Click the link below to verify your email address:\n{link}\n\nThis link expires in {ActivationTokenValidHours} hours.",
                 new NotificationRecipient(Email: email),
-                ContainsSecret: true));
+                ContainsSecret: true);
+            jobQueue.Enqueue((services, ct) => services.GetRequiredService<INotificationDispatcher>().DispatchAsync(notification, ct));
         }
 
-        /// Tells every admin of the given tenant that a newly-verified user is waiting for approval - never a silent no-op, since a tenant can never have zero admins.
-        private async Task NotifyTenantAdminsOfPendingApprovalAsync(User user)
+        /// Tells every admin of the given tenant that a newly-verified user is waiting for approval - never a silent no-op, since a tenant can never have zero admins. Enqueued as one job (own repo/dispatcher resolved from the job's scope, not the request's) so N admins never sequentially block the Activate response on N SMTP round-trips.
+        private void NotifyTenantAdminsOfPendingApproval(User user)
         {
-            IList<User> admins = await Repo.TenantAdminsGetAsync(user.TenantID!.Value);
-            foreach (User admin in admins)
+            int tenantId = user.TenantID!.Value;
+            string subject = $"{user.Email} ({user.Username}) verified their email and is waiting for your approval before they can sign in.";
+            jobQueue.Enqueue(async (services, ct) =>
             {
-                if (string.IsNullOrWhiteSpace(admin.Email)) { continue; }
-                await notifications.DispatchAsync(new Notification(
-                    "New user awaiting approval",
-                    $"{user.Email} ({user.Username}) verified their email and is waiting for your approval before they can sign in.",
-                    new NotificationRecipient(Email: admin.Email)));
-            }
+                IRepository jobRepo = services.GetRequiredService<IRepository>();
+                INotificationDispatcher jobNotifications = services.GetRequiredService<INotificationDispatcher>();
+                IList<User> admins = await jobRepo.TenantAdminsGetAsync(tenantId);
+                foreach (User admin in admins)
+                {
+                    if (string.IsNullOrWhiteSpace(admin.Email)) { continue; }
+                    await jobNotifications.DispatchAsync(new Notification("New user awaiting approval", subject, new NotificationRecipient(Email: admin.Email)), ct);
+                }
+            });
         }
 
         /// The full set of role-claim values this user's token should carry: real roles from userUserRole plus a prepended legacy admin/user alias so old [Authorize(Roles=...)]/CallerRole checks (ApiControllerBase.CallerRole reads only the FIRST claim) still work - empty only if userUserRole has nothing for this user.
