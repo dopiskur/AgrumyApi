@@ -5,6 +5,7 @@ namespace api.Models
         Reboot = 1,
         ForceOTA = 2,
         ForceConfigSync = 3,
+        ScanForDevices = 4,
     }
 
     /// <summary>Device acknowledges before executing, so a command stuck at Acknowledged (never reaching Executed) means it took the command but crashed or lost power before confirming the outcome.</summary>

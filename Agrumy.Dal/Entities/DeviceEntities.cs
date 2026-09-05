@@ -218,6 +218,18 @@ namespace api.Dal.Entities
         public DateTime? DateCreated { get; set; }
     }
 
+    /// <summary>One scanning device's sighting of one nearby Agrumy_ AP during a roadmap #268
+    /// discovery scan - raw reports, not yet deduplicated/best-picked (that lives in the repository
+    /// query layer, not here).</summary>
+    public class DeviceDiscoveryReportRow
+    {
+        public int IDReport { get; set; }
+        public int ScanningDeviceID { get; set; }
+        public string DiscoveredApMac { get; set; } = "";
+        public int? Rssi { get; set; }
+        public DateTime DateReported { get; set; }
+    }
+
     /// <summary>One discrete, one-shot device action - see api.Models.CommandStatus for why
     /// Acknowledged is a real, persisted state and not just an implementation detail.</summary>
     public class DeviceCommandRow

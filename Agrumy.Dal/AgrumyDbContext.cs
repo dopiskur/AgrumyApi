@@ -43,6 +43,7 @@ namespace api.Dal
         public DbSet<DeviceDiagnosticRow> DeviceDiagnostics => Set<DeviceDiagnosticRow>();
         public DbSet<DeviceCommandRow> DeviceCommands => Set<DeviceCommandRow>();
         public DbSet<RelayDeviceMappingRow> RelayDeviceMappings => Set<RelayDeviceMappingRow>();
+        public DbSet<DeviceDiscoveryReportRow> DeviceDiscoveryReports => Set<DeviceDiscoveryReportRow>();
 
         public DbSet<SensorDataRow> SensorData => Set<SensorDataRow>();
         public DbSet<SensorDataReportRow> SensorDataReports => Set<SensorDataReportRow>();
@@ -308,6 +309,16 @@ namespace api.Dal
                 // without needing MySQL's unsupported partial/filtered index syntax.
                 e.HasIndex(x => new { x.DeviceID, x.ActiveKey }).IsUnique().HasDatabaseName("ux_deviceCommand_device_activekey");
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
+            });
+
+            modelBuilder.Entity<DeviceDiscoveryReportRow>(e =>
+            {
+                e.ToTable("deviceDiscoveryReport");
+                e.HasKey(x => x.IDReport);
+                e.Property(x => x.IDReport).ValueGeneratedOnAdd();
+                e.Property(x => x.DiscoveredApMac).HasMaxLength(64).IsRequired();
+                e.HasIndex(x => x.DiscoveredApMac).HasDatabaseName("ix_deviceDiscoveryReport_apMac");
+                e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.ScanningDeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<DeviceDiagnosticRow>(e =>
