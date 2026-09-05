@@ -189,6 +189,36 @@ public class ApiControllerTests
     }
 
     [Fact]
+    public async Task DeviceAssign_GlobalAdmin_CrossTenantDeviceAndZone_Returns403_NeverAssigns()
+    {
+        // GlobalAdmin legitimately crosses tenants for the device AND the zone's own ownership checks, but the device and zone still belong to different tenants from each other.
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 1 });
+        _repo.Setup(r => r.DeviceUnitZoneGetByIdAsync(5)).ReturnsAsync(new DeviceUnitZone { IDDeviceUnitZone = 5, TenantID = 2 });
+
+        var controller = NewDeviceUnitController();
+        SetCallerRoles(controller, 0, "admin", RoleNames.GlobalAdmin);
+        var result = await controller.DeviceAssign(new DeviceZoneAssignment { IDDevice = 8, IDDeviceUnitZone = 5 });
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        // Strict mock: an un-set-up DeviceUnitZoneHasControllerAsync/DeviceAssignToZoneAsync call would throw, proving the assignment never happened.
+    }
+
+    [Fact]
+    public async Task DeviceAssign_SameTenantDeviceAndZone_Succeeds()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 1, DeviceControllerEnabled = false });
+        _repo.Setup(r => r.DeviceUnitZoneGetByIdAsync(5)).ReturnsAsync(new DeviceUnitZone { IDDeviceUnitZone = 5, TenantID = 1 });
+        _repo.Setup(r => r.DeviceAssignToZoneAsync(8, 5)).Returns(Task.CompletedTask);
+
+        var controller = NewDeviceUnitController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantDevice);
+        var result = await controller.DeviceAssign(new DeviceZoneAssignment { IDDevice = 8, IDDeviceUnitZone = 5 });
+
+        Assert.True(result.Value);
+        _repo.Verify(r => r.DeviceAssignToZoneAsync(8, 5), Times.Once);
+    }
+
+    [Fact]
     public async Task UsersGet_TenantDataReaderOnly_Returns403()
     {
         var controller = NewUserController();

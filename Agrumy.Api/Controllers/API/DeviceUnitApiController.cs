@@ -284,10 +284,16 @@ namespace api.Controllers.API
                 return deviceError;
             }
 
-            var (_, zoneError) = await EnsureOwnedZoneAsync(body.IDDeviceUnitZone, forWrite: true);
+            var (zone, zoneError) = await EnsureOwnedZoneAsync(body.IDDeviceUnitZone, forWrite: true);
             if (zoneError != null)
             {
                 return zoneError;
+            }
+
+            // Unconditional, no exception for a caller who legitimately crosses tenants for the two ownership checks above - a device must never end up assigned into another tenant's zone, not even by a Global admin's mistake.
+            if (device!.TenantID != zone!.TenantID)
+            {
+                return StatusCode(403, "Device and zone belong to different tenants.");
             }
 
             // A zone has at most one controller (not required, but capped at one).
