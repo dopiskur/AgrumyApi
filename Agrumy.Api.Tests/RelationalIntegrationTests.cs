@@ -508,6 +508,23 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task UserSetPasswordAsync_RevokesRefreshTokensAndBumpsTokenCutoff(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, email) = await MakeUser(t);
+        string refreshTokenHash = "hash_" + U();
+        await _repo.RefreshTokenAddAsync(userId, refreshTokenHash, DateTime.UtcNow.AddDays(30));
+
+        DateTime beforeChange = DateTime.UtcNow;
+        await _repo.UserSetPasswordAsync(email, new UserSecret { PwdHash = "h3", PwdSalt = "s3" });
+
+        User? user = await _repo.UserGetAsync(userId, null, null);
+        Assert.NotNull(user!.TokensValidAfterUtc);
+        Assert.True(user.TokensValidAfterUtc >= beforeChange);
+        Assert.NotNull((await _repo.RefreshTokenGetAsync(refreshTokenHash))!.RevokedAt);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
     public async Task BootstrapAdmin_Pending_SetOnce_ThenPermanentlyUnavailable(DbProviderKind provider)
     {
         var t = Use(provider);

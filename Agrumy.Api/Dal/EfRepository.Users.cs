@@ -158,13 +158,26 @@ namespace api.Dal
 
         public async Task<bool> UserSetPasswordAsync(string? email, UserSecret userSecret)
         {
-            int rows = await db.Users.Where(u => u.Email == email)
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(u => u.PwdHash, userSecret.PwdHash ?? "")
-                    .SetProperty(u => u.PwdSalt, userSecret.PwdSalt ?? "")
-                    // Any successful password change satisfies "you changed your password" - clearing the flag here avoids duplicating the write in every caller.
-                    .SetProperty(u => u.MustChangePassword, false));
-            return rows > 0;
+            var row = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if (row == null)
+            {
+                return false;
+            }
+
+            row.PwdHash = userSecret.PwdHash ?? "";
+            row.PwdSalt = userSecret.PwdSalt ?? "";
+            // Any successful password change satisfies "you changed your password" - clearing the flag here avoids duplicating the write in every caller.
+            row.MustChangePassword = false;
+            await db.SaveChangesAsync();
+            await RevokeUserTokensAsync(row.IDUser);
+            return true;
+        }
+
+        public async Task RevokeUserTokensAsync(int idUser)
+        {
+            await db.Users.Where(u => u.IDUser == idUser)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.TokensValidAfterUtc, DateTime.UtcNow));
+            await RefreshTokenRevokeAllForUserAsync(idUser);
         }
 
         // Never empty for a real tenant since its creator becomes an admin at registration - TenantID 0 has no owning admin, so Global admin is the equivalent role there.
@@ -196,6 +209,7 @@ namespace api.Dal
             EmailVerified = u.EmailVerified,
             TimeZone = u.TimeZone,
             MustChangePassword = u.MustChangePassword,
+            TokensValidAfterUtc = u.TokensValidAfterUtc,
         };
     }
 }

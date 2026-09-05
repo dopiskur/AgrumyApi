@@ -644,6 +644,10 @@ namespace api.Controllers.API
             if (enabledBefore != user.Enabled)
             {
                 await WriteAuditAsync("User.EnabledChanged", user.TenantID, "User", user.IDUser.ToString()!, $"{enabledBefore} -> {user.Enabled}");
+                if (enabledBefore == true && user.Enabled == false)
+                {
+                    await Repo.RevokeUserTokensAsync(user.IDUser!.Value);
+                }
             }
 
             // Non-admin callers can't touch roles at all - silently ignored, same guard as TenantID above.

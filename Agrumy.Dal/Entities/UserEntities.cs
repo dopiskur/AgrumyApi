@@ -80,6 +80,9 @@ namespace api.Dal.Entities
 
         // See api.Models.User.MustChangePassword for the full explanation.
         public bool MustChangePassword { get; set; }
+
+        // See api.Models.User.TokensValidAfterUtc for the full explanation.
+        public DateTime? TokensValidAfterUtc { get; set; }
     }
 
     /// One issued JWT refresh token - single-use, a rotation marks the row revoked and points ReplacedByTokenHash at its successor so a reused token is detectable; only the hash is stored.

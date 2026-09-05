@@ -73,6 +73,9 @@ builder.Services
             // Matches JwtTokenProvider.ValidateToken's explicit choice - same expiry boundary enforced by both validators.
             ClockSkew = TimeSpan.Zero
         };
+        // A JWT is self-validating and cannot be un-issued before its own expiry, so a password
+        // change or Enabled->false only takes effect immediately via this extra per-request check.
+        o.Events = new JwtBearerEvents { OnTokenValidated = TokenRevocationValidator.ValidateAsync };
     });
 
 // Device-communication endpoints authenticate by apiId/apiKey (or the short-lived apiAuth

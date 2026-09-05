@@ -28,6 +28,9 @@ namespace api.Dal.Interface
 
         Task<bool> UserSetPasswordAsync(string? email, UserSecret userSecret);
 
+        /// Bumps TokensValidAfterUtc and revokes every refresh token for this user - called on password change and on Enabled transitioning to false, so a stolen access/refresh token stops working immediately instead of surviving until its own natural expiry.
+        Task RevokeUserTokensAsync(int idUser);
+
         /// True while the fresh-install bootstrap Global Admin (see EfRepository.SeedBootstrapAdminAsync) still has PwdHash=NULL - drives Agrumy.Web's first-run "set password" screen, permanently false once claimed.
         Task<bool> BootstrapAdminPendingAsync();
 

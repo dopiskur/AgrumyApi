@@ -1774,6 +1774,38 @@ public class ApiControllerTests
     }
 
     [Fact]
+    public async Task UserUpdate_EnabledTrueToFalse_RevokesTokens()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local", Enabled = true });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
+        _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.RevokeUserTokensAsync(50)).Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 1);
+        var result = await controller.UserUpdate(new UserUpdate { IDUser = 50, Enabled = false });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        _repo.Verify(r => r.RevokeUserTokensAsync(50), Times.Once);
+    }
+
+    [Fact]
+    public async Task UserUpdate_EnabledStaysTrue_DoesNotRevokeTokens()
+    {
+        _repo.Setup(r => r.UserGetAsync(50, null, null)).ReturnsAsync(new User { IDUser = 50, TenantID = 1, Email = "x@test.local", Enabled = true });
+        _repo.Setup(r => r.UserRoleNamesGetAsync(50)).ReturnsAsync(new List<string> { RoleNames.TenantReader });
+        _repo.Setup(r => r.UserUpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+
+        var controller = NewUserController();
+        SetCaller(controller, "admin", 1);
+        var result = await controller.UserUpdate(new UserUpdate { IDUser = 50, FirstName = "New" });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        // Strict mock: an un-set-up RevokeUserTokensAsync/AuditLogAddAsync call would throw - proves neither ran when Enabled didn't change.
+    }
+
+    [Fact]
     public async Task ServerConfig_TenantAdmin_Returns403_ServerWideSettingsAreGlobalOnly()
     {
         // Strict mock: an un-set-up ServerConfigGetAsync call would throw, proving the request was refused before touching the repo.

@@ -30,6 +30,9 @@ namespace api.Models
 
         // Set only by tenant import - the imported hash is portable but unproven on this server, so login is blocked (UserApiController.UserLogin's 428 gate) until ForceChangePassword clears it.
         public bool MustChangePassword { get; set; }
+
+        // Written only by EfRepository.RevokeUserTokensAsync (password change, Enabled->false) - an access token whose iat predates this is rejected even though it hasn't naturally expired yet.
+        public DateTime? TokensValidAfterUtc { get; set; }
     }
 
     public class UserSecret
