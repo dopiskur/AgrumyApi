@@ -1792,6 +1792,32 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal("", await _repo.SensorDataGetAsync(tenantId, d.IDDevice, 10, 7, 0));
     }
 
+    // Roadmap #301: a caller-supplied (timeRange, timeMDMY) is otherwise unbounded - a request for "100 years" would load the device's entire history into memory. The clamp caps the effective cutoff without erroring, so a request beyond it just returns less than asked rather than everything.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task SensorDataGet_ClampsAnUnreasonablyLargeTimeRange_ToTheSafetyCeiling(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+
+        DateTime now = DateTime.UtcNow;
+        await using (var db = _fx.NewContext(t))
+        {
+            db.SensorData.AddRange(
+                // Well beyond the safety ceiling (400 days) - must be excluded even though the request below asks for 100 years.
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Temperature = 999, DateCreated = now.AddYears(-5) },
+                // Inside the ceiling - must still come back.
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, Temperature = 21, DateCreated = now.AddDays(-30) });
+            await db.SaveChangesAsync();
+        }
+
+        string json = await _repo.SensorDataGetAsync(tenantId, d.IDDevice, 100, 3, 0); // 100 years
+        var arr = JsonDocument.Parse(json).RootElement.GetProperty("sensorData");
+
+        Assert.Equal(1, arr.GetArrayLength());
+        Assert.Equal(21, arr[0].GetProperty("temperature").GetDouble());
+    }
+
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task SensorDataReportGet_Metadata_Then_Full_Row_TenantScoped(DbProviderKind provider)
     {

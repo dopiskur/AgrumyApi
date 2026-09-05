@@ -55,6 +55,23 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
+        // A caller-supplied (timeRange, timeMDMY) pair is otherwise unbounded - years/decades would load the device's entire history into memory for in-process aggregation (roadmap #301). Chosen generously above any legitimate chart/report window.
+        private const int MaxLookbackDays = 400;
+
+        /// UTC so the cutoff compares against UTC DateCreated without a DST-sized skew; never further back than MaxLookbackDays regardless of what the caller asked for.
+        private static DateTime ClampedCutoff(DateTime now, int timeRange, int timeMDMY)
+        {
+            DateTime requested = timeMDMY switch
+            {
+                0 => now.AddMinutes(-timeRange),
+                1 => now.AddDays(-timeRange),
+                2 => now.AddMonths(-timeRange),
+                _ => now.AddYears(-timeRange),
+            };
+            DateTime hardFloor = now.AddDays(-MaxLookbackDays);
+            return requested < hardFloor ? hardFloor : requested;
+        }
+
         public async Task<string> SensorDataGetAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY, int? buildReport)
         {
             if (timeMDMY is not (0 or 1 or 2 or 3) || timeRange == null)
@@ -62,15 +79,8 @@ namespace api.Dal
                 return "";
             }
 
-            // UTC so the cutoff compares against UTC DateCreated without a DST-sized skew.
             DateTime now = DateTime.UtcNow;
-            DateTime cutoff = timeMDMY switch
-            {
-                0 => now.AddMinutes(-timeRange.Value),
-                1 => now.AddDays(-timeRange.Value),
-                2 => now.AddMonths(-timeRange.Value),
-                _ => now.AddYears(-timeRange.Value),
-            };
+            DateTime cutoff = ClampedCutoff(now, timeRange.Value, timeMDMY.Value);
 
             // A null tenantID means "no filter" here - a bare == would translate to SQL TenantID IS NULL and match nothing.
             var rows = await db.SensorData.AsNoTracking()
@@ -119,13 +129,7 @@ namespace api.Dal
             }
 
             DateTime now = DateTime.UtcNow;
-            DateTime cutoff = timeMDMY switch
-            {
-                0 => now.AddMinutes(-timeRange.Value),
-                1 => now.AddDays(-timeRange.Value),
-                2 => now.AddMonths(-timeRange.Value),
-                _ => now.AddYears(-timeRange.Value),
-            };
+            DateTime cutoff = ClampedCutoff(now, timeRange.Value, timeMDMY.Value);
 
             IQueryable<SensorDataRow> baseQuery = db.SensorData.AsNoTracking()
                 .Where(r => (tenantID == null || r.TenantID == tenantID) && r.DateCreated > cutoff);
