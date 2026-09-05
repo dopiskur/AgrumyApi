@@ -74,5 +74,7 @@ namespace api.Models
         public string? DeviceName { get; set; }
         public int? UnitID { get; set; }
         public int? ZoneID { get; set; }
+        /// This API's own host (see DiscoveryApiController.PublicHost) - not the scanning device's own, possibly-stale deviceConfig.servicePoint.
+        public string? ServicePoint { get; set; }
     }
 }

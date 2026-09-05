@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using api;
 using api.Commands;
 using api.Controllers.API;
 using api.Dal.Interface;
@@ -6,6 +7,7 @@ using api.Models;
 using api.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Agrumy.Api.Tests;
@@ -20,7 +22,7 @@ public class DiscoveryWifiConfigTests
     private DiscoveryApiController NewController(int? tenantId, params string[] roles)
     {
         var controller = new DiscoveryApiController(_repo.Object, _cache.Object,
-            new CommandQueueService(_repo.Object, _repo.Object, _repo.Object));
+            new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), Options.Create(new AgrumySettings()));
         var claims = new List<Claim> { new("TenantID", tenantId?.ToString() ?? "") };
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
         controller.ControllerContext = new ControllerContext

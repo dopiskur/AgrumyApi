@@ -6,12 +6,13 @@ using api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace api.Controllers.API
 {
     /// "Scan for new devices" - device-facing report intake, the admin scan trigger, the aggregated results list, and Register (PIN + WiFi credentials to the winning scanning device).
     [Route("/api/Discovery")]
-    public class DiscoveryApiController(IRepository repo, ICache cache, CommandQueueService commandQueue) : ApiControllerBase(repo, cache)
+    public class DiscoveryApiController(IRepository repo, ICache cache, CommandQueueService commandQueue, IOptions<AgrumySettings> settings) : ApiControllerBase(repo, cache)
     {
         /// No identity field in the body by design - the scanning device comes exclusively from the authenticated apiId, same rule as DeviceApiController.PushEvent.
         [HttpPost("Report")]
@@ -254,6 +255,7 @@ namespace api.Controllers.API
                 DeviceName = request.DeviceName,
                 UnitID = request.UnitID,
                 ZoneID = request.ZoneID,
+                ServicePoint = PublicHost,
             });
 
             IssueCommandResult result = await commandQueue.IssueProvisionCommandAsync(winner.ScanningDeviceID, payloadJson);
@@ -273,5 +275,18 @@ namespace api.Controllers.API
 
         private Task<(TenantWifiConfig? Config, ActionResult? Error)> EnsureOwnedWifiConfigAsync(int idTenantWifiConfig) =>
             EnsureOwnedDeviceEntityAsync(() => Repo.TenantWifiConfigGetByIdAsync(idTenantWifiConfig), c => (int?)c.TenantID, "WiFi network", forWrite: true);
+
+        /// Same precedence as FirmwareApiController.PublicBaseUrl (WebView:ApiService, else the request's own host), but host-only - api.Models.DeviceConfig.ServicePoint has no scheme, firmware prepends http(s):// itself.
+        private string PublicHost
+        {
+            get
+            {
+                if (Uri.TryCreate(settings.Value.ApiService, UriKind.Absolute, out var uri) && !string.IsNullOrWhiteSpace(uri.Host))
+                {
+                    return uri.IsDefaultPort ? uri.Host : $"{uri.Host}:{uri.Port}";
+                }
+                return Request.Host.Value ?? "";
+            }
+        }
     }
 }
