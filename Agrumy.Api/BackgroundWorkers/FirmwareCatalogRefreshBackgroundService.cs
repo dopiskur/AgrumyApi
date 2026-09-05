@@ -1,6 +1,6 @@
 namespace api.BackgroundWorkers
 {
-    /// <summary>Same deliberate departure as WeatherBackgroundService: fixed 1-minute cadence, not the admin-configured interval - FirmwareCatalogRefreshEvaluator itself re-checks the live interval every tick.</summary>
+    /// Same deliberate departure as WeatherBackgroundService: fixed 1-minute cadence, not the admin-configured interval - FirmwareCatalogRefreshEvaluator re-checks the live interval every tick.
     public sealed class FirmwareCatalogRefreshBackgroundService(IServiceScopeFactory scopeFactory, ILogger<FirmwareCatalogRefreshBackgroundService> logger)
         : PeriodicBackgroundService(scopeFactory, logger)
     {

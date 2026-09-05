@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Covers config gating, the "skip, never throw" contract, message building, and dispatcher fan-out. No real SMTP/FCM traffic.</summary>
+/// Covers config gating, the "skip, never throw" contract, message building, and dispatcher fan-out. No real SMTP/FCM traffic.
 public class NotificationTests
 {
     private static IOptions<NotificationOptions> Opts(NotificationOptions o) => Options.Create(o);
@@ -258,7 +258,7 @@ public class NotificationTests
         public HttpClient CreateClient(string name) => new(Handler);
     }
 
-    /// <summary>Captures the last request so a test can assert on method/body/headers without any real network call.</summary>
+    /// Captures the last request so a test can assert on method/body/headers without any real network call.
     private sealed class FakeHttpMessageHandler(HttpStatusCode statusCode) : HttpMessageHandler
     {
         public HttpRequestMessage? LastRequest { get; private set; }

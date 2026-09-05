@@ -3,7 +3,7 @@ using api.Models;
 
 namespace api.Commands
 {
-    /// <summary>Success (>=1 command created) allows Message to be null; AllDuplicates and TargetNotFound always carry one so the API controller can pass it straight through as the error body.</summary>
+    /// Success (>=1 command created) allows Message to be null; AllDuplicates and TargetNotFound always carry one so the API controller can pass it straight through as the error body.
     public enum IssueCommandOutcome
     {
         Success,
@@ -13,12 +13,12 @@ namespace api.Commands
 
     public sealed record IssueCommandResult(IssueCommandOutcome Outcome, IReadOnlyList<int> CreatedCommandIds, string? Message = null);
 
-    /// <summary>Dedup, target resolution/fan-out, FIFO pending-command lookup, and ack/execute state transitions; directly unit-testable with mocked repositories, no HTTP/controller plumbing. No background worker - expiry is lazy, applied the moment a stale Pending row is next looked at (GetPendingCommandAsync).</summary>
+    /// Dedup, target resolution/fan-out, FIFO pending-command lookup, and ack/execute state transitions; no background worker - expiry is lazy, applied the moment a stale Pending row is next looked at.
     public sealed class CommandQueueService(ICommandRepository commandRepo, IDeviceRepository deviceRepo, IDeviceUnitRepository unitRepo)
     {
         private static readonly TimeSpan DefaultExpiry = TimeSpan.FromMinutes(30);
 
-        /// <summary>Resolves TargetType/TargetId to the actual device(s) (Device: itself; Zone: its one controller; Unit: every controller across every zone under it), then per-device dedup (reject a new command whose ActionType already has an active, unexpired command for that device). A multi-device fan-out where some devices dedup and others don't is still Success with a shorter list - only "every resolved device already had one" is AllDuplicates.</summary>
+        /// Resolves TargetType/TargetId to the actual device(s), then per-device dedup against an active unexpired command of that ActionType; a fan-out is Success unless EVERY resolved device already had one, which is AllDuplicates.
         public async Task<IssueCommandResult> IssueCommandAsync(CommandTargetType targetType, int targetId, CommandActionType actionType)
         {
             IList<Device> targets;
@@ -52,10 +52,7 @@ namespace api.Commands
             return await IssueToTargetsAsync(targets, actionType);
         }
 
-        /// <summary>Fans ScanForDevices out to every sensor-only device in scope - Zone if zoneId is
-        /// given, else Unit if unitId is given, else every sensor-only device in the tenant
-        /// (Fleet-wide). A different target-resolution rule than IssueCommandAsync's (many devices,
-        /// not one controller per zone/unit), but the same dedup/fan-out tail via IssueToTargetsAsync.</summary>
+        /// Fans ScanForDevices to every sensor-only device in scope (zone, else unit, else tenant-wide) - a different target-resolution rule than IssueCommandAsync's, same dedup/fan-out tail via IssueToTargetsAsync.
         public async Task<IssueCommandResult> IssueScanCommandAsync(int? tenantId, int? unitId, int? zoneId)
         {
             IList<Device> targets;
@@ -84,9 +81,8 @@ namespace api.Commands
             return await IssueToTargetsAsync(targets, CommandActionType.ScanForDevices);
         }
 
-        /// <summary>Issues a ProvisionDevice command to exactly one device (the roadmap #268
-        /// Register flow's winning scanning device), carrying payloadJson - see
-        /// api.Models.DiscoveryProvisionPayload. Same per-device dedup as every other ActionType.</summary>
+        /// Issues a ProvisionDevice command to exactly one device (the roadmap #268 Register flow's
+        /// winning scanning device), carrying payloadJson - see api.Models.DiscoveryProvisionPayload.
         public async Task<IssueCommandResult> IssueProvisionCommandAsync(int deviceId, string payloadJson)
         {
             DateTime utcNow = DateTime.UtcNow;
@@ -102,7 +98,7 @@ namespace api.Commands
             return new IssueCommandResult(IssueCommandOutcome.AllDuplicates, [], "A provisioning command is already pending for this device.");
         }
 
-        /// <summary>Per-(device, ActionType) dedup then insert, shared by every fan-out entry point above.</summary>
+        /// Per-(device, ActionType) dedup then insert, shared by every fan-out entry point above.
         private async Task<IssueCommandResult> IssueToTargetsAsync(IList<Device> targets, CommandActionType actionType)
         {
             DateTime utcNow = DateTime.UtcNow;
@@ -131,7 +127,7 @@ namespace api.Commands
                 : new IssueCommandResult(IssueCommandOutcome.AllDuplicates, [], "A command of that type is already pending for the targeted device(s).");
         }
 
-        /// <summary>The oldest Pending command for this device that is NOT expired - lazily expires (and skips past) any that are, so a stuck expired command of one ActionType never hides a still-valid one of a different type.</summary>
+        /// The oldest non-expired Pending command for this device - lazily expires (and skips past) any that are, so a stuck expired command never hides a still-valid one of a different type.
         public async Task<PendingCommand?> GetPendingCommandAsync(int deviceId)
         {
             DateTime utcNow = DateTime.UtcNow;
@@ -155,7 +151,7 @@ namespace api.Commands
             return null;
         }
 
-        /// <summary>Only a genuinely Pending command can be acknowledged; deviceId ownership is checked so a command belonging to a different device is treated as not found.</summary>
+        /// Only a genuinely Pending command can be acknowledged; a command belonging to a different device is treated as not found.
         public async Task AcknowledgeCommandAsync(int commandId, int deviceId)
         {
             DeviceCommand? command = await commandRepo.GetCommandByIdAsync(commandId);
@@ -165,7 +161,7 @@ namespace api.Commands
             }
         }
 
-        /// <summary>Accepts either Pending or Acknowledged as the prior state - Pending covers Reboot, which has no "after" to ack from. Same deviceId ownership check as AcknowledgeCommandAsync.</summary>
+        /// Accepts either Pending or Acknowledged as the prior state - Pending covers Reboot, which has no "after" to ack from; same ownership check as AcknowledgeCommandAsync.
         public async Task MarkExecutedAsync(int commandId, int deviceId)
         {
             DeviceCommand? command = await commandRepo.GetCommandByIdAsync(commandId);

@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>SaveAsync must not leave a .tmp file behind when the write is interrupted partway through.</summary>
+/// SaveAsync must not leave a .tmp file behind when the write is interrupted partway through.
 public class FirmwareStorageTests
 {
     private sealed class ExplodingStream : System.IO.Stream

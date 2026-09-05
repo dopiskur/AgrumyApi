@@ -4,7 +4,7 @@ using api.Notifications;
 
 namespace api.BackgroundWorkers
 {
-    /// <summary>A device's latest battery reading crossing ServerConfig.BatteryLowThreshold fires one alert per low-battery streak, dead-zone-latched against BatteryLowHysteresis to avoid chattering at the boundary.</summary>
+    /// A device's latest battery reading crossing ServerConfig.BatteryLowThreshold fires one alert per low-battery streak, dead-zone-latched against BatteryLowHysteresis to avoid chattering at the boundary.
     public sealed class LowBatteryAlertEvaluator(
         IDeviceRepository deviceRepo, IUserRepository userRepo, IServerConfigRepository serverConfigRepo, INotificationDispatcher dispatcher)
     {

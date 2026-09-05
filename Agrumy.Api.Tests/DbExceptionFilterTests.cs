@@ -12,7 +12,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>The global filter that replaced per-action try/catch blocks: a unique-constraint hit becomes a 409 business message, everything else goes through IRepository.ClassifyException -> 503/500/409.</summary>
+/// The global filter that replaced per-action try/catch blocks: a unique-constraint hit becomes a 409 business message, everything else goes through IRepository.ClassifyException -> 503/500/409.
 public class DbExceptionFilterTests
 {
     private static ExceptionContext Context(Exception ex)

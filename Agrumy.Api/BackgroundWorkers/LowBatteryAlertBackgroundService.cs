@@ -3,7 +3,7 @@ using api.Notifications;
 
 namespace api.BackgroundWorkers
 {
-    /// <summary>Thin PeriodicBackgroundService wrapper - the actual logic lives in LowBatteryAlertEvaluator, kept separate for testability.</summary>
+    /// Thin PeriodicBackgroundService wrapper - the actual logic lives in LowBatteryAlertEvaluator, kept separate for testability.
     public sealed class LowBatteryAlertBackgroundService(
         IServiceScopeFactory scopeFactory,
         IOptions<NotificationOptions> options,

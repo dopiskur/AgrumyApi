@@ -4,7 +4,7 @@ using api.Notifications;
 
 namespace api.BackgroundWorkers
 {
-    /// <summary>Offline-detection/notification logic, kept separate from OfflineAlertBackgroundService so it is directly unit-testable with mocked repositories.</summary>
+    /// Offline-detection/notification logic, kept separate from OfflineAlertBackgroundService so it is directly unit-testable with mocked repositories.
     public sealed class OfflineAlertEvaluator(IDeviceRepository deviceRepo, IUserRepository userRepo, INotificationDispatcher dispatcher)
     {
         public async Task RunOnceAsync(CancellationToken ct = default)

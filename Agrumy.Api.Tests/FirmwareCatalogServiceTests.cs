@@ -6,7 +6,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Exercises FirmwareCatalogService with a mocked repository and a canned IFirmwareFetcher - no database, no network. The Local-repository paths write real files, but only into a per-test temp directory.</summary>
+/// Exercises FirmwareCatalogService with a mocked repository and a canned IFirmwareFetcher - no database, no network. The Local-repository paths write real files, but only into a per-test temp directory.
 public class FirmwareCatalogServiceTests
 {
     private readonly Mock<IRepository> _repo = new(MockBehavior.Strict);
@@ -59,8 +59,7 @@ public class FirmwareCatalogServiceTests
 
     private const string GitHubReleasesUrl = "https://api.github.com/repos/dopiskur/AgrumyFirmware/releases?per_page=100&page=1";
 
-    /// <summary>Two releases (v1.1.0, v1.0.0), each with both boards + a manifest asset, plus a draft
-    /// that must be ignored and a stray asset name that must be skipped.</summary>
+    /// Two releases with both boards + a manifest asset, plus a draft release and a stray asset name to ignore.
     private void SetupGitHubReleases()
     {
         static string Asset(string tag, string name) => $"https://github.com/dopiskur/AgrumyFirmware/releases/download/{tag}/{name}";
@@ -116,17 +115,14 @@ public class FirmwareCatalogServiceTests
         Assert.False(Directory.Exists(_root) && Directory.EnumerateFiles(_root).Any());
     }
 
-    /// <summary>roadmap #186: a single ?per_page=100 request used to silently drop every release
-    /// past the first page. A full 100-item first page must trigger a second request; a release
-    /// that only exists on that second page must still make it into the catalog.</summary>
+    /// A full 100-item first page must trigger a second request, and a release only on that second page must reach the catalog.
     [Fact]
     public async Task GitHub_Refresh_Paginates_Past_The_First_100_Releases()
     {
         SetSource(FirmwareSource.GitHub);
         static string Asset(string tag, string name) => $"https://github.com/dopiskur/AgrumyFirmware/releases/download/{tag}/{name}";
 
-        // Page 1: exactly 100 releases, none carrying any assets - just enough to prove the count
-        // check ("== 100 -> fetch page 2") without needing 100 real asset blocks.
+        // Exactly 100 releases with no assets - enough to trip the "== 100 -> fetch page 2" check.
         var page1Releases = Enumerable.Range(1, 100)
             .Select(i => $$"""{"tag_name":"v0.0.{{i}}","draft":false,"prerelease":false,"published_at":"2026-01-01T00:00:00Z","assets":[]}""");
         _fetcher.Texts["https://api.github.com/repos/dopiskur/AgrumyFirmware/releases?per_page=100&page=1"] =
@@ -404,8 +400,7 @@ public class FirmwareCatalogServiceTests
 
     private const string FullImageAssetName = "agrumy-esp32dev-full-v1.1.0.bin";
 
-    /// <summary>Splices one extra asset entry into the v1.1.0 release's asset list already set up
-    /// by SetupGitHubReleases, right before the manifest.json entry.</summary>
+    /// Splices one extra asset into SetupGitHubReleases' v1.1.0 asset list, right before manifest.json.
     private void AddAssetToV110Release(string assetName, long size)
     {
         static string AssetUrl(string name) => $"https://github.com/dopiskur/AgrumyFirmware/releases/download/v1.1.0/{name}";

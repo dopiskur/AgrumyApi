@@ -9,7 +9,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Exercises WeatherEvaluator directly, no database or real HTTP call. Strict mocks double as the assertion that an early-return path makes NO further calls.</summary>
+/// Exercises WeatherEvaluator directly, no database or real HTTP call. Strict mocks double as the assertion that an early-return path makes NO further calls.
 public class WeatherEvaluatorTests
 {
     private readonly Mock<IServerConfigRepository> _serverConfig = new(MockBehavior.Strict);

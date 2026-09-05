@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace api.Firmware
 {
-    /// <summary>The directory this API serves .bin files from (Firmware:LocalPath, default "firmware-store" under the content root - NOT "firmware", which on a case-insensitive filesystem collides with this source folder when running from the project directory). File names are always the release convention, validated before anything is written or read, so a request path can never escape the directory.</summary>
+    /// The directory this API serves .bin files from (Firmware:LocalPath, default "firmware-store" - not "firmware", which collides case-insensitively with the source folder) - file names are always release-convention, validated so a request path can never escape it.
     public sealed class FirmwareStorage(IOptions<AgrumySettings> settings, IHostEnvironment environment)
     {
         public const string DefaultRelativePath = "firmware-store";
@@ -30,9 +30,7 @@ namespace api.Firmware
 
         public bool Exists(string fileName) => File.Exists(PathFor(fileName));
 
-        /// <summary>Writes via a temp file + rename so a download that dies halfway never leaves a
-        /// truncated .bin under the real name (the device would flash it - Update.end() would catch
-        /// a short image, but only after the download wasted its cycle). Returns (size, sha256).</summary>
+        /// Writes via a temp file + rename so a download that dies halfway never leaves a truncated .bin under the real name; returns (size, sha256).
         public async Task<(long SizeBytes, string Sha256)> SaveAsync(string fileName, Stream content, CancellationToken cancellationToken = default)
         {
             string finalPath = PathFor(fileName);
@@ -59,7 +57,7 @@ namespace api.Firmware
             }
             catch
             {
-                // Best-effort .tmp cleanup so a failed write doesn't leave dead weight on disk; own try/catch so a delete failure never masks the real exception.
+                // Own try/catch so a failed cleanup delete never masks the real exception.
                 try { File.Delete(tmpPath); } catch { /* best-effort */ }
                 throw;
             }

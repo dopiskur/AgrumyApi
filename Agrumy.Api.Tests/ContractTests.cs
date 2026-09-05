@@ -5,7 +5,7 @@ using Json.Schema;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Enforces the firmware &lt;-&gt; API contract in <c>contracts/device-api/*.schema.json</c>: serializes the C# models exactly the way ASP.NET Core MVC does and validates against the schemas, so a rename/casing change the compiler happily accepts fails here instead of on a device in the field.</summary>
+/// Enforces the firmware &lt;-&gt; API contract in <c>contracts/device-api/*.schema.json</c>: serializes the C# models exactly the way ASP.NET Core MVC does and validates against the schemas, so a rename/casing change the compiler happily accepts fails here instead of on a device in the field.
 public class ContractTests
 {
     // Matches Microsoft.AspNetCore.Mvc's internal default (JsonSerializerDefaults.Web).

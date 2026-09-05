@@ -6,7 +6,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Exercises SensorDataRetentionEvaluator directly, no real database connection - the AgrumyDbContext below is never-connected since db.Database.IsNpgsql() only reads the provider the context was built with.</summary>
+/// Exercises SensorDataRetentionEvaluator directly, no real database connection - the AgrumyDbContext below is never-connected since db.Database.IsNpgsql() only reads the provider the context was built with.
 public class SensorDataRetentionEvaluatorTests
 {
     private readonly Mock<IServerConfigRepository> _serverConfig = new(MockBehavior.Strict);

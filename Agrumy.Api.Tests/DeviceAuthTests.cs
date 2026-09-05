@@ -9,7 +9,7 @@ using Moq;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Drives DeviceApiKeyHandler/DeviceSessionHandler through every rejection path (missing header/unknown device/bad key/expired-session) plus the success path, end to end through the real LoggerMessage delegates.</summary>
+/// Drives DeviceApiKeyHandler/DeviceSessionHandler through every rejection path (missing header/unknown device/bad key/expired-session) plus the success path, end to end through the real LoggerMessage delegates.
 public class DeviceAuthTests
 {
     private static AuthorizationHandlerContext NewContext(IAuthorizationRequirement requirement, HttpContext http) =>

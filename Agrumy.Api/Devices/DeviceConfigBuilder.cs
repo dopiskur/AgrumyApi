@@ -5,10 +5,7 @@ using api.Utils;
 
 namespace api.Devices
 {
-    /// <summary>Builds the DeviceConfig body a Config poll or Register response sends back -
-    /// extracted out of DeviceApiController so RelayApiController.Batch's Config
-    /// entries produce byte-for-byte the same response a device would get calling
-    /// POST /api/Device/Config directly, without a second copy of this logic to drift.</summary>
+    /// Builds the DeviceConfig body a Config poll or Register response sends back, shared so RelayApiController.Batch's Config entries produce byte-for-byte the same response as a direct POST /api/Device/Config.
     public class DeviceConfigBuilder(IRepository repo, FirmwareCatalogService firmwareCatalog)
     {
         public async Task<DeviceConfig> BuildAsync(Device device, PendingCommand? pendingCommand, string? board)

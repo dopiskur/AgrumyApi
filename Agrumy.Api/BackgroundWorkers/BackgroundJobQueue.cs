@@ -2,7 +2,7 @@ using System.Threading.Channels;
 
 namespace api.BackgroundWorkers
 {
-    /// <summary>On-demand counterpart to PeriodicBackgroundService: a controller action enqueues one job and returns immediately (202 Accepted) instead of blocking on a long-running task. Singleton by necessity (the channel must outlive any one request's DI scope); each job gets its own scope from BackgroundJobRunner.</summary>
+    /// On-demand counterpart to PeriodicBackgroundService: a controller action enqueues one job and returns immediately (202 Accepted) instead of blocking; singleton so the channel outlives any one request's DI scope.
     public sealed class BackgroundJobQueue
     {
         private readonly Channel<Func<IServiceProvider, CancellationToken, Task>> channel =
@@ -14,7 +14,7 @@ namespace api.BackgroundWorkers
         public ChannelReader<Func<IServiceProvider, CancellationToken, Task>> Reader => channel.Reader;
     }
 
-    /// <summary>Runs queued jobs one at a time, in submission order. One job throwing is logged and never stops the runner.</summary>
+    /// Runs queued jobs one at a time, in submission order; one job throwing is logged and never stops the runner.
     public sealed class BackgroundJobRunner(
         BackgroundJobQueue queue, IServiceScopeFactory scopeFactory, ILogger<BackgroundJobRunner> logger) : BackgroundService
     {

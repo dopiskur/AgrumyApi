@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace api.BackgroundWorkers
 {
-    /// <summary>Computes the install-wide ServerConfig.WeatherRainPredicted flag; BuildDeviceConfigAsync combines it with each zone's own opt-in into the per-device veto.</summary>
+    /// Computes the install-wide ServerConfig.WeatherRainPredicted flag; BuildDeviceConfigAsync combines it with each zone's own opt-in into the per-device veto.
     public sealed class WeatherEvaluator(
         IServerConfigRepository serverConfigRepo, IWeatherForecastClient weatherClient, IOptions<AgrumySettings> settingsOptions,
         ILogger<WeatherEvaluator> logger)

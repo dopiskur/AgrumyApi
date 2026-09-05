@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Agrumy.Api.Tests;
 
-/// <summary>Health checks (DB + cache-backend, the latter tied into the cache's graceful-degradation behavior) and the per-route metrics aggregate.</summary>
+/// Health checks (DB + cache-backend, the latter tied into the cache's graceful-degradation behavior) and the per-route metrics aggregate.
 public class DiagnosticsTests
 {
     private sealed class FakeSystemRepository(bool canConnect, Exception? throwOnConnect = null) : ISystemRepository
@@ -63,7 +63,7 @@ public class DiagnosticsTests
         Assert.Equal(HealthStatus.Healthy, result.Status);
     }
 
-    /// <summary>Same fake as CacheRepositoryTests' ThrowingCache - stands in for a Redis client throwing a connection/timeout exception.</summary>
+    /// Same fake as CacheRepositoryTests' ThrowingCache - stands in for a Redis client throwing a connection/timeout exception.
     private sealed class ThrowingCache : IDistributedCache
     {
         public byte[]? Get(string key) => throw new InvalidOperationException("backend unreachable");

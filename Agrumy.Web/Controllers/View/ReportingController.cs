@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.View
 {
-    /// <summary>Cross-device list of every SensorDataReport in scope - the per-device Report tab (SensorDataController.Report) already covers generating/viewing one device's own reports, this is the "see everything already generated" overview the API itself did not previously support.</summary>
+    /// Cross-device list of every SensorDataReport in scope - the per-device Report tab (SensorDataController.Report) covers one device, this is the overview across all of them.
     [Authorize]
     public class ReportingController(IApi api) : Controller
     {

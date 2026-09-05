@@ -7,11 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.API
 {
-    /// <summary>Tenant Management CRUD (roadmap #196). Read is Global admin or Global reader; write
-    /// (create/rename) is Global admin only - a Tenant scope has no meaningful self-management of
-    /// its own existence, so this never delegates to a TenantAdmin the way Device/User management does.
-    /// [Authorize(Roles=...)] attributes stay at the wide legacy-friendly net (same reasoning as
-    /// ServerConfigApiController); the precise decision is the inline CallerIsGlobalAdmin/GlobalReader check.</summary>
+    /// Tenant Management CRUD - write is Global admin only since a tenant has no meaningful self-management of its own existence, unlike Device/User management; [Authorize] stays at the wide legacy net (same reasoning as ServerConfigApiController), the precise decision is the inline CallerIsGlobalAdmin/GlobalReader check.
     [Route("/api/Tenant")]
     public class TenantApiController(IRepository repo, ICache cache, TenantExportService exportService, TenantImportService importService) : ApiControllerBase(repo, cache)
     {
@@ -76,11 +72,7 @@ namespace api.Controllers.API
 
         // ---- Export/Import --------------------------------------------------
 
-        /// <summary>SENSITIVE: the response carries every exported user's password hash/salt and
-        /// every exported device's ApiKey - handle it like any other credential bundle (do not
-        /// email it unencrypted, do not commit it to a repo, etc.). Never persisted server-side -
-        /// built in memory and streamed straight back. A TenantAdmin may export only their OWN
-        /// tenant (CallerTenantId); Global admin may export any.</summary>
+        /// SENSITIVE: carries every exported user's password hash/salt and device's ApiKey (treat like a credential bundle, never persisted server-side, built in memory and streamed straight back) - a TenantAdmin exports only their OWN tenant, Global admin any.
         [Authorize(Roles = RoleNames.Admins)]
         [HttpGet("Export")]
         public async Task<ActionResult<TenantExport>> Export(int idTenant, bool includeSensorData = false, DateTime? sensorDataSinceUtc = null)
@@ -92,9 +84,7 @@ namespace api.Controllers.API
             return Ok(await exportService.ExportAsync(idTenant, includeSensorData, sensorDataSinceUtc));
         }
 
-        /// <summary>ByName only - see api.Models.TenantImportTarget. Global admin only: unlike
-        /// Export, this can create a brand-new tenant or add into one the caller doesn't already
-        /// administer, so it stays at the same "Global admin only" bar as TenantAdd/TenantUpdate above.</summary>
+        /// ByName only (see api.Models.TenantImportTarget), Global admin only - unlike Export this can create a brand-new tenant or add into one the caller doesn't administer, same bar as TenantAdd/TenantUpdate.
         [Authorize(Roles = "admin")]
         [HttpPost("Import")]
         public async Task<ActionResult<TenantImportResult>> Import([FromBody] TenantImportRequest value)
@@ -118,12 +108,7 @@ namespace api.Controllers.API
             return Ok(await importService.ImportByNameAsync(value.Export, value.TargetTenantName.Trim()));
         }
 
-        /// <summary>AsSentinel: claims TenantID=0 with this export's users/devices, replacing the
-        /// still-unclaimed bootstrap admin placeholder - see TenantImportService.ImportAsSentinelAsync
-        /// and ITenantRepository.TenantZeroIsEmptyAsync for the safety gate. Deliberately anonymous:
-        /// the whole point is a brand-new self-hosted server with nobody to authenticate as yet -
-        /// TenantZeroIsEmptyAsync (not a role check) is what stops this being called against an
-        /// already-provisioned server.</summary>
+        /// AsSentinel claims TenantID=0 with this export's users/devices, replacing the unclaimed bootstrap admin placeholder (see TenantImportService.ImportAsSentinelAsync, ITenantRepository.TenantZeroIsEmptyAsync) - deliberately anonymous since a brand-new self-hosted server has nobody to authenticate as yet, TenantZeroIsEmptyAsync itself blocks this against an already-provisioned server.
         [AllowAnonymous]
         [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("login")]
         [HttpPost("ImportAsSentinel")]

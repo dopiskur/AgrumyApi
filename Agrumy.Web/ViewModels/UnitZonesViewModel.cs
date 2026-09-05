@@ -8,7 +8,7 @@ namespace api.ViewModels
         public IList<DeviceUnitZoneDashboard> Zones { get; set; } = new List<DeviceUnitZoneDashboard>();
         public string DisplayTimeZone { get; set; } = "UTC";
 
-        /// <summary>{"sensorData":[...]} averaged across every device in this unit (all its zones) - see SensorDataUnitAverageGetAsync.</summary>
+        /// {"sensorData":[...]} averaged across every device in this unit (all its zones) - see SensorDataUnitAverageGetAsync.
         public string? SensorDataJson { get; set; }
     }
 }

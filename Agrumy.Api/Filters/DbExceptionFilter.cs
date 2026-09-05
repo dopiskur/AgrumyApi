@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace api.Filters
 {
-    /// <summary>Turns any exception escaping an API action into a response: a named unique-constraint hit (email/username) becomes a 409 business message; anything else goes through <see cref="ISystemRepository.ClassifyException"/> to the DbErrorResponse shape with the status <see cref="DbErrorResponse.StatusCodeFor"/> picks. Registered globally in Program.cs.</summary>
+    /// Turns any exception escaping an API action into a response: a named unique-constraint hit becomes a 409 business message, anything else goes through <see cref="ISystemRepository.ClassifyException"/>; registered globally in Program.cs.
     public sealed class DbExceptionFilter(ISystemRepository repo, ILogger<DbExceptionFilter> logger) : IExceptionFilter
     {
         public void OnException(ExceptionContext context)

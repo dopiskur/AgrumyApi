@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.View
 {
-    /// <summary>Read-only - the API itself already scopes the result to the caller's tenant (or every tenant for a Global admin), nothing further to decide here.</summary>
+    /// Read-only - the API itself already scopes the result to the caller's tenant (or every tenant for a Global admin), nothing further to decide here.
     [Authorize(Roles = RoleNames.Admins)]
     public class AuditLogController(IApi api) : Controller
     {
