@@ -49,6 +49,7 @@ namespace api.Dal
                 ProblemEventExpiryHours = 24,
                 PasswordMinLength = 8,
                 ConfigHeartbeatHours = 24,
+                MqttBrokerPort = 1883,
             };
             db.ServerConfigs.Add(generated);
             await db.SaveChangesAsync();
@@ -95,6 +96,15 @@ namespace api.Dal
             row.PasswordMinLength = config.PasswordMinLength;
             row.PasswordRequireComplexity = config.PasswordRequireComplexity;
             row.ConfigHeartbeatHours = config.ConfigHeartbeatHours;
+            row.MqttTransportEnabled = config.MqttTransportEnabled;
+            row.MqttBrokerHost = config.MqttBrokerHost;
+            row.MqttBrokerPort = config.MqttBrokerPort;
+            row.MqttUsername = config.MqttUsername;
+            // Blank means "leave the stored password alone" - the edit form never gets the real value back to resubmit, so blank can only mean "unchanged", never "clear it" (clearing means disabling the toggle instead).
+            if (!string.IsNullOrEmpty(config.MqttPassword))
+            {
+                row.MqttPassword = config.MqttPassword;
+            }
             await db.SaveChangesAsync();
 
             // Re-applied on every save so Postgres/TimescaleDB retention updates immediately - a no-op on MariaDB/MySQL, which reads this row fresh on its own daily tick.
@@ -211,6 +221,12 @@ namespace api.Dal
             PasswordMinLength = r.PasswordMinLength == 0 ? 8 : r.PasswordMinLength,
             PasswordRequireComplexity = r.PasswordRequireComplexity,
             ConfigHeartbeatHours = r.ConfigHeartbeatHours,
+            MqttTransportEnabled = r.MqttTransportEnabled,
+            MqttBrokerHost = r.MqttBrokerHost,
+            MqttBrokerPort = r.MqttBrokerPort == 0 ? 1883 : r.MqttBrokerPort,
+            MqttUsername = r.MqttUsername,
+            // Never sent back to the edit form - see ServerConfigUpdateAsync's "blank keeps existing" handling above.
+            MqttPassword = null,
         };
     }
 }

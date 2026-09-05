@@ -12,7 +12,7 @@ public class CommandQueueServiceTests
     private readonly Mock<IDeviceRepository> _devices = new(MockBehavior.Strict);
     private readonly Mock<IDeviceUnitRepository> _units = new(MockBehavior.Strict);
 
-    private CommandQueueService NewService() => new(_commands.Object, _devices.Object, _units.Object);
+    private CommandQueueService NewService() => new(_commands.Object, _devices.Object, _units.Object, new NoOpMqttCommandPublisher());
 
     private static Device ControllerDevice(int id) => new() { IDDevice = id, DeviceControllerEnabled = true };
 

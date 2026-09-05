@@ -127,6 +127,15 @@ namespace api.Controllers.API
                 return BadRequest("Config heartbeat must be 0 (disabled) or between 1 and 168 hours.");
             }
 
+            if (config.MqttBrokerPort is < 1 or > 65535)
+            {
+                return BadRequest("MQTT broker port must be between 1 and 65535.");
+            }
+            if (config.MqttTransportEnabled && string.IsNullOrWhiteSpace(config.MqttBrokerHost))
+            {
+                return BadRequest("MQTT broker host is required to enable MQTT instant command push.");
+            }
+
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await Repo.ServerConfigUpdateAsync(config);
             await WriteAuditAsync("ServerConfig.Updated", null, "ServerConfig", "1", null);

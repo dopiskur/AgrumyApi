@@ -147,6 +147,7 @@ builder.Services.AddHttpClient<IWeatherForecastClient, OpenWeatherMapClient>(cli
 builder.Services.AddScoped<WeatherEvaluator>();
 builder.Services.AddHostedService<WeatherBackgroundService>();
 
+builder.Services.AddScoped<api.Commands.IMqttCommandPublisher, api.Commands.MqttCommandPublisher>();
 builder.Services.AddScoped<CommandQueueService>();
 builder.Services.AddScoped<api.Devices.DeviceConfigBuilder>();
 builder.Services.AddScoped<api.Migration.TenantExportService>();

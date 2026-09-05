@@ -115,6 +115,27 @@ namespace api.Models
         // 0 disables it. DeviceConfigBuilder recomputes UtcOffsetSeconds/SkipWaterPumpForRain fresh on every build, but neither bumps ConfigVersion when it changes (a DST transition, an admin edit to ScheduleTimeZone, or a weather-poll flip) - this forces a full config resend periodically so those changes still reach a device that otherwise has nothing else queued. Clamped 1-168 (a week) by ServerConfigApiController.Update when non-zero.
         [Display(Name = "Config heartbeat (hours, 0 = off)")]
         public int ConfigHeartbeatHours { get; set; } = 24;
+
+        // Roadmap #146 - opt-in, configurable alternative alongside the HTTP/JWT poll cycle (not a
+        // replacement of it): when enabled, a newly-queued command is ALSO published immediately to
+        // this broker so a persistently-connected device (AgrumyFirmware's MqttController) can act on
+        // it before its next HTTP poll, instead of only through CommandQueueService/GetPendingCommandAsync.
+        // OTA/registration/firmware distribution stay on HTTP - see api.Commands.MqttCommandPublisher.
+        [Display(Name = "Enable MQTT instant command push")]
+        public bool MqttTransportEnabled { get; set; }
+
+        [Display(Name = "Broker host")]
+        public string? MqttBrokerHost { get; set; }
+
+        [Display(Name = "Broker port")]
+        public int MqttBrokerPort { get; set; } = 1883;
+
+        [Display(Name = "Broker username")]
+        public string? MqttUsername { get; set; }
+
+        // Never round-tripped back into the edit form - see ServerConfigController (Web)'s "blank keeps the existing value" handling.
+        [Display(Name = "Broker password")]
+        public string? MqttPassword { get; set; }
     }
 
     /// The only ServerConfig field a pre-login, unauthenticated page may see - Register uses it to decide whether to show "create a new tenant" without needing the admin-only /api/ServerConfig.

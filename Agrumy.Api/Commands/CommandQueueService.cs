@@ -15,7 +15,7 @@ namespace api.Commands
     public sealed record IssueCommandResult(IssueCommandOutcome Outcome, IReadOnlyList<int> CreatedCommandIds, string? Message = null);
 
     /// Dedup, target resolution/fan-out, FIFO pending-command lookup, and ack/execute state transitions; no background worker - expiry is lazy, applied the moment a stale Pending row is next looked at.
-    public sealed class CommandQueueService(ICommandRepository commandRepo, IDeviceRepository deviceRepo, IDeviceUnitRepository unitRepo)
+    public sealed class CommandQueueService(ICommandRepository commandRepo, IDeviceRepository deviceRepo, IDeviceUnitRepository unitRepo, IMqttCommandPublisher mqttPublisher)
     {
         private static readonly TimeSpan DefaultExpiry = TimeSpan.FromMinutes(30);
 
@@ -94,6 +94,17 @@ namespace api.Commands
             DateTime expiresAt = utcNow + DefaultExpiry;
             if (await commandRepo.AddCommandAsync(deviceId, CommandActionType.ProvisionDevice, utcNow, expiresAt, payloadJson) is int newCommandId)
             {
+                Device? target = await deviceRepo.DeviceGetByIdAsync(deviceId);
+                if (target != null)
+                {
+                    await mqttPublisher.PublishAsync(target, new PendingCommand
+                    {
+                        IDDeviceCommand = newCommandId,
+                        ActionType = CommandActionType.ProvisionDevice,
+                        ExpiresAt = expiresAt,
+                        Payload = payloadJson,
+                    });
+                }
                 return new IssueCommandResult(IssueCommandOutcome.Success, [newCommandId]);
             }
             return new IssueCommandResult(IssueCommandOutcome.AllDuplicates, [], "A provisioning command is already pending for this device.");
@@ -150,6 +161,12 @@ namespace api.Commands
                 if (await commandRepo.AddCommandAsync(deviceId, actionType, utcNow, expiresAt) is int newCommandId)
                 {
                     created.Add(newCommandId);
+                    await mqttPublisher.PublishAsync(target, new PendingCommand
+                    {
+                        IDDeviceCommand = newCommandId,
+                        ActionType = actionType,
+                        ExpiresAt = expiresAt,
+                    });
                 }
             }
 

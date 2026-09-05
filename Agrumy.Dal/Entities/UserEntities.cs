@@ -155,5 +155,12 @@ namespace api.Dal.Entities
 
         // See api.Models.ServerConfig's own copy for the full explanation.
         public int ConfigHeartbeatHours { get; set; } = 24;
+
+        // See api.Models.ServerConfig's own copies of these for the full explanation.
+        public bool MqttTransportEnabled { get; set; }
+        public string? MqttBrokerHost { get; set; }
+        public int MqttBrokerPort { get; set; } = 1883;
+        public string? MqttUsername { get; set; }
+        public string? MqttPassword { get; set; }
     }
 }

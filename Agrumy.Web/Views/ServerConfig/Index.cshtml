@@ -43,6 +43,9 @@
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-gateway" type="button" role="tab">Gateway</button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-mqtt" type="button" role="tab">MQTT Transport</button>
+                </li>
             </ul>
             <div class="tab-content border border-top-0 rounded-bottom p-3 mb-3">
                 <div class="tab-pane fade show active" id="tab-hysteresis" role="tabpanel">
@@ -333,6 +336,37 @@
                         <label asp-for="GatewayWaitWindowSeconds" class="form-label"></label>
                         <input asp-for="GatewayWaitWindowSeconds" class="form-control" />
                         <span asp-validation-for="GatewayWaitWindowSeconds" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="tab-mqtt" role="tabpanel">
+                    <p class="text-secondary">
+                        Roadmap #146: opt-in, alongside the normal HTTP/JWT poll cycle, not a
+                        replacement of it. When enabled, a newly-queued command is also published
+                        immediately to this broker so a persistently-connected device can act on it
+                        before its next poll - OTA/registration/firmware distribution stay on HTTP.
+                    </p>
+                    <div class="form-check mb-3">
+                        <input asp-for="MqttTransportEnabled" class="form-check-input" />
+                        <label asp-for="MqttTransportEnabled" class="form-check-label"></label>
+                    </div>
+                    <div class="mb-3" style="max-width:20rem">
+                        <label asp-for="MqttBrokerHost" class="form-label"></label>
+                        <input asp-for="MqttBrokerHost" class="form-control" />
+                    </div>
+                    <div class="mb-3" style="max-width:12rem">
+                        <label asp-for="MqttBrokerPort" class="form-label"></label>
+                        <input asp-for="MqttBrokerPort" class="form-control" />
+                        <span asp-validation-for="MqttBrokerPort" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3" style="max-width:20rem">
+                        <label asp-for="MqttUsername" class="form-label"></label>
+                        <input asp-for="MqttUsername" class="form-control" />
+                    </div>
+                    <div class="mb-0" style="max-width:20rem">
+                        <label asp-for="MqttPassword" class="form-label"></label>
+                        <input asp-for="MqttPassword" type="password" class="form-control" autocomplete="new-password" />
+                        <div class="form-text">Leave blank to keep the currently stored password.</div>
                     </div>
                 </div>
             </div>

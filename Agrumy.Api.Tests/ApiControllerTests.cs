@@ -33,12 +33,12 @@ public class ApiControllerTests
     {
         var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
         return new(_repo.Object, _cache.Object,
-            new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), catalog,
+            new CommandQueueService(_repo.Object, _repo.Object, _repo.Object, new NoOpMqttCommandPublisher()), catalog,
             new api.Devices.DeviceConfigBuilder(_repo.Object, catalog), TestSettings);
     }
     private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _jobQueue, TestSettings);
     private DeviceCommandApiController NewDeviceCommandController() =>
-        new(_repo.Object, _cache.Object, new CommandQueueService(_repo.Object, _repo.Object, _repo.Object));
+        new(_repo.Object, _cache.Object, new CommandQueueService(_repo.Object, _repo.Object, _repo.Object, new NoOpMqttCommandPublisher()));
 
     /// UserApiController enqueues notification jobs instead of dispatching them inline (roadmap #305) - this runs the one job a test expects to have been queued against a fake scope resolving the same mocks, then lets the test assert on _notifications/_repo as before.
     private async Task RunOneQueuedJobAsync()
@@ -527,7 +527,7 @@ public class ApiControllerTests
     {
         var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
         return new(_repo.Object, _cache.Object,
-            new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), catalog,
+            new CommandQueueService(_repo.Object, _repo.Object, _repo.Object, new NoOpMqttCommandPublisher()), catalog,
             new api.Devices.DeviceConfigBuilder(_repo.Object, catalog),
             Options.Create(new AgrumySettings { GatewayRegistrationSecret = serverSecret }));
     }
