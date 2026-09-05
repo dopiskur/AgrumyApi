@@ -26,7 +26,9 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Firmware catalog changes require the Global admin role");
             }
-            return Ok(await catalog.SyncAsync(request.Mode, PublicBaseUrl, cancellationToken));
+            FirmwareSyncResult result = await catalog.SyncAsync(request.Mode, PublicBaseUrl, cancellationToken);
+            await WriteAuditAsync("Firmware.Synced", null, "Firmware", request.Mode.ToString(), $"added {result.Added}, removed {result.Removed}, skipped {result.Skipped}");
+            return Ok(result);
         }
 
         [Authorize(Roles = RoleNames.GlobalAdmin)]
@@ -37,7 +39,9 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Firmware catalog changes require the Global admin role");
             }
-            return Ok(await catalog.ImportFromDirectoryAsync(request.Path, PublicBaseUrl, cancellationToken));
+            FirmwareSyncResult result = await catalog.ImportFromDirectoryAsync(request.Path, PublicBaseUrl, cancellationToken);
+            await WriteAuditAsync("Firmware.Imported", null, "Firmware", request.Path ?? "", $"added {result.Added}, skipped {result.Skipped}");
+            return Ok(result);
         }
 
         /// Multipart upload of one release-convention .bin - 4 MB is well above any ESP32 app partition (esp32dev's is 1.28 MB), so a wrong file is rejected before it is even read.
@@ -56,7 +60,12 @@ namespace api.Controllers.API
             }
             await using Stream content = file.OpenReadStream();
             (DeviceFirmware? firmware, string? error) = await catalog.UploadAsync(file.FileName, content, PublicBaseUrl, cancellationToken);
-            return error != null ? BadRequest(error) : Ok(firmware);
+            if (error != null)
+            {
+                return BadRequest(error);
+            }
+            await WriteAuditAsync("Firmware.Uploaded", null, "Firmware", firmware!.IDDeviceFirmware.ToString() ?? "", file.FileName);
+            return Ok(firmware);
         }
 
         /// ZIP upload from "Build from GitHub repository" (this server's or another's) - reuses ImportFromDirectoryAsync's validation, so a bigger cap than the single-.bin Upload above (multiple boards/versions in one archive).
@@ -74,7 +83,9 @@ namespace api.Controllers.API
                 return BadRequest("No file uploaded.");
             }
             await using Stream content = file.OpenReadStream();
-            return Ok(await catalog.UploadZipAsync(content, PublicBaseUrl, cancellationToken));
+            FirmwareSyncResult result = await catalog.UploadZipAsync(content, PublicBaseUrl, cancellationToken);
+            await WriteAuditAsync("Firmware.UploadedZip", null, "Firmware", file.FileName ?? "", $"added {result.Added}, skipped {result.Skipped}");
+            return Ok(result);
         }
 
         /// Packages the visible catalog (+ manifest.json) into a ZIP for download - same read-access level as Manifest/Fetch below, since this only repackages what those already expose.
@@ -94,7 +105,12 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Firmware catalog changes require the Global admin role");
             }
-            return await catalog.DeleteAsync(idDeviceFirmware) ? Ok() : NotFound();
+            if (!await catalog.DeleteAsync(idDeviceFirmware))
+            {
+                return NotFound();
+            }
+            await WriteAuditAsync("Firmware.Deleted", null, "Firmware", idDeviceFirmware.ToString(), null);
+            return Ok();
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]

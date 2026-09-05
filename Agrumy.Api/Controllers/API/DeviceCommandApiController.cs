@@ -28,6 +28,10 @@ namespace api.Controllers.API
             }
 
             IssueCommandResult result = await commandQueue.IssueCommandAsync(request.TargetType, request.TargetId, request.ActionType);
+            if (result.Outcome == IssueCommandOutcome.Success)
+            {
+                await WriteAuditAsync("DeviceCommand.Issued", CallerTenantId, request.TargetType.ToString(), request.TargetId.ToString(), request.ActionType.ToString());
+            }
             return result.Outcome switch
             {
                 IssueCommandOutcome.Success => Ok(result.CreatedCommandIds),

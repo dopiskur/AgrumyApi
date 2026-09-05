@@ -50,6 +50,7 @@ namespace api.Controllers.API
             internalDevice.TenantID = existing!.TenantID; // payload cannot move a device to another tenant
 
             await Repo.DeviceUpdateAsync(internalDevice);
+            await WriteAuditAsync("Device.Updated", existing.TenantID, "Device", existing.IDDevice.ToString()!, existing.DeviceName);
             return true;
         }
 
@@ -66,6 +67,7 @@ namespace api.Controllers.API
 
             // The device's OWN tenant, not the caller's - a Global admin/Device deleting a foreign tenant's device would otherwise silently match zero rows.
             await Repo.DeviceDeleteAsync(idDevice, device!.TenantID);
+            await WriteAuditAsync("Device.Deleted", device.TenantID, "Device", idDevice.ToString()!, device.DeviceName);
             return true;
         }
 

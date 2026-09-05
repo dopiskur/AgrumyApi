@@ -129,6 +129,7 @@ namespace api.Controllers.API
 
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await Repo.ServerConfigUpdateAsync(config);
+            await WriteAuditAsync("ServerConfig.Updated", null, "ServerConfig", "1", null);
             return Ok();
         }
 

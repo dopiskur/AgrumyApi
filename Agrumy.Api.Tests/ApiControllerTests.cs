@@ -226,6 +226,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 1, DeviceControllerEnabled = false });
         _repo.Setup(r => r.DeviceUnitZoneGetByIdAsync(5)).ReturnsAsync(new DeviceUnitZone { IDDeviceUnitZone = 5, TenantID = 1 });
         _repo.Setup(r => r.DeviceAssignToZoneAsync(8, 5)).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewDeviceUnitController();
         SetCallerRoles(controller, 1, "user", RoleNames.TenantDevice);
@@ -1646,6 +1647,7 @@ public class ApiControllerTests
     {
         _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 1 });
         _repo.Setup(r => r.DeviceUpdateAsync(It.IsAny<Device>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewDeviceController();
         SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.TenantDevice);
@@ -1661,6 +1663,7 @@ public class ApiControllerTests
         // TenantID=0 is a real default tenant, not a "no tenant" sentinel - its own admin must be able to manage devices there.
         _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 0 });
         _repo.Setup(r => r.DeviceUpdateAsync(It.IsAny<Device>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewDeviceController();
         SetCallerRoles(controller, 0, "user", RoleNames.TenantReader, RoleNames.TenantDevice);
@@ -1689,6 +1692,7 @@ public class ApiControllerTests
     {
         _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 99 });
         _repo.Setup(r => r.DeviceUpdateAsync(It.IsAny<Device>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewDeviceController();
         SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.GlobalDevice);
@@ -1822,6 +1826,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.ServerConfigUpdateAsync(It.IsAny<ServerConfig>()))
              .Callback<ServerConfig>(c => saved = c)
              .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
         var controller = NewServerConfigController();
         SetCaller(controller, "admin", 0);
 
@@ -1850,6 +1855,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.ServerConfigUpdateAsync(It.IsAny<ServerConfig>()))
              .Callback<ServerConfig>(c => saved = c)
              .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
         var controller = NewServerConfigController();
         SetCaller(controller, "admin", 0);
 
@@ -1907,6 +1913,7 @@ public class ApiControllerTests
     {
         _repo.Setup(r => r.DeviceGetByIdAsync(7)).ReturnsAsync(new Device { IDDevice = 7, TenantID = 99 });
         _repo.Setup(r => r.DeviceDeleteAsync(7, 99)).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewDeviceController();
         SetCallerRoles(controller, 0, "admin", RoleNames.GlobalAdmin);
@@ -2198,6 +2205,7 @@ public class ApiControllerTests
     {
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { IDServerConfig = 1 });
         _repo.Setup(r => r.ServerConfigUpdateAsync(It.IsAny<ServerConfig>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
         var controller = NewServerConfigController();
         SetCallerRoles(controller, 0, "admin", RoleNames.GlobalAdmin);
