@@ -18,10 +18,10 @@
                 @Html.DisplayFor(model => model.IDDevice)
             </dd>
             <dt class="col-sm-3">
-                @Html.DisplayNameFor(model => model.DeviceTypeID)
+                @Html.DisplayNameFor(model => model.DeviceRoleID)
             </dt>
             <dd class="col-sm-9">
-                @Html.DisplayFor(model => model.DeviceTypeID)
+                @Html.DisplayFor(model => model.DeviceRoleID)
             </dd>
 
             <dt class="col-sm-3">
@@ -134,7 +134,7 @@
         }
         <a asp-action="Edit" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Edit</a>
         <a asp-action="EditSensor" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Sensor config</a>
-        @* Hidden when there's no relay-hardware signal (DeviceType choice AND no recognized Kit) - avoids a control that does nothing. *@
+        @* Hidden when there's no relay-hardware signal (DeviceRole choice AND no recognized Kit) - avoids a control that does nothing. *@
         @if (ViewBag.ControllerCapable == true)
         {
             <a asp-action="EditController" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Controller config</a>

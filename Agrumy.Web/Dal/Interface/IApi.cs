@@ -94,8 +94,8 @@ namespace api.Dal.Interface
         [Put("/api/Device/Controller")]
         Task DeviceConfigControllerUpdate([Body] DeviceUpdate deviceUpdate);
 
-        [Get("/api/Device/Type")]
-        Task<IEnumerable<DeviceType>> DeviceTypeGet();
+        [Get("/api/Device/Role")]
+        Task<IEnumerable<DeviceRole>> DeviceRoleGet();
 
         [Get("/api/Device/TypeService")]
         Task<IEnumerable<DeviceTypeService>> DeviceTypeServiceGet();

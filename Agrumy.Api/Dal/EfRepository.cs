@@ -159,12 +159,12 @@ namespace api.Dal
         /// These IDs must match AgrumyFirmware's ControllerController.h RelayFunctionType enum and DeviceController.cpp, plus Agrumy.Web's DeviceController.Edit - renumbering desyncs the dropdown from what the device actually does.
         private static async Task SeedDeviceTypeLookupsAsync(AgrumyDbContext db)
         {
-            if (!await db.DeviceTypes.AnyAsync())
+            if (!await db.DeviceRoles.AnyAsync())
             {
-                db.DeviceTypes.AddRange(
-                    new DeviceTypeRow { IDDeviceType = 0, DeviceTypeName = "Basic", SensorEnabled = false, ControllerEnabled = false },
-                    new DeviceTypeRow { IDDeviceType = 1, DeviceTypeName = "Sensor", SensorEnabled = true, ControllerEnabled = false },
-                    new DeviceTypeRow { IDDeviceType = 3, DeviceTypeName = "Sensor+Controller", SensorEnabled = true, ControllerEnabled = true });
+                db.DeviceRoles.AddRange(
+                    new DeviceRoleRow { IDDeviceRole = 0, DeviceRoleName = "Basic", SensorEnabled = false, ControllerEnabled = false },
+                    new DeviceRoleRow { IDDeviceRole = 1, DeviceRoleName = "Sensor", SensorEnabled = true, ControllerEnabled = false },
+                    new DeviceRoleRow { IDDeviceRole = 3, DeviceRoleName = "Sensor+Controller", SensorEnabled = true, ControllerEnabled = true });
             }
 
             if (!await db.DeviceTypeServices.AnyAsync())
@@ -203,7 +203,7 @@ namespace api.Dal
                     new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.AnalogWaterLevel, SensorName = "Analog water tank", WaterTankLevel = 1 });
             }
 
-            // Any Kit string not in this table falls back to the existing, admin-controlled DeviceType/DeviceControllerEnabled signal - see DeviceFleetGetAsync.
+            // Any Kit string not in this table falls back to the existing, admin-controlled DeviceRole/DeviceControllerEnabled signal - see DeviceFleetGetAsync.
             if (!await db.DeviceTypeKits.AnyAsync())
             {
                 db.DeviceTypeKits.AddRange(

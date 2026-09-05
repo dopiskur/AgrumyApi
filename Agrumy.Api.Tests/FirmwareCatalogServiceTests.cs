@@ -336,7 +336,7 @@ public class FirmwareCatalogServiceTests
     [Fact]
     public async Task ResolveOffer_Nothing_When_FirmwareUpdate_Not_Set()
     {
-        Assert.Null(await NewService().ResolveOfferAsync(new Device { IDDevice = 1, FirmwareUpdate = false, DeviceTypeID = 3 }, "esp32dev"));
+        Assert.Null(await NewService().ResolveOfferAsync(new Device { IDDevice = 1, FirmwareUpdate = false, DeviceRoleID = 3 }, "esp32dev"));
         // Strict mock: no repository call was set up - any lookup would have thrown.
 
     }
@@ -347,7 +347,7 @@ public class FirmwareCatalogServiceTests
         SetSource(FirmwareSource.GitHub);
         _rows.Add(new DeviceFirmware { IDDeviceFirmware = 1, Board = "esp32dev", Version = "1.0.0", Source = FirmwareSource.GitHub, Url = "u100", Sha256 = "abc100" });
         _rows.Add(new DeviceFirmware { IDDeviceFirmware = 2, Board = "esp32dev", Version = "1.1.0", Source = FirmwareSource.GitHub, Url = "u110", Sha256 = "abc110" });
-        var device = new Device { IDDevice = 1, FirmwareUpdate = true, DeviceTypeID = 3 };
+        var device = new Device { IDDevice = 1, FirmwareUpdate = true, DeviceRoleID = 3 };
 
         Assert.Equal("1.1.0", (await NewService().ResolveOfferAsync(device, "esp32dev"))!.Version);
         device.FirmwareTargetVersion = "1.0.0"; // rollback
@@ -359,7 +359,7 @@ public class FirmwareCatalogServiceTests
     {
         _repo.Setup(r => r.DeviceFirmwareLatestGetAsync(3)).ReturnsAsync(new DeviceFirmware { Version = "0.1.5", Url = "legacy" });
 
-        DeviceFirmware? offer = await NewService().ResolveOfferAsync(new Device { IDDevice = 1, FirmwareUpdate = true, DeviceTypeID = 3 }, board: null);
+        DeviceFirmware? offer = await NewService().ResolveOfferAsync(new Device { IDDevice = 1, FirmwareUpdate = true, DeviceRoleID = 3 }, board: null);
 
         Assert.Equal("legacy", offer!.Url);
     }
@@ -395,7 +395,7 @@ public class FirmwareCatalogServiceTests
         SetSource(FirmwareSource.GitHub);
         _rows.Add(new DeviceFirmware { IDDeviceFirmware = 1, Board = "esp32dev", Version = "1.0.0", Source = FirmwareSource.GitHub, Sha256 = "abc100" });
         _rows.Add(new DeviceFirmware { IDDeviceFirmware = 2, Board = "esp32dev", Version = "1.1.0", Source = FirmwareSource.GitHub, Sha256 = null }); // no manifest.json on this release
-        var device = new Device { IDDevice = 1, FirmwareUpdate = true, DeviceTypeID = 3 };
+        var device = new Device { IDDevice = 1, FirmwareUpdate = true, DeviceRoleID = 3 };
 
         DeviceFirmware? offer = await NewService().ResolveOfferAsync(device, "esp32dev");
 

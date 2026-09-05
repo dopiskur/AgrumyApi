@@ -16,7 +16,7 @@ namespace Agrumy.Api.Tests;
 /// Runs against every real database engine configured via AGRUMY_TEST_MYSQL/AGRUMY_TEST_POSTGRES; skipped when unset.
 public sealed class RelationalIntegrationFixture
 {
-    public sealed record Target(DbProviderKind Provider, string ConnectionString, int DeviceTypeId);
+    public sealed record Target(DbProviderKind Provider, string ConnectionString, int DeviceRoleId);
 
     private readonly Dictionary<DbProviderKind, Target> _targets = new();
     public IReadOnlyCollection<Target> Targets => _targets.Values;
@@ -40,8 +40,8 @@ public sealed class RelationalIntegrationFixture
             db.SaveChanges();
         }
 
-        int deviceType = db.DeviceTypes.Where(t => t.DeviceTypeName == "greenhouse")
-                           .Select(t => (int?)t.IDDeviceType).FirstOrDefault() ?? SeedDeviceType(db);
+        int deviceRole = db.DeviceRoles.Where(t => t.DeviceRoleName == "greenhouse")
+                           .Select(t => (int?)t.IDDeviceRole).FirstOrDefault() ?? SeedDeviceRole(db);
 
         // deviceUnitZone.DeviceUnitID has a real FK to deviceUnit - the sentinel Zone row below (DeviceUnitID=0) needs the sentinel Unit row to already exist.
         if (!db.DeviceUnits.Any())
@@ -65,16 +65,16 @@ public sealed class RelationalIntegrationFixture
                 new DeviceTypeSensorRow { IDDeviceTypeSensor = 1, SensorName = "dht22" });
         db.SaveChanges();
 
-        _targets[provider] = new Target(provider, conn, deviceType);
+        _targets[provider] = new Target(provider, conn, deviceRole);
     }
 
-    private static int SeedDeviceType(AgrumyDbContext db)
+    private static int SeedDeviceRole(AgrumyDbContext db)
     {
         // IDs 0-3 are reserved by Agrumy.Web's hardcoded switch; pick one outside that range.
-        var t = new DeviceTypeRow { IDDeviceType = 999, DeviceTypeName = "greenhouse" };
-        db.DeviceTypes.Add(t);
+        var t = new DeviceRoleRow { IDDeviceRole = 999, DeviceRoleName = "greenhouse" };
+        db.DeviceRoles.Add(t);
         db.SaveChanges();
-        return t.IDDeviceType;
+        return t.IDDeviceRole;
     }
 
     public AgrumyDbContext NewContext(Target t) => new(DbOptionsFactory.Build(t.Provider, t.ConnectionString));
@@ -150,7 +150,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var d = new Device
         {
             TenantID = tenantId,
-            DeviceTypeID = t.DeviceTypeId,
+            DeviceRoleID = t.DeviceRoleId,
             DeviceTypeServiceID = 1,
             ConfigVersion = 1,
             DeviceName = "dev_" + U(),
@@ -794,7 +794,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var d = new Device
         {
             TenantID = tenantId,
-            DeviceTypeID = t.DeviceTypeId,
+            DeviceRoleID = t.DeviceRoleId,
             DeviceTypeServiceID = 1,
             ConfigVersion = 1,
             DeviceName = "dev_" + U(),
@@ -824,7 +824,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var d2 = new Device
         {
             TenantID = tenantId,
-            DeviceTypeID = t.DeviceTypeId,
+            DeviceRoleID = t.DeviceRoleId,
             DeviceTypeServiceID = 1,
             ConfigVersion = 1,
             DeviceName = "dev_" + U(),
@@ -849,7 +849,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var d2 = new Device
         {
             TenantID = tenant2,
-            DeviceTypeID = t.DeviceTypeId,
+            DeviceRoleID = t.DeviceRoleId,
             DeviceTypeServiceID = 1,
             ConfigVersion = 1,
             DeviceName = "dev_" + U(),
@@ -941,7 +941,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var basicUnknownKit = await MakeDevice(t, tenantId);
         var recognizedKit = await MakeDevice(t, tenantId);
 
-        // Flip DeviceControllerEnabled off (MakeDevice defaults it true) so capability can ONLY come from the DeviceType/Kit signal, isolating each half of the OR.
+        // Flip DeviceControllerEnabled off (MakeDevice defaults it true) so capability can ONLY come from the DeviceRole/Kit signal, isolating each half of the OR.
         basicUnknownKit.DeviceControllerEnabled = false;
         await _repo.DeviceUpdateAsync(basicUnknownKit);
         await _repo.DeviceDiagnosticUpsertAsync(basicUnknownKit.IDDevice!.Value, tenantId,
@@ -1418,7 +1418,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     public async Task DeviceType_Lists_Return_Seeded_Rows(DbProviderKind provider)
     {
         var t = Use(provider);
-        Assert.Contains(await _repo.DeviceTypeGetAsync(), x => x.IDDeviceType == t.DeviceTypeId);
+        Assert.Contains(await _repo.DeviceRoleGetAsync(), x => x.IDDeviceRole == t.DeviceRoleId);
         Assert.Contains(await _repo.DeviceTypeServiceGetAsync(), x => x.IDDeviceTypeService == 1);
         Assert.Contains(await _repo.DeviceTypeRelayGetAsync(), x => x.IDDeviceTypeRelay == 1);
         Assert.Contains(await _repo.DeviceTypeSensorGetAsync(), x => x.IDDeviceTypeSensor == 1);
@@ -1652,7 +1652,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     {
         var d = new Device
         {
-            TenantID = tenantId, DeviceTypeID = t.DeviceTypeId, DeviceTypeServiceID = 1, ConfigVersion = 1,
+            TenantID = tenantId, DeviceRoleID = t.DeviceRoleId, DeviceTypeServiceID = 1, ConfigVersion = 1,
             DeviceName = "dev_" + U(), MacAddress = U(), ApiId = Guid.NewGuid().ToString(), ApiKey = Guid.NewGuid().ToString(),
             ServicePoint = "api.agrumy.com", DeviceSensorEnabled = true, DeviceControllerEnabled = true, Enabled = true,
         };

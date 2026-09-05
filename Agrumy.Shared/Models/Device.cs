@@ -15,8 +15,8 @@ namespace api.Models
         [HiddenInput(DisplayValue = true)]
         public int TenantID { get; set; } = 0;
 
-        public int? DeviceTypeID { get; set; } = 0;
-        // No default (unlike DeviceTypeID above) - null means genuinely unassigned, not a 0-as-sentinel value.
+        public int? DeviceRoleID { get; set; } = 0;
+        // No default (unlike DeviceRoleID above) - null means genuinely unassigned, not a 0-as-sentinel value.
         [HiddenInput(DisplayValue = true)]
         public int? DeviceUnitID { get; set; }
         [HiddenInput(DisplayValue = true)]
@@ -80,8 +80,8 @@ namespace api.Models
         public int? CommandVersion { get; set; }
         public int? IDDevice { get; set; }
         public int TenantID { get; set; } = 0;
-        public int? DeviceTypeID { get; set; } = 0;
-        // No default (unlike DeviceTypeID above) - null means genuinely unassigned, see Device.DeviceUnitID.
+        public int? DeviceRoleID { get; set; } = 0;
+        // No default (unlike DeviceRoleID above) - null means genuinely unassigned, see Device.DeviceUnitID.
         public int? DeviceUnitID { get; set; }
         public int? DeviceUnitZoneID { get; set; }
         public int? DeviceConfigSensorID { get; set; }
@@ -113,7 +113,7 @@ namespace api.Models
     public class DeviceEditForm
     {
         public int? IDDevice { get; set; }
-        public int? DeviceTypeID { get; set; }
+        public int? DeviceRoleID { get; set; }
         public int? DeviceTypeServiceID { get; set; }
         public string? DeviceName { get; set; }
         public string? ServicePoint { get; set; }
@@ -135,7 +135,7 @@ namespace api.Models
             CommandVersion = d.CommandVersion,
             IDDevice = d.IDDevice,
             TenantID = d.TenantID,
-            DeviceTypeID = d.DeviceTypeID,
+            DeviceRoleID = d.DeviceRoleID,
             DeviceUnitID = d.DeviceUnitID,
             DeviceUnitZoneID = d.DeviceUnitZoneID,
             DeviceConfigSensorID = d.DeviceConfigSensorID,
@@ -170,7 +170,7 @@ namespace api.Models
             CommandVersion = dto.CommandVersion,
             IDDevice = dto.IDDevice,
             TenantID = dto.TenantID,
-            DeviceTypeID = dto.DeviceTypeID,
+            DeviceRoleID = dto.DeviceRoleID,
             DeviceUnitID = dto.DeviceUnitID,
             DeviceUnitZoneID = dto.DeviceUnitZoneID,
             DeviceConfigSensorID = dto.DeviceConfigSensorID,
@@ -201,7 +201,7 @@ namespace api.Models
         /// Copies exactly the fields DeviceEditForm exposes onto an existing DeviceDto (fetched fresh from the API, never from client input) - every field the form can't carry (TenantID, MacAddress, IsGateway, ...) is left as whatever that fresh copy already had.
         public static void ApplyTo(this DeviceEditForm form, DeviceDto target)
         {
-            target.DeviceTypeID = form.DeviceTypeID;
+            target.DeviceRoleID = form.DeviceRoleID;
             target.DeviceTypeServiceID = form.DeviceTypeServiceID;
             target.DeviceName = form.DeviceName;
             target.ServicePoint = form.ServicePoint;
@@ -218,7 +218,7 @@ namespace api.Models
         public static DeviceEditForm ToEditForm(this DeviceDto d) => new()
         {
             IDDevice = d.IDDevice,
-            DeviceTypeID = d.DeviceTypeID,
+            DeviceRoleID = d.DeviceRoleID,
             DeviceTypeServiceID = d.DeviceTypeServiceID,
             DeviceName = d.DeviceName,
             ServicePoint = d.ServicePoint,
@@ -331,7 +331,7 @@ namespace api.Models
         public bool Online { get; set; }
         // Commercial board last reported in the heartbeat; empty = generic chip-target, null = never reported.
         public string? Kit { get; set; }
-        // True when the device has real relay hardware - admin set DeviceType to Sensor+Controller, or Kit maps to a deviceTypeKit board with relays; drives the Web UI's Controller tab.
+        // True when the device has real relay hardware - admin set DeviceRole to Sensor+Controller, or Kit maps to a deviceTypeKit board with relays; drives the Web UI's Controller tab.
         public bool ControllerCapable { get; set; }
         // Lets the Web layer filter one shared DeviceFleetGet() response down to a single zone's devices (DeviceUnitController.ZoneDetails) instead of a second endpoint.
         public int? DeviceUnitID { get; set; }
@@ -439,10 +439,10 @@ namespace api.Models
         public int Duration { get; set; }
     }
 
-    public class DeviceType()
+    public class DeviceRole()
     {
-        public int? IDDeviceType { get; set; }
-        public string? DeviceTypeName { get; set; }
+        public int? IDDeviceRole { get; set; }
+        public string? DeviceRoleName { get; set; }
         public bool? SensorEnabled { get; set; } = false;
         public bool? ControllerEnabled { get; set; } = false;
     }

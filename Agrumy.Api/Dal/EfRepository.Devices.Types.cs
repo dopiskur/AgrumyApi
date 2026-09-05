@@ -8,13 +8,13 @@ namespace api.Dal
     /// IDeviceRepository members: fixed device-type lookup lists.
     internal partial class EfRepository
     {
-        public async Task<IList<DeviceType>> DeviceTypeGetAsync()
+        public async Task<IList<DeviceRole>> DeviceRoleGetAsync()
         {
-            return await db.DeviceTypes.AsNoTracking()
-                .Select(t => new DeviceType
+            return await db.DeviceRoles.AsNoTracking()
+                .Select(t => new DeviceRole
                 {
-                    IDDeviceType = t.IDDeviceType,
-                    DeviceTypeName = t.DeviceTypeName,
+                    IDDeviceRole = t.IDDeviceRole,
+                    DeviceRoleName = t.DeviceRoleName,
                     SensorEnabled = t.SensorEnabled,
                     ControllerEnabled = t.ControllerEnabled,
                 })

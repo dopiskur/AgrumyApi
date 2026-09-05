@@ -78,7 +78,7 @@ namespace api.Firmware
                 }
             }
 
-            return device.DeviceTypeID == null ? null : await deviceRepo.DeviceFirmwareLatestGetAsync(device.DeviceTypeID);
+            return device.DeviceRoleID == null ? null : await deviceRepo.DeviceFirmwareLatestGetAsync(device.DeviceRoleID);
         }
 
         // ---- per-device update request ---------------------------------------

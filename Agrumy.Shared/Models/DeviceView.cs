@@ -7,7 +7,7 @@
         public DeviceEditForm? DeviceEdit { get; set; }
         public DeviceConfigSensor? DeviceConfigSensor { get; set; }
         public DeviceConfigController? DeviceConfigController { get; set; }
-        public IEnumerable<DeviceType>? DeviceType { get; set; }
+        public IEnumerable<DeviceRole>? DeviceRole { get; set; }
         public IEnumerable<DeviceTypeService>? DeviceTypeService { get; set; }
         public IEnumerable<DeviceTypeRelay>? DeviceTypeRelay { get; set; }
         public IEnumerable<DeviceTypeSensor>? DeviceTypeSensor { get; set; }

@@ -395,12 +395,12 @@ namespace api.Controllers.API
 
         #endregion
 
-        #region Device Types
+        #region Device Roles
 
-        [HttpGet("Type")]
+        [HttpGet("Role")]
         [Authorize]
-        public async Task<ActionResult<IEnumerable<DeviceType>>> DeviceTypeGet() =>
-            Ok(await Repo.DeviceTypeGetAsync());
+        public async Task<ActionResult<IEnumerable<DeviceRole>>> DeviceRoleGet() =>
+            Ok(await Repo.DeviceRoleGetAsync());
 
         [HttpGet("TypeService")]
         [Authorize]

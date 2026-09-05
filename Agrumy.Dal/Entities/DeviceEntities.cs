@@ -50,10 +50,10 @@ namespace api.Dal.Entities
         public DateTime? LastFiredAtUtc { get; set; }
     }
 
-    public class DeviceTypeRow
+    public class DeviceRoleRow
     {
-        public int IDDeviceType { get; set; }
-        public string? DeviceTypeName { get; set; }
+        public int IDDeviceRole { get; set; }
+        public string? DeviceRoleName { get; set; }
         public bool? SensorEnabled { get; set; }
         public bool? ControllerEnabled { get; set; }
     }
@@ -175,7 +175,7 @@ namespace api.Dal.Entities
     {
         public int IDDevice { get; set; }
         public int TenantID { get; set; } // Non-nullable, matching the DB column (NOT NULL DEFAULT 0).
-        public int? DeviceTypeID { get; set; }
+        public int? DeviceRoleID { get; set; }
         public int? DeviceUnitID { get; set; }
         public int? DeviceUnitZoneID { get; set; }
         public int? DeviceConfigSensorID { get; set; }

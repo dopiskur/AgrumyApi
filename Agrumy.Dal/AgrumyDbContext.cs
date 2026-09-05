@@ -22,7 +22,7 @@ namespace api.Dal
         public DbSet<DeviceUnitZoneRow> DeviceUnitZones => Set<DeviceUnitZoneRow>();
         public DbSet<DeviceUnitZoneRuleRow> DeviceUnitZoneRules => Set<DeviceUnitZoneRuleRow>();
         public DbSet<RuleNotificationStateRow> RuleNotificationStates => Set<RuleNotificationStateRow>();
-        public DbSet<DeviceTypeRow> DeviceTypes => Set<DeviceTypeRow>();
+        public DbSet<DeviceRoleRow> DeviceRoles => Set<DeviceRoleRow>();
         public DbSet<DeviceTypeServiceRow> DeviceTypeServices => Set<DeviceTypeServiceRow>();
         public DbSet<DeviceTypeRelayRow> DeviceTypeRelays => Set<DeviceTypeRelayRow>();
         public DbSet<DeviceTypeSensorRow> DeviceTypeSensors => Set<DeviceTypeSensorRow>();
@@ -179,12 +179,12 @@ namespace api.Dal
                 e.HasIndex(x => new { x.RuleID, x.DeviceUnitZoneID }).IsUnique().HasDatabaseName("ux_ruleNotificationState_rule_zone");
             });
 
-            modelBuilder.Entity<DeviceTypeRow>(e =>
+            modelBuilder.Entity<DeviceRoleRow>(e =>
             {
-                e.ToTable("deviceType");
-                e.HasKey(x => x.IDDeviceType);
-                e.Property(x => x.IDDeviceType).ValueGeneratedNever(); // Fixed catalog; DeviceController.Edit switches on the literal IDs 0/1/2/3, so the seed must control them exactly.
-                e.Property(x => x.DeviceTypeName).HasMaxLength(100);
+                e.ToTable("deviceRole");
+                e.HasKey(x => x.IDDeviceRole);
+                e.Property(x => x.IDDeviceRole).ValueGeneratedNever(); // Fixed catalog; DeviceController.Edit switches on the literal IDs 0/1/2/3, so the seed must control them exactly.
+                e.Property(x => x.DeviceRoleName).HasMaxLength(100);
             });
 
             modelBuilder.Entity<DeviceTypeServiceRow>(e =>
@@ -283,7 +283,7 @@ namespace api.Dal
                 // Legacy device FKs (fk_device_*). DeviceUnitZoneID has no FK on device.
                 e.HasOne<DeviceConfigControllerRow>().WithMany().HasForeignKey(x => x.DeviceConfigControllerID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceConfigSensorRow>().WithMany().HasForeignKey(x => x.DeviceConfigSensorID).OnDelete(DeleteBehavior.NoAction);
-                e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.DeviceTypeID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceRoleRow>().WithMany().HasForeignKey(x => x.DeviceRoleID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceTypeServiceRow>().WithMany().HasForeignKey(x => x.DeviceTypeServiceID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<TenantRow>().WithMany().HasForeignKey(x => x.TenantID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);

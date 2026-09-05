@@ -183,7 +183,7 @@ namespace api.Controllers.View
             DeviceDto device = await api.DeviceGet(idDevice);
             return View(new DeviceView
             {
-                DeviceType = await api.DeviceTypeGet(),
+                DeviceRole = await api.DeviceRoleGet(),
                 DeviceTypeService = await api.DeviceTypeServiceGet(),
                 Device = device,
                 DeviceEdit = device.ToEditForm(),
@@ -198,7 +198,7 @@ namespace api.Controllers.View
             DeviceEditForm form = deviceView.DeviceEdit!;
             if (!ModelState.IsValid)
             {
-                deviceView.DeviceType = await api.DeviceTypeGet();
+                deviceView.DeviceRole = await api.DeviceRoleGet();
                 deviceView.DeviceTypeService = await api.DeviceTypeServiceGet();
                 deviceView.Device = await api.DeviceGet(form.IDDevice);
                 return View(deviceView);
@@ -207,7 +207,7 @@ namespace api.Controllers.View
             // Start from the server's own current copy - TenantID/MacAddress/IsGateway/ApiId/ApiKey never come from the form at all, by construction (DeviceEditForm has no property for them).
             DeviceDto device = await api.DeviceGet(form.IDDevice);
             form.ApplyTo(device);
-            (device.DeviceSensorEnabled, device.DeviceControllerEnabled) = device.DeviceTypeID switch
+            (device.DeviceSensorEnabled, device.DeviceControllerEnabled) = device.DeviceRoleID switch
             {
                 0 => (false, false),
                 1 => (true, false),

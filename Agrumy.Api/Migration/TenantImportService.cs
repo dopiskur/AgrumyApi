@@ -177,7 +177,7 @@ namespace api.Migration
                 Device created = await repo.DeviceAddAsync(new Device
                 {
                     TenantID = tenantId,
-                    DeviceTypeID = ed.Device.DeviceTypeID,
+                    DeviceRoleID = ed.Device.DeviceRoleID,
                     DeviceUnitID = ed.Device.DeviceUnitID is int u ? RemapOrSentinel(u, unitIdMap) : null,
                     DeviceUnitZoneID = ed.Device.DeviceUnitZoneID is int z ? RemapOrSentinel(z, zoneIdMap) : null,
                     DeviceName = ed.Device.DeviceName,

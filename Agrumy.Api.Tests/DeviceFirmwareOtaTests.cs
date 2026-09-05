@@ -46,7 +46,7 @@ public class DeviceFirmwareOtaTests
     {
         IDDevice = 500,
         TenantID = 0,
-        DeviceTypeID = 7,
+        DeviceRoleID = 7,
         ApiId = "api-id",
         ApiKey = "api-key",
         DeviceSensorEnabled = false,
@@ -108,7 +108,7 @@ public class DeviceFirmwareOtaTests
     {
         var device = BaseDevice();
         device.FirmwareUpdate = true;
-        device.DeviceTypeID = null;
+        device.DeviceRoleID = null;
 
         var cfg = RegisterAndGetConfig(device);
 

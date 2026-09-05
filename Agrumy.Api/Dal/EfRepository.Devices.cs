@@ -33,7 +33,7 @@ namespace api.Dal
             var row = new DeviceRow
             {
                 TenantID = device.TenantID,
-                DeviceTypeID = device.DeviceTypeID,
+                DeviceRoleID = device.DeviceRoleID,
                 DeviceUnitID = device.DeviceUnitID,
                 DeviceUnitZoneID = device.DeviceUnitZoneID,
                 DeviceName = device.DeviceName,
@@ -169,7 +169,7 @@ namespace api.Dal
 
             // Does not set MacAddress, config-id columns, DeviceUnitID/DeviceUnitZoneID (written exclusively by DeviceAssignToZoneAsync/DeviceUnassignFromZoneAsync to stay consistent), or ApiId/ApiKey (omitting them would wipe a device's real credential).
             row.TenantID = device.TenantID;
-            row.DeviceTypeID = device.DeviceTypeID;
+            row.DeviceRoleID = device.DeviceRoleID;
             row.DeviceTypeServiceID = device.DeviceTypeServiceID;
             row.DeviceName = device.DeviceName;
             row.ServicePoint = device.ServicePoint;
@@ -194,7 +194,7 @@ namespace api.Dal
         {
             IDDevice = d.IDDevice,
             TenantID = d.TenantID,
-            DeviceTypeID = d.DeviceTypeID,
+            DeviceRoleID = d.DeviceRoleID,
             DeviceUnitID = d.DeviceUnitID,
             DeviceUnitZoneID = d.DeviceUnitZoneID,
             DeviceConfigSensorID = d.DeviceConfigSensorID,

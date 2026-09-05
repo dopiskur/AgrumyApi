@@ -59,7 +59,7 @@ namespace api.Dal.Interface
         Task DeviceConfigSensorUpdateAsync(int? iDDevice, DeviceConfigSensor? deviceConfigSensor);
 
         // Device fixed lists
-        Task<IList<DeviceType>> DeviceTypeGetAsync();
+        Task<IList<DeviceRole>> DeviceRoleGetAsync();
         Task<IList<DeviceTypeService>> DeviceTypeServiceGetAsync();
         Task<IList<DeviceTypeRelay>> DeviceTypeRelayGetAsync();
         Task<IList<DeviceTypeSensor>> DeviceTypeSensorGetAsync();

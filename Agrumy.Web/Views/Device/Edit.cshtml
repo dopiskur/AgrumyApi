@@ -6,8 +6,8 @@
     var form = Model.DeviceEdit!;
     string EditField(string name) => $"{nameof(Model.DeviceEdit)}.{name}";
 
-    var deviceTypeItems = new SelectList(Model.DeviceType, nameof(DeviceType.IDDeviceType), nameof(DeviceType.DeviceTypeName), form.DeviceTypeID);
-    var deviceTypeSelect = new SelectFieldViewModel { Name = EditField(nameof(form.DeviceTypeID)), Label = "Device type", Items = deviceTypeItems };
+    var deviceTypeItems = new SelectList(Model.DeviceRole, nameof(DeviceRole.IDDeviceRole), nameof(DeviceRole.DeviceRoleName), form.DeviceRoleID);
+    var deviceTypeSelect = new SelectFieldViewModel { Name = EditField(nameof(form.DeviceRoleID)), Label = "Device role", Items = deviceTypeItems };
 
     var deviceTypeServiceItems = new SelectList(Model.DeviceTypeService, nameof(DeviceTypeService.IDDeviceTypeService), nameof(DeviceTypeService.ServiceType), form.DeviceTypeServiceID);
     var deviceTypeServiceSelect = new SelectFieldViewModel { Name = EditField(nameof(form.DeviceTypeServiceID)), Label = "Service type", Items = deviceTypeServiceItems };
@@ -91,7 +91,7 @@
                 <span asp-validation-for="DeviceEdit.SleepSeconds" class="text-danger"></span>
             </div>
 
-            @* Recomputed from DeviceTypeID in DeviceController.Edit POST for every known type - shown for transparency, but edits only survive for unknown type ids. *@
+            @* Recomputed from DeviceRoleID in DeviceController.Edit POST for every known role - shown for transparency, but edits only survive for unknown role ids. *@
             <div class="mb-3">
                 <label asp-for="DeviceEdit.DeviceSensorEnabled" class="form-label"></label>
                 <input asp-for="DeviceEdit.DeviceSensorEnabled" class="form-control" />
