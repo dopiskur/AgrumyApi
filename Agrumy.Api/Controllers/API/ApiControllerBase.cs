@@ -1,4 +1,5 @@
 using api.Dal.Interface;
+using api.Models;
 using api.Security;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
@@ -108,6 +109,24 @@ namespace api.Controllers.API
                 return (entity, StatusCode(403, $"{ownerLabel} belongs to a different tenant"));
             }
             return (entity, null);
+        }
+
+        /// Looks up the caller's IDUser by their JWT email rather than trusting a claim, since the token carries no user-id claim.
+        protected async Task WriteAuditAsync(string action, int? targetTenantId, string targetType, string targetId, string? details)
+        {
+            string? actorEmail = User.Identity?.Name;
+            User? actor = string.IsNullOrEmpty(actorEmail) ? null : await Repo.UserGetAsync(null, actorEmail, null);
+            await Repo.AuditLogAddAsync(new AuditLogEntry
+            {
+                TimestampUtc = DateTime.UtcNow,
+                TenantID = targetTenantId,
+                ActorUserID = actor?.IDUser,
+                ActorEmail = actorEmail,
+                Action = action,
+                TargetType = targetType,
+                TargetId = targetId,
+                Details = details,
+            });
         }
     }
 }

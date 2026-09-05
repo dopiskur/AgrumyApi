@@ -34,6 +34,8 @@ public class ApiControllerTests
             new api.Devices.DeviceConfigBuilder(_repo.Object, catalog));
     }
     private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _notifications.Object, TestSettings);
+    private TenantApiController NewTenantController() => new(_repo.Object, _cache.Object,
+        new api.Migration.TenantExportService(_repo.Object), new api.Migration.TenantImportService(_repo.Object));
 
     /// Gives a bare (non-DI-constructed) controller the JWT claims an [Authorize] action reads via HttpContext.User.
     private static void SetCaller(ControllerBase controller, string role, int? tenantId) =>
@@ -1934,6 +1936,58 @@ public class ApiControllerTests
         var result = await controller.Delete(7);
 
         Assert.Equal(403, Assert.IsType<ObjectResult>(result).StatusCode);
+    }
+
+    private void StubEmptyTenantExport(int idTenant)
+    {
+        _repo.Setup(r => r.TenantGetByIdAsync(idTenant)).ReturnsAsync(new Tenant { IDTenant = idTenant, TenantName = "Acme" });
+        _repo.Setup(r => r.UsersGetAsync(idTenant)).ReturnsAsync(new List<User>());
+        _repo.Setup(r => r.DeviceUnitsGetAsync(idTenant)).ReturnsAsync(new List<DeviceUnit>());
+        _repo.Setup(r => r.DevicesGetAsync(idTenant)).ReturnsAsync(new List<Device>());
+    }
+
+    [Fact]
+    public async Task TenantExport_GlobalAdmin_WritesAuditLog()
+    {
+        StubEmptyTenantExport(7);
+        AuditLogEntry? written = null;
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>()))
+             .Callback<AuditLogEntry>(e => written = e)
+             .Returns(Task.CompletedTask);
+
+        var controller = NewTenantController();
+        SetCaller(controller, "admin", 0); // Global admin
+        var result = await controller.Export(7);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.NotNull(written);
+        Assert.Equal("Tenant.Exported", written!.Action);
+        Assert.Equal(7, written.TenantID);
+    }
+
+    [Fact]
+    public async Task TenantExport_TenantAdmin_OwnTenant_WritesAuditLog()
+    {
+        StubEmptyTenantExport(7);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+
+        var controller = NewTenantController();
+        SetCallerRoles(controller, 7, "user", RoleNames.TenantReader, RoleNames.TenantAdmin); // Tenant admin of tenant 7
+        var result = await controller.Export(7);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        _repo.Verify(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task TenantExport_TenantAdmin_DifferentTenant_Returns403_NoAuditLog()
+    {
+        var controller = NewTenantController();
+        SetCallerRoles(controller, 7, "user", RoleNames.TenantReader, RoleNames.TenantAdmin); // Tenant admin of tenant 7, not 8
+        var result = await controller.Export(8);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        // Strict mock: an un-set-up TenantGetByIdAsync/AuditLogAddAsync call would throw, proving the export never ran.
     }
 }
 

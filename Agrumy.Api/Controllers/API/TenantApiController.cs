@@ -81,7 +81,9 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Exporting a tenant requires being its Tenant admin, or Global admin.");
             }
-            return Ok(await exportService.ExportAsync(idTenant, includeSensorData, sensorDataSinceUtc));
+            TenantExport export = await exportService.ExportAsync(idTenant, includeSensorData, sensorDataSinceUtc);
+            await WriteAuditAsync("Tenant.Exported", idTenant, "Tenant", idTenant.ToString(), $"includeSensorData={includeSensorData}");
+            return Ok(export);
         }
 
         /// ByName only (see api.Models.TenantImportTarget), Global admin only - unlike Export this can create a brand-new tenant or add into one the caller doesn't administer, same bar as TenantAdd/TenantUpdate.
