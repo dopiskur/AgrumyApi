@@ -151,12 +151,16 @@ namespace api.Controllers.API
             return Ok("If that account exists and is not yet verified, a new activation email has been sent.");
         }
 
+        /// Same precedence as FirmwareApiController.PublicBaseUrl (WebView:ApiService, else the request's own host) - JWT:Issuer is a token claim, not a base URL, even though it happens to hold the same value today.
+        private string PublicBaseUrl =>
+            string.IsNullOrWhiteSpace(settings.ApiService) ? $"{Request.Scheme}://{Request.Host}" : settings.ApiService;
+
         /// Enqueued, not awaited - SMTP (or any other configured channel) must never hold the registration/resend request open.
         private void SendActivationEmail(string? email, string plaintextToken)
         {
             if (string.IsNullOrWhiteSpace(email)) { return; }
 
-            string link = $"{settings.JwtIssuer}/api/User/Activate?token={Uri.EscapeDataString(plaintextToken)}";
+            string link = $"{PublicBaseUrl}/api/User/Activate?token={Uri.EscapeDataString(plaintextToken)}";
             var notification = new Notification(
                 "Confirm your Agrumy account",
                 $"Click the link below to verify your email address:\n{link}\n\nThis link expires in {ActivationTokenValidHours} hours.",
@@ -268,7 +272,7 @@ namespace api.Controllers.API
                 return (null, StatusCode(500, "User has no valid role assigned."));
             }
 
-            string token = JwtTokenProvider.CreateToken(SecureKey!, AccessTokenMinutes, user.Email!, tokenRoles, user.TenantID.ToString()!);
+            string token = JwtTokenProvider.CreateToken(SecureKey!, AccessTokenMinutes, user.Email!, tokenRoles, user.TenantID.ToString()!, settings.JwtIssuer, settings.JwtAudience);
             var (refreshToken, refreshTokenHash) = GenerateOpaqueToken();
             await Repo.RefreshTokenAddAsync(user.IDUser!.Value, refreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
 
@@ -325,7 +329,7 @@ namespace api.Controllers.API
                 return StatusCode(401, "Refresh token already used; all sessions for this user were revoked.");
             }
 
-            string newAccessToken = JwtTokenProvider.CreateToken(SecureKey!, AccessTokenMinutes, user.Email!, tokenRoles, user.TenantID.ToString()!);
+            string newAccessToken = JwtTokenProvider.CreateToken(SecureKey!, AccessTokenMinutes, user.Email!, tokenRoles, user.TenantID.ToString()!, settings.JwtIssuer, settings.JwtAudience);
             return Ok(new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = newAccessToken, RefreshToken = newRefreshToken });
         }
 

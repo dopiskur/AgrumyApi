@@ -23,14 +23,14 @@ namespace api.Security
 
 
         /// A user can hold several roles at once, so <paramref name="roles"/> becomes one <see cref="ClaimTypes.Role"/> claim per entry; the caller must include the legacy "admin"/"user" alias in the set for old single-role checks to keep working (see api.Security.RoleNames.ImpliesLegacyAdmin).
-        public static string CreateToken(string secureKey, int expiration, string subject, IEnumerable<string> roles, string tenantID)
+        public static string CreateToken(string secureKey, int expiration, string subject, IEnumerable<string> roles, string tenantID, string? issuer, string? audience)
         {
             var tokenKey = Encoding.UTF8.GetBytes(secureKey);
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Issuer = Config.jwtIssuer,
-                Audience = Config.jwtAudience,
+                Issuer = issuer,
+                Audience = audience,
                 Expires = DateTime.UtcNow.AddMinutes(expiration),
                 SigningCredentials = new SigningCredentials(
                     new SymmetricSecurityKey(tokenKey),
