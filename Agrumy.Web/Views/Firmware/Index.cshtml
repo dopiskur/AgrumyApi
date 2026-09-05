@@ -47,9 +47,6 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-local" type="button" role="tab"><i class="bi bi-hdd"></i> Local Repository</button>
             </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-offline" type="button" role="tab"><i class="bi bi-folder-symlink"></i> Offline USB Copy</button>
-            </li>
         </ul>
         <div class="tab-content border border-top-0 rounded-bottom p-3">
 
@@ -156,29 +153,20 @@
                         <div class="form-text">Files must be named <code>agrumy-&lt;board&gt;-v&lt;version&gt;.bin</code>; a <code>manifest.json</code> next to them (written by the offline-repo tools) is used to verify SHA-256 checksums.</div>
                     </div>
                     <div class="col-lg-6">
-                        <h6 class="text-uppercase text-secondary small">Upload a .bin</h6>
+                        <h6 class="text-uppercase text-secondary small">Upload a .bin or .zip</h6>
                         <form asp-action="Upload" method="post" enctype="multipart/form-data" class="d-flex gap-2">
-                            <input type="file" name="file" class="form-control" accept=".bin" required />
+                            <input type="file" name="file" class="form-control" accept=".bin,.zip" required />
                             <button type="submit" class="btn btn-outline-primary text-nowrap"><i class="bi bi-upload"></i> Upload</button>
                         </form>
-                        <div class="form-text">Stored in the local repository and offered to devices of that board regardless of the active source.</div>
+                        <div class="form-text">A single <code>.bin</code> is stored and offered to devices of that board regardless of the active source; a <code>.zip</code> (as produced by "Build from GitHub repository" below) is extracted and imported the same way.</div>
                     </div>
                 </div>
-            </div>
-
-            <div class="tab-pane fade" id="tab-offline" role="tabpanel">
-                <p class="text-secondary small mb-2">
-                    Copies every catalog file plus a <code>manifest.json</code> with SHA-256 checksums into a folder you pick (e.g. a USB stick).
-                    Take it to the offline greenhouse server and use "Import from a directory" there. Chrome/Edge/Opera only -
-                    on other browsers use the <code>tools/offline-repo/</code> script from the AgrumyFirmware repository instead.
-                </p>
-                <button type="button" id="buildOfflineRepo" class="btn btn-outline-secondary" data-manifest-url="@Url.Action("OfflineManifest")" data-file-url="@Url.Action("OfflineFile")">
-                    <i class="bi bi-folder-symlink"></i> Build offline USB copy…
-                </button>
-                <span id="offlineRepoUnsupportedHint" class="text-secondary small ms-2" hidden>Needs Chrome, Edge or Opera over HTTPS - see the note above.</span>
-                <div id="offlineRepoProgress" class="mt-2" hidden>
-                    <div class="progress" role="progressbar"><div class="progress-bar" style="width:0%"></div></div>
-                    <div class="small text-secondary mt-1" id="offlineRepoStatus"></div>
+                <hr />
+                <h6 class="text-uppercase text-secondary small">Build from GitHub repository</h6>
+                <p class="text-secondary small mb-2">Packages the visible catalog plus a <code>manifest.json</code> with SHA-256 checksums into a ZIP - take it to an air-gapped server and Upload it there, or use "Import from a directory" after unzipping.</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-secondary" href="@Url.Action("DownloadZip", new { latestOnly = true })"><i class="bi bi-file-earmark-zip"></i> Download latest per board (.zip)</a>
+                    <a class="btn btn-outline-secondary" href="@Url.Action("DownloadZip", new { latestOnly = false })"><i class="bi bi-file-earmark-zip"></i> Download entire catalog (.zip)</a>
                 </div>
             </div>
 
@@ -240,6 +228,5 @@
 
 @section Scripts {
     <script type="module" src="~/lib/esp-web-tools/dist/install-button.min.js"></script>
-    <script src="~/js/offline-repo.js"></script>
     <script src="~/js/firmware-install-picker.js"></script>
 }

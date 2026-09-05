@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text.Json;
 using api.Dal.Interface;
 using api.Firmware;
@@ -476,5 +477,118 @@ public class FirmwareCatalogServiceTests
         Assert.Equal(2, files.Count);
         Assert.Contains(files, f => f.Kind == "ota" && f.Url == "ota-url");
         Assert.Contains(files, f => f.Kind == "full" && f.Url == "full-url" && f.SizeBytes == 900);
+    }
+
+
+    private async Task AddLocalRowAsync(string board, string version)
+    {
+        string fileName = $"agrumy-{board}-v{version}.bin";
+        (DeviceFirmware? fw, string? error) = await NewService().UploadAsync(fileName, new MemoryStream(FakeFirmwareFetcher.Bytes(fileName)), "https://api.agrumy.com");
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public async Task BuildDownloadZip_LatestOnly_Includes_Only_The_Newest_File_Per_Board()
+    {
+        SetSource(FirmwareSource.Local);
+        await AddLocalRowAsync("esp32dev", "1.0.0");
+        await AddLocalRowAsync("esp32dev", "1.1.0");
+        await AddLocalRowAsync("esp32s3usbotg", "2.0.0");
+
+        (Stream content, string fileName) = await NewService().BuildDownloadZipAsync(latestOnly: true, "https://api.agrumy.com");
+
+        Assert.EndsWith("-latest-" + DateTime.UtcNow.ToString("yyyyMMdd") + ".zip", fileName);
+        using var zip = new ZipArchive(content, ZipArchiveMode.Read);
+        Assert.Equal(new HashSet<string> { "manifest.json", "agrumy-esp32dev-v1.1.0.bin", "agrumy-esp32s3usbotg-v2.0.0.bin" },
+            zip.Entries.Select(e => e.FullName).ToHashSet());
+        Assert.Null(zip.GetEntry("agrumy-esp32dev-v1.0.0.bin")); // superseded by 1.1.0 - excluded when latestOnly
+        FirmwareManifest manifest = JsonSerializer.Deserialize<FirmwareManifest>(
+            new StreamReader(zip.GetEntry("manifest.json")!.Open()).ReadToEnd(), new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        Assert.Equal(new HashSet<string?> { "1.1.0", "2.0.0" }, manifest.Releases.Select(r => r.Version).ToHashSet());
+    }
+
+    [Fact]
+    public async Task BuildDownloadZip_AllFiles_Includes_Every_Visible_File()
+    {
+        SetSource(FirmwareSource.Local);
+        await AddLocalRowAsync("esp32dev", "1.0.0");
+        await AddLocalRowAsync("esp32dev", "1.1.0");
+
+        (Stream content, _) = await NewService().BuildDownloadZipAsync(latestOnly: false, "https://api.agrumy.com");
+
+        using var zip = new ZipArchive(content, ZipArchiveMode.Read);
+        Assert.Equal(3, zip.Entries.Count); // manifest.json + both versions
+        Assert.NotNull(zip.GetEntry("agrumy-esp32dev-v1.0.0.bin"));
+        Assert.NotNull(zip.GetEntry("agrumy-esp32dev-v1.1.0.bin"));
+    }
+
+    [Fact]
+    public async Task UploadZip_RoundTrips_A_Zip_Built_By_BuildDownloadZip()
+    {
+        SetSource(FirmwareSource.Local);
+        await AddLocalRowAsync("esp32dev", "1.0.0");
+        await AddLocalRowAsync("esp32s3usbotg", "2.0.0");
+        (Stream zipContent, _) = await NewService().BuildDownloadZipAsync(latestOnly: false, "https://api.agrumy.com");
+
+        // A fresh catalog (own repo + storage root) importing the ZIP - proves the format round-trips, not just that Import already works.
+        var freshRepo = new Mock<IRepository>(MockBehavior.Strict);
+        var freshRows = new List<DeviceFirmware>();
+        int freshNextId = 1;
+        freshRepo.Setup(r => r.FirmwareListForBoardAsync(It.IsAny<string>(), It.IsAny<IReadOnlyCollection<FirmwareSource>>()))
+                 .ReturnsAsync((string board, IReadOnlyCollection<FirmwareSource> sources) => freshRows.Where(x => x.Board == board && sources.Contains(x.Source)).ToList());
+        freshRepo.Setup(r => r.FirmwareAddAsync(It.IsAny<DeviceFirmware>()))
+                 .ReturnsAsync((DeviceFirmware f) => { f.IDDeviceFirmware = freshNextId++; freshRows.Add(f); return f.IDDeviceFirmware.Value; });
+        FirmwareCatalogService freshCatalog = FirmwareTestSupport.NewCatalog(freshRepo.Object, storage: FirmwareTestSupport.NewStorage(out _));
+
+        FirmwareSyncResult result = await freshCatalog.UploadZipAsync(zipContent, "https://api.agrumy.com");
+
+        Assert.Equal(2, result.Added);
+        Assert.Empty(result.Warnings);
+        Assert.Contains(freshRows, r => r.Board == "esp32dev" && r.Version == "1.0.0");
+        Assert.Contains(freshRows, r => r.Board == "esp32s3usbotg" && r.Version == "2.0.0");
+    }
+
+    [Fact]
+    public async Task UploadZip_Rejects_A_Zip_With_Too_Many_Entries()
+    {
+        var zipStream = new MemoryStream();
+        using (var zip = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            for (int i = 0; i < 65; i++)
+            {
+                zip.CreateEntry($"f{i}.bin");
+            }
+        }
+        zipStream.Position = 0;
+
+        FirmwareSyncResult result = await NewService().UploadZipAsync(zipStream, "https://api.agrumy.com");
+
+        Assert.Equal(0, result.Added);
+        Assert.Contains(result.Warnings, w => w.Contains("more than"));
+        Assert.Empty(_rows);
+    }
+
+    [Fact]
+    public async Task UploadZip_Ignores_An_Entry_That_Would_Escape_The_Extraction_Directory()
+    {
+        SetSource(FirmwareSource.Local);
+        var zipStream = new MemoryStream();
+        using (var zip = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            await using (Stream evil = zip.CreateEntry("../../evil.bin").Open())
+            {
+                await evil.WriteAsync(FakeFirmwareFetcher.Bytes("evil"));
+            }
+            await using (Stream good = zip.CreateEntry("agrumy-esp32dev-v1.0.0.bin").Open())
+            {
+                await good.WriteAsync(FakeFirmwareFetcher.Bytes("good"));
+            }
+        }
+        zipStream.Position = 0;
+
+        FirmwareSyncResult result = await NewService().UploadZipAsync(zipStream, "https://api.agrumy.com");
+
+        Assert.Equal(1, result.Added); // the escaping entry was silently skipped, not extracted, not thrown
+        Assert.Single(_rows, r => r.Board == "esp32dev" && r.Version == "1.0.0");
     }
 }

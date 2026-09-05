@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using api.Dal.Interface;
@@ -439,9 +440,119 @@ namespace api.Firmware
             return true;
         }
 
-        // ---- manifest + file access (browser tool, Custom repositories) --------
+        // ---- ZIP download/upload (Web admin page's "Local Repository" tab) --------
 
-        /// The visible catalog in manifest.json form - what the offline-repo browser tool copies to USB and what another Agrumy install reads as a Custom repository.
+        // Bounds UploadZipAsync's extraction against a crafted ZIP claiming a tiny compressed size but a huge uncompressed one.
+        private const int MaxZipEntries = 64;
+        private const long MaxZipUncompressedBytes = 200L * 1024 * 1024;
+
+        /// A downloadable ZIP of the visible catalog (active source + Local) plus its manifest.json - <paramref name="latestOnly"/> keeps just the newest file per (Board, Kind), otherwise every visible file is included; round-trips through <see cref="UploadZipAsync"/>.
+        public async Task<(Stream Content, string FileName)> BuildDownloadZipAsync(bool latestOnly, string publicBaseUrl, CancellationToken cancellationToken = default)
+        {
+            FirmwareManifest manifest = await BuildManifestAsync(publicBaseUrl);
+            var selected = new List<(FirmwareManifestRelease Release, FirmwareManifestFile File)>();
+            var seenBoardKind = new HashSet<(string Board, string Kind)>();
+            foreach (FirmwareManifestRelease release in manifest.Releases) // already newest-version-first
+            {
+                foreach (FirmwareManifestFile file in release.Files)
+                {
+                    if (file.Board == null)
+                    {
+                        continue;
+                    }
+                    if (latestOnly && !seenBoardKind.Add((file.Board, file.Kind ?? "ota")))
+                    {
+                        continue;
+                    }
+                    selected.Add((release, file));
+                }
+            }
+
+            var trimmedManifest = new FirmwareManifest
+            {
+                GeneratedAt = manifest.GeneratedAt,
+                Source = manifest.Source,
+                Releases = selected
+                    .GroupBy(s => s.Release.Version)
+                    .Select(g => new FirmwareManifestRelease { Version = g.Key, PublishedAt = g.First().Release.PublishedAt, Files = g.Select(s => s.File).ToList() })
+                    .ToList(),
+            };
+
+            var zipStream = new MemoryStream();
+            using (var zip = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                await using (Stream manifestEntry = zip.CreateEntry(ManifestFileName, CompressionLevel.Optimal).Open())
+                {
+                    await JsonSerializer.SerializeAsync(manifestEntry, trimmedManifest, ManifestJson, cancellationToken);
+                }
+                var addedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var (_, file) in selected)
+                {
+                    if (file.FileName == null || !addedFiles.Add(file.FileName))
+                    {
+                        continue;
+                    }
+                    var opened = await OpenAsync(file.FileName, cancellationToken);
+                    if (opened == null)
+                    {
+                        continue;
+                    }
+                    await using Stream source = opened.Value.Content;
+                    await using Stream dest = zip.CreateEntry(file.FileName, CompressionLevel.Optimal).Open();
+                    await source.CopyToAsync(dest, cancellationToken);
+                }
+            }
+            zipStream.Position = 0;
+            string fileName = $"agrumy-firmware-{(latestOnly ? "latest" : "all")}-{DateTime.UtcNow:yyyyMMdd}.zip";
+            return (zipStream, fileName);
+        }
+
+        /// Extracts a ZIP built by <see cref="BuildDownloadZipAsync"/> (or hand-assembled the same way) to a scratch directory and imports it exactly like <see cref="ImportFromDirectoryAsync"/> - same manifest.json SHA verification, same full-image pairing, no separate code path to drift.
+        public async Task<FirmwareSyncResult> UploadZipAsync(Stream zipContent, string publicBaseUrl, CancellationToken cancellationToken = default)
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), "agrumy-firmware-upload-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                using (var archive = new ZipArchive(zipContent, ZipArchiveMode.Read, leaveOpen: true))
+                {
+                    if (archive.Entries.Count > MaxZipEntries)
+                    {
+                        return new FirmwareSyncResult { Warnings = { $"ZIP has {archive.Entries.Count} entries, more than the {MaxZipEntries} allowed - rejected." } };
+                    }
+                    long totalUncompressed = archive.Entries.Sum(e => e.Length);
+                    if (totalUncompressed > MaxZipUncompressedBytes)
+                    {
+                        return new FirmwareSyncResult { Warnings = { $"ZIP would extract to more than {MaxZipUncompressedBytes / 1024 / 1024} MB - rejected." } };
+                    }
+                    // Defense in depth beyond .NET's own entry-name checks - an entry can never resolve outside tempDir.
+                    string tempDirFull = Path.GetFullPath(tempDir) + Path.DirectorySeparatorChar;
+                    foreach (ZipArchiveEntry entry in archive.Entries)
+                    {
+                        if (string.IsNullOrEmpty(entry.Name))
+                        {
+                            continue; // directory entry
+                        }
+                        string destination = Path.GetFullPath(Path.Combine(tempDir, entry.FullName));
+                        if (!destination.StartsWith(tempDirFull, StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+                        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                        entry.ExtractToFile(destination, overwrite: true);
+                    }
+                }
+                return await ImportFromDirectoryAsync(tempDir, publicBaseUrl, cancellationToken);
+            }
+            finally
+            {
+                try { Directory.Delete(tempDir, recursive: true); } catch { /* best-effort cleanup */ }
+            }
+        }
+
+        // ---- manifest + file access (ZIP download, Custom repositories) --------
+
+        /// The visible catalog in manifest.json form - embedded in BuildDownloadZipAsync's ZIP and what another Agrumy install reads as a Custom repository.
         public async Task<FirmwareManifest> BuildManifestAsync(string publicBaseUrl)
         {
             FirmwareSource active = (await configRepo.ServerConfigGetAsync(1)).FirmwareSource;

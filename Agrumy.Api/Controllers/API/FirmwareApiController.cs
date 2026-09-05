@@ -59,6 +59,33 @@ namespace api.Controllers.API
             return error != null ? BadRequest(error) : Ok(firmware);
         }
 
+        /// ZIP upload from "Build from GitHub repository" (this server's or another's) - reuses ImportFromDirectoryAsync's validation, so a bigger cap than the single-.bin Upload above (multiple boards/versions in one archive).
+        [Authorize(Roles = RoleNames.GlobalAdmin)]
+        [HttpPost("UploadZip")]
+        [RequestSizeLimit(64 * 1024 * 1024)]
+        public async Task<ActionResult<FirmwareSyncResult>> UploadZip(IFormFile file, CancellationToken cancellationToken)
+        {
+            if (!CallerIsGlobalAdmin)
+            {
+                return StatusCode(403, "Firmware catalog changes require the Global admin role");
+            }
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest("No file uploaded.");
+            }
+            await using Stream content = file.OpenReadStream();
+            return Ok(await catalog.UploadZipAsync(content, PublicBaseUrl, cancellationToken));
+        }
+
+        /// Packages the visible catalog (+ manifest.json) into a ZIP for download - same read-access level as Manifest/Fetch below, since this only repackages what those already expose.
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpGet("DownloadZip")]
+        public async Task<ActionResult> DownloadZip(bool latestOnly, CancellationToken cancellationToken)
+        {
+            (Stream content, string fileName) = await catalog.BuildDownloadZipAsync(latestOnly, PublicBaseUrl, cancellationToken);
+            return File(content, "application/zip", fileName);
+        }
+
         [Authorize(Roles = RoleNames.GlobalAdmin)]
         [HttpDelete]
         public async Task<ActionResult> Delete(int idDeviceFirmware)

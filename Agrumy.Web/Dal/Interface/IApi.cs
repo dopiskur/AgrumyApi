@@ -240,10 +240,15 @@ namespace api.Dal.Interface
         [Delete("/api/Firmware")]
         Task FirmwareDelete(int idDeviceFirmware);
 
-        [Get("/api/Firmware/Manifest")]
-        Task<FirmwareManifest> FirmwareManifest();
+        [Multipart]
+        [Post("/api/Firmware/UploadZip")]
+        Task<FirmwareSyncResult> FirmwareUploadZip([AliasAs("file")] StreamPart file);
 
-        /// Raw .bin bytes of one catalog entry, streamed through the API whatever its source - the browser "Build offline repo" tool's same-origin path to a GitHub asset.
+        /// A ZIP of the visible catalog + manifest.json, streamed through so the browser download proxies through Agrumy.Web like every other admin action.
+        [Get("/api/Firmware/DownloadZip")]
+        Task<HttpResponseMessage> FirmwareDownloadZip(bool latestOnly);
+
+        /// Raw .bin bytes of one catalog entry, streamed through the API whatever its source - the Flash Device tab's same-origin path to a GitHub asset.
         [Get("/api/Firmware/Fetch")]
         Task<HttpResponseMessage> FirmwareFetch(string fileName);
 

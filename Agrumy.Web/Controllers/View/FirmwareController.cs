@@ -77,20 +77,46 @@ namespace api.Controllers.View
         {
             if (file == null || file.Length == 0)
             {
-                TempData["Error"] = "Choose a .bin file first.";
+                TempData["Error"] = "Choose a .bin or .zip file first.";
                 return RedirectToAction(nameof(Index));
             }
             try
             {
                 await using Stream stream = file.OpenReadStream();
-                DeviceFirmware added = await api.FirmwareUpload(new StreamPart(stream, file.FileName, "application/octet-stream"));
-                TempData["Message"] = $"Uploaded {added.FileName} ({added.Board} {added.Version}).";
+                if (string.Equals(Path.GetExtension(file.FileName), ".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    FirmwareSyncResult result = await api.FirmwareUploadZip(new StreamPart(stream, file.FileName, "application/zip"));
+                    TempData["Message"] = $"Done: {result.Added} added, {result.Skipped} skipped, {result.Removed} removed.";
+                    if (result.Warnings.Count > 0)
+                    {
+                        TempData["Error"] = string.Join(" | ", result.Warnings);
+                    }
+                }
+                else
+                {
+                    DeviceFirmware added = await api.FirmwareUpload(new StreamPart(stream, file.FileName, "application/octet-stream"));
+                    TempData["Message"] = $"Uploaded {added.FileName} ({added.Board} {added.Version}).";
+                }
             }
             catch (ApiException ex)
             {
                 TempData["Error"] = ex.Body;
             }
             return RedirectToAction(nameof(Index));
+        }
+
+        /// "Build from GitHub repository": packages the visible catalog into a ZIP the browser downloads directly - <paramref name="latestOnly"/> keeps just the newest build per board, otherwise every visible build is included.
+        public async Task<ActionResult> DownloadZip(bool latestOnly)
+        {
+            HttpResponseMessage response = await api.FirmwareDownloadZip(latestOnly);
+            if (!response.IsSuccessStatusCode)
+            {
+                return StatusCode((int)response.StatusCode);
+            }
+            string downloadName = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+                ?? "agrumy-firmware.zip";
+            return File(await response.Content.ReadAsStreamAsync(), "application/zip", downloadName);
         }
 
         [HttpPost]
@@ -100,8 +126,6 @@ namespace api.Controllers.View
             await api.FirmwareDelete(idDeviceFirmware);
             return RedirectToAction(nameof(Index));
         }
-
-        public async Task<ActionResult> OfflineManifest() => Json(await api.FirmwareManifest());
 
         public async Task<ActionResult> OfflineFile(string fileName)
         {
