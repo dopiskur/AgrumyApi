@@ -35,6 +35,7 @@ if (string.IsNullOrWhiteSpace(settingsForBootCheck.DefaultConnection))
 {
     api.Setup.SetupWizard.ConfigureServices(builder);
     var wizardApp = builder.Build();
+    api.Setup.SetupWizard.LogSetupToken(wizardApp.Services.GetRequiredService<ILogger<Program>>());
     api.Setup.SetupWizard.MapEndpoints(wizardApp);
     await wizardApp.RunAsync();
     return;

@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Nodes;
 using api.Dal;
 using Microsoft.AspNetCore.Antiforgery;
@@ -8,6 +10,12 @@ namespace api.Setup
     /// If ConnectionStrings:DefaultConnection is missing at boot, Program.cs routes here instead of the normal pipeline - an unauthenticated DB-details-only form that writes appsettings.json and restarts (RestartUtil) once the admin submits a connection that opens; container installs never reach this since install.sh always sets it upfront.
     internal static class SetupWizard
     {
+        // One-time, process-lifetime token gating the wizard (roadmap #321/#248) - closes the window
+        // between the service starting and the admin reaching the page: whoever gets there first over
+        // the network still needs this value, which only reaches the service's own log (same pattern
+        // as the bootstrap Global Admin setup secret).
+        private static readonly string SetupToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+
         public static void ConfigureServices(WebApplicationBuilder builder)
         {
             // The wizard's only real risk window is "whoever reaches this unauthenticated page
@@ -16,10 +24,17 @@ namespace api.Setup
             builder.Services.AddLogging();
         }
 
+        public static void LogSetupToken(ILogger logger) =>
+            logger.LogWarning("Setup wizard token (required in the URL, works once): open this page as ?token={SetupToken}", SetupToken);
+
         public static void MapEndpoints(WebApplication app)
         {
             app.MapGet("/", (IAntiforgery antiforgery, HttpContext context) =>
             {
+                if (!TokenMatches(context))
+                {
+                    return Results.Content(RenderTokenRequired(), "text/html", statusCode: 403);
+                }
                 AntiforgeryTokenSet tokens = antiforgery.GetAndStoreTokens(context);
                 return Results.Content(RenderForm(tokens.RequestToken, error: null), "text/html");
             });
@@ -31,6 +46,11 @@ namespace api.Setup
                 IHostApplicationLifetime lifetime,
                 ILogger<Program> logger) =>
             {
+                if (!TokenMatches(context))
+                {
+                    return Results.Content(RenderTokenRequired(), "text/html", statusCode: 403);
+                }
+
                 // Every rejection path re-renders the form with its OWN fresh token - reusing the just-submitted (single-use) one would fail the resend the same way an expired token does.
                 string FreshToken() => antiforgery.GetAndStoreTokens(context).RequestToken!;
 
@@ -111,6 +131,25 @@ namespace api.Setup
             File.Move(tempPath, path, overwrite: true);
         }
 
+        private static bool TokenMatches(HttpContext context) =>
+            context.Request.Query.TryGetValue("token", out var supplied) &&
+            CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(supplied.ToString()), Encoding.UTF8.GetBytes(SetupToken));
+
+        private static string RenderTokenRequired() => """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8" />
+                <title>Agrumy - Setup token required</title>
+                <style>body { font-family: sans-serif; max-width: 32rem; margin: 3rem auto; padding: 0 1rem; }</style>
+            </head>
+            <body>
+                <h1>Setup token required</h1>
+                <p>Missing or incorrect <code>?token=</code> in the URL. Check this service's own log (e.g. <code>journalctl -u agrumy-api</code>) for a line starting "Setup wizard token".</p>
+            </body>
+            </html>
+            """;
+
         private static string RenderForm(string? antiforgeryToken, string? error)
         {
             string errorHtml = error is null ? "" : $"""<p style="color:#b00;font-weight:bold">{System.Net.WebUtility.HtmlEncode(error)}</p>""";
@@ -135,7 +174,7 @@ namespace api.Setup
                 <h1>Agrumy - Database setup</h1>
                 <p>This install has no database connection configured yet. Fill in your database's details below - Agrumy will provision its schema automatically on the first connection.</p>
                 {{errorHtml}}
-                <form method="post">
+                <form method="post" action="?token={{Uri.EscapeDataString(SetupToken)}}">
                     {{tokenField}}
                     <label>Database type</label>
                     <div class="radio-row">
