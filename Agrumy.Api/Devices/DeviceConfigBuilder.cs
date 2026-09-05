@@ -27,10 +27,13 @@ namespace api.Devices
         public async Task<DeviceConfig> BuildAsync(Device device, PendingCommand? pendingCommand, string? board)
         {
             // Computed fresh on every Config/Register response rather than cached, so a DST
-            // transition or an admin changing ServerConfig.ScheduleTimeZone reaches every device on
-            // its very next poll. This same fetch is reused for WeatherRainPredicted below.
+            // transition or an admin changing the tenant's ScheduleTimeZone reaches every device on
+            // its very next poll (subject to NeedsRefreshAsync's own heartbeat gate). ServerConfig is
+            // still fetched here and reused for WeatherRainPredicted below.
             ServerConfig serverConfig = await repo.ServerConfigGetAsync(1);
-            int utcOffsetSeconds = TimeZoneHelper.GetUtcOffsetSeconds(DateTime.UtcNow, serverConfig.ScheduleTimeZone);
+            // Per-tenant, not global - a device with no tenant row (shouldn't happen) or an unset zone both fall back to UTC via GetUtcOffsetSeconds' own null handling.
+            Tenant? tenant = await repo.TenantGetByIdAsync(device.TenantID);
+            int utcOffsetSeconds = TimeZoneHelper.GetUtcOffsetSeconds(DateTime.UtcNow, tenant?.ScheduleTimeZone);
 
             var deviceConfig = new DeviceConfig
             {

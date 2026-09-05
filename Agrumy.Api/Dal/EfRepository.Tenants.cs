@@ -32,14 +32,14 @@ namespace api.Dal
         {
             return await db.Tenants.AsNoTracking()
                 .OrderBy(t => t.TenantName)
-                .Select(t => new Tenant { IDTenant = t.IDTenant, TenantName = t.TenantName })
+                .Select(t => new Tenant { IDTenant = t.IDTenant, TenantName = t.TenantName, ScheduleTimeZone = t.ScheduleTimeZone })
                 .ToListAsync();
         }
 
         public async Task<Tenant?> TenantGetByIdAsync(int idTenant)
         {
             var row = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.IDTenant == idTenant);
-            return row == null ? null : new Tenant { IDTenant = row.IDTenant, TenantName = row.TenantName };
+            return row == null ? null : new Tenant { IDTenant = row.IDTenant, TenantName = row.TenantName, ScheduleTimeZone = row.ScheduleTimeZone };
         }
 
         public async Task TenantUpdateAsync(Tenant tenant)
@@ -50,6 +50,7 @@ namespace api.Dal
                 return;
             }
             row.TenantName = tenant.TenantName ?? row.TenantName;
+            row.ScheduleTimeZone = tenant.ScheduleTimeZone;
             await db.SaveChangesAsync();
         }
 

@@ -2,6 +2,7 @@ using api.Dal.Interface;
 using api.Migration;
 using api.Models;
 using api.Security;
+using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -66,6 +67,21 @@ namespace api.Controllers.API
                 return BadRequest("Tenant name is required.");
             }
             tenant.TenantName = tenant.TenantName.Trim();
+
+            // A bad id would silently degrade every device in this tenant's schedule mode to UTC (TimeZoneHelper.GetUtcOffsetSeconds' fallback) instead of failing at save time; blank/null clears it back to "not configured".
+            if (!string.IsNullOrWhiteSpace(tenant.ScheduleTimeZone))
+            {
+                if (!TimeZoneHelper.TryNormalizeToIana(tenant.ScheduleTimeZone, out string iana))
+                {
+                    return BadRequest("Unknown time zone: " + tenant.ScheduleTimeZone);
+                }
+                tenant.ScheduleTimeZone = iana;
+            }
+            else
+            {
+                tenant.ScheduleTimeZone = null;
+            }
+
             await Repo.TenantUpdateAsync(tenant);
             return Ok();
         }

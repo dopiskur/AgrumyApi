@@ -7,6 +7,7 @@ using api.Utils;
 using api.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace api.Controllers.View
 {
@@ -35,7 +36,12 @@ namespace api.Controllers.View
         }
 
         [Authorize(Roles = RoleNames.GlobalAdmin)]
-        public async Task<ActionResult> Edit(int idTenant) => View(await api.TenantGet(idTenant));
+        public async Task<ActionResult> Edit(int idTenant)
+        {
+            Tenant tenant = await api.TenantGet(idTenant);
+            ViewBag.TimeZones = TimeZoneOptions(tenant.ScheduleTimeZone);
+            return View(tenant);
+        }
 
         [Authorize(Roles = RoleNames.GlobalAdmin)]
         [HttpPost]
@@ -44,10 +50,29 @@ namespace api.Controllers.View
         {
             if (!ModelState.IsValid)
             {
+                ViewBag.TimeZones = TimeZoneOptions(tenant.ScheduleTimeZone);
                 return View(tenant);
             }
-            await api.TenantUpdate(tenant);
+            try
+            {
+                await api.TenantUpdate(tenant);
+            }
+            catch (ApiException ex)
+            {
+                ModelState.AddModelError(nameof(Tenant.ScheduleTimeZone), ex.Body);
+                ViewBag.TimeZones = TimeZoneOptions(tenant.ScheduleTimeZone);
+                return View(tenant);
+            }
             return RedirectToAction(nameof(Index));
+        }
+
+        // A blank ScheduleTimeZone is a real, intentional state (schedules evaluate as UTC), unlike a user's display TimeZone.
+        private static List<SelectListItem> TimeZoneOptions(string? selected)
+        {
+            var options = new List<SelectListItem> { new("(not set - schedules evaluate as UTC)", "") };
+            options.AddRange(TimeZoneHelper.GetTimeZoneOptions()
+                .Select(o => new SelectListItem(o.DisplayName, o.Id, string.Equals(o.Id, selected, StringComparison.OrdinalIgnoreCase))));
+            return options;
         }
 
         // ---- Export/Import --------------------------------------------------

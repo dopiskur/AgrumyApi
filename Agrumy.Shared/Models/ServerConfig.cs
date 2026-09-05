@@ -49,10 +49,6 @@ namespace api.Models
         [Display(Name = "Enable Tenant Management page")]
         public bool TenantManagementEnabled { get; set; }
 
-        // Install-wide IANA zone id schedule-mode windows evaluate against; null sends every device UtcOffsetSeconds=0 (UTC) via BuildDeviceConfigAsync rather than failing.
-        [Display(Name = "Schedule time zone")]
-        public string? ScheduleTimeZone { get; set; }
-
         // Where firmware comes from (api.Models.FirmwareSource); GitHub defaults for zero-setup installs. String on the wire (Refit enum-as-name) since this admin DTO doesn't touch the device-facing raw-int convention.
         [Display(Name = "Firmware source")]
         [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]

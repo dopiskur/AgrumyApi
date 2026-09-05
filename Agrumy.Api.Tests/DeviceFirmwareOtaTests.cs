@@ -20,8 +20,9 @@ public class DeviceFirmwareOtaTests
              .ReturnsAsync(new User { IDUser = 77, TenantID = device.TenantID, DevicePin = "ABC234", DevicePinExpires = DateTime.UtcNow.AddHours(1) });
         _repo.Setup(r => r.DeviceGetAsync(device.TenantID, null, null, "AABBCCDDEEFF"))
              .ReturnsAsync(device); // IDDevice set => controller skips DeviceAddAsync
-        // BuildDeviceConfigAsync always reads ServerConfig (UtcOffsetSeconds); no ScheduleTimeZone configured, so the response's offset is 0/UTC.
+        // BuildDeviceConfigAsync always reads ServerConfig and the device's own tenant (UtcOffsetSeconds); no ScheduleTimeZone configured, so the response's offset is 0/UTC.
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
+        _repo.Setup(r => r.TenantGetByIdAsync(device.TenantID)).ReturnsAsync(new Tenant { IDTenant = device.TenantID });
         // DeviceRegistration always checks for a pending command before returning.
         _repo.Setup(r => r.GetPendingCommandsAsync(device.IDDevice!.Value)).ReturnsAsync(new List<DeviceCommand>());
 

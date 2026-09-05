@@ -35,9 +35,6 @@
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-accounts" type="button" role="tab">Accounts</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-scheduling" type="button" role="tab">Scheduling</button>
-                </li>
-                <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-retention" type="button" role="tab">Data Retention</button>
                 </li>
                 <li class="nav-item" role="presentation">
@@ -200,19 +197,6 @@
                     <div class="mb-0 form-check">
                         <input asp-for="PasswordRequireComplexity" class="form-check-input" />
                         <label asp-for="PasswordRequireComplexity" class="form-check-label"></label>
-                    </div>
-                </div>
-
-                <div class="tab-pane fade" id="tab-scheduling" role="tabpanel">
-                    <p class="text-secondary">
-                        Local wall-clock zone schedule-mode relay windows (Device &rarr; Controller
-                        &rarr; Schedules) are evaluated against. Not set = windows
-                        evaluate as UTC.
-                    </p>
-                    <div class="mb-0">
-                        <label asp-for="ScheduleTimeZone" class="form-label"></label>
-                        <select asp-for="ScheduleTimeZone" asp-items="(IEnumerable<SelectListItem>)ViewBag.TimeZones" class="form-select"></select>
-                        <span asp-validation-for="ScheduleTimeZone" class="text-danger"></span>
                     </div>
                 </div>
 

@@ -1,4 +1,5 @@
 @model api.Models.Tenant
+@using Microsoft.AspNetCore.Mvc.Rendering
 
 @{
     ViewData["Title"] = "Edit";
@@ -16,10 +17,21 @@
                 <p class="form-control-plaintext">@Html.DisplayFor(m => m.IDTenant)</p>
                 @Html.HiddenFor(m => m.IDTenant)
             </div>
-            <div class="mb-0">
+            <div class="mb-3">
                 <label asp-for="TenantName" class="form-label"></label>
                 <input asp-for="TenantName" class="form-control" required />
                 <span asp-validation-for="TenantName" class="text-danger"></span>
+            </div>
+
+            <div class="mb-0" style="max-width:24rem">
+                <label asp-for="ScheduleTimeZone" class="form-label"></label>
+                <select asp-for="ScheduleTimeZone" asp-items="(IEnumerable<SelectListItem>)ViewBag.TimeZones" class="form-select"></select>
+                <span asp-validation-for="ScheduleTimeZone" class="text-danger"></span>
+                <div class="form-text">
+                    Local wall-clock zone this tenant's schedule-mode relay windows (Device &rarr;
+                    Controller &rarr; Schedules) are evaluated against. Not set = windows evaluate as
+                    UTC.
+                </div>
             </div>
 
             <div class="mt-3">

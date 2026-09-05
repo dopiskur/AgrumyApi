@@ -49,9 +49,6 @@ namespace api
         // Off by default - gates the Tenant Management menu item alongside the GlobalAdmin role check.
         public bool TenantManagementEnabled { get; set; }
 
-        // No fallback constant - null is valid and treated as UTC by TimeZoneHelper.GetUtcOffsetSeconds, so schedule mode stays inert-but-safe until an admin sets this.
-        public string? ScheduleTimeZone { get; set; }
-
         // FirmwareLocalPath: relative to content root, null = FirmwareStorage.DefaultRelativePath. FirmwareGitHubRepository only seeds serverConfig - the admin page owns the live value.
         public string? FirmwareLocalPath { get; set; }
         public string FirmwareGitHubRepository { get; set; } = "dopiskur/AgrumyFirmware";
@@ -94,7 +91,6 @@ namespace api
             MaxRulesPerZone = ParseIntOr(configuration, "ServerConfig:MaxRulesPerZone", 10),
             AllowSelfServiceTenantCreation = ParseBoolOr(configuration, "ServerConfig:AllowSelfServiceTenantCreation", false),
             TenantManagementEnabled = ParseBoolOr(configuration, "ServerConfig:TenantManagementEnabled", false),
-            ScheduleTimeZone = configuration.GetSection("ServerConfig:ScheduleTimeZone").Value,
             FirmwareLocalPath = configuration.GetSection("Firmware:LocalPath").Value,
             FirmwareGitHubRepository = configuration.GetSection("Firmware:GitHubRepository").Value is { Length: > 0 } repo ? repo : "dopiskur/AgrumyFirmware",
             FirmwareGitHubToken = configuration.GetSection("Firmware:GitHubToken").Value,

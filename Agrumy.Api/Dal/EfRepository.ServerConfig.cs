@@ -38,7 +38,6 @@ namespace api.Dal
                 MaxRulesPerZone = settings.MaxRulesPerZone,
                 AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation,
                 TenantManagementEnabled = settings.TenantManagementEnabled,
-                ScheduleTimeZone = settings.ScheduleTimeZone,
                 FirmwareSource = (int)FirmwareSource.GitHub,
                 FirmwareGitHubRepository = settings.FirmwareGitHubRepository,
                 FirmwareRefreshIntervalHours = settings.FirmwareRefreshIntervalHours,
@@ -77,7 +76,6 @@ namespace api.Dal
             row.MaxRulesPerZone = config.MaxRulesPerZone;
             row.AllowSelfServiceTenantCreation = config.AllowSelfServiceTenantCreation;
             row.TenantManagementEnabled = config.TenantManagementEnabled;
-            row.ScheduleTimeZone = config.ScheduleTimeZone;
             row.FirmwareSource = (int)config.FirmwareSource;
             row.FirmwareGitHubRepository = config.FirmwareGitHubRepository;
             row.FirmwareCustomRepositoryUrl = config.FirmwareCustomRepositoryUrl;
@@ -133,7 +131,6 @@ namespace api.Dal
             row.MaxRulesPerZone = settings.MaxRulesPerZone;
             row.AllowSelfServiceTenantCreation = settings.AllowSelfServiceTenantCreation;
             row.TenantManagementEnabled = settings.TenantManagementEnabled;
-            row.ScheduleTimeZone = settings.ScheduleTimeZone;
             row.SensorDataRetentionDays = settings.SensorDataRetentionDays;
             row.WeatherPollIntervalMinutes = settings.WeatherPollIntervalMinutes;
             row.WeatherRainSkipThreshold = settings.WeatherRainSkipThreshold;
@@ -188,7 +185,6 @@ namespace api.Dal
             MaxRulesPerZone = r.MaxRulesPerZone ?? settings.MaxRulesPerZone,
             AllowSelfServiceTenantCreation = r.AllowSelfServiceTenantCreation,
             TenantManagementEnabled = r.TenantManagementEnabled,
-            ScheduleTimeZone = r.ScheduleTimeZone,
             FirmwareSource = (FirmwareSource)r.FirmwareSource,
             // An older row has NULL here; falling back to the settings seed beats an empty repository nobody can sync from.
             FirmwareGitHubRepository = string.IsNullOrWhiteSpace(r.FirmwareGitHubRepository) ? settings.FirmwareGitHubRepository : r.FirmwareGitHubRepository,

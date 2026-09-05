@@ -6,6 +6,8 @@ namespace api.Dal.Entities
     {
         public int IDTenant { get; set; }
         public string TenantName { get; set; } = "";
+        // See api.Models.Tenant.ScheduleTimeZone for the full explanation.
+        public string? ScheduleTimeZone { get; set; }
         public DateTime? DateCreated { get; set; }
     }
 
@@ -122,7 +124,7 @@ namespace api.Dal.Entities
         public int? MaxRulesPerZone { get; set; }
         public bool AllowSelfServiceTenantCreation { get; set; }
         public bool TenantManagementEnabled { get; set; }
-        public string? ScheduleTimeZone { get; set; }
+        // ScheduleTimeZone is now per-tenant (see TenantRow.ScheduleTimeZone) - the serverConfig column is left in place, unmapped, rather than dropped.
         public int FirmwareSource { get; set; }
         public string? FirmwareGitHubRepository { get; set; }
         public string? FirmwareCustomRepositoryUrl { get; set; }

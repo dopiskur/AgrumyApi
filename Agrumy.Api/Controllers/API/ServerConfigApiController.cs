@@ -32,20 +32,6 @@ namespace api.Controllers.API
                 return StatusCode(403, "Server-wide settings require the Global admin role");
             }
 
-            // A bad id would silently degrade every device's schedule mode to UTC (TimeZoneHelper.GetUtcOffsetSeconds' fallback) instead of failing at save time; blank/null clears it back to "not configured".
-            if (!string.IsNullOrWhiteSpace(config.ScheduleTimeZone))
-            {
-                if (!TimeZoneHelper.TryNormalizeToIana(config.ScheduleTimeZone, out string iana))
-                {
-                    return BadRequest("Unknown time zone: " + config.ScheduleTimeZone);
-                }
-                config.ScheduleTimeZone = iana;
-            }
-            else
-            {
-                config.ScheduleTimeZone = null;
-            }
-
             // A Custom source with no manifest URL (or a non-http one) would leave every sync failing with a vague error.
             if (!Enum.IsDefined(config.FirmwareSource))
             {

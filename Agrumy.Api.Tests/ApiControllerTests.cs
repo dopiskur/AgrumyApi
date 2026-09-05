@@ -313,6 +313,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.IsAny<DeviceConfigPoll>()))
              .Returns(Task.CompletedTask);
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // BuildDeviceConfigAsync always reads this
+        _repo.Setup(r => r.TenantGetByIdAsync(3)).ReturnsAsync(new Tenant { IDTenant = 3 });
         _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // none pending
         _repo.Setup(r => r.DeviceMarkConfigSentAsync(500, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
 
@@ -337,6 +338,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.IsAny<DeviceConfigPoll>()))
              .Returns(Task.CompletedTask);
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { ConfigHeartbeatHours = 24 });
+        _repo.Setup(r => r.TenantGetByIdAsync(3)).ReturnsAsync(new Tenant { IDTenant = 3 });
         _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>());
         _repo.Setup(r => r.DeviceMarkConfigSentAsync(500, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
 
@@ -437,6 +439,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF"))
              .ReturnsAsync(new Device { IDDevice = 500, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // BuildDeviceConfigAsync always reads this now
+        _repo.Setup(r => r.TenantGetByIdAsync(1)).ReturnsAsync(new Tenant { IDTenant = 1 });
         _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // none pending
 
         var result = await NewDeviceController().DeviceRegistration(PinRegistration("abc234"));
@@ -453,6 +456,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.DeviceGetAsync(1, null, null, "112233445566"))
              .ReturnsAsync(new Device { IDDevice = 501, TenantID = 1, DeviceSensorEnabled = false, DeviceControllerEnabled = false });
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // BuildDeviceConfigAsync always reads this now
+        _repo.Setup(r => r.TenantGetByIdAsync(1)).ReturnsAsync(new Tenant { IDTenant = 1 });
         _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // none pending
         _repo.Setup(r => r.GetPendingCommandsAsync(501)).ReturnsAsync(new List<DeviceCommand>());
 
@@ -488,6 +492,7 @@ public class ApiControllerTests
              .Callback<Device>(d => captured = d)
              .ReturnsAsync((Device d) => { d.IDDevice = 900; return d; });
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
+        _repo.Setup(r => r.TenantGetByIdAsync(1)).ReturnsAsync(new Tenant { IDTenant = 1 });
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
         _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
 
@@ -516,6 +521,7 @@ public class ApiControllerTests
              .Callback<Device>(d => captured = d)
              .ReturnsAsync((Device d) => { d.IDDevice = 900; return d; });
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
+        _repo.Setup(r => r.TenantGetByIdAsync(1)).ReturnsAsync(new Tenant { IDTenant = 1 });
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
         _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
 
@@ -544,6 +550,7 @@ public class ApiControllerTests
              .Callback<Device>(d => captured = d)
              .ReturnsAsync((Device d) => { d.IDDevice = 900; return d; });
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
+        _repo.Setup(r => r.TenantGetByIdAsync(1)).ReturnsAsync(new Tenant { IDTenant = 1 });
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
         _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
 
@@ -569,6 +576,7 @@ public class ApiControllerTests
              .Callback<Device>(d => c = d)
              .ReturnsAsync((Device d) => { d.IDDevice = 900; return d; });
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
+        _repo.Setup(r => r.TenantGetByIdAsync(1)).ReturnsAsync(new Tenant { IDTenant = 1 });
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
         captured = () => c;
     }
@@ -1674,47 +1682,47 @@ public class ApiControllerTests
 
 
     [Fact]
-    public async Task ServerConfigUpdate_UnknownScheduleTimeZone_Returns400_AndNeverWrites()
+    public async Task TenantUpdate_UnknownScheduleTimeZone_Returns400_AndNeverWrites()
     {
-        var controller = NewServerConfigController();
+        var controller = NewTenantController();
         SetCaller(controller, "admin", 0);
 
-        var result = await controller.Update(new ServerConfig { ScheduleTimeZone = "Not/AZone" });
+        var result = await controller.TenantUpdate(new Tenant { IDTenant = 1, TenantName = "t1", ScheduleTimeZone = "Not/AZone" });
 
         Assert.IsType<BadRequestObjectResult>(result);
-        // MockBehavior.Strict: ServerConfigUpdateAsync has no setup, proving the bad id was rejected before any write.
+        // MockBehavior.Strict: TenantUpdateAsync has no setup, proving the bad id was rejected before any write.
     }
 
     [Fact]
-    public async Task ServerConfigUpdate_ValidScheduleTimeZone_NormalizesToIana_AndPersists()
+    public async Task TenantUpdate_ValidScheduleTimeZone_NormalizesToIana_AndPersists()
     {
-        ServerConfig? saved = null;
-        _repo.Setup(r => r.ServerConfigUpdateAsync(It.IsAny<ServerConfig>()))
-             .Callback<ServerConfig>(c => saved = c)
+        Tenant? saved = null;
+        _repo.Setup(r => r.TenantUpdateAsync(It.IsAny<Tenant>()))
+             .Callback<Tenant>(t => saved = t)
              .Returns(Task.CompletedTask);
 
-        var controller = NewServerConfigController();
+        var controller = NewTenantController();
         SetCaller(controller, "admin", 0);
 
-        var result = await controller.Update(new ServerConfig { ScheduleTimeZone = "Europe/Zagreb" });
+        var result = await controller.TenantUpdate(new Tenant { IDTenant = 1, TenantName = "t1", ScheduleTimeZone = "Europe/Zagreb" });
 
         Assert.IsType<OkResult>(result);
         Assert.Equal("Europe/Zagreb", saved!.ScheduleTimeZone);
     }
 
     [Fact]
-    public async Task ServerConfigUpdate_BlankScheduleTimeZone_ClearsToNull()
+    public async Task TenantUpdate_BlankScheduleTimeZone_ClearsToNull()
     {
-        // Blank is a valid "not configured" state (see api.Models.ServerConfig) - must not be rejected like an actually-invalid value.
-        ServerConfig? saved = null;
-        _repo.Setup(r => r.ServerConfigUpdateAsync(It.IsAny<ServerConfig>()))
-             .Callback<ServerConfig>(c => saved = c)
+        // Blank is a valid "not configured" state (see api.Models.Tenant) - must not be rejected like an actually-invalid value.
+        Tenant? saved = null;
+        _repo.Setup(r => r.TenantUpdateAsync(It.IsAny<Tenant>()))
+             .Callback<Tenant>(t => saved = t)
              .Returns(Task.CompletedTask);
 
-        var controller = NewServerConfigController();
+        var controller = NewTenantController();
         SetCaller(controller, "admin", 0);
 
-        var result = await controller.Update(new ServerConfig { ScheduleTimeZone = "   " });
+        var result = await controller.TenantUpdate(new Tenant { IDTenant = 1, TenantName = "t1", ScheduleTimeZone = "   " });
 
         Assert.IsType<OkResult>(result);
         Assert.Null(saved!.ScheduleTimeZone);

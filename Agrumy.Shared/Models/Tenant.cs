@@ -4,6 +4,8 @@
     {
         public int? IDTenant { get; set; }
         public string? TenantName { get; set; }
+        // IANA id; DeviceConfigBuilder uses it (falling back to AgrumySettings.ScheduleTimeZone, then UTC) to compute the UtcOffsetSeconds every device in this tenant gets - null/empty means the tenant hasn't set one of its own.
+        public string? ScheduleTimeZone { get; set; }
     }
 
     /// <summary>One saved WiFi AP a tenant's admin can hand to a newly discovered device

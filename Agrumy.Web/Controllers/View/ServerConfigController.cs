@@ -4,19 +4,13 @@ using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace api.Controllers.View
 {
     [Authorize(Roles = RoleNames.GlobalAdmin)]
     public class ServerConfigController(IApi api) : Controller
     {
-        public async Task<ActionResult> Index()
-        {
-            ServerConfig config = await api.ServerConfigGet();
-            ViewBag.TimeZones = TimeZoneOptions(config.ScheduleTimeZone);
-            return View(config);
-        }
+        public async Task<ActionResult> Index() => View(await api.ServerConfigGet());
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -24,7 +18,6 @@ namespace api.Controllers.View
         {
             if (!ModelState.IsValid)
             {
-                ViewBag.TimeZones = TimeZoneOptions(serverConfig.ScheduleTimeZone);
                 return View(serverConfig);
             }
 
@@ -34,7 +27,7 @@ namespace api.Controllers.View
             }
             catch (ApiException ex)
             {
-                // Route the API's error text to the field it's actually about, else it lands under the time zone by default.
+                // Route the API's error text to the field it's actually about, else it lands under firmware source by default.
                 string field = ex.Body.Contains("firmware", StringComparison.OrdinalIgnoreCase) || ex.Body.Contains("GitHub", StringComparison.OrdinalIgnoreCase)
                     ? nameof(ServerConfig.FirmwareSource)
                     : ex.Body.Contains("cooldown", StringComparison.OrdinalIgnoreCase)
@@ -51,9 +44,8 @@ namespace api.Controllers.View
                                             ? nameof(ServerConfig.WeatherPollIntervalMinutes)
                                             : ex.Body.Contains("rain-skip", StringComparison.OrdinalIgnoreCase)
                                                 ? nameof(ServerConfig.WeatherRainSkipThreshold)
-                                                : nameof(ServerConfig.ScheduleTimeZone);
+                                                : nameof(ServerConfig.FirmwareSource);
                 ModelState.AddModelError(field, ex.Body);
-                ViewBag.TimeZones = TimeZoneOptions(serverConfig.ScheduleTimeZone);
                 return View(serverConfig);
             }
 
@@ -102,15 +94,6 @@ namespace api.Controllers.View
             {
                 return StatusCode(ex.StatusCode, ex.Body);
             }
-        }
-
-        // A blank ScheduleTimeZone is a real, intentional state (schedules evaluate as UTC), unlike a user's display TimeZone.
-        private static List<SelectListItem> TimeZoneOptions(string? selected)
-        {
-            var options = new List<SelectListItem> { new("(not set - schedules evaluate as UTC)", "") };
-            options.AddRange(TimeZoneHelper.GetTimeZoneOptions()
-                .Select(o => new SelectListItem(o.DisplayName, o.Id, string.Equals(o.Id, selected, StringComparison.OrdinalIgnoreCase))));
-            return options;
         }
     }
 }

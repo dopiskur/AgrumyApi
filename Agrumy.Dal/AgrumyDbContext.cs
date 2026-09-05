@@ -50,6 +50,7 @@ namespace api.Dal
                 e.HasKey(x => x.IDTenant);
                 e.Property(x => x.IDTenant).ValueGeneratedOnAdd();
                 e.Property(x => x.TenantName).HasMaxLength(100).IsRequired();
+                e.Property(x => x.ScheduleTimeZone).HasMaxLength(64); // same cap as serverConfig.ScheduleTimeZone/user.TimeZone
                 e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.HasIndex(x => x.TenantName).IsUnique().HasDatabaseName("Name_UNIQUE");
             });
@@ -133,7 +134,6 @@ namespace api.Dal
                 e.Property(x => x.ServerConfigName).HasMaxLength(100);
                 e.Property(x => x.ConfigKey).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ServerConfigCol).HasColumnName("serverConfigcol").HasMaxLength(45);
-                e.Property(x => x.ScheduleTimeZone).HasMaxLength(64); // same cap as user.TimeZone
                 e.Property(x => x.FirmwareGitHubRepository).HasMaxLength(200);
                 e.Property(x => x.FirmwareCustomRepositoryUrl).HasMaxLength(500);
             });

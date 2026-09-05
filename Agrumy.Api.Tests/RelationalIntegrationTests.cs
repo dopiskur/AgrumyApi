@@ -244,17 +244,20 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task ServerConfig_ScheduleTimeZone_UpdateAndGet_RoundTrips(DbProviderKind provider)
+    public async Task Tenant_ScheduleTimeZone_UpdateAndGet_RoundTrips(DbProviderKind provider)
     {
-        Use(provider);
-        int id = new Random().Next(1000, 9_000_000);
-        var config = await _repo.ServerConfigGetAsync(id);
-        Assert.Null(config.ScheduleTimeZone); // not configured yet - a real column, not a computed default
+        var t = Use(provider);
+        int idTenant = await _repo.TenantAddAsync("tz_" + U());
 
-        config.ScheduleTimeZone = "Europe/Zagreb";
-        await _repo.ServerConfigUpdateAsync(config);
+        var tenant = await _repo.TenantGetByIdAsync(idTenant);
+        Assert.NotNull(tenant);
+        Assert.Null(tenant.ScheduleTimeZone); // not configured yet - per-tenant, not a global fallback
 
-        var back = await _repo.ServerConfigGetAsync(id);
+        tenant.ScheduleTimeZone = "Europe/Zagreb";
+        await _repo.TenantUpdateAsync(tenant);
+
+        var back = await _repo.TenantGetByIdAsync(idTenant);
+        Assert.NotNull(back);
         Assert.Equal("Europe/Zagreb", back.ScheduleTimeZone);
     }
 
@@ -296,7 +299,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(afterEvaluator.WeatherRainPredicted);
         Assert.NotNull(afterEvaluator.WeatherCheckedAtUtc);
 
-        afterEvaluator.ScheduleTimeZone = "Europe/Zagreb";
+        afterEvaluator.TenantManagementEnabled = true;
         await _repo.ServerConfigUpdateAsync(afterEvaluator);
 
         var afterAdminSave = await _repo.ServerConfigGetAsync(id);
