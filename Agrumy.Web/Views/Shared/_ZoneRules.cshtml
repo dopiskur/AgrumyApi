@@ -26,6 +26,9 @@
                 var s = rule.ConditionConfig?.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options);
                 int start = s?.Start ?? 0, end = start + (s?.Duration ?? 0);
                 return $"{start / 3600:00}:{start % 3600 / 60:00}-{end / 3600:00}:{end % 3600 / 60:00}, days 0b{Convert.ToString(s?.DaysOfWeek ?? 0, 2).PadLeft(7, '0')}";
+            case ConditionType.Astronomical:
+                var a = rule.ConditionConfig?.Deserialize<AstronomicalConditionConfig>(ConditionConfigJson.Options);
+                return $"sunrise {a?.SunriseOffsetMinutes:+#;-#;0}min to sunset {a?.SunsetOffsetMinutes:+#;-#;0}min, days 0b{Convert.ToString(a?.DaysOfWeek ?? 0, 2).PadLeft(7, '0')}";
             default:
                 return "?";
         }
@@ -124,7 +127,32 @@
                             <button type="submit" class="btn btn-sm btn-primary">Add</button>
                         </form>
                     </details>
+                    <details class="d-inline-block">
+                        <summary class="btn btn-sm btn-outline-primary" style="cursor:pointer;">+ Astronomical rule</summary>
+                        <form asp-action="RuleAdd" method="post" class="d-flex flex-wrap align-items-end gap-2 mt-2">
+                            <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
+                            <input type="hidden" name="relayFunction" value="@((int)function)" />
+                            <input type="hidden" name="conditionType" value="@((int)ConditionType.Astronomical)" />
+                            <div>
+                                <label class="form-label small mb-0">Days (0-127 mask)</label>
+                                <input type="number" min="0" max="127" name="daysOfWeek" class="form-control form-control-sm" style="width:8rem" required title="7-bit mask, bit 0 = Sunday .. bit 6 = Saturday" />
+                            </div>
+                            <div>
+                                <label class="form-label small mb-0">Sunrise offset (min)</label>
+                                <input type="number" min="-720" max="720" name="sunriseOffsetMinutes" value="0" class="form-control form-control-sm" style="width:8rem" required title="Negative starts earlier than sunrise" />
+                            </div>
+                            <div>
+                                <label class="form-label small mb-0">Sunset offset (min)</label>
+                                <input type="number" min="-720" max="720" name="sunsetOffsetMinutes" value="0" class="form-control form-control-sm" style="width:8rem" required title="Positive ends later than sunset" />
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                        </form>
+                    </details>
                 </div>
+                <p class="text-secondary small mb-0 mt-1">
+                    Astronomical rules need a location set under Server Settings &rarr; Weather - a
+                    day with no location configured sends no rule that day (function stays off).
+                </p>
             </div>
         }
 

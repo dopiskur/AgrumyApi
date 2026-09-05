@@ -263,6 +263,19 @@ namespace api.Controllers.API
                             return "Schedule rule: duration must be at least 1 second and not cross local midnight (start + duration <= 86400).";
                         }
                         return null;
+                    case ConditionType.Astronomical:
+                        var astro = config.Deserialize<AstronomicalConditionConfig>(ConditionConfigJson.Options)
+                            ?? throw new JsonException("missing astronomical config");
+                        if (astro.DaysOfWeek < 0 || astro.DaysOfWeek > 0b1111111)
+                        {
+                            return "Astronomical rule: days of week must be a value from 0 to 127.";
+                        }
+                        if (astro.SunriseOffsetMinutes < -720 || astro.SunriseOffsetMinutes > 720
+                            || astro.SunsetOffsetMinutes < -720 || astro.SunsetOffsetMinutes > 720)
+                        {
+                            return "Astronomical rule: offsets must be between -720 and 720 minutes.";
+                        }
+                        return null;
                     default:
                         return "Unknown condition type.";
                 }

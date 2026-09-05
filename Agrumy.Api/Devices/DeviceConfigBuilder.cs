@@ -84,7 +84,9 @@ namespace api.Devices
                 DeviceConfigController? controller = await repo.DeviceConfigControllerGetAsync(device.DeviceConfigControllerID);
                 if (controller != null && device.DeviceUnitZoneID is int idZone)
                 {
-                    controller.Rules = await repo.DeviceUnitZoneRulesGetAsync(idZone);
+                    IList<DeviceUnitZoneRule> rules = await repo.DeviceUnitZoneRulesGetAsync(idZone);
+                    DateOnly localDate = DateOnly.FromDateTime(DateTime.UtcNow.AddSeconds(utcOffsetSeconds));
+                    controller.Rules = AstronomicalRuleResolver.Resolve(rules, serverConfig, localDate, utcOffsetSeconds);
                     DeviceUnitZone? zone = await repo.DeviceUnitZoneGetByIdAsync(idZone);
                     controller.WaterPumpMaxRunSeconds = zone?.WaterPumpMaxRunSeconds;
                     controller.WaterPumpCooldownSeconds = zone?.WaterPumpCooldownSeconds;

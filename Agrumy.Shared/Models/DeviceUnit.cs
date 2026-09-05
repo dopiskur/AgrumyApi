@@ -37,12 +37,14 @@ namespace api.Models
         WaterPump = 4,
     }
 
-    /// Which condition a DeviceUnitZoneRule evaluates - see ThresholdConditionConfig/IntervalConditionConfig/ScheduleConditionConfig for each type's shape; composite AND/OR across types is deliberately out of scope.
+    /// Which condition a DeviceUnitZoneRule evaluates - see ThresholdConditionConfig/IntervalConditionConfig/ScheduleConditionConfig/AstronomicalConditionConfig for each type's shape; composite AND/OR across types is deliberately out of scope.
     public enum ConditionType
     {
         Threshold = 1,
         Interval = 2,
         Schedule = 3,
+        /// Never reaches firmware as-is - api.Devices.AstronomicalRuleResolver compiles it into an effective Schedule rule for today's local date before the config is sent.
+        Astronomical = 4,
     }
 
     /// A materialized JsonNode's keys are frozen by whatever options built it - an outer JsonSerializer.Serialize(camelCaseOptions) does NOT re-key it, so every DeviceUnitZoneRule.ConditionConfig read/write must use these exact Options or camelCase drifts to PascalCase.
@@ -70,6 +72,9 @@ namespace api.Models
 
     /// One wall-clock window - multiple windows for the same function are multiple Schedule rules, OR'd together. DaysOfWeek: 7-bit mask (bit0=Sunday). Start/Duration: seconds since local midnight, must not cross midnight.
     public record ScheduleConditionConfig(int DaysOfWeek, int Start, int Duration);
+
+    /// On from (today's sunrise + SunriseOffsetMinutes) to (today's sunset + SunsetOffsetMinutes) at ServerConfig.WeatherLocationLat/Lon, on the days in DaysOfWeek (same 7-bit mask as ScheduleConditionConfig) - negative offsets extend the window earlier, positive later, so e.g. (-30, 60) supplements natural daylight by 30 minutes at dawn and 60 at dusk.
+    public record AstronomicalConditionConfig(int DaysOfWeek, int SunriseOffsetMinutes, int SunsetOffsetMinutes);
 
     /// Per-sensor-type average from each device's LATEST reading only, not a historical average (which would skew by poll frequency); null means nothing in scope has reported that type.
     public class SensorAverages

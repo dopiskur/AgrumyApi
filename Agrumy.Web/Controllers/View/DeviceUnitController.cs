@@ -242,7 +242,8 @@ namespace api.Controllers.View
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> RuleAdd(int idDeviceUnitZone, RelayFunction relayFunction, ConditionType conditionType,
-            double? threshold, double? hysteresis, int? interval, int? intervalLength, int? daysOfWeek, int? start, int? duration)
+            double? threshold, double? hysteresis, int? interval, int? intervalLength, int? daysOfWeek, int? start, int? duration,
+            int? sunriseOffsetMinutes, int? sunsetOffsetMinutes)
         {
             // Must use ConditionConfigJson.Options here - the options-less JsonSerializer overloads would leak PascalCase onto the wire.
             System.Text.Json.Nodes.JsonNode? config = conditionType switch
@@ -250,6 +251,7 @@ namespace api.Controllers.View
                 ConditionType.Threshold => System.Text.Json.JsonSerializer.SerializeToNode(new ThresholdConditionConfig(threshold ?? 0, hysteresis ?? 0), ConditionConfigJson.Options),
                 ConditionType.Interval => System.Text.Json.JsonSerializer.SerializeToNode(new IntervalConditionConfig(interval ?? 0, intervalLength ?? 0), ConditionConfigJson.Options),
                 ConditionType.Schedule => System.Text.Json.JsonSerializer.SerializeToNode(new ScheduleConditionConfig(daysOfWeek ?? 0, start ?? 0, duration ?? 0), ConditionConfigJson.Options),
+                ConditionType.Astronomical => System.Text.Json.JsonSerializer.SerializeToNode(new AstronomicalConditionConfig(daysOfWeek ?? 0, sunriseOffsetMinutes ?? 0, sunsetOffsetMinutes ?? 0), ConditionConfigJson.Options),
                 _ => null,
             };
             try
