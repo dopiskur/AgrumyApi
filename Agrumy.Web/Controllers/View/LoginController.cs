@@ -40,7 +40,8 @@ namespace api.Controllers.View
             try
             {
                 result = await api.UserLogin(userLogin);
-                roles = result?.Token is { } token ? JwtTokenProvider.ValidateToken(token) : null;
+                // Trusted already - this token just came back from Web's own HTTPS call to Agrumy.Api, so no shared signing key is needed here.
+                roles = result?.Token is { } token ? JwtTokenProvider.DecodeRolesWithoutVerification(token) : null;
             }
             catch (ApiException ex)
             {
@@ -93,7 +94,7 @@ namespace api.Controllers.View
             try
             {
                 result = await api.UserForceChangePassword(value);
-                roles = result?.Token is { } token ? JwtTokenProvider.ValidateToken(token) : null;
+                roles = result?.Token is { } token ? JwtTokenProvider.DecodeRolesWithoutVerification(token) : null;
             }
             catch (ApiException ex)
             {

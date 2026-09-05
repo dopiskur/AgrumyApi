@@ -58,6 +58,20 @@ namespace api.Security
 
 
 
+        /// Reads role claims WITHOUT verifying the signature - only ever safe when the caller already trusts the token's origin through some other channel (e.g. Agrumy.Web decoding a token it just received directly from its own HTTPS call to Agrumy.Api's Login/RefreshToken), never for a token arriving from an untrusted party. Null if the token cannot even be parsed as a JWT.
+        public static IReadOnlyList<string>? DecodeRolesWithoutVerification(string token)
+        {
+            try
+            {
+                var jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(token);
+                return jwtToken.Claims.Where(x => x.Type == "role").Select(x => x.Value).ToList();
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+        }
+
         /// Every role claim on a valid token, or null if the token is invalid/expired/wrongly-signed. An empty (non-null) list means the token validated but carried no roles — callers must treat that as "no roles", not "check failed".
         public static IReadOnlyList<string>? ValidateToken(string token) => ValidateToken(token, Config.secureKey);
 

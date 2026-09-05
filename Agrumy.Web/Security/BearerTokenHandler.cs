@@ -98,7 +98,8 @@ namespace api.Security
 
         private static ClaimsPrincipal RebuildPrincipalFromToken(ClaimsPrincipal current, string accessToken)
         {
-            IReadOnlyList<string>? roles = JwtTokenProvider.ValidateToken(accessToken);
+            // Trusted already - this token just came back from RedeemAsync's own HTTPS call to Agrumy.Api, so no shared signing key is needed here.
+            IReadOnlyList<string>? roles = JwtTokenProvider.DecodeRolesWithoutVerification(accessToken);
             if (roles is null || roles.Count == 0)
             {
                 return current;

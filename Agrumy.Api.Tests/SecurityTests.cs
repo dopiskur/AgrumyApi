@@ -224,6 +224,48 @@ public class JwtTokenProviderTests
 
         Assert.Null(JwtTokenProvider.ValidateToken(tokenWithWrongIssuerAndAudience));
     }
+
+    [Fact]
+    public void DecodeRolesWithoutVerification_ReadsRoles_EvenWithoutTheSigningKey()
+    {
+        string token = JwtTokenProvider.CreateToken(SigningKey, 5, "alice@example.com", new[] { "admin", "Tenant reader" }, "0");
+
+        var roles = JwtTokenProvider.DecodeRolesWithoutVerification(token);
+
+        Assert.Equal(new[] { "admin", "Tenant reader" }, roles);
+    }
+
+    [Fact]
+    public void DecodeRolesWithoutVerification_StillReadsAnExpiredToken()
+    {
+        // Unlike ValidateToken - decoding never checks expiry/signature, by design (see the method's own remarks for when that's safe).
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey));
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new[] { new Claim("role", "user") }),
+            NotBefore = DateTime.UtcNow.AddMinutes(-10),
+            Expires = DateTime.UtcNow.AddMinutes(-5),
+            SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature)
+        };
+        var handler = new JwtSecurityTokenHandler();
+        string expired = handler.WriteToken(handler.CreateToken(descriptor));
+
+        Assert.Equal(new[] { "user" }, JwtTokenProvider.DecodeRolesWithoutVerification(expired));
+    }
+
+    [Fact]
+    public void DecodeRolesWithoutVerification_StillReadsATokenSignedWithAnUnknownKey()
+    {
+        string token = JwtTokenProvider.CreateToken("a-totally-different-signing-key-that-is-long-enough", 5, "eve@example.com", new[] { "user" }, "0");
+
+        Assert.Equal(new[] { "user" }, JwtTokenProvider.DecodeRolesWithoutVerification(token));
+    }
+
+    [Fact]
+    public void DecodeRolesWithoutVerification_RejectsGarbage()
+    {
+        Assert.Null(JwtTokenProvider.DecodeRolesWithoutVerification("not-a-jwt"));
+    }
 }
 
 public class FieldValidatorTests

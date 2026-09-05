@@ -345,6 +345,7 @@ public class ApiControllerTests
              .ReturnsAsync((Device d) => { d.IDDevice = 900; return d; });
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
+        _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
 
         var result = await NewDeviceControllerWithRelaySecret("shared-secret").DeviceRegistration(new DeviceRegistration
         {
@@ -372,6 +373,7 @@ public class ApiControllerTests
              .ReturnsAsync((Device d) => { d.IDDevice = 900; return d; });
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
+        _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
 
         var result = await NewDeviceControllerWithRelaySecret("shared-secret").DeviceRegistration(new DeviceRegistration
         {
@@ -399,6 +401,7 @@ public class ApiControllerTests
              .ReturnsAsync((Device d) => { d.IDDevice = 900; return d; });
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
+        _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
 
         var result = await NewDeviceControllerWithRelaySecret(null).DeviceRegistration(new DeviceRegistration
         {
