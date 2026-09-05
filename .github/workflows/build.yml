@@ -14,6 +14,36 @@ jobs:
     permissions:
       contents: read #This is required for actions/checkout
 
+    # Roadmap #314: without these, RelationalIntegrationTests.cs's ~90 [SkippableFact]/[SkippableTheory]
+    # tests find AGRUMY_TEST_MYSQL/AGRUMY_TEST_POSTGRES unset and silently skip instead of running -
+    # same engines/versions as docker-compose.yml (mariadb:11) and the "plain postgres works too" note
+    # in docker-compose.large.yml (no TimescaleDB extension needed - EnsureCreatedAsync never calls the
+    # hypertable-conversion step these tests exercise).
+    services:
+      mysql:
+        image: mariadb:11
+        env:
+          MARIADB_DATABASE: agrumy
+          MARIADB_USER: agrumy
+          MARIADB_PASSWORD: agrumy
+          MARIADB_RANDOM_ROOT_PASSWORD: "yes"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: agrumy
+          POSTGRES_USER: agrumy
+          POSTGRES_PASSWORD: agrumy
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U agrumy -d agrumy"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+
     steps:
       # Roadmap #75: SHA-pinned instead of a version tag - a tag can be moved to point at a
       # different (compromised) commit after the fact, a commit hash cannot. Comment names the
@@ -29,4 +59,7 @@ jobs:
         run: dotnet build agrumy.sln --configuration Release
 
       - name: dotnet test
+        env:
+          AGRUMY_TEST_MYSQL: "server=127.0.0.1;port=3306;database=agrumy;user=agrumy;password=agrumy;"
+          AGRUMY_TEST_POSTGRES: "Host=127.0.0.1;Port=5432;Database=agrumy;Username=agrumy;Password=agrumy"
         run: dotnet test agrumy.sln --configuration Release --no-build
