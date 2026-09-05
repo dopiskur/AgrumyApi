@@ -2,23 +2,16 @@ using api.Models;
 
 namespace api.Dal.Interface
 {
-    /// <summary>Command facet of the data layer: raw deviceCommand CRUD only - dedup, fan-out, and
-    /// the FIFO "which one is next" business logic live in CommandQueueService (Agrumy.Api/Commands),
-    /// which sits above this facet the same way OfflineAlertEvaluator sits above IDeviceRepository.</summary>
+    /// Command facet: raw deviceCommand CRUD only - dedup, fan-out, and FIFO ordering live in CommandQueueService above this facet.
     public interface ICommandRepository
     {
-        /// <summary>Every Pending/Acknowledged (i.e. still "active") command for this device whose
-        /// ActionType matches - used for the per-(device, ActionType) dedup check. Expired-but-not-
-        /// yet-marked rows are excluded by the ExpiresAt filter, not by Status alone.</summary>
+        /// Every still-active (Pending/Acknowledged) command for this device matching ActionType, used for the per-(device, ActionType) dedup check - excludes expired-but-not-yet-marked rows via the ExpiresAt filter, not Status alone.
         Task<bool> HasActiveCommandAsync(int deviceId, CommandActionType actionType, DateTime utcNow);
 
-        /// <summary>Creates one Pending command row and bumps the device's CommandVersion in the
-        /// same call. Null return means a DB-level unique constraint rejected it because another
-        /// request already created an active command for this (device, actionType) pair - the caller treats that as a dedup skip.</summary>
+        /// Creates one Pending command row and bumps the device's CommandVersion in the same call - null return means a unique-constraint rejection (another request already has an active command for this pair), treated by the caller as a dedup skip.
         Task<int?> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt);
 
-        /// <summary>Every Pending command for this device, oldest first - CommandQueueService picks
-        /// the first one that is not (yet) expired and lazily expires any that are.</summary>
+        /// Every Pending command for this device, oldest first - CommandQueueService picks the first not (yet) expired and lazily expires any that are.
         Task<IList<DeviceCommand>> GetPendingCommandsAsync(int deviceId);
 
         Task<DeviceCommand?> GetCommandByIdAsync(int commandId);

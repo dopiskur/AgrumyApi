@@ -3,45 +3,30 @@ using System.Text.Json.Nodes;
 
 namespace api.Dal.Interface
 {
-    /// <summary>Telemetry facet of the data layer.</summary>
+    /// Telemetry facet of the data layer.
     public interface ISensorDataRepository
     {
-        /// <summary>
-        /// Persist a telemetry batch. deviceID/tenantID/deviceUnitID/deviceUnitZoneID come from the
-        /// authenticated device identity and are applied to every row; the same keys inside each JSON
-        /// object are ignored, so a device cannot write telemetry against another device or tenant.
-        /// </summary>
+        /// Persists a telemetry batch - deviceID/tenantID/deviceUnitID/deviceUnitZoneID come from the authenticated identity and are applied to every row; matching keys inside the JSON itself are ignored.
         Task SensorDataPushAsync(JsonArray jsonArray, int deviceID, int tenantID, int? deviceUnitID, int? deviceUnitZoneID);
         Task<string> SensorDataGetAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY, int? buildReport);
 
-        /// <summary>Same JSON shape as SensorDataGetAsync, but time-bucket averaged across every device in
-        /// the zone/unit instead of one device's own raw readings - a metric only one device reports
-        /// averages over just that value, so this also covers the "single contributor" case correctly.</summary>
+        /// Same JSON shape as SensorDataGetAsync, but time-bucket averaged across every device in the zone/unit instead of one device's own raw readings.
         Task<string> SensorDataZoneAverageGetAsync(int? tenantID, int deviceUnitZoneID, int? timeRange, int? timeMDMY);
         Task<string> SensorDataUnitAverageGetAsync(int? tenantID, int deviceUnitID, int? timeRange, int? timeMDMY);
 
         Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? tenantID, int? getData, int? deviceID, int? sensorDataReportID);
         Task SensorDataDeleteAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY);
 
-        /// <summary>Raw, untransformed rows for a whole tenant (tenant export) - unlike
-        /// SensorDataGetAsync/the zone/unit averages above, this is not shaped for chart
-        /// consumption. sinceUtc null means every row ever recorded for the tenant.</summary>
+        /// Raw, untransformed rows for a whole tenant (tenant export), not shaped for chart consumption like SensorDataGetAsync - sinceUtc null means every row ever recorded.
         Task<IList<SensorData>> SensorDataExportGetAsync(int tenantID, DateTime? sinceUtc);
 
-        /// <summary>Bulk-inserts already-tenant/device/unit/zone-remapped rows (tenant import) -
-        /// the caller has already resolved every id to its NEW value on the target
-        /// server, this just persists them as-is, IDSensorData included (auto-generated, ignored).</summary>
+        /// Bulk-inserts already-remapped rows (tenant import) - the caller has resolved every id to its new value on the target server, this just persists them as-is.
         Task SensorDataImportAsync(IList<SensorData> rows);
 
-        /// <summary>Downsamples every row older than cutoffUtc, per device, into one 5-minute-bucket
-        /// average-without-outliers row, replacing the raw rows in place. Plain LINQ/EF throughout -
-        /// identical on MariaDB and PostgreSQL, no TimescaleDB-specific SQL.</summary>
+        /// Downsamples every row older than cutoffUtc, per device, into one 5-minute-bucket average-without-outliers row, replacing the raw rows in place.
         Task OptimizeOldSensorDataAsync(DateTime cutoffUtc, CancellationToken ct);
 
-        /// <summary>Deletes rows older than cutoffUtc outright - nothing survives, not even an
-        /// aggregate. Uses drop_chunks() on a TimescaleDB hypertable or a plain DELETE otherwise;
-        /// shrinkAfterPurge additionally runs OPTIMIZE TABLE on MariaDB/MySQL, whose DELETE never
-        /// shrinks the underlying .ibd file on its own.</summary>
+        /// Deletes rows older than cutoffUtc outright (drop_chunks() on TimescaleDB, plain DELETE otherwise) - shrinkAfterPurge also runs OPTIMIZE TABLE on MariaDB/MySQL, whose DELETE never shrinks the .ibd file.
         Task PurgeOldSensorDataAsync(DateTime cutoffUtc, bool shrinkAfterPurge, CancellationToken ct);
     }
 }

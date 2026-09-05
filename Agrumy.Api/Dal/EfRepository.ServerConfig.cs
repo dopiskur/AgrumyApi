@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// <summary>IServerConfigRepository members.</summary>
+    /// IServerConfigRepository members.
     internal partial class EfRepository
     {
         public async Task<ServerConfig> ServerConfigGetAsync(int idServerConfig = 1)
@@ -17,9 +17,7 @@ namespace api.Dal
                 return ToDto(row);
             }
 
-            // No row: generate a default one (mirrors the old ServerConfigGetAsync + ServerConfigAddAsync),
-            // seeding the hysteresis fields from appsettings.json so a fresh install has sane
-            // defaults before an admin ever visits the settings page.
+            // No row: generate one, seeding hysteresis fields from appsettings.json so a fresh install starts with sane defaults.
             var generated = new ServerConfigRow
             {
                 IDServerConfig = idServerConfig,
@@ -84,9 +82,7 @@ namespace api.Dal
             row.FirmwareRefreshIntervalHours = config.FirmwareRefreshIntervalHours;
             // FirmwareLastRefreshedAtUtc deliberately NOT written here - see ServerConfigFirmwareRefreshStateSetAsync below.
             row.SensorDataRetentionDays = config.SensorDataRetentionDays;
-            // WeatherRainPredicted/WeatherCheckedAtUtc deliberately NOT written here - they are
-            // WeatherEvaluator's computed output (see ServerConfigWeatherStateSetAsync below), so a
-            // form post that doesn't know about them can never clobber a fresher reading.
+            // WeatherRainPredicted/WeatherCheckedAtUtc deliberately NOT written here - WeatherEvaluator owns them via ServerConfigWeatherStateSetAsync, so a form post can't clobber a fresher reading.
             row.WeatherLocationLat = config.WeatherLocationLat;
             row.WeatherLocationLon = config.WeatherLocationLon;
             row.WeatherPollIntervalMinutes = config.WeatherPollIntervalMinutes;
@@ -98,15 +94,11 @@ namespace api.Dal
             row.ProblemEventExpiryHours = config.ProblemEventExpiryHours;
             await db.SaveChangesAsync();
 
-            // Re-applied on every save so an admin edit takes effect immediately on Postgres/
-            // TimescaleDB - a no-op on MariaDB/MySQL, whose retention instead comes from
-            // SensorDataRetentionBackgroundService reading the row fresh on its next daily tick.
+            // Re-applied on every save so Postgres/TimescaleDB retention updates immediately - a no-op on MariaDB/MySQL, which reads this row fresh on its own daily tick.
             await ApplyRetentionPolicyAsync(config.SensorDataRetentionDays);
         }
 
-        /// <summary>Forces the DB serverConfig row's hysteresis fields back to appsettings.json's
-        /// ServerConfig:Hysteresis values, creating the row if it does not exist yet. Only called
-        /// at startup when ServerConfig:Reload is true - see AgrumySettings.ServerConfigReload.</summary>
+        /// Forces hysteresis fields back to appsettings.json's ServerConfig:Hysteresis values (creating the row if missing) - only called at startup when AgrumySettings.ServerConfigReload is true.
         public async Task ServerConfigReloadFromAppSettingsAsync(int idServerConfig = 1)
         {
             var row = await db.ServerConfigs.FirstOrDefaultAsync(s => s.IDServerConfig == idServerConfig);
@@ -145,9 +137,7 @@ namespace api.Dal
             await ApplyRetentionPolicyAsync(settings.SensorDataRetentionDays);
         }
 
-        /// <summary>The ONLY writer of WeatherRainPredicted/WeatherCheckedAtUtc - called exclusively
-        /// by WeatherEvaluator, deliberately narrower than ServerConfigUpdateAsync's full-object
-        /// overwrite so the admin Server Settings form can never race a fresher reading back to stale.</summary>
+        /// The only writer of WeatherRainPredicted/WeatherCheckedAtUtc, called exclusively by WeatherEvaluator - narrower than ServerConfigUpdateAsync so the admin form can't race a fresher reading back to stale.
         public async Task ServerConfigWeatherStateSetAsync(bool rainPredicted, DateTime checkedAtUtc, int idServerConfig = 1)
         {
             var row = await db.ServerConfigs.FirstOrDefaultAsync(s => s.IDServerConfig == idServerConfig);
@@ -160,8 +150,7 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
-        /// <summary>The ONLY writer of FirmwareLastRefreshedAtUtc - called exclusively by
-        /// FirmwareCatalogRefreshEvaluator, same isolation reasoning as ServerConfigWeatherStateSetAsync above.</summary>
+        /// The only writer of FirmwareLastRefreshedAtUtc, called exclusively by FirmwareCatalogRefreshEvaluator - same isolation reasoning as ServerConfigWeatherStateSetAsync.
         public async Task ServerConfigFirmwareRefreshStateSetAsync(DateTime checkedAtUtc, int idServerConfig = 1)
         {
             var row = await db.ServerConfigs.FirstOrDefaultAsync(s => s.IDServerConfig == idServerConfig);
@@ -173,7 +162,7 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
-        // Instance, not static: the #94 GitHub-repository fallback below reads the injected settings.
+        // Instance, not static - the GitHub-repository fallback below reads the injected settings.
         private ServerConfig ToDto(ServerConfigRow r) => new()
         {
             IDServerConfig = r.IDServerConfig,
@@ -196,31 +185,26 @@ namespace api.Dal
             TenantManagementEnabled = r.TenantManagementEnabled,
             ScheduleTimeZone = r.ScheduleTimeZone,
             FirmwareSource = (FirmwareSource)r.FirmwareSource,
-            // A row created before #94 has NULL here; the setting's seed is the right fallback
-            // rather than an empty repository nobody can sync from.
+            // An older row has NULL here; falling back to the settings seed beats an empty repository nobody can sync from.
             FirmwareGitHubRepository = string.IsNullOrWhiteSpace(r.FirmwareGitHubRepository) ? settings.FirmwareGitHubRepository : r.FirmwareGitHubRepository,
             FirmwareCustomRepositoryUrl = r.FirmwareCustomRepositoryUrl,
-            // A row created before #203 has NULL here - same appsettings-seed fallback as
-            // FirmwareGitHubRepository above, rather than surfacing "disabled" for every existing install.
+            // An older row has NULL here - same appsettings-seed fallback as FirmwareGitHubRepository, rather than showing "disabled" for every existing install.
             FirmwareRefreshIntervalHours = r.FirmwareRefreshIntervalHours ?? settings.FirmwareRefreshIntervalHours,
             FirmwareLastRefreshedAtUtc = r.FirmwareLastRefreshedAtUtc,
             SensorDataRetentionDays = r.SensorDataRetentionDays,
             WeatherLocationLat = r.WeatherLocationLat,
             WeatherLocationLon = r.WeatherLocationLon,
-            // A row created before #11 has NULL here - same appsettings-seed fallback as
-            // FirmwareGitHubRepository above, rather than surfacing an empty interval/threshold.
+            // An older row has NULL here - same appsettings-seed fallback as FirmwareGitHubRepository, rather than surfacing an empty interval/threshold.
             WeatherPollIntervalMinutes = r.WeatherPollIntervalMinutes ?? settings.WeatherPollIntervalMinutes,
             WeatherRainSkipThreshold = r.WeatherRainSkipThreshold ?? settings.WeatherRainSkipThreshold,
             WeatherRainPredicted = r.WeatherRainPredicted,
             WeatherCheckedAtUtc = r.WeatherCheckedAtUtc,
             RelayEnabled = r.RelayEnabled,
             RelayMode = (RelayMode)r.RelayMode,
-            // A row created before this field existed has 0 here, which happens to already equal a sane default
-            // (10-300 clamp keeps 0 out of reach otherwise) - not worth a settings.* fallback.
+            // An older row has 0 here, which already equals the sane default (a 10-300 clamp keeps 0 unreachable otherwise) - no settings.* fallback needed.
             RelayWaitWindowSeconds = r.RelayWaitWindowSeconds == 0 ? 30 : r.RelayWaitWindowSeconds,
             ProblemEventAlertsEnabled = r.ProblemEventAlertsEnabled,
-            // A row created before this field existed has 0 here (column default backfills real rows
-            // to 24, but the in-memory generated-default path above always sets it explicitly too).
+            // An older row has 0 here (column default backfills real rows to 24; the generated-default path above already sets it explicitly).
             ProblemEventExpiryHours = r.ProblemEventExpiryHours == 0 ? 24 : r.ProblemEventExpiryHours,
         };
     }

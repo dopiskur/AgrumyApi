@@ -2,8 +2,7 @@ using api.Models;
 
 namespace api.Dal.Interface
 {
-    /// <summary>Tenant facet - lookups and the silent create-on-registration path (see
-    /// UserApiController.UserRegistration), plus Tenant Management CRUD (roadmap #196).</summary>
+    /// Tenant facet - lookups, the silent create-on-registration path (see UserApiController.UserRegistration), and Tenant Management CRUD.
     public interface ITenantRepository
     {
         Task<bool> TenantGetAsync(string tenantName);
@@ -14,11 +13,7 @@ namespace api.Dal.Interface
         Task<Tenant?> TenantGetByIdAsync(int idTenant);
         Task TenantUpdateAsync(Tenant tenant);
 
-        /// <summary>Whether TenantID=0 is a safe target for ImportAsSentinel - true
-        /// only when it has no devices and at most the single still-unclaimed bootstrap admin row
-        /// (PwdHash IS NULL every fresh install seeds - see EfRepository.SeedBootstrapAdminAsync).
-        /// Any real device or a second/claimed user means someone is already using this server, so
-        /// import-as-sentinel refuses rather than merging into or overwriting them.</summary>
+        /// True only when TenantID=0 has no devices and at most the single still-unclaimed bootstrap admin row (see EfRepository.SeedBootstrapAdminAsync) - any real device or claimed user means ImportAsSentinel must refuse rather than overwrite them.
         Task<bool> TenantZeroIsEmptyAsync();
     }
 }
