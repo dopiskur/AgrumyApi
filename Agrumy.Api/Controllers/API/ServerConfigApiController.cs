@@ -134,6 +134,12 @@ namespace api.Controllers.API
                 return BadRequest("Minimum password length must be between 4 and 128.");
             }
 
+            // 0 disables it; otherwise bounded to a week, same "0/off or a sane positive range" pattern as FirmwareRefreshIntervalHours.
+            if (config.ConfigHeartbeatHours is < 0 or > 168)
+            {
+                return BadRequest("Config heartbeat must be 0 (disabled) or between 1 and 168 hours.");
+            }
+
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await Repo.ServerConfigUpdateAsync(config);
             return Ok();

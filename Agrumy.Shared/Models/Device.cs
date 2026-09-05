@@ -69,7 +69,8 @@ namespace api.Models
         public DateTime? DateCreated { get; set; }
         public DateTime? DateModified { get; set; }
 
-
+        // Written only when GetConfig/RunConfigAsync actually sends a full DeviceConfig body - drives the ConfigHeartbeatHours periodic resend (see DeviceConfigBuilder.NeedsRefreshAsync); never exposed via DeviceDto, purely internal bookkeeping.
+        public DateTime? LastFullConfigSentAt { get; set; }
     }
 
     /// The only shape of a device that ever crosses the HTTP boundary in either direction (GET responses, PUT /api/Device body) - identical to Device minus ApiId/ApiKey, which stay internal to EfRepository/DeviceConfigBuilder no matter what future fields get added here.

@@ -353,6 +353,17 @@
                 </div>
             </div>
 
+            <div class="mb-3" style="max-width:16rem">
+                <label asp-for="ConfigHeartbeatHours" class="form-label"></label>
+                <input asp-for="ConfigHeartbeatHours" class="form-control" />
+                <span asp-validation-for="ConfigHeartbeatHours" class="text-danger"></span>
+                <div class="form-text">
+                    Resends a device's full config even when its ConfigVersion hasn't changed, so a
+                    DST transition, a timezone edit, or a rain-skip flip still reaches it - 0 disables
+                    this and relies on ConfigVersion alone.
+                </div>
+            </div>
+
             <div class="mb-0">
                 <input type="submit" value="Save" class="btn btn-primary" />
             </div>

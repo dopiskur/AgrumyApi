@@ -217,12 +217,14 @@ namespace api.Controllers.API
 
             // Compared against the device row read above (not a stale/absent session-cache copy) - config-unchanged alone is no longer enough to skip the response, since a pending command must ride along on this same poll.
             PendingCommand? pendingCommand = await commandQueue.GetPendingCommandAsync(device.IDDevice.Value);
-            if (value.ConfigVersion == device.ConfigVersion && pendingCommand == null)
+            if (!await configBuilder.NeedsRefreshAsync(device, value.ConfigVersion, pendingCommand))
             {
-                return Ok(); // device is up to date and nothing is queued for it - do nothing
+                return Ok(); // device is up to date, nothing is queued for it, and no heartbeat resend is due - do nothing
             }
 
-            return Ok(await configBuilder.BuildAsync(device, pendingCommand, value.Board));
+            DeviceConfig config = await configBuilder.BuildAsync(device, pendingCommand, value.Board);
+            await Repo.DeviceMarkConfigSentAsync(device.IDDevice.Value, DateTime.UtcNow);
+            return Ok(config);
         }
 
         /// Arms an OTA for one device - Version null means latest catalog build for its board (one-click), a specific version installs exactly that (rollback/downgrade); the firmware's own offered-vs-running gate (ServiceController::apiConfig) makes a redundant request harmless, GetConfig clears it once the heartbeat confirms.

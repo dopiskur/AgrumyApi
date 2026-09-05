@@ -186,6 +186,10 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
+        public Task DeviceMarkConfigSentAsync(int deviceID, DateTime sentAtUtc) =>
+            db.Devices.Where(d => d.IDDevice == deviceID)
+                .ExecuteUpdateAsync(s => s.SetProperty(d => d.LastFullConfigSentAt, sentAtUtc));
+
         private static Device ToDto(DeviceRow d) => new()
         {
             IDDevice = d.IDDevice,
@@ -219,6 +223,7 @@ namespace api.Dal
             DateModified = d.DateModified,
             IsRelay = d.IsRelay,
             RelayProfile = d.RelayProfile is int p ? (RelayProfile)p : null,
+            LastFullConfigSentAt = d.LastFullConfigSentAt,
         };
     }
 }

@@ -150,5 +150,8 @@ namespace api.Dal.Entities
         // See api.Security.PasswordPolicy for the full explanation.
         public int PasswordMinLength { get; set; }
         public bool PasswordRequireComplexity { get; set; }
+
+        // See api.Models.ServerConfig's own copy for the full explanation.
+        public int ConfigHeartbeatHours { get; set; } = 24;
     }
 }

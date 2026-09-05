@@ -121,12 +121,13 @@ namespace api.Controllers.API
             }
 
             PendingCommand? pendingCommand = await commandQueue.GetPendingCommandAsync(device.IDDevice.Value);
-            if (poll.ConfigVersion == device.ConfigVersion && pendingCommand == null)
+            if (!await configBuilder.NeedsRefreshAsync(device, poll.ConfigVersion, pendingCommand))
             {
-                return new RelayBatchEntryResult { Success = true, StatusCode = 200 }; // up to date, nothing queued - mirrors GetConfig's empty-200
+                return new RelayBatchEntryResult { Success = true, StatusCode = 200 }; // up to date, nothing queued, no heartbeat due - mirrors GetConfig's empty-200
             }
 
             DeviceConfig config = await configBuilder.BuildAsync(device, pendingCommand, poll.Board);
+            await Repo.DeviceMarkConfigSentAsync(device.IDDevice!.Value, DateTime.UtcNow);
             return new RelayBatchEntryResult { Success = true, StatusCode = 200, Config = config };
         }
 

@@ -49,6 +49,7 @@ namespace api.Dal
                 ProblemEventAlertsEnabled = true,
                 ProblemEventExpiryHours = 24,
                 PasswordMinLength = 8,
+                ConfigHeartbeatHours = 24,
             };
             db.ServerConfigs.Add(generated);
             await db.SaveChangesAsync();
@@ -95,6 +96,7 @@ namespace api.Dal
             row.ProblemEventExpiryHours = config.ProblemEventExpiryHours;
             row.PasswordMinLength = config.PasswordMinLength;
             row.PasswordRequireComplexity = config.PasswordRequireComplexity;
+            row.ConfigHeartbeatHours = config.ConfigHeartbeatHours;
             await db.SaveChangesAsync();
 
             // Re-applied on every save so Postgres/TimescaleDB retention updates immediately - a no-op on MariaDB/MySQL, which reads this row fresh on its own daily tick.
@@ -212,6 +214,7 @@ namespace api.Dal
             // An older row has 0 here, which is not a usable minimum length - same 0-means-unset fallback as RelayWaitWindowSeconds.
             PasswordMinLength = r.PasswordMinLength == 0 ? 8 : r.PasswordMinLength,
             PasswordRequireComplexity = r.PasswordRequireComplexity,
+            ConfigHeartbeatHours = r.ConfigHeartbeatHours,
         };
     }
 }

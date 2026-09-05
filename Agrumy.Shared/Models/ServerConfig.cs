@@ -115,6 +115,10 @@ namespace api.Models
 
         [Display(Name = "Require upper/lower case, digit, and symbol")]
         public bool PasswordRequireComplexity { get; set; }
+
+        // 0 disables it. DeviceConfigBuilder recomputes UtcOffsetSeconds/SkipWaterPumpForRain fresh on every build, but neither bumps ConfigVersion when it changes (a DST transition, an admin edit to ScheduleTimeZone, or a weather-poll flip) - this forces a full config resend periodically so those changes still reach a device that otherwise has nothing else queued. Clamped 1-168 (a week) by ServerConfigApiController.Update when non-zero.
+        [Display(Name = "Config heartbeat (hours, 0 = off)")]
+        public int ConfigHeartbeatHours { get; set; } = 24;
     }
 
     /// The only ServerConfig field a pre-login, unauthenticated page may see - Register uses it to decide whether to show "create a new tenant" without needing the admin-only /api/ServerConfig.

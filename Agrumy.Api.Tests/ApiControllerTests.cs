@@ -288,9 +288,10 @@ public class ApiControllerTests
         controller.HttpContext.Items[DeviceAuth.ApiIdItemKey] = "api-guid";
 
         _repo.Setup(r => r.DeviceGetByApiIdAsync("api-guid"))
-             .ReturnsAsync(new Device { IDDevice = 500, TenantID = 3, ConfigVersion = 66 });
+             .ReturnsAsync(new Device { IDDevice = 500, TenantID = 3, ConfigVersion = 66, LastFullConfigSentAt = DateTime.UtcNow });
         _repo.Setup(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.IsAny<DeviceConfigPoll>()))
              .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // NeedsRefreshAsync's heartbeat check
         _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // none pending
 
         var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 66, Rssi = -60 });
@@ -313,6 +314,7 @@ public class ApiControllerTests
              .Returns(Task.CompletedTask);
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // BuildDeviceConfigAsync always reads this
         _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // none pending
+        _repo.Setup(r => r.DeviceMarkConfigSentAsync(500, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
 
         // Version mismatch must return the full config from the DB read, not a cache lookup that no longer carries ConfigVersion.
         var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 65 });
@@ -320,6 +322,48 @@ public class ApiControllerTests
         Assert.IsType<OkObjectResult>(result.Result);
         _cache.Verify(c => c.GetDeviceCacheAsync(It.IsAny<string>()), Times.Never);
         _cache.Verify(c => c.SetItemAsync(It.IsAny<string>(), It.IsAny<DeviceCache>()), Times.Never);
+    }
+
+    // Roadmap #288: UtcOffsetSeconds/SkipWaterPumpForRain are recomputed fresh on every BuildAsync call but never bump ConfigVersion, so a matching version alone must not be enough to skip a device that hasn't had a full send in longer than ConfigHeartbeatHours.
+    [Fact]
+    public async Task GetConfig_VersionMatches_ButHeartbeatWindowElapsed_StillSendsFullConfig()
+    {
+        var controller = NewDeviceController();
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        controller.HttpContext.Items[DeviceAuth.ApiIdItemKey] = "api-guid";
+
+        _repo.Setup(r => r.DeviceGetByApiIdAsync("api-guid"))
+             .ReturnsAsync(new Device { IDDevice = 500, TenantID = 3, ConfigVersion = 66, LastFullConfigSentAt = DateTime.UtcNow.AddHours(-25) });
+        _repo.Setup(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.IsAny<DeviceConfigPoll>()))
+             .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { ConfigHeartbeatHours = 24 });
+        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>());
+        _repo.Setup(r => r.DeviceMarkConfigSentAsync(500, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+
+        var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 66 });
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        _repo.Verify(r => r.DeviceMarkConfigSentAsync(500, It.IsAny<DateTime>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetConfig_VersionMatches_HeartbeatDisabled_StaysUpToDate()
+    {
+        var controller = NewDeviceController();
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        controller.HttpContext.Items[DeviceAuth.ApiIdItemKey] = "api-guid";
+
+        _repo.Setup(r => r.DeviceGetByApiIdAsync("api-guid"))
+             .ReturnsAsync(new Device { IDDevice = 500, TenantID = 3, ConfigVersion = 66, LastFullConfigSentAt = null });
+        _repo.Setup(r => r.DeviceDiagnosticUpsertAsync(500, 3, It.IsAny<DeviceConfigPoll>()))
+             .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { ConfigHeartbeatHours = 0 });
+        _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>());
+
+        var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 66 });
+
+        Assert.IsType<OkResult>(result.Result); // empty body: 0 disables the heartbeat entirely, even with no prior send recorded
+        // Strict mock: an un-set-up DeviceMarkConfigSentAsync call would throw, proving no config was sent.
     }
 
     // Authenticate must size the session TTL to the device's own SleepSeconds, not a fixed default, or a slow-polling device loses its session mid-cycle.

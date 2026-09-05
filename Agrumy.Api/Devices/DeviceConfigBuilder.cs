@@ -8,6 +8,22 @@ namespace api.Devices
     /// Builds the DeviceConfig body a Config poll or Register response sends back, shared so RelayApiController.Batch's Config entries produce byte-for-byte the same response as a direct POST /api/Device/Config.
     public class DeviceConfigBuilder(IRepository repo, FirmwareCatalogService firmwareCatalog)
     {
+        /// Whether GetConfig/RunConfigAsync must send a full config this poll: a real version mismatch, a pending command, or - because BuildAsync recomputes UtcOffsetSeconds/SkipWaterPumpForRain fresh every call without either ever bumping ConfigVersion - the periodic heartbeat window has elapsed since the device's last full send. Not used by Register, which always sends a fresh config unconditionally.
+        public async Task<bool> NeedsRefreshAsync(Device device, int? pollConfigVersion, PendingCommand? pendingCommand)
+        {
+            if (pollConfigVersion != device.ConfigVersion || pendingCommand != null)
+            {
+                return true;
+            }
+            ServerConfig serverConfig = await repo.ServerConfigGetAsync(1);
+            if (serverConfig.ConfigHeartbeatHours <= 0)
+            {
+                return false;
+            }
+            return device.LastFullConfigSentAt is not DateTime last
+                || (DateTime.UtcNow - last).TotalHours >= serverConfig.ConfigHeartbeatHours;
+        }
+
         public async Task<DeviceConfig> BuildAsync(Device device, PendingCommand? pendingCommand, string? board)
         {
             // Computed fresh on every Config/Register response rather than cached, so a DST
