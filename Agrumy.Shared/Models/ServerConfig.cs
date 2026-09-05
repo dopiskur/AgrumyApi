@@ -93,17 +93,17 @@ namespace api.Models
         [Display(Name = "Forecast last checked")]
         public DateTime? WeatherCheckedAtUtc { get; set; }
 
-        // Gates the Relay Devices admin page (_Layout.cshtml, same pattern as TenantManagementEnabled) and whether RelayApiController accepts Batch calls at all.
-        [Display(Name = "Enable Agrumy.Relay support")]
-        public bool RelayEnabled { get; set; }
+        // Gates the Gateway Devices admin page (_Layout.cshtml, same pattern as TenantManagementEnabled) and whether GatewayApiController accepts Batch calls at all.
+        [Display(Name = "Enable Agrumy.Gateway support")]
+        public bool GatewayEnabled { get; set; }
 
-        [Display(Name = "Relay mode")]
+        [Display(Name = "Gateway mode")]
         [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
-        public RelayMode RelayMode { get; set; }
+        public GatewayMode GatewayMode { get; set; }
 
-        // Aggregated mode only (see RelayBatchResponse); clamped 10-300 by ServerConfigApiController.Update, same pattern as MaxRulesPerZone.
+        // Aggregated mode only (see GatewayBatchResponse); clamped 10-300 by ServerConfigApiController.Update, same pattern as MaxRulesPerZone.
         [Display(Name = "Aggregated wait window (seconds)")]
-        public int RelayWaitWindowSeconds { get; set; } = 30;
+        public int GatewayWaitWindowSeconds { get; set; } = 30;
 
         // Enforced by api.Security.PasswordPolicy wherever a NEW password is set; clamped 4-128 by ServerConfigApiController.Update.
         [Display(Name = "Minimum password length")]

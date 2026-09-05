@@ -1,21 +1,21 @@
-@model api.ViewModels.RelayMappingViewModel
+@model api.ViewModels.GatewayMappingViewModel
 
 @{
-    ViewData["Title"] = "Relay Devices - " + Model.Relay.DeviceName + " DevEUI Mapping";
+    ViewData["Title"] = "Gateway Devices - " + Model.Gateway.DeviceName + " DevEUI Mapping";
 }
 
 <div class="card mb-3">
     <div class="card-header">
-        <h3 class="card-title">@Model.Relay.DeviceName &mdash; DevEUI Mapping</h3>
+        <h3 class="card-title">@Model.Gateway.DeviceName &mdash; DevEUI Mapping</h3>
         <div class="card-tools">
-            <a asp-action="Index" class="btn btn-sm btn-secondary">Back to Relay Devices</a>
+            <a asp-action="Index" class="btn btn-sm btn-secondary">Back to Gateway Devices</a>
         </div>
     </div>
     <div class="card-body">
         <p class="text-secondary">
-            Maps a LoRaWAN end-device's DevEUI to the Agrumy device whose ApiId/ApiKey this relay
+            Maps a LoRaWAN end-device's DevEUI to the Agrumy device whose ApiId/ApiKey this gateway
             should use when it sees an uplink from that DevEUI (roadmap #147). Only meaningful
-            while this relay's profile is LoRaGateway.
+            while this gateway's profile is LoRaGateway.
         </p>
         @if (!Model.Mappings.Any())
         {
@@ -40,8 +40,8 @@
                             <td>@m.DeviceName <span class="text-secondary small">(@m.DeviceApiId)</span></td>
                             <td>
                                 <form asp-action="MappingDelete" method="post" class="d-inline">
-                                    <input type="hidden" name="idRelayDeviceMapping" value="@m.IDRelayDeviceMapping" />
-                                    <input type="hidden" name="idRelayDevice" value="@Model.Relay.IDDevice" />
+                                    <input type="hidden" name="idGatewayDeviceMapping" value="@m.IDGatewayDeviceMapping" />
+                                    <input type="hidden" name="idGatewayDevice" value="@Model.Gateway.IDDevice" />
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove mapping" aria-label="Remove mapping">
                                         <i class="bi bi-trash"></i>
                                     </button>
@@ -57,7 +57,7 @@
         <hr />
         <h6 class="fw-semibold">Add mapping</h6>
         <form asp-action="MappingAdd" method="post" class="row g-2 align-items-end">
-            <input type="hidden" name="idRelayDevice" value="@Model.Relay.IDDevice" />
+            <input type="hidden" name="idGatewayDevice" value="@Model.Gateway.IDDevice" />
             <div class="col-sm-4">
                 <label class="form-label" for="devEUI">DevEUI</label>
                 <input type="text" id="devEUI" name="devEUI" class="form-control font-monospace" maxlength="16"

@@ -5,7 +5,7 @@ using api.Utils;
 
 namespace api.Devices
 {
-    /// Builds the DeviceConfig body a Config poll or Register response sends back, shared so RelayApiController.Batch's Config entries produce byte-for-byte the same response as a direct POST /api/Device/Config.
+    /// Builds the DeviceConfig body a Config poll or Register response sends back, shared so GatewayApiController.Batch's Config entries produce byte-for-byte the same response as a direct POST /api/Device/Config.
     public class DeviceConfigBuilder(IRepository repo, FirmwareCatalogService firmwareCatalog)
     {
         /// Whether GetConfig/RunConfigAsync must send a full config this poll: a real version mismatch, a pending command, or - because BuildAsync recomputes UtcOffsetSeconds/SkipWaterPumpForRain fresh every call without either ever bumping ConfigVersion - the periodic heartbeat window has elapsed since the device's last full send. Not used by Register, which always sends a fresh config unconditionally.

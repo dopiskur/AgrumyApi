@@ -122,19 +122,19 @@ namespace api.Dal.Interface
         [Get("/api/Device/FleetStatus")]
         Task<DeviceFleetStatus> DeviceFleetStatusGet(int idDevice);
 
-        // ---- Relay ------------------------------------------
+        // ---- Gateway ------------------------------------------
 
-        [Get("/api/Relay/All")]
-        Task<IList<DeviceDto>> RelaysGetAll();
+        [Get("/api/Gateway/All")]
+        Task<IList<DeviceDto>> GatewaysGetAll();
 
-        [Get("/api/Relay/DeviceMapping/All")]
-        Task<IList<RelayDeviceMapping>> RelayDeviceMappingGetAll(int idRelayDevice);
+        [Get("/api/Gateway/DeviceMapping/All")]
+        Task<IList<GatewayDeviceMapping>> GatewayDeviceMappingGetAll(int idGatewayDevice);
 
-        [Post("/api/Relay/DeviceMapping")]
-        Task RelayDeviceMappingAdd([Body] RelayDeviceMapping value);
+        [Post("/api/Gateway/DeviceMapping")]
+        Task GatewayDeviceMappingAdd([Body] GatewayDeviceMapping value);
 
-        [Delete("/api/Relay/DeviceMapping")]
-        Task RelayDeviceMappingDelete(int idRelayDeviceMapping, int idRelayDevice);
+        [Delete("/api/Gateway/DeviceMapping")]
+        Task GatewayDeviceMappingDelete(int idGatewayDeviceMapping, int idGatewayDevice);
 
         // ---- Unit/Zone -----------------------------------
 

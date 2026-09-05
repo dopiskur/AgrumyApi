@@ -13,7 +13,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Agrumy.Api.Tests", "Agrumy.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Agrumy.Dal", "Agrumy.Dal\Agrumy.Dal.csproj", "{733EDAF5-545C-4434-8FD8-5677538A334A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Agrumy.Relay", "Agrumy.Relay\Agrumy.Relay.csproj", "{44319F50-C6CE-44EE-BC09-DD624C790CB5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Agrumy.Gateway", "Agrumy.Gateway\Agrumy.Gateway.csproj", "{44319F50-C6CE-44EE-BC09-DD624C790CB5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

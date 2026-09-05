@@ -13,7 +13,7 @@ namespace api.Dal.Interface
         IFirmwareRepository,
         ISensorDataRepository,
         IAuditLogRepository,
-        IRelayRepository,
+        IGatewayRepository,
         IDiscoveryRepository
     {
     }

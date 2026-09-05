@@ -91,7 +91,7 @@ builder.Services.AddScoped<ICommandRepository>(sp => sp.GetRequiredService<EfRep
 builder.Services.AddScoped<IFirmwareRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ISensorDataRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IAuditLogRepository>(sp => sp.GetRequiredService<EfRepository>());
-builder.Services.AddScoped<IRelayRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<IGatewayRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IDiscoveryRepository>(sp => sp.GetRequiredService<EfRepository>());
 
 // Cache:Redis:ConnectionString switches to Redis; unset/empty keeps the in-process default.
@@ -258,7 +258,7 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
     // A fixed-window limiter's RetryAfter metadata is exact (window reset time), so a caller
-    // that honors it - notably Agrumy.Relay, whose 429s reach devices as a "Wait" signal on
+    // that honors it - notably Agrumy.Gateway, whose 429s reach devices as a "Wait" signal on
     // their own config-poll - gets a real number instead of guessing a backoff.
     options.OnRejected = (context, ct) =>
     {

@@ -31,12 +31,12 @@ namespace api.Models
         public string? DeviceName { get; set; }
         [HiddenInput(DisplayValue = true)]
         public string? MacAddress { get; set; }
-        // True only for an Agrumy.Relay instance, flagged so RelayApiController.Batch can tell a relay's own credential from an ordinary device's.
+        // True only for an Agrumy.Gateway instance, flagged so GatewayApiController.Batch can tell a gateway's own credential from an ordinary device's.
         [HiddenInput(DisplayValue = true)]
-        public bool IsRelay { get; set; }
-        // Null for non-relay devices; set once at registration (DeviceRegistration.RelayProfile), not editable afterward since Profile A/B imply different physical setups.
+        public bool IsGateway { get; set; }
+        // Null for non-gateway devices; set once at registration (DeviceRegistration.GatewayProfile), not editable afterward since Profile A/B imply different physical setups.
         [HiddenInput(DisplayValue = true)]
-        public RelayProfile? RelayProfile { get; set; }
+        public GatewayProfile? GatewayProfile { get; set; }
         // The device's actual bearer credential - never serialized out; BuildDeviceConfigAsync reads it directly in C# instead.
         [JsonIgnore]
         public string? ApiId { get; set; }
@@ -89,8 +89,8 @@ namespace api.Models
         public int? DeviceTypeServiceID { get; set; } = 0;
         public string? DeviceName { get; set; }
         public string? MacAddress { get; set; }
-        public bool IsRelay { get; set; }
-        public RelayProfile? RelayProfile { get; set; }
+        public bool IsGateway { get; set; }
+        public GatewayProfile? GatewayProfile { get; set; }
         public string? ServicePoint { get; set; }
         public string? ServiceType { get; set; }
         public string? ServicePublicKey { get; set; }
@@ -109,7 +109,7 @@ namespace api.Models
         public DateTime? DateModified { get; set; }
     }
 
-    /// The Web Edit form's ONLY binding target - deliberately carries just what EfRepository.DeviceUpdateAsync's own whitelist actually writes, so MacAddress/TenantID/IsRelay/RelayProfile/ApiId/ApiKey/ConfigVersion have no property for an over-posted form value to land on, by construction rather than by remembering to filter them out downstream.
+    /// The Web Edit form's ONLY binding target - deliberately carries just what EfRepository.DeviceUpdateAsync's own whitelist actually writes, so MacAddress/TenantID/IsGateway/GatewayProfile/ApiId/ApiKey/ConfigVersion have no property for an over-posted form value to land on, by construction rather than by remembering to filter them out downstream.
     public class DeviceEditForm
     {
         public int? IDDevice { get; set; }
@@ -143,8 +143,8 @@ namespace api.Models
             DeviceTypeServiceID = d.DeviceTypeServiceID,
             DeviceName = d.DeviceName,
             MacAddress = d.MacAddress,
-            IsRelay = d.IsRelay,
-            RelayProfile = d.RelayProfile,
+            IsGateway = d.IsGateway,
+            GatewayProfile = d.GatewayProfile,
             ServicePoint = d.ServicePoint,
             ServiceType = d.ServiceType,
             ServicePublicKey = d.ServicePublicKey,
@@ -178,8 +178,8 @@ namespace api.Models
             DeviceTypeServiceID = dto.DeviceTypeServiceID,
             DeviceName = dto.DeviceName,
             MacAddress = dto.MacAddress,
-            IsRelay = dto.IsRelay,
-            RelayProfile = dto.RelayProfile,
+            IsGateway = dto.IsGateway,
+            GatewayProfile = dto.GatewayProfile,
             ServicePoint = dto.ServicePoint,
             ServiceType = dto.ServiceType,
             ServicePublicKey = dto.ServicePublicKey,
@@ -198,7 +198,7 @@ namespace api.Models
             DateModified = dto.DateModified,
         };
 
-        /// Copies exactly the fields DeviceEditForm exposes onto an existing DeviceDto (fetched fresh from the API, never from client input) - every field the form can't carry (TenantID, MacAddress, IsRelay, ...) is left as whatever that fresh copy already had.
+        /// Copies exactly the fields DeviceEditForm exposes onto an existing DeviceDto (fetched fresh from the API, never from client input) - every field the form can't carry (TenantID, MacAddress, IsGateway, ...) is left as whatever that fresh copy already had.
         public static void ApplyTo(this DeviceEditForm form, DeviceDto target)
         {
             target.DeviceTypeID = form.DeviceTypeID;
@@ -244,10 +244,10 @@ namespace api.Models
         // Entered on the captive portal at first setup - only used as DeviceName when a new device has no Discovery-provisioned name already queued.
         public string? DisplayName { get; set; }
 
-        // Agrumy.Relay sends these on its own first registration so IsRelay/RelayProfile come back set; null/false for ordinary firmware, and only consulted when the MacAddress is genuinely new. Honored only if RelayRegistrationSecret matches the server's configured Relay:RegistrationSecret - any other caller's IsRelay:true is silently dropped, registering an ordinary device instead.
-        public bool IsRelay { get; set; }
-        public RelayProfile? RelayProfile { get; set; }
-        public string? RelayRegistrationSecret { get; set; }
+        // Agrumy.Gateway sends these on its own first registration so IsGateway/GatewayProfile come back set; null/false for ordinary firmware, and only consulted when the MacAddress is genuinely new. Honored only if GatewayRegistrationSecret matches the server's configured Gateway:RegistrationSecret - any other caller's IsGateway:true is silently dropped, registering an ordinary device instead.
+        public bool IsGateway { get; set; }
+        public GatewayProfile? GatewayProfile { get; set; }
+        public string? GatewayRegistrationSecret { get; set; }
     }
 
     public class DeviceConfig()

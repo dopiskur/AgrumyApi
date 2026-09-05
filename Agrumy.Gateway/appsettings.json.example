@@ -10,11 +10,11 @@
     "Email": "owner@example.com",
     "DevicePin": "ABC234"
   },
-  "Relay": {
-    "MacAddress": "RELAY-CHANGE-ME",
+  "Gateway": {
+    "MacAddress": "GATEWAY-CHANGE-ME",
     "Profile": "WiFiRepeater",
-    "RegistrationFilePath": "relay-registration.json",
-    "RegistrationSecret": "MUST_MATCH_THE_SERVERS_RELAY_REGISTRATIONSECRET",
+    "RegistrationFilePath": "gateway-registration.json",
+    "RegistrationSecret": "MUST_MATCH_THE_SERVERS_GATEWAY_REGISTRATIONSECRET",
     "LocalPort": 5080
   },
   "ChirpStack": {

@@ -14,7 +14,7 @@
   <data name="Firmware" xml:space="preserve"><value>Firmver</value></data>
   <data name="Server Settings" xml:space="preserve"><value>Postavke servera</value></data>
   <data name="Tenants" xml:space="preserve"><value>Tenanti</value></data>
-  <data name="Relay Devices" xml:space="preserve"><value>Relay uređaji</value></data>
+  <data name="Gateway Devices" xml:space="preserve"><value>Gateway uređaji</value></data>
   <data name="Logout" xml:space="preserve"><value>Odjava</value></data>
   <data name="My Profile" xml:space="preserve"><value>Moj profil</value></data>
   <data name="All rights reserved." xml:space="preserve"><value>Sva prava pridržana.</value></data>

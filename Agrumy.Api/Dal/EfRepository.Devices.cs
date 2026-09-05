@@ -49,8 +49,8 @@ namespace api.Dal
                 BatteryEnabled = device.BatteryEnabled,
                 Enabled = device.Enabled,
                 ConfigVersion = device.ConfigVersion,
-                IsRelay = device.IsRelay,
-                RelayProfile = (int?)device.RelayProfile,
+                IsGateway = device.IsGateway,
+                GatewayProfile = (int?)device.GatewayProfile,
             };
             db.Devices.Add(row);
             await db.SaveChangesAsync();
@@ -222,8 +222,8 @@ namespace api.Dal
             CommandVersion = d.CommandVersion,
             DateCreated = d.DateCreated,
             DateModified = d.DateModified,
-            IsRelay = d.IsRelay,
-            RelayProfile = d.RelayProfile is int p ? (RelayProfile)p : null,
+            IsGateway = d.IsGateway,
+            GatewayProfile = d.GatewayProfile is int p ? (GatewayProfile)p : null,
             LastFullConfigSentAt = d.LastFullConfigSentAt,
         };
     }

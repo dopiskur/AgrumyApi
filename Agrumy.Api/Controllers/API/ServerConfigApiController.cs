@@ -100,14 +100,14 @@ namespace api.Controllers.API
                 return BadRequest("Firmware auto-refresh interval must be 0/empty (disabled) or a positive number of hours.");
             }
 
-            // Matches the 10s/5min bounds the Relay design settled on - short enough a LoRa device's own retry loop stays reasonable, long enough to actually batch.
-            if (config.RelayWaitWindowSeconds is < 10 or > 300)
+            // Matches the 10s/5min bounds the Gateway design settled on - short enough a LoRa device's own retry loop stays reasonable, long enough to actually batch.
+            if (config.GatewayWaitWindowSeconds is < 10 or > 300)
             {
-                return BadRequest("Relay wait window must be between 10 and 300 seconds.");
+                return BadRequest("Gateway wait window must be between 10 and 300 seconds.");
             }
-            if (!Enum.IsDefined(config.RelayMode))
+            if (!Enum.IsDefined(config.GatewayMode))
             {
-                return BadRequest("Unknown relay mode: " + config.RelayMode);
+                return BadRequest("Unknown gateway mode: " + config.GatewayMode);
             }
 
             // Fixed dropdown on the Server Settings page - anything else means a stale/tampered form post.

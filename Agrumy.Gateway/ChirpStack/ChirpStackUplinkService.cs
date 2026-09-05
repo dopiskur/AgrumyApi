@@ -8,16 +8,16 @@ using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Client;
 
-namespace api.Relay.ChirpStack
+namespace api.Gateway.ChirpStack
 {
-    /// Profile B (LoRaGateway) only - subscribes to ChirpStack's MQTT uplink topic, forwards each through the same /api/Relay/Batch path Profile A uses, and publishes the result back as a downlink; UNTESTED against any real ChirpStack instance, gateway, or LoRa device - treat as a first draft, not a working integration.
+    /// Profile B (LoRaGateway) only - subscribes to ChirpStack's MQTT uplink topic, forwards each through the same /api/Gateway/Batch path Profile A uses, and publishes the result back as a downlink; UNTESTED against any real ChirpStack instance, gateway, or LoRa device - treat as a first draft, not a working integration.
     public sealed partial class ChirpStackUplinkService(
-        AgrumyServiceClient client, IOptions<RelayOptions> options, ILogger<ChirpStackUplinkService> logger)
+        AgrumyServiceClient client, IOptions<GatewayOptions> options, ILogger<ChirpStackUplinkService> logger)
         : BackgroundService
     {
         private readonly ChirpStackOptions cs = options.Value.ChirpStack;
         private IMqttClient? mqtt;
-        private Dictionary<string, RelayDeviceMapping> mappingByDevEui = new();
+        private Dictionary<string, GatewayDeviceMapping> mappingByDevEui = new();
 
         [LoggerMessage(Level = LogLevel.Information, Message = "Connected to ChirpStack MQTT at {Host}:{Port}, subscribed to {Topic}.")]
         private static partial void LogConnected(ILogger logger, string host, int port, string topic);
@@ -96,7 +96,7 @@ namespace api.Relay.ChirpStack
         {
             try
             {
-                IList<RelayDeviceMapping> mappings = await client.GetDeviceMappingAsync(ct);
+                IList<GatewayDeviceMapping> mappings = await client.GetDeviceMappingAsync(ct);
                 mappingByDevEui = mappings
                     .Where(m => !string.IsNullOrEmpty(m.DevEUI))
                     .ToDictionary(m => m.DevEUI!.ToUpperInvariant());
@@ -116,7 +116,7 @@ namespace api.Relay.ChirpStack
             }
             catch (Exception ex)
             {
-                // One malformed/unrecognized uplink must never take the MQTT loop down - same "skip the poison entry" reasoning as RelayApiController.Batch's per-entry try/catch.
+                // One malformed/unrecognized uplink must never take the MQTT loop down - same "skip the poison entry" reasoning as GatewayApiController.Batch's per-entry try/catch.
                 LogUplinkFailed(logger, ex);
             }
         }
@@ -129,7 +129,7 @@ namespace api.Relay.ChirpStack
             string? devEui = root.TryGetProperty("deviceInfo", out var deviceInfo) && deviceInfo.TryGetProperty("devEui", out var devEuiEl)
                 ? devEuiEl.GetString()
                 : null;
-            if (string.IsNullOrEmpty(devEui) || !mappingByDevEui.TryGetValue(devEui.ToUpperInvariant(), out RelayDeviceMapping? mapping))
+            if (string.IsNullOrEmpty(devEui) || !mappingByDevEui.TryGetValue(devEui.ToUpperInvariant(), out GatewayDeviceMapping? mapping))
             {
                 LogUnmappedDevEui(logger, devEui);
                 return;
@@ -137,7 +137,7 @@ namespace api.Relay.ChirpStack
 
             int sf = TryGetSpreadingFactor(root) ?? 12; // unknown SF - assume worst case (safest duty-cycle-wise)
 
-            // Placeholder wire format (see class remarks) - base64-decoded "data" is small JSON: {"t":"config"|"sensor"|"event"|"ack", ...fields matching the equivalent RelayEntryType's HTTP payload}.
+            // Placeholder wire format (see class remarks) - base64-decoded "data" is small JSON: {"t":"config"|"sensor"|"event"|"ack", ...fields matching the equivalent GatewayEntryType's HTTP payload}.
             if (!root.TryGetProperty("data", out var dataEl) || dataEl.GetString() is not string base64)
             {
                 LogNoDataField(logger, devEui);
@@ -146,12 +146,12 @@ namespace api.Relay.ChirpStack
             byte[] frmPayload = Convert.FromBase64String(base64);
             using JsonDocument envelope = JsonDocument.Parse(frmPayload);
             string? entryTypeTag = envelope.RootElement.TryGetProperty("t", out var tEl) ? tEl.GetString() : null;
-            RelayEntryType? entryType = entryTypeTag switch
+            GatewayEntryType? entryType = entryTypeTag switch
             {
-                "config" => RelayEntryType.Config,
-                "sensor" => RelayEntryType.SensorData,
-                "event" => RelayEntryType.Event,
-                "ack" => RelayEntryType.CommandAck,
+                "config" => GatewayEntryType.Config,
+                "sensor" => GatewayEntryType.SensorData,
+                "event" => GatewayEntryType.Event,
+                "ack" => GatewayEntryType.CommandAck,
                 _ => null,
             };
             if (entryType is null)
@@ -160,15 +160,15 @@ namespace api.Relay.ChirpStack
                 return;
             }
 
-            var entry = new RelayBatchEntry
+            var entry = new GatewayBatchEntry
             {
                 DeviceApiId = mapping.DeviceApiId,
                 DeviceApiKey = mapping.DeviceApiKey,
                 Type = entryType.Value,
                 Payload = envelope.RootElement.Clone(),
             };
-            RelayBatchResponse response = await client.BatchAsync(new RelayBatchRequest { Entries = [entry] }, CancellationToken.None);
-            RelayBatchEntryResult? result = response.Results.FirstOrDefault();
+            GatewayBatchResponse response = await client.BatchAsync(new GatewayBatchRequest { Entries = [entry] }, CancellationToken.None);
+            GatewayBatchEntryResult? result = response.Results.FirstOrDefault();
 
             await PublishDownlinkAsync(devEui, result, sf);
         }
@@ -182,8 +182,8 @@ namespace api.Relay.ChirpStack
                 ? sf
                 : null;
 
-        /// Class A: ChirpStack itself queues this for the device's next RX window - Relay just publishes once, it never manages the actual radio timing.
-        private async Task PublishDownlinkAsync(string devEui, RelayBatchEntryResult? result, int sf)
+        /// Class A: ChirpStack itself queues this for the device's next RX window - Gateway just publishes once, it never manages the actual radio timing.
+        private async Task PublishDownlinkAsync(string devEui, GatewayBatchEntryResult? result, int sf)
         {
             if (mqtt is null || !mqtt.IsConnected)
             {

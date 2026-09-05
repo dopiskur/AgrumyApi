@@ -1,12 +1,12 @@
 using api.Models;
 
-namespace api.Relay
+namespace api.Gateway
 {
-    /// Bound from appsettings.json / environment variables (AgrumyService/Relay/ChirpStack sections) - see appsettings.json.example for the full set with comments.
-    public class RelayOptions
+    /// Bound from appsettings.json / environment variables (AgrumyService/Gateway/ChirpStack sections) - see appsettings.json.example for the full set with comments.
+    public class GatewayOptions
     {
         public AgrumyServiceOptions AgrumyService { get; set; } = new();
-        public RelaySelfOptions Relay { get; set; } = new();
+        public GatewaySelfOptions Gateway { get; set; } = new();
         public ChirpStackOptions ChirpStack { get; set; } = new();
     }
 
@@ -18,16 +18,16 @@ namespace api.Relay
         public string DevicePin { get; set; } = "";
     }
 
-    public class RelaySelfOptions
+    public class GatewaySelfOptions
     {
-        /// Any string unique to this physical relay - a Raspberry Pi has no single canonical MAC; the registration DB column is just a uniqueness key, not parsed as a MAC anywhere.
+        /// Any string unique to this physical gateway - a Raspberry Pi has no single canonical MAC; the registration DB column is just a uniqueness key, not parsed as a MAC anywhere.
         public string MacAddress { get; set; } = "";
-        public RelayProfile Profile { get; set; } = RelayProfile.WiFiRepeater;
+        public GatewayProfile Profile { get; set; } = GatewayProfile.WiFiRepeater;
         /// Where registration persists ApiId/ApiKey/IDDevice after the one-time PIN succeeds, so a restart doesn't need the PIN again - same reason AgrumyFirmware persists deviceRegistration.json to LittleFS.
-        public string RegistrationFilePath { get; set; } = "relay-registration.json";
-        /// Must match the server's Relay:RegistrationSecret - without it, Register still succeeds but silently drops IsRelay, so relay-only endpoints stay unreachable for this device.
+        public string RegistrationFilePath { get; set; } = "gateway-registration.json";
+        /// Must match the server's Gateway:RegistrationSecret - without it, Register still succeeds but silently drops IsGateway, so gateway-only endpoints stay unreachable for this device.
         public string RegistrationSecret { get; set; } = "";
-        /// Profile A (WiFiRepeater) only - local devices point their ServicePoint at this relay's own address:port instead of AgrumyService directly.
+        /// Profile A (WiFiRepeater) only - local devices point their ServicePoint at this gateway's own address:port instead of AgrumyService directly.
         public int LocalPort { get; set; } = 5080;
     }
 
@@ -40,7 +40,7 @@ namespace api.Relay
         public string? MqttPassword { get; set; }
         /// ChirpStack application id the uplink/downlink topics are namespaced under (application/{ApplicationId}/device/{devEui}/event/up, .../command/down).
         public string ApplicationId { get; set; } = "";
-        /// How often to re-fetch this relay's DevEUI mapping from GET /api/Relay/DeviceMapping.
+        /// How often to re-fetch this gateway's DevEUI mapping from GET /api/Gateway/DeviceMapping.
         public int MappingRefreshSeconds { get; set; } = 60;
     }
 }

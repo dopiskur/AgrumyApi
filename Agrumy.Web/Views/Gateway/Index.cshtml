@@ -1,0 +1,60 @@
+@model api.ViewModels.GatewayListViewModel
+
+@{
+    ViewData["Title"] = "Gateway Devices";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Gateway Devices</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-secondary">
+            Roadmap #147: an Agrumy.Gateway instance registers through the same PIN flow as any
+            other device (Fleet page) - it shows up here once it does, flagged
+            <code>IsGateway</code>. Use <a asp-controller="ServerConfig" asp-action="Index">Server
+            Settings &rarr; Gateway</a> to turn support on/off and set the batching mode.
+        </p>
+        @if (!Model.Gateways.Any())
+        {
+            <p class="text-secondary fst-italic">No gateway has registered yet.</p>
+        }
+        else
+        {
+            <div class="table-responsive p-0">
+                <table id="gatewaysTable" class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Profile</th>
+                            <th>MacAddress</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+@foreach (var gateway in Model.Gateways)
+{
+                        <tr>
+                            <td>@gateway.DeviceName</td>
+                            <td>@(gateway.GatewayProfile?.ToString() ?? "-")</td>
+                            <td class="text-secondary small">@gateway.MacAddress</td>
+                            <td>
+                                @if (gateway.GatewayProfile == api.Models.GatewayProfile.LoRaGateway)
+                                {
+                                    <a asp-action="Mapping" asp-route-idGatewayDevice="@gateway.IDDevice" class="btn btn-sm btn-primary">
+                                        DevEUI Mapping
+                                    </a>
+                                }
+                            </td>
+                        </tr>
+}
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_DataTableScripts" model="@("gatewaysTable")" />
+}

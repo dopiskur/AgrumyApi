@@ -10,14 +10,14 @@
     // (just hides the item) since this runs in the shared layout on every page - a transient Api
     // hiccup must not take down the whole navigation shell.
     bool tenantManagementEnabled = false;
-    bool relayEnabled = false;
+    bool gatewayEnabled = false;
     if (User.IsInRole(RoleNames.GlobalAdmin))
     {
         try
         {
             var serverConfig = await Api.ServerConfigGet();
             tenantManagementEnabled = serverConfig.TenantManagementEnabled;
-            relayEnabled = serverConfig.RelayEnabled;
+            gatewayEnabled = serverConfig.GatewayEnabled;
         }
         catch (api.Utils.ApiException) { }
     }
@@ -187,12 +187,12 @@
                                     </a>
                                 </li>
                             }
-                            @if (relayEnabled)
+                            @if (gatewayEnabled)
                             {
                                 <li class="nav-item">
-                                    <a asp-area="" asp-controller="Relay" asp-action="Index" class="nav-link @navActive("Relay")">
+                                    <a asp-area="" asp-controller="Gateway" asp-action="Index" class="nav-link @navActive("Gateway")">
                                         <i class="nav-icon bi bi-router"></i>
-                                        <p>@Localizer["Relay Devices"]</p>
+                                        <p>@Localizer["Gateway Devices"]</p>
                                     </a>
                                 </li>
                             }

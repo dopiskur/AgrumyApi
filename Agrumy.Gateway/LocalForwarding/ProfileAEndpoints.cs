@@ -4,24 +4,24 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace api.Relay.LocalForwarding
+namespace api.Gateway.LocalForwarding
 {
-    /// Profile A (WiFiRepeater): a local device points its ServicePoint at this relay instead of api.agrumy.com, sending unmodified requests - each call becomes one always-immediate RelayBatchEntry through the same /api/Relay/Batch path Profile B uses.
+    /// Profile A (WiFiRepeater): a local device points its ServicePoint at this gateway instead of api.agrumy.com, sending unmodified requests - each call becomes one always-immediate GatewayBatchEntry through the same /api/Gateway/Batch path Profile B uses.
     public static class ProfileAEndpoints
     {
         public static void MapProfileAEndpoints(this WebApplication app)
         {
             app.MapPost("/api/Device/Config", (HttpRequest req, AgrumyServiceClient client) =>
-                ForwardAsync(req, client, RelayEntryType.Config));
+                ForwardAsync(req, client, GatewayEntryType.Config));
             app.MapPost("/api/SensorData", (HttpRequest req, AgrumyServiceClient client) =>
-                ForwardAsync(req, client, RelayEntryType.SensorData));
+                ForwardAsync(req, client, GatewayEntryType.SensorData));
             app.MapPost("/api/Device/Event", (HttpRequest req, AgrumyServiceClient client) =>
-                ForwardAsync(req, client, RelayEntryType.Event));
+                ForwardAsync(req, client, GatewayEntryType.Event));
             app.MapPost("/api/Device/Command/Ack", (HttpRequest req, AgrumyServiceClient client) =>
-                ForwardAsync(req, client, RelayEntryType.CommandAck));
+                ForwardAsync(req, client, GatewayEntryType.CommandAck));
         }
 
-        private static async Task<IResult> ForwardAsync(HttpRequest req, AgrumyServiceClient client, RelayEntryType type)
+        private static async Task<IResult> ForwardAsync(HttpRequest req, AgrumyServiceClient client, GatewayEntryType type)
         {
             string apiId = req.Headers["apiId"].ToString();
             string apiKey = req.Headers["apiKey"].ToString();
@@ -31,7 +31,7 @@ namespace api.Relay.LocalForwarding
             }
 
             using JsonDocument body = await JsonDocument.ParseAsync(req.Body);
-            var entry = new RelayBatchEntry
+            var entry = new GatewayBatchEntry
             {
                 DeviceApiId = apiId,
                 DeviceApiKey = apiKey,
@@ -39,26 +39,26 @@ namespace api.Relay.LocalForwarding
                 Payload = body.RootElement.Clone(),
             };
 
-            RelayBatchResponse response;
+            GatewayBatchResponse response;
             try
             {
-                response = await client.BatchAsync(new RelayBatchRequest { Entries = [entry] }, req.HttpContext.RequestAborted);
+                response = await client.BatchAsync(new GatewayBatchRequest { Entries = [entry] }, req.HttpContext.RequestAborted);
             }
             catch (HttpRequestException)
             {
                 // AgrumyService unreachable - same "connection lost" shape a device's own direct call would see, so its existing retry/buffer logic applies unchanged.
                 return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
-            catch (RelayRateLimitedException ex)
+            catch (GatewayRateLimitedException ex)
             {
                 // A genuine 429, not a generic failure - the device's own apiConfig() recognizes this distinctly and waits the given window instead of counting it toward its reboot-on-repeated-failure escalation.
                 req.HttpContext.Response.Headers.RetryAfter = ex.RetryAfterSeconds.ToString();
                 return Results.StatusCode(StatusCodes.Status429TooManyRequests);
             }
 
-            RelayBatchEntryResult result = response.Results.Count > 0
+            GatewayBatchEntryResult result = response.Results.Count > 0
                 ? response.Results[0]
-                : new RelayBatchEntryResult { Success = false, StatusCode = 500, Error = "Empty batch response." };
+                : new GatewayBatchEntryResult { Success = false, StatusCode = 500, Error = "Empty batch response." };
 
             if (!result.Success)
             {

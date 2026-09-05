@@ -204,7 +204,7 @@ namespace api.Controllers.View
                 return View(deviceView);
             }
 
-            // Start from the server's own current copy - TenantID/MacAddress/IsRelay/ApiId/ApiKey never come from the form at all, by construction (DeviceEditForm has no property for them).
+            // Start from the server's own current copy - TenantID/MacAddress/IsGateway/ApiId/ApiKey never come from the form at all, by construction (DeviceEditForm has no property for them).
             DeviceDto device = await api.DeviceGet(form.IDDevice);
             form.ApplyTo(device);
             (device.DeviceSensorEnabled, device.DeviceControllerEnabled) = device.DeviceTypeID switch

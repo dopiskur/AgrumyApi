@@ -192,18 +192,18 @@ namespace api.Dal.Entities
         public DateTime? DateModified { get; set; }
 
         // See api.Models.Device's own copies of these for the full explanation.
-        public bool IsRelay { get; set; }
-        public int? RelayProfile { get; set; }
+        public bool IsGateway { get; set; }
+        public int? GatewayProfile { get; set; }
 
         // See api.Models.Device.LastFullConfigSentAt for the full explanation.
         public DateTime? LastFullConfigSentAt { get; set; }
     }
 
-    /// One LoRaWAN end-device's DevEUI mapped to the Agrumy device (ApiId/ApiKey) a LoRaGateway relay acts on behalf of for that DevEUI's uplinks.
-    public class RelayDeviceMappingRow
+    /// One LoRaWAN end-device's DevEUI mapped to the Agrumy device (ApiId/ApiKey) a LoRaGateway acts on behalf of for that DevEUI's uplinks.
+    public class GatewayDeviceMappingRow
     {
-        public int IDRelayDeviceMapping { get; set; }
-        public int IDRelayDevice { get; set; }
+        public int IDGatewayDeviceMapping { get; set; }
+        public int IDGatewayDevice { get; set; }
         public string DevEUI { get; set; } = "";
         public int IDDevice { get; set; }
         public DateTime? DateCreated { get; set; }

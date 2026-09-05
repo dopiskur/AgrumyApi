@@ -4,8 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>api.Relay</RootNamespace>
-    <AssemblyName>Agrumy.Relay</AssemblyName>
+    <RootNamespace>api.Gateway</RootNamespace>
+    <AssemblyName>Agrumy.Gateway</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- DTOs only (api.Models.RelayBatchEntry/RelayBatchResponse/DeviceRegistration/...) and the
+    <!-- DTOs only (api.Models.GatewayBatchEntry/GatewayBatchResponse/DeviceRegistration/...) and the
          SF-interval helper - deliberately NOT Agrumy.Dal/Agrumy.Api, same "talks to Agrumy.Api only
          over HTTP, no direct DB access" rule Agrumy.Web already follows (see repo README). -->
     <ProjectReference Include="..\Agrumy.Shared\Agrumy.Shared.csproj" />

@@ -1,18 +1,18 @@
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 
-namespace api.Relay.Registration
+namespace api.Gateway.Registration
 {
-    /// In-memory holder for this relay's own ApiId/ApiKey/IDDevice, backed by a JSON file on disk - registered as a singleton so every handler/background service sees the same state without re-reading the file.
-    public class RelayRegistrationStore(IOptions<RelayOptions> options)
+    /// In-memory holder for this gateway's own ApiId/ApiKey/IDDevice, backed by a JSON file on disk - registered as a singleton so every handler/background service sees the same state without re-reading the file.
+    public class GatewayRegistrationStore(IOptions<GatewayOptions> options)
     {
         private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
 
-        private readonly string path = options.Value.Relay.RegistrationFilePath;
-        private RelayRegistrationState state = new();
+        private readonly string path = options.Value.Gateway.RegistrationFilePath;
+        private GatewayRegistrationState state = new();
         private readonly object gate = new();
 
-        public RelayRegistrationState Current
+        public GatewayRegistrationState Current
         {
             get { lock (gate) { return state; } }
         }
@@ -24,14 +24,14 @@ namespace api.Relay.Registration
                 return;
             }
             string json = File.ReadAllText(path);
-            var loaded = JsonSerializer.Deserialize<RelayRegistrationState>(json);
+            var loaded = JsonSerializer.Deserialize<GatewayRegistrationState>(json);
             if (loaded != null)
             {
                 lock (gate) { state = loaded; }
             }
         }
 
-        public void Save(RelayRegistrationState newState)
+        public void Save(GatewayRegistrationState newState)
         {
             lock (gate) { state = newState; }
             string json = JsonSerializer.Serialize(newState, WriteOptions);

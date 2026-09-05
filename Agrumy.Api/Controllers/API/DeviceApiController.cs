@@ -332,10 +332,10 @@ namespace api.Controllers.API
             Device? device = await Repo.DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
             if (device is null)
             {
-                // A client merely holding a valid user email+PIN (the same bar every ordinary device meets) must not be able to claim relay status on its own say-so - only honored when it also proves it's the real Agrumy.Relay via this shared secret.
-                bool provenRelay = value.IsRelay
-                    && !string.IsNullOrEmpty(settings.RelayRegistrationSecret)
-                    && DeviceAuth.ConstantTimeEquals(value.RelayRegistrationSecret, settings.RelayRegistrationSecret);
+                // A client merely holding a valid user email+PIN (the same bar every ordinary device meets) must not be able to claim gateway status on its own say-so - only honored when it also proves it's the real Agrumy.Gateway via this shared secret.
+                bool provenGateway = value.IsGateway
+                    && !string.IsNullOrEmpty(settings.GatewayRegistrationSecret)
+                    && DeviceAuth.ConstantTimeEquals(value.GatewayRegistrationSecret, settings.GatewayRegistrationSecret);
 
                 // Roadmap #268: this mac may be the target of an earlier Discovery/Register call -
                 // that queued ProvisionDevice command carries the DeviceName/Zone the admin picked then.
@@ -355,8 +355,8 @@ namespace api.Controllers.API
                     ServicePoint = value.ServicePoint,
                     DeviceSensorEnabled = false,
                     DeviceControllerEnabled = false,
-                    IsRelay = provenRelay,
-                    RelayProfile = provenRelay ? value.RelayProfile : null,
+                    IsGateway = provenGateway,
+                    GatewayProfile = provenGateway ? value.GatewayProfile : null,
                 });
 
                 if (provision?.ZoneID is int zoneId)

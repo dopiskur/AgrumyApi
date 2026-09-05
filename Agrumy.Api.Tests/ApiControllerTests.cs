@@ -523,17 +523,17 @@ public class ApiControllerTests
         _repo.Verify(r => r.UserSetDevicePinAsync(It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<DateTime?>()), Times.Never);
     }
 
-    private DeviceApiController NewDeviceControllerWithRelaySecret(string? serverSecret)
+    private DeviceApiController NewDeviceControllerWithGatewaySecret(string? serverSecret)
     {
         var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
         return new(_repo.Object, _cache.Object,
             new CommandQueueService(_repo.Object, _repo.Object, _repo.Object), catalog,
             new api.Devices.DeviceConfigBuilder(_repo.Object, catalog),
-            Options.Create(new AgrumySettings { RelayRegistrationSecret = serverSecret }));
+            Options.Create(new AgrumySettings { GatewayRegistrationSecret = serverSecret }));
     }
 
     [Fact]
-    public async Task DeviceRegistration_IsRelay_CorrectSecret_IsHonored()
+    public async Task DeviceRegistration_IsGateway_CorrectSecret_IsHonored()
     {
         StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
         _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF")).ReturnsAsync((Device?)null);
@@ -546,23 +546,23 @@ public class ApiControllerTests
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
         _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
 
-        var result = await NewDeviceControllerWithRelaySecret("shared-secret").DeviceRegistration(new DeviceRegistration
+        var result = await NewDeviceControllerWithGatewaySecret("shared-secret").DeviceRegistration(new DeviceRegistration
         {
             Email = "owner@example.com",
             DevicePin = "ABC234",
             MacAddress = "AABBCCDDEEFF",
-            IsRelay = true,
-            RelayProfile = RelayProfile.WiFiRepeater,
-            RelayRegistrationSecret = "shared-secret",
+            IsGateway = true,
+            GatewayProfile = GatewayProfile.WiFiRepeater,
+            GatewayRegistrationSecret = "shared-secret",
         });
 
         Assert.IsType<OkObjectResult>(result.Result);
-        Assert.True(captured!.IsRelay);
-        Assert.Equal(RelayProfile.WiFiRepeater, captured.RelayProfile);
+        Assert.True(captured!.IsGateway);
+        Assert.Equal(GatewayProfile.WiFiRepeater, captured.GatewayProfile);
     }
 
     [Fact]
-    public async Task DeviceRegistration_IsRelay_WrongSecret_SilentlyRegistersAsOrdinaryDevice()
+    public async Task DeviceRegistration_IsGateway_WrongSecret_SilentlyRegistersAsOrdinaryDevice()
     {
         StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
         _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF")).ReturnsAsync((Device?)null);
@@ -575,23 +575,23 @@ public class ApiControllerTests
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
         _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
 
-        var result = await NewDeviceControllerWithRelaySecret("shared-secret").DeviceRegistration(new DeviceRegistration
+        var result = await NewDeviceControllerWithGatewaySecret("shared-secret").DeviceRegistration(new DeviceRegistration
         {
             Email = "owner@example.com",
             DevicePin = "ABC234",
             MacAddress = "AABBCCDDEEFF",
-            IsRelay = true,
-            RelayProfile = RelayProfile.WiFiRepeater,
-            RelayRegistrationSecret = "guessed-wrong",
+            IsGateway = true,
+            GatewayProfile = GatewayProfile.WiFiRepeater,
+            GatewayRegistrationSecret = "guessed-wrong",
         });
 
         Assert.IsType<OkObjectResult>(result.Result);
-        Assert.False(captured!.IsRelay);
-        Assert.Null(captured.RelayProfile);
+        Assert.False(captured!.IsGateway);
+        Assert.Null(captured.GatewayProfile);
     }
 
     [Fact]
-    public async Task DeviceRegistration_IsRelay_NoServerSecretConfigured_AlwaysDropsRelayStatus()
+    public async Task DeviceRegistration_IsGateway_NoServerSecretConfigured_AlwaysDropsGatewayStatus()
     {
         StubOwner("ABC234", DateTime.UtcNow.AddHours(1));
         _repo.Setup(r => r.DeviceGetAsync(1, null, null, "AABBCCDDEEFF")).ReturnsAsync((Device?)null);
@@ -604,18 +604,18 @@ public class ApiControllerTests
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
         _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
 
-        var result = await NewDeviceControllerWithRelaySecret(null).DeviceRegistration(new DeviceRegistration
+        var result = await NewDeviceControllerWithGatewaySecret(null).DeviceRegistration(new DeviceRegistration
         {
             Email = "owner@example.com",
             DevicePin = "ABC234",
             MacAddress = "AABBCCDDEEFF",
-            IsRelay = true,
-            RelayProfile = RelayProfile.WiFiRepeater,
-            RelayRegistrationSecret = "",
+            IsGateway = true,
+            GatewayProfile = GatewayProfile.WiFiRepeater,
+            GatewayRegistrationSecret = "",
         });
 
         Assert.IsType<OkObjectResult>(result.Result);
-        Assert.False(captured!.IsRelay);
+        Assert.False(captured!.IsGateway);
     }
 
     private void StubNewDeviceRegistration(out Func<Device?> captured)
@@ -2467,9 +2467,9 @@ public class RoleGateAuthorizationTests
     }
 
     [Fact]
-    public void RelayController_MappingWrites_RequireAntiForgeryToken()
+    public void GatewayController_MappingWrites_RequireAntiForgeryToken()
     {
-        var controller = typeof(api.Controllers.View.RelayController);
+        var controller = typeof(api.Controllers.View.GatewayController);
         Assert.Contains(controller.GetMethod("MappingAdd")!.GetCustomAttributes(inherit: true),
             a => a is Microsoft.AspNetCore.Mvc.ValidateAntiForgeryTokenAttribute);
         Assert.Contains(controller.GetMethod("MappingDelete")!.GetCustomAttributes(inherit: true),

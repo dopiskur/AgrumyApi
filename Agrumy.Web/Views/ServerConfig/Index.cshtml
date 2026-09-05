@@ -41,7 +41,7 @@
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-weather" type="button" role="tab">Weather</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-relay" type="button" role="tab">Relay</button>
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-gateway" type="button" role="tab">Gateway</button>
                 </li>
             </ul>
             <div class="tab-content border border-top-0 rounded-bottom p-3 mb-3">
@@ -305,23 +305,23 @@
                     </p>
                 </div>
 
-                <div class="tab-pane fade" id="tab-relay" role="tabpanel">
+                <div class="tab-pane fade" id="tab-gateway" role="tabpanel">
                     <p class="text-secondary">
-                        Roadmap #147: Agrumy.Relay forwards other devices' traffic through
-                        <code>POST /api/Relay/Batch</code> instead of reporting its own sensors -
-                        either a local WiFi repeater (devices keep their own ApiKey, Relay is a
+                        Roadmap #147: Agrumy.Gateway forwards other devices' traffic through
+                        <code>POST /api/Gateway/Batch</code> instead of reporting its own sensors -
+                        either a local WiFi repeater (devices keep their own ApiKey, Gateway is a
                         transparent forwarder) or a LoRa/ChirpStack gateway (devices are mapped by
-                        DevEUI on the <a asp-controller="Relay" asp-action="Index">Relay Devices</a>
-                        page). Disabled here means RelayApiController.Batch rejects every call,
-                        registered relays included.
+                        DevEUI on the <a asp-controller="Gateway" asp-action="Index">Gateway Devices</a>
+                        page). Disabled here means GatewayApiController.Batch rejects every call,
+                        registered gateways included.
                     </p>
                     <div class="form-check mb-3">
-                        <input asp-for="RelayEnabled" class="form-check-input" />
-                        <label asp-for="RelayEnabled" class="form-check-label"></label>
+                        <input asp-for="GatewayEnabled" class="form-check-input" />
+                        <label asp-for="GatewayEnabled" class="form-check-label"></label>
                     </div>
                     <div class="mb-3" style="max-width:20rem">
-                        <label asp-for="RelayMode" class="form-label"></label>
-                        <select asp-for="RelayMode" class="form-select" asp-items="Html.GetEnumSelectList<api.Models.RelayMode>()"></select>
+                        <label asp-for="GatewayMode" class="form-label"></label>
+                        <select asp-for="GatewayMode" class="form-select" asp-items="Html.GetEnumSelectList<api.Models.GatewayMode>()"></select>
                         <div class="form-text">
                             Realtime forwards every entry immediately. Aggregated holds entries up to
                             the wait window below before flushing as one batch - only meaningful for
@@ -330,9 +330,9 @@
                         </div>
                     </div>
                     <div class="mb-0" style="max-width:12rem">
-                        <label asp-for="RelayWaitWindowSeconds" class="form-label"></label>
-                        <input asp-for="RelayWaitWindowSeconds" class="form-control" />
-                        <span asp-validation-for="RelayWaitWindowSeconds" class="text-danger"></span>
+                        <label asp-for="GatewayWaitWindowSeconds" class="form-label"></label>
+                        <input asp-for="GatewayWaitWindowSeconds" class="form-control" />
+                        <span asp-validation-for="GatewayWaitWindowSeconds" class="text-danger"></span>
                     </div>
                 </div>
             </div>

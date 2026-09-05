@@ -141,9 +141,9 @@ namespace api.Dal.Entities
         public DateTime? WeatherCheckedAtUtc { get; set; }
 
         // See api.Models.ServerConfig's own copies of these for the full explanation.
-        public bool RelayEnabled { get; set; }
-        public int RelayMode { get; set; }
-        public int RelayWaitWindowSeconds { get; set; } = 30;
+        public bool GatewayEnabled { get; set; }
+        public int GatewayMode { get; set; }
+        public int GatewayWaitWindowSeconds { get; set; } = 30;
 
         // See api.Models.ServerConfig's own copies of these for the full explanation.
         public bool ProblemEventAlertsEnabled { get; set; } = true;

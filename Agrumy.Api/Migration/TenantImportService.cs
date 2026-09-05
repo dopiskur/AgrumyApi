@@ -186,8 +186,8 @@ namespace api.Migration
                     BatteryEnabled = ed.Device.BatteryEnabled,
                     Enabled = ed.Device.Enabled,
                     ConfigVersion = 1,
-                    IsRelay = ed.Device.IsRelay,
-                    RelayProfile = ed.Device.RelayProfile,
+                    IsGateway = ed.Device.IsGateway,
+                    GatewayProfile = ed.Device.GatewayProfile,
                 });
 
                 if (ed.Sensor != null)

@@ -44,7 +44,7 @@ namespace api.Dal
                 SensorDataRetentionDays = settings.SensorDataRetentionDays,
                 WeatherPollIntervalMinutes = settings.WeatherPollIntervalMinutes,
                 WeatherRainSkipThreshold = settings.WeatherRainSkipThreshold,
-                RelayWaitWindowSeconds = 30,
+                GatewayWaitWindowSeconds = 30,
                 ProblemEventAlertsEnabled = true,
                 ProblemEventExpiryHours = 24,
                 PasswordMinLength = 8,
@@ -87,9 +87,9 @@ namespace api.Dal
             row.WeatherLocationLon = config.WeatherLocationLon;
             row.WeatherPollIntervalMinutes = config.WeatherPollIntervalMinutes;
             row.WeatherRainSkipThreshold = config.WeatherRainSkipThreshold;
-            row.RelayEnabled = config.RelayEnabled;
-            row.RelayMode = (int)config.RelayMode;
-            row.RelayWaitWindowSeconds = config.RelayWaitWindowSeconds;
+            row.GatewayEnabled = config.GatewayEnabled;
+            row.GatewayMode = (int)config.GatewayMode;
+            row.GatewayWaitWindowSeconds = config.GatewayWaitWindowSeconds;
             row.ProblemEventAlertsEnabled = config.ProblemEventAlertsEnabled;
             row.ProblemEventExpiryHours = config.ProblemEventExpiryHours;
             row.PasswordMinLength = config.PasswordMinLength;
@@ -200,14 +200,14 @@ namespace api.Dal
             WeatherRainSkipThreshold = r.WeatherRainSkipThreshold ?? settings.WeatherRainSkipThreshold,
             WeatherRainPredicted = r.WeatherRainPredicted,
             WeatherCheckedAtUtc = r.WeatherCheckedAtUtc,
-            RelayEnabled = r.RelayEnabled,
-            RelayMode = (RelayMode)r.RelayMode,
+            GatewayEnabled = r.GatewayEnabled,
+            GatewayMode = (GatewayMode)r.GatewayMode,
             // An older row has 0 here, which already equals the sane default (a 10-300 clamp keeps 0 unreachable otherwise) - no settings.* fallback needed.
-            RelayWaitWindowSeconds = r.RelayWaitWindowSeconds == 0 ? 30 : r.RelayWaitWindowSeconds,
+            GatewayWaitWindowSeconds = r.GatewayWaitWindowSeconds == 0 ? 30 : r.GatewayWaitWindowSeconds,
             ProblemEventAlertsEnabled = r.ProblemEventAlertsEnabled,
             // An older row has 0 here (column default backfills real rows to 24; the generated-default path above already sets it explicitly).
             ProblemEventExpiryHours = r.ProblemEventExpiryHours == 0 ? 24 : r.ProblemEventExpiryHours,
-            // An older row has 0 here, which is not a usable minimum length - same 0-means-unset fallback as RelayWaitWindowSeconds.
+            // An older row has 0 here, which is not a usable minimum length - same 0-means-unset fallback as GatewayWaitWindowSeconds.
             PasswordMinLength = r.PasswordMinLength == 0 ? 8 : r.PasswordMinLength,
             PasswordRequireComplexity = r.PasswordRequireComplexity,
             ConfigHeartbeatHours = r.ConfigHeartbeatHours,
