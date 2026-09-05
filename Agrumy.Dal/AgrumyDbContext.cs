@@ -99,8 +99,7 @@ namespace api.Dal
                 e.Property(x => x.IDUser).ValueGeneratedOnAdd();
                 e.Property(x => x.Email).HasMaxLength(100).IsRequired();
                 e.Property(x => x.Username).HasMaxLength(100);
-                // Nullable - see UserRow.PwdHash for why.
-                e.Property(x => x.PwdSalt).HasMaxLength(128);
+                e.Property(x => x.PwdSalt).HasMaxLength(128); // Nullable - see UserRow.PwdHash for why.
                 e.Property(x => x.FirstName).HasMaxLength(100);
                 e.Property(x => x.LastName).HasMaxLength(100);
                 e.Property(x => x.Phone).HasMaxLength(15);
@@ -112,8 +111,7 @@ namespace api.Dal
                 e.HasIndex(x => x.Email).IsUnique().HasDatabaseName("email_UNIQUE");
                 e.HasIndex(x => x.Username).IsUnique().HasDatabaseName("Username_UNIQUE");
                 e.HasIndex(x => x.ActivationTokenHash).IsUnique().HasDatabaseName("ActivationTokenHash_UNIQUE");
-                // Every tenant-scoped user list filters by TenantID alone - roadmap #310.
-                e.HasIndex(x => x.TenantID).HasDatabaseName("ix_user_tenant");
+                e.HasIndex(x => x.TenantID).HasDatabaseName("ix_user_tenant"); // Every tenant-scoped user list filters by TenantID alone.
             });
 
             modelBuilder.Entity<RefreshTokenRow>(e =>
@@ -159,8 +157,7 @@ namespace api.Dal
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            // One rule per row - several rows may share (DeviceUnitZoneID, RelayFunction); OR
-            // semantics across them are resolved in application code (EfRepository), not here.
+            // Several rows may share (DeviceUnitZoneID, RelayFunction); OR semantics across them are resolved in EfRepository, not here.
             modelBuilder.Entity<DeviceUnitZoneRuleRow>(e =>
             {
                 e.ToTable("deviceUnitZoneRule");
@@ -175,9 +172,7 @@ namespace api.Dal
             {
                 e.ToTable("deviceType");
                 e.HasKey(x => x.IDDeviceType);
-                // Fixed catalog, not admin-creatable - DeviceController.Edit switches on the literal
-                // IDs 0/1/2/3, so the seed must control them exactly.
-                e.Property(x => x.IDDeviceType).ValueGeneratedNever();
+                e.Property(x => x.IDDeviceType).ValueGeneratedNever(); // Fixed catalog; DeviceController.Edit switches on the literal IDs 0/1/2/3, so the seed must control them exactly.
                 e.Property(x => x.DeviceTypeName).HasMaxLength(100);
             });
 
@@ -221,7 +216,7 @@ namespace api.Dal
 
             modelBuilder.Entity<DeviceConfigControllerRelayRow>(e =>
             {
-                // Roadmap #309: replaces the old Relay1-8 columns/FKs (legacy fk_deviceConfigController_relayN) - one row per assigned slot instead of 8 fixed columns, no fixed ceiling baked into the schema itself.
+                // Replaces the old Relay1-8 columns/FKs (legacy fk_deviceConfigController_relayN) with one row per assigned slot, no fixed ceiling baked into the schema.
                 e.ToTable("deviceConfigControllerRelay");
                 e.HasKey(x => new { x.IDDeviceConfigController, x.Slot });
                 e.HasOne<DeviceConfigControllerRow>().WithMany().HasForeignKey(x => x.IDDeviceConfigController).OnDelete(DeleteBehavior.Cascade);
@@ -264,9 +259,7 @@ namespace api.Dal
                 e.HasKey(x => x.IDDevice);
                 e.Property(x => x.IDDevice).ValueGeneratedOnAdd();
                 e.Property(x => x.DeviceName).HasMaxLength(128);
-                // AgrumyFirmware always sends exactly 12 (hex, no separators) - the wider cap is
-                // for Agrumy.Gateway, whose MacAddress is a free-form uniqueness key, not a real MAC.
-                e.Property(x => x.MacAddress).HasMaxLength(64);
+                e.Property(x => x.MacAddress).HasMaxLength(64); // AgrumyFirmware sends exactly 12 hex chars; the wider cap is for Agrumy.Gateway's free-form MacAddress uniqueness key.
                 e.Property(x => x.FirmwareTargetVersion).HasMaxLength(20); // same cap as deviceFirmware.Version
                 e.Property(x => x.ApiId).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ApiKey).HasMaxLength(128).IsRequired();
@@ -274,12 +267,8 @@ namespace api.Dal
                 e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.Property(x => x.DateModified).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.HasIndex(x => x.ApiId).IsUnique().HasDatabaseName("ApiID_UNIQUE");
-                // Composite, not a bare MacAddress unique - a physical device can be legitimately
-                // resold across tenants; NULL MacAddress/TenantID rows never collide, so
-                // pre-registration rows are unaffected.
-                e.HasIndex(x => new { x.MacAddress, x.TenantID }).IsUnique().HasDatabaseName("MacAddress_TenantID_UNIQUE");
-                // TenantID is the SECOND column of the unique index above, so a plain WHERE TenantID = x (every tenant-scoped device list) cannot use it as a prefix - roadmap #310.
-                e.HasIndex(x => x.TenantID).HasDatabaseName("ix_device_tenant");
+                e.HasIndex(x => new { x.MacAddress, x.TenantID }).IsUnique().HasDatabaseName("MacAddress_TenantID_UNIQUE"); // Composite, not a bare MacAddress unique - a device can be legitimately resold across tenants.
+                e.HasIndex(x => x.TenantID).HasDatabaseName("ix_device_tenant"); // TenantID is the second column of the unique index above, so it can't be used as a prefix for a plain WHERE TenantID = x.
                 // Legacy device FKs (fk_device_*). DeviceUnitZoneID has no FK on device.
                 e.HasOne<DeviceConfigControllerRow>().WithMany().HasForeignKey(x => x.DeviceConfigControllerID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceConfigSensorRow>().WithMany().HasForeignKey(x => x.DeviceConfigSensorID).OnDelete(DeleteBehavior.NoAction);
@@ -296,10 +285,7 @@ namespace api.Dal
                 e.Property(x => x.IDGatewayDeviceMapping).ValueGeneratedOnAdd();
                 e.Property(x => x.DevEUI).HasMaxLength(16).IsRequired();
                 e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
-                // One gateway never maps the same DevEUI twice; the same end-device COULD in
-                // principle sit under two gateways (roaming/overlap), so this is not also unique on
-                // IDDevice alone.
-                e.HasIndex(x => new { x.IDGatewayDevice, x.DevEUI }).IsUnique().HasDatabaseName("ux_gatewayDeviceMapping_gateway_deveui");
+                e.HasIndex(x => new { x.IDGatewayDevice, x.DevEUI }).IsUnique().HasDatabaseName("ux_gatewayDeviceMapping_gateway_deveui"); // Not unique on IDDevice alone - the same end-device can sit under two gateways (roaming/overlap).
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.IDGatewayDevice).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.IDDevice).OnDelete(DeleteBehavior.NoAction);
             });
@@ -310,10 +296,7 @@ namespace api.Dal
                 e.HasKey(x => x.IDDeviceCommand);
                 e.Property(x => x.IDDeviceCommand).ValueGeneratedOnAdd();
                 e.HasIndex(x => new { x.DeviceID, x.Status }).HasDatabaseName("ix_deviceCommand_device_status");
-                // See DeviceCommandRow.ActiveKey - a unique index works across both providers
-                // (MySQL and PostgreSQL both allow multiple NULLs through a unique index/constraint)
-                // without needing MySQL's unsupported partial/filtered index syntax.
-                e.HasIndex(x => new { x.DeviceID, x.ActiveKey }).IsUnique().HasDatabaseName("ux_deviceCommand_device_activekey");
+                e.HasIndex(x => new { x.DeviceID, x.ActiveKey }).IsUnique().HasDatabaseName("ux_deviceCommand_device_activekey"); // See DeviceCommandRow.ActiveKey; both providers allow multiple NULLs through a unique index, avoiding MySQL's unsupported partial-index syntax.
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 
@@ -330,9 +313,8 @@ namespace api.Dal
             modelBuilder.Entity<DeviceDiagnosticRow>(e =>
             {
                 e.ToTable("deviceDiagnostic");
-                // DeviceID is the PK (1:1 with device) - deliberately NOT ValueGeneratedOnAdd.
                 e.HasKey(x => x.DeviceID);
-                e.Property(x => x.DeviceID).ValueGeneratedNever();
+                e.Property(x => x.DeviceID).ValueGeneratedNever(); // PK is 1:1 with device, deliberately not ValueGeneratedOnAdd.
                 e.Property(x => x.FirmwareVersion).HasMaxLength(20); // same cap as deviceFirmware.Version
                 e.Property(x => x.Board).HasMaxLength(40);
                 e.Property(x => x.Kit).HasMaxLength(64); // same cap as deviceTypeKit.Kit
@@ -348,13 +330,10 @@ namespace api.Dal
                 e.Property(x => x.Board).HasMaxLength(40);
                 e.Property(x => x.FileName).HasMaxLength(120);
                 e.Property(x => x.Sha256).HasMaxLength(64);
-                // Same caps as the OTA columns above - full-image file names are only a few
-                // characters longer (agrumy-{board}-full-v{version}.bin vs -v{version}.bin).
-                e.Property(x => x.FullImageFileName).HasMaxLength(120);
+                e.Property(x => x.FullImageFileName).HasMaxLength(120); // Same cap as the OTA FileName above - full-image names are only a few characters longer.
                 e.Property(x => x.FullImageSha256).HasMaxLength(64);
                 e.Property(x => x.DateAdded).HasDefaultValueSql("CURRENT_TIMESTAMP");
-                // The "which .bin for this board" lookups all filter on (Board, Source).
-                e.HasIndex(x => new { x.Board, x.Source }).HasDatabaseName("ix_deviceFirmware_board_source");
+                e.HasIndex(x => new { x.Board, x.Source }).HasDatabaseName("ix_deviceFirmware_board_source"); // The "which .bin for this board" lookups all filter on (Board, Source).
             });
 
             modelBuilder.Entity<SensorDataRow>(e =>
@@ -365,10 +344,8 @@ namespace api.Dal
                 // Legacy Battery/Moisture/WaterLevel are tinyint(1); the DTO exposes them as int, so a fresh DB uses int (old tinyint(1) columns still read fine).
                 e.HasIndex(x => new { x.DeviceID, x.TenantID, x.DateCreated })
                  .HasDatabaseName("ix_sensorData_device_tenant_date");
-                // The 24h trend sparkline query filters directly by zone, not by device - see
-                // db/migrations/2026-09-02-sensordata-deviceunitzone-index.sql.
                 e.HasIndex(x => new { x.DeviceUnitZoneID, x.DateCreated })
-                 .HasDatabaseName("ix_sensorData_deviceUnitZone_date");
+                 .HasDatabaseName("ix_sensorData_deviceUnitZone_date"); // The 24h trend sparkline query filters directly by zone, not by device.
                 // Legacy fk_sensorData_* (no FK on sensorData.TenantID).
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
@@ -392,8 +369,7 @@ namespace api.Dal
                 e.ToTable("eventDevice");
                 e.HasKey(x => x.IDEventDevice);
                 e.Property(x => x.IDEventDevice).ValueGeneratedOnAdd();
-                // Every device-events read/problem-alert scan filters DeviceID plus a Date range - roadmap #310.
-                e.HasIndex(x => new { x.DeviceID, x.Date }).HasDatabaseName("ix_eventDevice_device_date");
+                e.HasIndex(x => new { x.DeviceID, x.Date }).HasDatabaseName("ix_eventDevice_device_date"); // Every device-events read/problem-alert scan filters DeviceID plus a Date range.
             });
 
             modelBuilder.Entity<EventServiceRow>(e =>
@@ -412,8 +388,7 @@ namespace api.Dal
                 e.Property(x => x.Action).HasMaxLength(100);
                 e.Property(x => x.TargetType).HasMaxLength(50);
                 e.Property(x => x.TargetId).HasMaxLength(50);
-                // Listing a tenant's own history is the common query; a Global admin's cross-tenant listing scans the whole table, acceptable at this volume.
-                e.HasIndex(x => new { x.TenantID, x.TimestampUtc }).HasDatabaseName("ix_auditLog_tenant_timestamp");
+                e.HasIndex(x => new { x.TenantID, x.TimestampUtc }).HasDatabaseName("ix_auditLog_tenant_timestamp"); // A Global admin's cross-tenant listing scans the whole table, acceptable at this volume.
             });
         }
     }

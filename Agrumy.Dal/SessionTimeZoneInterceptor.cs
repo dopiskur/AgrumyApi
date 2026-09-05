@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace api.Dal
 {
-    /// Forces the DB session's own timezone to UTC on every connection open, so a `CURRENT_TIMESTAMP`/`NOW()` column default computes in UTC regardless of the server process's OS timezone - verified live on invent.hr (MySQL @@global.time_zone is SYSTEM, 2h off UTC at the time this was found), which every app-level DateTime.UtcNow assumes it already is (roadmap #302).
+    /// Forces the DB session's own timezone to UTC on every connection open so a `CURRENT_TIMESTAMP`/`NOW()` column default computes in UTC, matching what every app-level DateTime.UtcNow assumes.
     internal sealed class SessionTimeZoneInterceptor(string setTimeZoneSql) : DbConnectionInterceptor
     {
         public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)

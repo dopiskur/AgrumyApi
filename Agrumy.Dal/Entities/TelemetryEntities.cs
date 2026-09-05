@@ -36,14 +36,11 @@ namespace api.Dal.Entities
     {
         public int IDEventDevice { get; set; }
         public int DeviceID { get; set; }
-        // Legacy schema predates multi-tenancy - stamped from the authenticated device's identity
-        // at push time, never from a client-supplied value.
-        public int TenantID { get; set; }
+        public int TenantID { get; set; } // Stamped from the authenticated device's identity at push time, never from a client-supplied value.
         public int EventID { get; set; }
         public DateTime? Date { get; set; }
         public string? Message { get; set; }
-        // Set once an admin dismisses this alert - stops it counting toward Unit/Zone Orange status even inside the expiry window.
-        public DateTime? AcknowledgedAt { get; set; }
+        public DateTime? AcknowledgedAt { get; set; } // Set once an admin dismisses this alert, stopping it counting toward Unit/Zone Orange status even inside the expiry window.
     }
 
     public class EventServiceRow

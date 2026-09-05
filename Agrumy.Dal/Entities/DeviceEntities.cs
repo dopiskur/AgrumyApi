@@ -116,7 +116,7 @@ namespace api.Dal.Entities
         public bool? RelayEnabled { get; set; }
     }
 
-    /// One physically-wired relay slot assigned to a RelayFunction (roadmap #309) - only assigned slots get a row, replacing the fixed Relay1..Relay8 columns that used to live on DeviceConfigControllerRow.
+    /// One physically-wired relay slot assigned to a RelayFunction - only assigned slots get a row, replacing the fixed Relay1..Relay8 columns that used to live on DeviceConfigControllerRow.
     public class DeviceConfigControllerRelayRow
     {
         public int IDDeviceConfigController { get; set; }
@@ -159,8 +159,7 @@ namespace api.Dal.Entities
     public class DeviceRow
     {
         public int IDDevice { get; set; }
-        // Non-nullable, matching the DB column (NOT NULL DEFAULT 0).
-        public int TenantID { get; set; }
+        public int TenantID { get; set; } // Non-nullable, matching the DB column (NOT NULL DEFAULT 0).
         public int? DeviceTypeID { get; set; }
         public int? DeviceUnitID { get; set; }
         public int? DeviceUnitZoneID { get; set; }
@@ -183,20 +182,16 @@ namespace api.Dal.Entities
         public bool? Reboot { get; set; }
         public bool? Reset { get; set; }
         public bool? FirmwareUpdate { get; set; }
-        // See api.Models.Device.FirmwareTargetVersion.
-        public string? FirmwareTargetVersion { get; set; }
+        public string? FirmwareTargetVersion { get; set; } // See api.Models.Device.FirmwareTargetVersion.
         public int? ConfigVersion { get; set; }
-        // See api.Models.DeviceConfig.CommandVersion for the full story.
-        public int CommandVersion { get; set; }
+        public int CommandVersion { get; set; } // See api.Models.DeviceConfig.CommandVersion.
         public DateTime? DateCreated { get; set; }
         public DateTime? DateModified { get; set; }
 
-        // See api.Models.Device's own copies of these for the full explanation.
         public bool IsGateway { get; set; }
         public int? GatewayProfile { get; set; }
 
-        // See api.Models.Device.LastFullConfigSentAt for the full explanation.
-        public DateTime? LastFullConfigSentAt { get; set; }
+        public DateTime? LastFullConfigSentAt { get; set; } // See api.Models.Device.LastFullConfigSentAt.
     }
 
     /// One LoRaWAN end-device's DevEUI mapped to the Agrumy device (ApiId/ApiKey) a LoRaGateway acts on behalf of for that DevEUI's uplinks.
@@ -229,8 +224,7 @@ namespace api.Dal.Entities
         public DateTime IssuedAt { get; set; }
         public DateTime ExpiresAt { get; set; }
         public DateTime? ExecutedAt { get; set; }
-        // Mirrors ActionType while active, NULL once terminal - backs the unique (DeviceID, ActiveKey) index that makes IssueCommandAsync's dedup a real DB constraint.
-        public int? ActiveKey { get; set; }
+        public int? ActiveKey { get; set; } // Mirrors ActionType while active, NULL once terminal; backs the unique (DeviceID, ActiveKey) index IssueCommandAsync's dedup relies on.
         public string? Payload { get; set; }
     }
 
@@ -243,19 +237,11 @@ namespace api.Dal.Entities
         public long? UptimeSeconds { get; set; }
         public int? RssiDbm { get; set; }
         public long? FreeHeapBytes { get; set; }
-        // When OfflineAlertBackgroundService last notified admins about this device's CURRENT
-        // offline streak - null means either never offline, or back online since the last alert.
-        // One notification per streak, not one per tick, without a separate dedup table.
-        public DateTime? OfflineNotifiedAt { get; set; }
-        // Same dedup-by-streak rule as OfflineNotifiedAt above, but for LowBatteryAlertEvaluator -
-        // null means either never low, or recovered above ServerConfig.BatteryLowThreshold +
-        // BatteryLowHysteresis since the last alert.
-        public DateTime? LowBatteryNotifiedAt { get; set; }
+        public DateTime? OfflineNotifiedAt { get; set; } // When OfflineAlertBackgroundService last notified admins about the device's current offline streak; one notification per streak, not per tick.
+        public DateTime? LowBatteryNotifiedAt { get; set; } // Same dedup-by-streak rule as OfflineNotifiedAt, but for LowBatteryAlertEvaluator.
         public string? FirmwareVersion { get; set; }
-        // See api.Models.DeviceConfigPoll.Board.
-        public string? Board { get; set; }
-        // See api.Models.DeviceConfigPoll.Kit.
-        public string? Kit { get; set; }
+        public string? Board { get; set; } // See api.Models.DeviceConfigPoll.Board.
+        public string? Kit { get; set; } // See api.Models.DeviceConfigPoll.Kit.
     }
 
     /// Catalog of recognized commercial kits and whether each has real wired relay hardware - Kit itself is the key (a build-flag string, e.g. "KC868-A6"), not an auto-increment id.
@@ -265,8 +251,7 @@ namespace api.Dal.Entities
         public bool ControllerCapable { get; set; }
     }
 
-    // Board/Source/FileName/SizeBytes/Sha256/PublishedAt - see api.Models.DeviceFirmware for what
-    // each means; DeviceTypeID is the legacy key.
+    // Board/Source/FileName/SizeBytes/Sha256/PublishedAt - see api.Models.DeviceFirmware for what each means; DeviceTypeID is the legacy key.
     public class DeviceFirmwareRow
     {
         public int IDDeviceFirmware { get; set; }
