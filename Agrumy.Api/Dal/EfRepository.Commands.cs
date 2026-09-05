@@ -66,6 +66,16 @@ namespace api.Dal
             return rows.Select(ToDto).ToList();
         }
 
+        public async Task ExpirePendingCommandsAsync(int deviceId, DateTime utcNow)
+        {
+            // Clears ActiveKey too, same as SetCommandStatusAsync's Expired branch - otherwise the freed dedup slot stays wrongly occupied.
+            await db.DeviceCommands
+                .Where(c => c.DeviceID == deviceId && c.Status == (int)CommandStatus.Pending && c.ExpiresAt <= utcNow)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(c => c.Status, (int)CommandStatus.Expired)
+                    .SetProperty(c => c.ActiveKey, (int?)null));
+        }
+
         public async Task<IList<DeviceCommand>> GetActiveProvisionCommandsAsync()
         {
             int[] activeStatuses = [(int)CommandStatus.Pending, (int)CommandStatus.Acknowledged];

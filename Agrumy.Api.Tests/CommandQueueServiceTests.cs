@@ -161,13 +161,14 @@ public class CommandQueueServiceTests
         var expired = new DeviceCommand { IDDeviceCommand = 1, DeviceID = 500, ActionType = CommandActionType.Reboot, Status = CommandStatus.Pending, ExpiresAt = DateTime.UtcNow.AddMinutes(-5) };
         var valid = new DeviceCommand { IDDeviceCommand = 2, DeviceID = 500, ActionType = CommandActionType.ForceOTA, Status = CommandStatus.Pending, ExpiresAt = DateTime.UtcNow.AddMinutes(30) };
         _commands.Setup(c => c.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand> { expired, valid });
-        _commands.Setup(c => c.SetCommandStatusAsync(1, CommandStatus.Expired, null)).Returns(Task.CompletedTask);
+        _commands.Setup(c => c.ExpirePendingCommandsAsync(500, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
 
         PendingCommand? pending = await NewService().GetPendingCommandAsync(500);
 
         Assert.NotNull(pending);
         Assert.Equal(2, pending!.IDDeviceCommand);
-        _commands.Verify(c => c.SetCommandStatusAsync(1, CommandStatus.Expired, null), Times.Once);
+        _commands.Verify(c => c.ExpirePendingCommandsAsync(500, It.IsAny<DateTime>()), Times.Once);
+        // Strict mock: an un-set-up SetCommandStatusAsync call would throw, proving expiry is now one bulk call, not one write per expired row.
     }
 
     [Fact]
@@ -175,11 +176,38 @@ public class CommandQueueServiceTests
     {
         var expired = new DeviceCommand { IDDeviceCommand = 1, DeviceID = 500, ActionType = CommandActionType.Reboot, Status = CommandStatus.Pending, ExpiresAt = DateTime.UtcNow.AddMinutes(-5) };
         _commands.Setup(c => c.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand> { expired });
-        _commands.Setup(c => c.SetCommandStatusAsync(1, CommandStatus.Expired, null)).Returns(Task.CompletedTask);
+        _commands.Setup(c => c.ExpirePendingCommandsAsync(500, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
 
         PendingCommand? pending = await NewService().GetPendingCommandAsync(500);
 
         Assert.Null(pending);
+    }
+
+    [Fact]
+    public async Task GetPendingCommand_MultipleExpiredRows_ExpiresInOneBulkCall_NotOnePerRow()
+    {
+        var expired1 = new DeviceCommand { IDDeviceCommand = 1, DeviceID = 500, ActionType = CommandActionType.Reboot, Status = CommandStatus.Pending, ExpiresAt = DateTime.UtcNow.AddMinutes(-10) };
+        var expired2 = new DeviceCommand { IDDeviceCommand = 2, DeviceID = 500, ActionType = CommandActionType.ForceOTA, Status = CommandStatus.Pending, ExpiresAt = DateTime.UtcNow.AddMinutes(-5) };
+        var valid = new DeviceCommand { IDDeviceCommand = 3, DeviceID = 500, ActionType = CommandActionType.ForceConfigSync, Status = CommandStatus.Pending, ExpiresAt = DateTime.UtcNow.AddMinutes(30) };
+        _commands.Setup(c => c.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand> { expired1, expired2, valid });
+        _commands.Setup(c => c.ExpirePendingCommandsAsync(500, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+
+        PendingCommand? pending = await NewService().GetPendingCommandAsync(500);
+
+        Assert.Equal(3, pending!.IDDeviceCommand);
+        _commands.Verify(c => c.ExpirePendingCommandsAsync(500, It.IsAny<DateTime>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetPendingCommand_NoExpiredRows_NeverCallsExpire()
+    {
+        var valid = new DeviceCommand { IDDeviceCommand = 1, DeviceID = 500, ActionType = CommandActionType.Reboot, Status = CommandStatus.Pending, ExpiresAt = DateTime.UtcNow.AddMinutes(30) };
+        _commands.Setup(c => c.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand> { valid });
+        // Strict mock: an un-set-up ExpirePendingCommandsAsync call would throw, proving it's skipped when nothing needs expiring.
+
+        PendingCommand? pending = await NewService().GetPendingCommandAsync(500);
+
+        Assert.Equal(1, pending!.IDDeviceCommand);
     }
 
     /// Two poll cycles: the first poll's ack+execute must not disturb the second, still-Pending command behind it - proves FIFO holds across cycles.

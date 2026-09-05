@@ -164,11 +164,15 @@ namespace api.Commands
             DateTime utcNow = DateTime.UtcNow;
             IList<DeviceCommand> candidates = await commandRepo.GetPendingCommandsAsync(deviceId); // oldest first
 
+            if (candidates.Any(c => c.ExpiresAt <= utcNow))
+            {
+                await commandRepo.ExpirePendingCommandsAsync(deviceId, utcNow); // one bulk statement, not one write per expired row
+            }
+
             foreach (var candidate in candidates)
             {
                 if (candidate.ExpiresAt <= utcNow)
                 {
-                    await commandRepo.SetCommandStatusAsync(candidate.IDDeviceCommand, CommandStatus.Expired);
                     continue;
                 }
                 return new PendingCommand
