@@ -221,8 +221,9 @@ public class ContractTests
         AssertValid("authenticate.request.schema.json", "{}");
     }
 
+    // Pre-#326 firmware (String+atof SensorData) - still accepted since not every device in the field is on the new firmware yet.
     [Fact]
-    public void SensorDataRequest_FirmwareShapedPayload_MatchesSchema()
+    public void SensorDataRequest_LegacyStringShapedPayload_MatchesSchema()
     {
         const string payload =
             """
@@ -231,6 +232,26 @@ public class ContractTests
                 "deviceID": 1000038, "tenantID": 0, "deviceUnitID": 0, "deviceUnitZoneID": 0,
                 "temperature": "26.13", "soilTemperature": null, "humidity": "47.5", "battery": null,
                 "moisture": null, "light": "2", "co2": "408", "tvoc": null, "barometer": "100727.82",
+                "liquidPH": null, "rainLevel": null, "waterLevel": null, "wind": null,
+                "dateCreated": "2026-08-29 09:50:00"
+              }
+            ]
+            """;
+
+        AssertValid("sensordata.request.schema.json", payload);
+    }
+
+    // Roadmap #326: SensorData moved from Arduino String+atof to double/NaN, so a real reading now serializes as a JSON number instead of a numeric string.
+    [Fact]
+    public void SensorDataRequest_FirmwareShapedPayload_MatchesSchema()
+    {
+        const string payload =
+            """
+            [
+              {
+                "deviceID": 1000038, "tenantID": 0, "deviceUnitID": 0, "deviceUnitZoneID": 0,
+                "temperature": 26.13, "soilTemperature": null, "humidity": 47.5, "battery": null,
+                "moisture": null, "light": 2, "co2": 408, "tvoc": null, "barometer": 100727.82,
                 "liquidPH": null, "rainLevel": null, "waterLevel": null, "wind": null,
                 "dateCreated": "2026-08-29 09:50:00"
               }
