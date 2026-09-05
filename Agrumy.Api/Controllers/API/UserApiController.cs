@@ -164,7 +164,8 @@ namespace api.Controllers.API
             await notifications.DispatchAsync(new Notification(
                 "Confirm your Agrumy account",
                 $"Click the link below to verify your email address:\n{link}\n\nThis link expires in {ActivationTokenValidHours} hours.",
-                new NotificationRecipient(Email: email)));
+                new NotificationRecipient(Email: email),
+                ContainsSecret: true));
         }
 
         /// Tells every admin of the given tenant that a newly-verified user is waiting for approval - never a silent no-op, since a tenant can never have zero admins.

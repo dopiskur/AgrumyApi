@@ -30,6 +30,10 @@ namespace api.Notifications
 
         public async Task<NotificationResult> SendAsync(Notification notification, CancellationToken ct = default)
         {
+            if (notification.ContainsSecret)
+            {
+                return NotificationResult.Skipped("notification carries a secret, never forwarded to webhook");
+            }
             if (!IsConfigured)
             {
                 return NotificationResult.Skipped("webhook channel disabled or Url missing/not https");

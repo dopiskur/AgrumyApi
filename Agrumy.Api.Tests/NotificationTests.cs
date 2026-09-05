@@ -193,6 +193,20 @@ public class NotificationTests
     }
 
     [Fact]
+    public async Task Webhook_SendAsync_Skips_SecretBearingNotification_EvenWhenConfigured()
+    {
+        var factory = new FakeHttpClientFactory(HttpStatusCode.OK);
+        var ch = Webhook(new WebhookChannelOptions { Enabled = true, Url = "https://example.com/hook" }, factory);
+        var secretNotification = Sample() with { ContainsSecret = true };
+
+        var result = await ch.SendAsync(secretNotification);
+
+        Assert.False(result.Sent);
+        Assert.False(result.Attempted);
+        Assert.Null(factory.Handler.LastRequest);
+    }
+
+    [Fact]
     public async Task Webhook_SendAsync_Blocked_By_SsrfGuard_For_Loopback_Url()
     {
         var ch = Webhook(new WebhookChannelOptions { Enabled = true, Url = "https://localhost/hook" });

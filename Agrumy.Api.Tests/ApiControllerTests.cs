@@ -358,6 +358,7 @@ public class ApiControllerTests
         Assert.Equal(new[] { RoleNames.TenantAdmin }, seededRoles); // admin on a brand new tenant
         Assert.False(capturedUser.Enabled);         // Activate() is what enables, not registration
         Assert.False(capturedUser.EmailVerified);   // still needs to click the activation link
+        _notifications.Verify(n => n.DispatchAsync(It.Is<Notification>(msg => msg.ContainsSecret), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
