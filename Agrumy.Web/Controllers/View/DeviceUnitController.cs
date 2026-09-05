@@ -23,7 +23,7 @@ namespace api.Controllers.View
                 return RedirectToAction(nameof(Zone), new { idDeviceUnitZone = zones[0].IDDeviceUnitZone });
             }
 
-            string? timeZone = (await api.UserGetSelf()).TimeZone;
+            string? timeZone = User.GetTimeZone();
             return View(new UnitZonesViewModel
             {
                 Unit = await api.DeviceUnitGet(idDeviceUnit),
@@ -94,7 +94,7 @@ namespace api.Controllers.View
             IList<DeviceFleetStatus> fleet = (await api.DeviceFleetGet())
                 .Where(f => f.DeviceUnitZoneID == idDeviceUnitZone)
                 .ToList();
-            string? timeZone = (await api.UserGetSelf()).TimeZone;
+            string? timeZone = User.GetTimeZone();
             foreach (var d in fleet)
             {
                 if (d.LastSeenAt is DateTime utc)

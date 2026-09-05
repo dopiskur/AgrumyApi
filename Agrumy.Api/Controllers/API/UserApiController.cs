@@ -272,7 +272,7 @@ namespace api.Controllers.API
             var (refreshToken, refreshTokenHash) = GenerateOpaqueToken();
             await Repo.RefreshTokenAddAsync(user.IDUser!.Value, refreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
 
-            return (new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = token, RefreshToken = refreshToken }, null);
+            return (new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = token, RefreshToken = refreshToken, TimeZone = user.TimeZone }, null);
         }
 
         /// Redeems a refresh token for a new access token, rotating it in the same call (single-use) - anonymous by design, since the refresh token itself is the credential, same model as Login next to it.

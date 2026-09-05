@@ -118,6 +118,7 @@ namespace api.Models
         /// Long-lived opaque token that redeems a new <see cref="Token"/> once this JWT expires. Single-use - rotated on every redemption.
         public string? RefreshToken { get; set; }
         public string? Token { get; set; }
+        public string? TimeZone { get; set; }
     }
 
     /// Body of POST /api/User/ChangePassword - no Login field on purpose, identity comes only from the caller's JWT, so this can never be used as an unauthenticated password-guessing oracle.

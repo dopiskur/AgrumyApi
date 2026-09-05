@@ -108,6 +108,11 @@ namespace api.Security
 
             var claims = new List<Claim> { new(ClaimTypes.Name, current.Identity?.Name ?? "") };
             claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+            // Not in the JWT itself - carry it forward from the cookie instead of round-tripping to Agrumy.Api just to refresh it.
+            if (current.GetTimeZone() is { } timeZone)
+            {
+                claims.Add(new Claim(UserClaims.TimeZone, timeZone));
+            }
             return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
         }
 

@@ -89,7 +89,7 @@ namespace api.Controllers.View
             IList<DeviceFleetStatus> fleet = await api.DeviceFleetGet();
 
             // LastSeenAt is stored/served in UTC; convert here for display only.
-            string? timeZone = (await api.UserGetSelf()).TimeZone;
+            string? timeZone = User.GetTimeZone();
             foreach (var d in fleet)
             {
                 if (d.LastSeenAt is DateTime utc)
@@ -236,7 +236,7 @@ namespace api.Controllers.View
             IList<DeviceEvent>? events = await api.DeviceEventsGet(idDevice);
 
             // CreatedAt is stored/served in UTC; convert here for display only.
-            string? timeZone = (await api.UserGetSelf()).TimeZone;
+            string? timeZone = User.GetTimeZone();
             foreach (var e in events ?? [])
             {
                 if (e.CreatedAt is DateTime utc)

@@ -1,5 +1,6 @@
 using api.Dal.Interface;
 using api.Models;
+using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,7 +29,7 @@ namespace api.Controllers.View
             deviceView.SensorDataJson = await api.SensorDataGet(idDevice, timeRange, timeMDMY, 0);
 
             // Chart x-axis shows the user's local time; storage stays UTC.
-            string? timeZone = (await api.UserGetSelf()).TimeZone;
+            string? timeZone = User.GetTimeZone();
             deviceView.SensorDataJson = SensorDataTimeLocalizer.LocalizeDates(deviceView.SensorDataJson, timeZone);
             ViewBag.DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone;
 
@@ -72,7 +73,7 @@ namespace api.Controllers.View
             }
 
             // Reports store UTC snapshots; convert for display.
-            string? timeZone = (await api.UserGetSelf()).TimeZone;
+            string? timeZone = User.GetTimeZone();
             deviceView.SensorDataJson = SensorDataTimeLocalizer.LocalizeDates(deviceView.SensorDataJson, timeZone);
             ViewBag.DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone;
 

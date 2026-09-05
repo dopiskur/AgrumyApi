@@ -118,6 +118,10 @@ namespace api.Controllers.View
             // HttpOnly, SameSite=Strict cookie; the raw JWT/refresh token are stored tokens for BearerTokenHandler, never exposed to page script.
             var claims = new List<Claim> { new(ClaimTypes.Name, result.Email ?? "") };
             claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+            if (!string.IsNullOrEmpty(result.TimeZone))
+            {
+                claims.Add(new Claim(UserClaims.TimeZone, result.TimeZone));
+            }
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
 
             var props = new AuthenticationProperties

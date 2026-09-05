@@ -1,7 +1,11 @@
+using System.Security.Claims;
 using api.Dal.Interface;
 using api.Models;
+using api.Security;
 using api.Utils;
 using api.ViewModels;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -36,6 +40,7 @@ namespace api.Controllers.View
                 return View(await RestoreDisplayFieldsAsync(value));
             }
 
+            await RefreshTimeZoneClaimAsync(value.Profile.TimeZone);
             TempData["ProfileMessage"] = "Profile saved.";
             return RedirectToAction(nameof(Index));
         }
@@ -107,5 +112,24 @@ namespace api.Controllers.View
             TimeZoneHelper.GetTimeZoneOptions()
                 .Select(o => new SelectListItem(o.DisplayName, o.Id, string.Equals(o.Id, selected, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
+
+        // Re-issues the auth cookie with the new TimeZone claim so it takes effect immediately, not just after the next token refresh.
+        private async Task RefreshTimeZoneClaimAsync(string? timeZone)
+        {
+            var auth = await HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            if (!auth.Succeeded || auth.Principal is null || auth.Properties is null)
+            {
+                return;
+            }
+
+            var claims = auth.Principal.Claims.Where(c => c.Type != UserClaims.TimeZone).ToList();
+            if (!string.IsNullOrEmpty(timeZone))
+            {
+                claims.Add(new Claim(UserClaims.TimeZone, timeZone));
+            }
+
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme)), auth.Properties);
+        }
     }
 }
