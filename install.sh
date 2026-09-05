@@ -224,14 +224,27 @@ latest_release_tag() {
 download_and_install_app() {
   # $1 = Agrumy.Api | Agrumy.Web, $2 = version tag (e.g. v1.0.0), $3 = install dir, $4 = service user
   local app="$1" tag="$2" install_dir="$3" service_user="$4"
-  local app_lower tarball_url tmp_tar
+  local app_lower tarball_name tarball_url tmp_tar tmp_sums expected_sha actual_sha
   app_lower="$(echo "$app" | tr '[:upper:]' '[:lower:]' | tr -d '.')"
-  tarball_url="https://github.com/${REPO}/releases/download/${tag}/agrumy-${app_lower}-${tag}.tar.gz"
+  tarball_name="agrumy-${app_lower}-${tag}.tar.gz"
+  tarball_url="https://github.com/${REPO}/releases/download/${tag}/${tarball_name}"
 
   as_root mkdir -p "$install_dir"
   tmp_tar="$(mktemp)"
   log "Downloading $app $tag"
   curl -fsSL "$tarball_url" -o "$tmp_tar" || err "Could not download $tarball_url - has a release been tagged yet? (git tag vX.Y.Z && git push origin vX.Y.Z on ${REPO})"
+
+  # release.yml publishes SHA256SUMS.txt next to every tarball - verify before this script (running
+  # as root) extracts and executes anything downloaded over the wire.
+  tmp_sums="$(mktemp)"
+  curl -fsSL "https://github.com/${REPO}/releases/download/${tag}/SHA256SUMS.txt" -o "$tmp_sums" \
+    || err "Could not download SHA256SUMS.txt for ${tag} - refusing to install an unverified binary."
+  expected_sha="$(grep -F -- "$tarball_name" "$tmp_sums" | awk '{print $1}')"
+  [ -n "$expected_sha" ] || err "SHA256SUMS.txt has no entry for ${tarball_name}."
+  actual_sha="$(sha256sum "$tmp_tar" | awk '{print $1}')"
+  [ "$actual_sha" = "$expected_sha" ] || err "Checksum mismatch for ${tarball_name}: expected ${expected_sha}, got ${actual_sha}. Aborting install."
+  rm -f "$tmp_sums"
+
   as_root tar -xzf "$tmp_tar" -C "$install_dir"
   rm -f "$tmp_tar"
   # pscp/scp losing the execute bit is a known trap (CLAUDE.md) - tar preserves it, but set it
