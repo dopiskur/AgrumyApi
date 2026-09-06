@@ -147,7 +147,7 @@
     <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.min.js"></script>
     <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.bootstrap5.min.js"></script>
     <script src="~/js/live-refresh.js"></script>
-    <script>
+    <script nonce="@Context.CspNonce()">
         // Not the shared _DataTableScripts partial: DataTables keeps its own row cache, so a raw
         // tbody innerHTML swap would desync it - this callback destroys/reinits DataTables instead.
         function initFleetTable() {

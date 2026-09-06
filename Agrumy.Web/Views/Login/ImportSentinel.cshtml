@@ -40,7 +40,7 @@
 </div>
 
 @section Scripts {
-    <script>
+    <script nonce="@Context.CspNonce()">
         document.getElementById('exportFile')?.addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) { return; }
