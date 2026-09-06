@@ -147,5 +147,15 @@ namespace api.Dal.Entities
         public int MqttBrokerPort { get; set; } = 1883;
         public string? MqttUsername { get; set; }
         public string? MqttPassword { get; set; }
+
+        // See api.Models.ServerConfig's own copies of these for the full explanation.
+        public bool EmailEnabled { get; set; }
+        public string? EmailHost { get; set; }
+        public int EmailPort { get; set; } = 587;
+        public bool EmailUseStartTls { get; set; } = true;
+        public string? EmailUsername { get; set; }
+        public string? EmailPassword { get; set; }
+        public string? EmailFromAddress { get; set; }
+        public string EmailFromName { get; set; } = "Agrumy";
     }
 }

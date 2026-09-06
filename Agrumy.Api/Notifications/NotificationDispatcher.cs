@@ -25,7 +25,7 @@ namespace api.Notifications
 
             foreach (var channel in _channels)
             {
-                if (!channel.IsConfigured)
+                if (!await channel.IsConfiguredAsync(ct))
                 {
                     outcomes.Add(new ChannelOutcome(channel.Name, NotificationResult.Skipped("channel not configured")));
                     continue;

@@ -51,6 +51,9 @@
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-mqtt" type="button" role="tab">MQTT Transport</button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-email" type="button" role="tab">Email</button>
+                </li>
             </ul>
             <div class="tab-content border border-top-0 rounded-bottom p-3 mb-3">
                 <div class="tab-pane fade show active" id="tab-hysteresis" role="tabpanel">
@@ -321,6 +324,60 @@
                         <div class="form-text">Leave blank to keep the currently stored password.</div>
                     </div>
                 </div>
+
+                <div class="tab-pane fade" id="tab-email" role="tabpanel">
+                    <p class="text-secondary">
+                        SMTP delivery for alert/activation emails (roadmap #223) - replaces the old
+                        appsettings-only configuration, so it's editable here without server file
+                        access. Save this tab first, then use "Send test email" below to confirm the
+                        connection actually works.
+                    </p>
+                    <div class="form-check mb-3">
+                        <input asp-for="EmailEnabled" class="form-check-input" />
+                        <label asp-for="EmailEnabled" class="form-check-label"></label>
+                    </div>
+                    <div class="mb-3" style="max-width:20rem">
+                        <label asp-for="EmailHost" class="form-label"></label>
+                        <input asp-for="EmailHost" class="form-control" />
+                    </div>
+                    <div class="mb-3" style="max-width:12rem">
+                        <label asp-for="EmailPort" class="form-label"></label>
+                        <input asp-for="EmailPort" class="form-control" />
+                        <span asp-validation-for="EmailPort" class="text-danger"></span>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input asp-for="EmailUseStartTls" class="form-check-input" />
+                        <label asp-for="EmailUseStartTls" class="form-check-label"></label>
+                        <div class="form-text">On (587, default) for STARTTLS, off (465) for implicit TLS.</div>
+                    </div>
+                    <div class="mb-3" style="max-width:20rem">
+                        <label asp-for="EmailUsername" class="form-label"></label>
+                        <input asp-for="EmailUsername" class="form-control" />
+                    </div>
+                    <div class="mb-3" style="max-width:20rem">
+                        <label asp-for="EmailPassword" class="form-label"></label>
+                        <input asp-for="EmailPassword" type="password" class="form-control" autocomplete="new-password" />
+                        <div class="form-text">Leave blank to keep the currently stored password.</div>
+                    </div>
+                    <div class="mb-3" style="max-width:20rem">
+                        <label asp-for="EmailFromAddress" class="form-label"></label>
+                        <input asp-for="EmailFromAddress" class="form-control" />
+                    </div>
+                    <div class="mb-0" style="max-width:20rem">
+                        <label asp-for="EmailFromName" class="form-label"></label>
+                        <input asp-for="EmailFromName" class="form-control" />
+                    </div>
+
+                    <hr />
+                    <div class="mb-0" style="max-width:24rem">
+                        <label class="form-label" for="testEmailRecipient">Send test email to</label>
+                        <div class="input-group">
+                            <input type="email" id="testEmailRecipient" class="form-control" placeholder="you@example.com" />
+                            <button type="button" id="testEmailButton" class="btn btn-outline-secondary">Send test email</button>
+                        </div>
+                        <div id="testEmailStatus" class="mt-2"></div>
+                    </div>
+                </div>
             </div>
 
             <div class="mb-3" style="max-width:16rem">
@@ -389,4 +446,5 @@
     <script src="~/js/data-maintenance.js"></script>
     <script src="~/lib/leaflet/leaflet.js"></script>
     <script src="~/js/weather-location.js"></script>
+    <script src="~/js/send-test-email.js"></script>
 }

@@ -19,11 +19,13 @@ namespace api.Notifications
 
         public string Name => "push-fcm";
 
-        public bool IsConfigured =>
+        private bool IsConfigured =>
             _options.Enabled
             && !string.IsNullOrWhiteSpace(_options.FcmProjectId)
             && !string.IsNullOrWhiteSpace(_options.FcmCredentialsPath)
             && File.Exists(_options.FcmCredentialsPath);
+
+        public Task<bool> IsConfiguredAsync(CancellationToken ct = default) => Task.FromResult(IsConfigured);
 
         public Task<NotificationResult> SendAsync(Notification notification, CancellationToken ct = default)
         {

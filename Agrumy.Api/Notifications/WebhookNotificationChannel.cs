@@ -23,10 +23,12 @@ namespace api.Notifications
 
         public string Name => "webhook";
 
-        public bool IsConfigured =>
+        private bool IsConfigured =>
             _options.Enabled
             && Uri.TryCreate(_options.Url, UriKind.Absolute, out Uri? uri)
             && uri.Scheme == Uri.UriSchemeHttps;
+
+        public Task<bool> IsConfiguredAsync(CancellationToken ct = default) => Task.FromResult(IsConfigured);
 
         public async Task<NotificationResult> SendAsync(Notification notification, CancellationToken ct = default)
         {

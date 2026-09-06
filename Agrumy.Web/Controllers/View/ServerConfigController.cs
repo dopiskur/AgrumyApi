@@ -44,13 +44,33 @@ namespace api.Controllers.View
                                             ? nameof(ServerConfig.WeatherPollIntervalMinutes)
                                             : ex.Body.Contains("rain-skip", StringComparison.OrdinalIgnoreCase)
                                                 ? nameof(ServerConfig.WeatherRainSkipThreshold)
-                                                : nameof(ServerConfig.FirmwareSource);
+                                                : ex.Body.Contains("SMTP port", StringComparison.OrdinalIgnoreCase)
+                                                    ? nameof(ServerConfig.EmailPort)
+                                                    : ex.Body.Contains("email notifications", StringComparison.OrdinalIgnoreCase)
+                                                        ? nameof(ServerConfig.EmailHost)
+                                                        : nameof(ServerConfig.FirmwareSource);
                 ModelState.AddModelError(field, ex.Body);
                 return View(serverConfig);
             }
 
             TempData["Message"] = "Server settings saved.";
             return RedirectToAction(nameof(Index));
+        }
+
+        /// Sends through the SAVED settings (Save first, then test) - not whatever is currently typed into the unsaved form.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> TestEmail(string toEmail)
+        {
+            try
+            {
+                await api.ServerConfigTestEmail(toEmail);
+                return Ok();
+            }
+            catch (ApiException ex)
+            {
+                return StatusCode(ex.StatusCode, ex.Body);
+            }
         }
 
         [HttpGet]

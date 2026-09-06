@@ -1,7 +1,10 @@
 using System.Net;
+using api.Dal.Interface;
+using api.Models;
 using api.Notifications;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Moq;
 
 namespace Agrumy.Api.Tests;
 
@@ -14,8 +17,13 @@ public class NotificationTests
         new("Low water level", "Tank on device 12 is below the configured minimum.",
             new NotificationRecipient(email, tokens), NotificationSeverity.Warning);
 
-    private static EmailNotificationChannel Email(EmailChannelOptions email) =>
-        new(Opts(new NotificationOptions { Email = email }), NullLogger<EmailNotificationChannel>.Instance);
+    /// Email's config now lives in ServerConfig (DB), read fresh via IRepository.ServerConfigGetAsync(1) - see EmailNotificationChannel's class remarks.
+    private static EmailNotificationChannel Email(ServerConfig config)
+    {
+        var repo = new Mock<IRepository>(MockBehavior.Strict);
+        repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(config);
+        return new EmailNotificationChannel(repo.Object, NullLogger<EmailNotificationChannel>.Instance);
+    }
 
     private static FcmPushNotificationChannel Fcm(PushChannelOptions push) =>
         new(Opts(new NotificationOptions { Push = push }), NullLogger<FcmPushNotificationChannel>.Instance);
@@ -25,33 +33,33 @@ public class NotificationTests
 
 
     [Fact]
-    public void Email_IsConfigured_False_When_Disabled()
+    public async Task Email_IsConfigured_False_When_Disabled()
     {
-        var ch = Email(new EmailChannelOptions { Enabled = false, Host = "smtp.x", FromAddress = "a@x" });
-        Assert.False(ch.IsConfigured);
+        var ch = Email(new ServerConfig { EmailEnabled = false, EmailHost = "smtp.x", EmailFromAddress = "a@x" });
+        Assert.False(await ch.IsConfiguredAsync());
     }
 
     [Theory]
     [InlineData(null, "a@x")]
     [InlineData("smtp.x", null)]
     [InlineData("  ", "a@x")]
-    public void Email_IsConfigured_False_When_Missing_Host_Or_From(string? host, string? from)
+    public async Task Email_IsConfigured_False_When_Missing_Host_Or_From(string? host, string? from)
     {
-        var ch = Email(new EmailChannelOptions { Enabled = true, Host = host, FromAddress = from });
-        Assert.False(ch.IsConfigured);
+        var ch = Email(new ServerConfig { EmailEnabled = true, EmailHost = host, EmailFromAddress = from });
+        Assert.False(await ch.IsConfiguredAsync());
     }
 
     [Fact]
-    public void Email_IsConfigured_True_When_Complete()
+    public async Task Email_IsConfigured_True_When_Complete()
     {
-        var ch = Email(new EmailChannelOptions { Enabled = true, Host = "smtp.x", FromAddress = "a@x" });
-        Assert.True(ch.IsConfigured);
+        var ch = Email(new ServerConfig { EmailEnabled = true, EmailHost = "smtp.x", EmailFromAddress = "a@x" });
+        Assert.True(await ch.IsConfiguredAsync());
     }
 
     [Fact]
     public async Task Email_SendAsync_Skips_When_Not_Configured()
     {
-        var result = await Email(new EmailChannelOptions()).SendAsync(Sample());
+        var result = await Email(new ServerConfig()).SendAsync(Sample());
         Assert.False(result.Sent);
         Assert.False(result.Attempted);
     }
@@ -59,7 +67,7 @@ public class NotificationTests
     [Fact]
     public async Task Email_SendAsync_Skips_When_Recipient_Has_No_Email()
     {
-        var ch = Email(new EmailChannelOptions { Enabled = true, Host = "smtp.x", FromAddress = "a@x" });
+        var ch = Email(new ServerConfig { EmailEnabled = true, EmailHost = "smtp.x", EmailFromAddress = "a@x" });
         var result = await ch.SendAsync(Sample(email: null));
         Assert.False(result.Sent);
         Assert.False(result.Attempted);
@@ -69,8 +77,8 @@ public class NotificationTests
     [Fact]
     public void Email_BuildMessage_Sets_From_To_Subject_Body()
     {
-        var ch = Email(new EmailChannelOptions { FromAddress = "alerts@agrumy.com", FromName = "Agrumy Alerts" });
-        var msg = ch.BuildMessage(Sample());
+        var config = new ServerConfig { EmailFromAddress = "alerts@agrumy.com", EmailFromName = "Agrumy Alerts" };
+        var msg = EmailNotificationChannel.BuildMessage(Sample(), config);
 
         Assert.Equal("alerts@agrumy.com", ((MimeKit.MailboxAddress)msg.From[0]).Address);
         Assert.Equal("Agrumy Alerts", ((MimeKit.MailboxAddress)msg.From[0]).Name);
@@ -81,16 +89,16 @@ public class NotificationTests
 
 
     [Fact]
-    public void Fcm_IsConfigured_False_By_Default()
+    public async Task Fcm_IsConfigured_False_By_Default()
     {
-        Assert.False(Fcm(new PushChannelOptions()).IsConfigured);
+        Assert.False(await Fcm(new PushChannelOptions()).IsConfiguredAsync());
     }
 
     [Fact]
-    public void Fcm_IsConfigured_False_Even_When_Enabled_Without_Credentials()
+    public async Task Fcm_IsConfigured_False_Even_When_Enabled_Without_Credentials()
     {
         var ch = Fcm(new PushChannelOptions { Enabled = true, FcmProjectId = "agrumy", FcmCredentialsPath = "/no/such/file.json" });
-        Assert.False(ch.IsConfigured);
+        Assert.False(await ch.IsConfiguredAsync());
     }
 
     [Fact]
@@ -125,7 +133,7 @@ public class NotificationTests
     public async Task Dispatcher_With_No_Configured_Channels_Returns_All_Skipped_And_Does_Not_Throw()
     {
         var dispatcher = new NotificationDispatcher(
-            new INotificationChannel[] { Email(new EmailChannelOptions()), Fcm(new PushChannelOptions()) },
+            new INotificationChannel[] { Email(new ServerConfig()), Fcm(new PushChannelOptions()) },
             NullLogger<NotificationDispatcher>.Instance);
 
         var outcomes = await dispatcher.DispatchAsync(Sample());
@@ -154,34 +162,34 @@ public class NotificationTests
     private sealed class ThrowingChannel : INotificationChannel
     {
         public string Name => "throwing";
-        public bool IsConfigured => true;
+        public Task<bool> IsConfiguredAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Task<NotificationResult> SendAsync(Notification notification, CancellationToken ct = default) =>
             throw new InvalidOperationException("boom");
     }
 
 
     [Fact]
-    public void Webhook_IsConfigured_False_When_Disabled()
+    public async Task Webhook_IsConfigured_False_When_Disabled()
     {
         var ch = Webhook(new WebhookChannelOptions { Enabled = false, Url = "https://example.com/hook" });
-        Assert.False(ch.IsConfigured);
+        Assert.False(await ch.IsConfiguredAsync());
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData("http://example.com/hook")] // not https
     [InlineData("not a url")]
-    public void Webhook_IsConfigured_False_When_Url_Missing_Or_Not_Https(string? url)
+    public async Task Webhook_IsConfigured_False_When_Url_Missing_Or_Not_Https(string? url)
     {
         var ch = Webhook(new WebhookChannelOptions { Enabled = true, Url = url });
-        Assert.False(ch.IsConfigured);
+        Assert.False(await ch.IsConfiguredAsync());
     }
 
     [Fact]
-    public void Webhook_IsConfigured_True_When_Enabled_With_Https_Url()
+    public async Task Webhook_IsConfigured_True_When_Enabled_With_Https_Url()
     {
         var ch = Webhook(new WebhookChannelOptions { Enabled = true, Url = "https://example.com/hook" });
-        Assert.True(ch.IsConfigured);
+        Assert.True(await ch.IsConfiguredAsync());
     }
 
     [Fact]

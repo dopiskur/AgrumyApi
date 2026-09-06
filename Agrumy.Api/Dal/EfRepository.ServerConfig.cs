@@ -50,6 +50,9 @@ namespace api.Dal
                 PasswordMinLength = 8,
                 ConfigHeartbeatHours = 24,
                 MqttBrokerPort = 1883,
+                EmailPort = 587,
+                EmailUseStartTls = true,
+                EmailFromName = "Agrumy",
             };
             db.ServerConfigs.Add(generated);
             await db.SaveChangesAsync();
@@ -106,6 +109,18 @@ namespace api.Dal
             if (!string.IsNullOrEmpty(config.MqttPassword))
             {
                 row.MqttPassword = config.MqttPassword;
+            }
+            row.EmailEnabled = config.EmailEnabled;
+            row.EmailHost = config.EmailHost;
+            row.EmailPort = config.EmailPort;
+            row.EmailUseStartTls = config.EmailUseStartTls;
+            row.EmailUsername = config.EmailUsername;
+            row.EmailFromAddress = config.EmailFromAddress;
+            row.EmailFromName = config.EmailFromName;
+            // Same "blank keeps existing" handling as MqttPassword above.
+            if (!string.IsNullOrEmpty(config.EmailPassword))
+            {
+                row.EmailPassword = config.EmailPassword;
             }
             await db.SaveChangesAsync();
 
@@ -229,6 +244,16 @@ namespace api.Dal
             MqttUsername = r.MqttUsername,
             // Never sent back to the edit form - see ServerConfigUpdateAsync's "blank keeps existing" handling above.
             MqttPassword = null,
+            EmailEnabled = r.EmailEnabled,
+            EmailHost = r.EmailHost,
+            // An older row has 0 here, which is not a usable port - same 0-means-unset fallback as GatewayWaitWindowSeconds.
+            EmailPort = r.EmailPort == 0 ? 587 : r.EmailPort,
+            EmailUseStartTls = r.EmailUseStartTls,
+            EmailUsername = r.EmailUsername,
+            EmailFromAddress = r.EmailFromAddress,
+            EmailFromName = string.IsNullOrWhiteSpace(r.EmailFromName) ? "Agrumy" : r.EmailFromName,
+            // Never sent back to the edit form - same reasoning as MqttPassword above.
+            EmailPassword = null,
         };
     }
 }

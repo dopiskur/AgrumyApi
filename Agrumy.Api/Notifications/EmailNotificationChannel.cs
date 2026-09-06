@@ -1,32 +1,28 @@
+using api.Dal.Interface;
+using api.Models;
 using MailKit.Net.Smtp;
 using MailKit.Security;
-using Microsoft.Extensions.Options;
 using MimeKit;
 
 namespace api.Notifications
 {
-    /// SMTP email delivery via MailKit. Configured under <c>Notifications:Email</c>.
-    public sealed class EmailNotificationChannel : INotificationChannel
+    /// SMTP email delivery via MailKit. Config lives in the DB-backed ServerConfig (Email* fields, admin-editable via Server Settings), not appsettings - read fresh on every call rather than a bound options snapshot, same pattern as api.Commands.MqttCommandPublisher's ServerConfigGetAsync(1) read.
+    public sealed class EmailNotificationChannel(IRepository repo, ILogger<EmailNotificationChannel> logger) : INotificationChannel
     {
-        private readonly EmailChannelOptions _options;
-        private readonly ILogger<EmailNotificationChannel> _logger;
-
-        public EmailNotificationChannel(IOptions<NotificationOptions> options, ILogger<EmailNotificationChannel> logger)
-        {
-            _options = options.Value.Email;
-            _logger = logger;
-        }
-
         public string Name => "email";
 
-        public bool IsConfigured =>
-            _options.Enabled
-            && !string.IsNullOrWhiteSpace(_options.Host)
-            && !string.IsNullOrWhiteSpace(_options.FromAddress);
+        private static bool IsConfigured(ServerConfig config) =>
+            config.EmailEnabled
+            && !string.IsNullOrWhiteSpace(config.EmailHost)
+            && !string.IsNullOrWhiteSpace(config.EmailFromAddress);
+
+        public async Task<bool> IsConfiguredAsync(CancellationToken ct = default) =>
+            IsConfigured(await repo.ServerConfigGetAsync(1));
 
         public async Task<NotificationResult> SendAsync(Notification notification, CancellationToken ct = default)
         {
-            if (!IsConfigured)
+            ServerConfig config = await repo.ServerConfigGetAsync(1);
+            if (!IsConfigured(config))
             {
                 return NotificationResult.Skipped("email channel disabled or missing Host/FromAddress");
             }
@@ -35,19 +31,19 @@ namespace api.Notifications
                 return NotificationResult.Skipped("recipient has no email address");
             }
 
-            var message = BuildMessage(notification);
+            var message = BuildMessage(notification, config);
 
             try
             {
                 using var client = new SmtpClient();
-                var socketOptions = _options.UseStartTls
+                var socketOptions = config.EmailUseStartTls
                     ? SecureSocketOptions.StartTls
                     : SecureSocketOptions.SslOnConnect;
-                await client.ConnectAsync(_options.Host!, _options.Port, socketOptions, ct); // Host non-null: IsConfigured
+                await client.ConnectAsync(config.EmailHost!, config.EmailPort, socketOptions, ct); // Host non-null: IsConfigured
 
-                if (!string.IsNullOrEmpty(_options.Username))
+                if (!string.IsNullOrEmpty(config.EmailUsername))
                 {
-                    await client.AuthenticateAsync(_options.Username, _options.Password ?? "", ct);
+                    await client.AuthenticateAsync(config.EmailUsername, config.EmailPassword ?? "", ct);
                 }
 
                 await client.SendAsync(message, ct);
@@ -56,16 +52,16 @@ namespace api.Notifications
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Email notification to {Recipient} failed.", notification.Recipient.Email);
+                logger.LogWarning(ex, "Email notification to {Recipient} failed.", notification.Recipient.Email);
                 return NotificationResult.Failed(ex.Message);
             }
         }
 
         /// Callers pass a notification with a non-empty recipient email; FromAddress is validated by <see cref="IsConfigured"/> on the send path.
-        internal MimeMessage BuildMessage(Notification notification)
+        internal static MimeMessage BuildMessage(Notification notification, ServerConfig config)
         {
             var message = new MimeMessage();
-            message.From.Add(new MailboxAddress(_options.FromName, _options.FromAddress ?? ""));
+            message.From.Add(new MailboxAddress(config.EmailFromName, config.EmailFromAddress ?? ""));
             message.To.Add(MailboxAddress.Parse(notification.Recipient.Email ?? ""));
             message.Subject = notification.Subject;
             message.Body = new TextPart("plain") { Text = notification.Body };

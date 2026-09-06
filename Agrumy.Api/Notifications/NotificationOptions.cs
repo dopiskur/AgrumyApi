@@ -5,7 +5,6 @@ namespace api.Notifications
     {
         public const string SectionName = "Notifications";
 
-        public EmailChannelOptions Email { get; set; } = new();
         public PushChannelOptions Push { get; set; } = new();
         public WebhookChannelOptions Webhook { get; set; } = new();
 
@@ -21,21 +20,6 @@ namespace api.Notifications
 
         // How often TankRefillAlertEvaluator (#234) sweeps calibrated zones; same reasoning as BatteryCheckIntervalMinutes - a tank drains over hours/days, not seconds.
         public int TankCheckIntervalMinutes { get; set; } = 30;
-    }
-
-    public sealed class EmailChannelOptions
-    {
-        public bool Enabled { get; set; }
-        public string? Host { get; set; }
-        public int Port { get; set; } = 587;
-
-        /// 587 with STARTTLS (true, default) vs 465 implicit TLS (false).
-        public bool UseStartTls { get; set; } = true;
-
-        public string? Username { get; set; }
-        public string? Password { get; set; }
-        public string? FromAddress { get; set; }
-        public string FromName { get; set; } = "Agrumy";
     }
 
     /// FCM (Android/iOS) push - inert until <see cref="Enabled"/> is set AND the Android app exists to register device tokens; see <see cref="FcmPushNotificationChannel"/>.

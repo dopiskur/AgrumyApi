@@ -1657,7 +1657,7 @@ public class ApiControllerTests
     }
 
 
-    private ServerConfigApiController NewServerConfigController() => new(_repo.Object, _cache.Object);
+    private ServerConfigApiController NewServerConfigController() => new(_repo.Object, _cache.Object, []);
     private SensorDataController NewSensorDataController() => new(_repo.Object, _cache.Object);
 
     [Fact]
@@ -1953,6 +1953,107 @@ public class ApiControllerTests
 
         Assert.IsType<OkResult>(result);
         Assert.Equal(6, saved!.ProblemEventExpiryHours);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(65536)]
+    public async Task ServerConfigUpdate_EmailPortOutOfRange_Returns400_AndNeverWrites(int port)
+    {
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.Update(new ServerConfig { EmailPort = port });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        // MockBehavior.Strict: ServerConfigUpdateAsync has no setup, proving the bad value was rejected before any write.
+    }
+
+    [Fact]
+    public async Task ServerConfigUpdate_EmailEnabledWithoutHostOrFromAddress_Returns400_AndNeverWrites()
+    {
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.Update(new ServerConfig { EmailEnabled = true, EmailPort = 587 });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task ServerConfigUpdate_EmailEnabledWithHostAndFromAddress_Persists()
+    {
+        ServerConfig? saved = null;
+        _repo.Setup(r => r.ServerConfigUpdateAsync(It.IsAny<ServerConfig>()))
+             .Callback<ServerConfig>(c => saved = c)
+             .Returns(Task.CompletedTask);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.Update(new ServerConfig
+        {
+            EmailEnabled = true,
+            EmailHost = "smtp.example.com",
+            EmailPort = 587,
+            EmailFromAddress = "alerts@agrumy.com",
+        });
+
+        Assert.IsType<OkResult>(result);
+        Assert.True(saved!.EmailEnabled);
+        Assert.Equal("smtp.example.com", saved.EmailHost);
+    }
+
+    [Fact]
+    public async Task TestEmail_NotGlobalAdmin_Returns403()
+    {
+        var controller = NewServerConfigController();
+        SetCallerRoles(controller, 0, "user", RoleNames.TenantAdmin);
+
+        var result = await controller.TestEmail("grower@example.com");
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result).StatusCode);
+    }
+
+    [Fact]
+    public async Task TestEmail_BlankRecipient_Returns400()
+    {
+        var controller = NewServerConfigController();
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.TestEmail("  ");
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task TestEmail_SendsThroughTheRegisteredEmailChannel()
+    {
+        var email = new Mock<INotificationChannel>(MockBehavior.Strict);
+        email.SetupGet(c => c.Name).Returns("email");
+        email.Setup(c => c.SendAsync(It.IsAny<Notification>(), default)).ReturnsAsync(NotificationResult.Ok("sent"));
+        var controller = new ServerConfigApiController(_repo.Object, _cache.Object, [email.Object]);
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.TestEmail("grower@example.com");
+
+        Assert.IsType<OkResult>(result);
+        email.Verify(c => c.SendAsync(It.Is<Notification>(n => n.Recipient.Email == "grower@example.com"), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task TestEmail_ChannelSkipsOrFails_Returns400WithDetail()
+    {
+        var email = new Mock<INotificationChannel>(MockBehavior.Strict);
+        email.SetupGet(c => c.Name).Returns("email");
+        email.Setup(c => c.SendAsync(It.IsAny<Notification>(), default)).ReturnsAsync(NotificationResult.Skipped("email channel disabled or missing Host/FromAddress"));
+        var controller = new ServerConfigApiController(_repo.Object, _cache.Object, [email.Object]);
+        SetCaller(controller, "admin", 0);
+
+        var result = await controller.TestEmail("grower@example.com");
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("email channel disabled or missing Host/FromAddress", badRequest.Value);
     }
 
     [Fact]

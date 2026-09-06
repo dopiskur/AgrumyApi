@@ -368,6 +368,10 @@ namespace api.Dal.Interface
         [Get("/api/ServerConfig")]
         Task<ServerConfig> ServerConfigGet();
 
+        /// Sends through the SAVED Email settings, not the unsaved form - see ServerConfigApiController.TestEmail.
+        [Post("/api/ServerConfig/TestEmail")]
+        Task ServerConfigTestEmail(string toEmail);
+
         [Put("/api/ServerConfig")]
         Task ServerConfigUpdate([Body] ServerConfig config);
 

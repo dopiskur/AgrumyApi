@@ -134,6 +134,33 @@ namespace api.Models
         // Never round-tripped back into the edit form - see ServerConfigController (Web)'s "blank keeps the existing value" handling.
         [Display(Name = "Broker password")]
         public string? MqttPassword { get; set; }
+
+        // SMTP email delivery config, DB-backed replacement for the old appsettings-only Notifications:Email section - see api.Notifications.EmailNotificationChannel, which now reads this instead.
+        [Display(Name = "Enable email notifications")]
+        public bool EmailEnabled { get; set; }
+
+        [Display(Name = "SMTP host")]
+        public string? EmailHost { get; set; }
+
+        [Display(Name = "SMTP port")]
+        public int EmailPort { get; set; } = 587;
+
+        /// 587 with STARTTLS (true, default) vs 465 implicit TLS (false).
+        [Display(Name = "Use STARTTLS")]
+        public bool EmailUseStartTls { get; set; } = true;
+
+        [Display(Name = "SMTP username")]
+        public string? EmailUsername { get; set; }
+
+        // Never round-tripped back into the edit form - same "blank keeps existing" handling as MqttPassword above.
+        [Display(Name = "SMTP password")]
+        public string? EmailPassword { get; set; }
+
+        [Display(Name = "From address")]
+        public string? EmailFromAddress { get; set; }
+
+        [Display(Name = "From name")]
+        public string EmailFromName { get; set; } = "Agrumy";
     }
 
     /// The only ServerConfig field a pre-login, unauthenticated page may see - Register uses it to decide whether to show "create a new tenant" without needing the admin-only /api/ServerConfig.

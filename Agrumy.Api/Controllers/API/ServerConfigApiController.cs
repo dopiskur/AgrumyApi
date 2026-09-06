@@ -1,5 +1,6 @@
 using api.Dal.Interface;
 using api.Models;
+using api.Notifications;
 using api.Security;
 using api.Utils;
 using Microsoft.AspNetCore.Authorization;
@@ -9,7 +10,7 @@ namespace api.Controllers.API
 {
     /// Server-wide settings, admin-only; there is exactly one row (id 1), auto-created on first read.
     [Route("api/ServerConfig")]
-    public class ServerConfigApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
+    public class ServerConfigApiController(IRepository repo, ICache cache, IEnumerable<INotificationChannel> notificationChannels) : ApiControllerBase(repo, cache)
     {
         // These are SERVER-WIDE settings, so Global admin only. The attribute stays at the wider RoleNames.LegacyAdmin gate so an account the multi-role migration missed reaches the inline check, where CallerIsGlobalAdmin's legacy fallback (tenant-0 admin) still lets it through.
 
@@ -136,10 +137,47 @@ namespace api.Controllers.API
                 return BadRequest("MQTT broker host is required to enable MQTT instant command push.");
             }
 
+            if (config.EmailPort is < 1 or > 65535)
+            {
+                return BadRequest("SMTP port must be between 1 and 65535.");
+            }
+            if (config.EmailEnabled && (string.IsNullOrWhiteSpace(config.EmailHost) || string.IsNullOrWhiteSpace(config.EmailFromAddress)))
+            {
+                return BadRequest("SMTP host and From address are required to enable email notifications.");
+            }
+
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await Repo.ServerConfigUpdateAsync(config);
             await WriteAuditAsync("ServerConfig.Updated", null, "ServerConfig", "1", null);
             return Ok();
+        }
+
+        /// Sends a real test message through the saved (not the unsaved form's) Email settings - "Save" first, then test - so an admin can confirm SMTP actually works without waiting on a real alert/activation email.
+        [HttpPost("TestEmail")]
+        [Authorize(Roles = RoleNames.LegacyAdmin)]
+        public async Task<ActionResult> TestEmail(string toEmail)
+        {
+            if (!CallerIsGlobalAdmin)
+            {
+                return StatusCode(403, "Server-wide settings require the Global admin role");
+            }
+            if (string.IsNullOrWhiteSpace(toEmail))
+            {
+                return BadRequest("toEmail is required.");
+            }
+
+            INotificationChannel? email = notificationChannels.FirstOrDefault(c => c.Name == "email");
+            if (email is null)
+            {
+                return StatusCode(500, "Email channel is not registered.");
+            }
+
+            var notification = new Notification(
+                "Agrumy test email",
+                "This is a test email from your Agrumy server's Server Settings -> Email section.",
+                new NotificationRecipient(toEmail));
+            NotificationResult result = await email.SendAsync(notification);
+            return result.Sent ? Ok() : BadRequest(result.Detail ?? "Send failed.");
         }
 
         /// The Register page is anonymous and must not call the admin-only Get() above just to know whether to show a "create a new tenant" field - this exposes only that one flag.
