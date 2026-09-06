@@ -1,0 +1,76 @@
+@model api.Models.DeviceView
+@using api.Models
+@using Microsoft.AspNetCore.Html
+
+@{
+    ViewData["Title"] = "Simulation Mode";
+    var device = Model.Device!;
+    var sim = Model.DeviceSimulation!;
+
+    // One row per overridable metric - the checkbox toggles whether the slider posts a value (checked) or is disabled (unchecked, so the browser omits it and the bound field stays null, i.e. "use the real reading"). Enabled/disabled state is inferred from the current value being non-null, not a separate stored flag.
+    string Field(string name) => $"{nameof(Model.DeviceSimulation)}.{name}";
+
+    IHtmlContent MetricRow(string name, string label, double? value, (double Min, double Max) range, string unit, double step = 1)
+    {
+        string field = Field(name);
+        string id = $"sim_{name}";
+        bool active = value.HasValue;
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"""
+        <div class="mb-3 row align-items-center">
+            <div class="col-sm-1">
+                <input type="checkbox" class="form-check-input sim-toggle" data-target="{id}" {(active ? "checked" : "")} />
+            </div>
+            <label class="col-sm-2 col-form-label">{label}</label>
+            <div class="col-sm-7">
+                <input type="range" class="form-range" id="{id}" name="{field}" min="{range.Min}" max="{range.Max}" step="{step}" value="{value ?? (range.Min + range.Max) / 2}" {(active ? "" : "disabled")}
+                       oninput="document.getElementById('{id}_val').textContent = this.value" />
+            </div>
+            <div class="col-sm-2">
+                <span id="{id}_val">{value ?? (range.Min + range.Max) / 2}</span> {unit}
+            </div>
+        </div>
+        """);
+        return new HtmlString(sb.ToString());
+    }
+}
+
+<h1>Simulation Mode</h1>
+<h4>@device.DeviceName</h4>
+<p class="text-muted">Roadmap #251 - per-metric overrides for THIS physical device. A metric left off keeps its real, physical reading; a metric turned on replaces the reading with the slider value before the device's own controller logic runs. Turning off "Simulation Mode" below returns the device to fully real readings without deleting anything.</p>
+
+<form asp-action="Simulation" method="post">
+    <input type="hidden" asp-for="Device!.IDDevice" />
+
+    <div class="form-check form-switch mb-4">
+        <input class="form-check-input" type="checkbox" role="switch" asp-for="DeviceSimulation!.Enabled" id="simEnabled" />
+        <label class="form-check-label" for="simEnabled"><strong>Simulation Mode enabled</strong></label>
+    </div>
+
+    @MetricRow(nameof(DeviceSimulation.Temperature), "Temperature", sim.Temperature, SimulationMetricRange.Temperature, "&deg;C", 0.1)
+    @MetricRow(nameof(DeviceSimulation.SoilTemperature), "Soil temperature", sim.SoilTemperature, SimulationMetricRange.SoilTemperature, "&deg;C", 0.1)
+    @MetricRow(nameof(DeviceSimulation.Humidity), "Humidity", sim.Humidity, SimulationMetricRange.Humidity, "%", 0.1)
+    @MetricRow(nameof(DeviceSimulation.Battery), "Battery", sim.Battery, SimulationMetricRange.Battery, "%")
+    @MetricRow(nameof(DeviceSimulation.Moisture), "Moisture", sim.Moisture, SimulationMetricRange.Moisture, "%")
+    @MetricRow(nameof(DeviceSimulation.Light), "Light", sim.Light, SimulationMetricRange.Light, "lux")
+    @MetricRow(nameof(DeviceSimulation.Co2), "CO2", sim.Co2, SimulationMetricRange.Co2, "ppm")
+    @MetricRow(nameof(DeviceSimulation.Tvoc), "TVOC", sim.Tvoc, SimulationMetricRange.Tvoc, "ppb")
+    @MetricRow(nameof(DeviceSimulation.Barometer), "Barometer", sim.Barometer, SimulationMetricRange.Barometer, "Pa")
+    @MetricRow(nameof(DeviceSimulation.LiquidPH), "Liquid pH", sim.LiquidPH, SimulationMetricRange.LiquidPH, "pH", 0.1)
+    @MetricRow(nameof(DeviceSimulation.RainLevel), "Rain level", sim.RainLevel, SimulationMetricRange.RainLevel, "")
+    @MetricRow(nameof(DeviceSimulation.WaterLevel), "Water level", sim.WaterLevel, SimulationMetricRange.WaterLevel, "")
+    @MetricRow(nameof(DeviceSimulation.Wind), "Wind", sim.Wind, SimulationMetricRange.Wind, "")
+
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-action="Details" asp-route-idDevice="@device.IDDevice" class="btn btn-outline-secondary">Cancel</a>
+</form>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.sim-toggle').forEach(function (cb) {
+            cb.addEventListener('change', function () {
+                document.getElementById(cb.dataset.target).disabled = !cb.checked;
+            });
+        });
+    </script>
+}

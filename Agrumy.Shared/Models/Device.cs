@@ -285,6 +285,8 @@ namespace api.Models
         public bool? Enabled { get; set; }
         // Tenant-wide fail-closed switch (roadmap #230), from Tenant.EmergencyStopActive - ActuatorController forces every relay off ahead of any rule when set, independent of DeviceConfigController.RelayEnabled.
         public bool? EmergencyStop { get; set; }
+        // Roadmap #251 modality A: true tells firmware to start polling GET /api/Device/Simulation every 5s (or on every wake if SleepDeep) for per-metric overrides, instead of relying on this same, slower Config poll.
+        public bool? SimulationModeEnabled { get; set; }
         public DeviceConfigSensor? DeviceConfigSensor { get; set; }
         public DeviceConfigController? DeviceConfigController { get; set; }
 
@@ -393,6 +395,43 @@ namespace api.Models
         public int? SensorWaterLevel { get; set; }
         public int? SensorWind { get; set; }
 
+    }
+
+    /// Roadmap #251 modality A. Per-metric sensor-reading overrides for an already-registered physical device - a null field means "use the real reading", Enabled=false ignores every field regardless of value. Same field set/types as SensorDataPush so an override slots in wherever a real reading would.
+    public class DeviceSimulation
+    {
+        public bool Enabled { get; set; }
+        public double? Temperature { get; set; }
+        public double? SoilTemperature { get; set; }
+        public double? Humidity { get; set; }
+        public int? Battery { get; set; }
+        public int? Moisture { get; set; }
+        public int? Light { get; set; }
+        public int? Co2 { get; set; }
+        public int? Tvoc { get; set; }
+        public double? Barometer { get; set; }
+        public double? LiquidPH { get; set; }
+        public int? RainLevel { get; set; }
+        public int? WaterLevel { get; set; }
+        public int? Wind { get; set; }
+    }
+
+    /// Slider bounds for the Simulation Mode Web UI - reasonable ranges, not hard physical limits (roadmap #251 only pins Temperature/Humidity/Co2 explicitly; the rest are a first-pass judgment call). Co2's 401-8000 matches the existing outlier guard in EfRepository.SensorData.cs.
+    public static class SimulationMetricRange
+    {
+        public static readonly (double Min, double Max) Temperature = (-50, 50);
+        public static readonly (double Min, double Max) SoilTemperature = (-50, 50);
+        public static readonly (double Min, double Max) Humidity = (0, 100);
+        public static readonly (double Min, double Max) Battery = (0, 100);
+        public static readonly (double Min, double Max) Moisture = (0, 100);
+        public static readonly (double Min, double Max) Light = (0, 100000);
+        public static readonly (double Min, double Max) Co2 = (401, 8000);
+        public static readonly (double Min, double Max) Tvoc = (0, 60000);
+        public static readonly (double Min, double Max) Barometer = (30000, 110000);
+        public static readonly (double Min, double Max) LiquidPH = (0, 14);
+        public static readonly (double Min, double Max) RainLevel = (0, 100);
+        public static readonly (double Min, double Max) WaterLevel = (0, 100);
+        public static readonly (double Min, double Max) Wind = (0, 100);
     }
 
     /// One physically-wired relay slot and the RelayFunction assigned to it - Slot is 1-based, matching AgrumyFirmware's ConfigPin.RELAY_PINS[Slot-1]. A slot with no row is unassigned/disabled; there is no fixed count baked into this shape, unlike the old fixed Relay1..Relay8 columns.

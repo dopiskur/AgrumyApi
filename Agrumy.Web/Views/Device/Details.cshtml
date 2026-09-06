@@ -139,6 +139,10 @@
         {
             <a asp-action="EditController" asp-route-idDevice="@Model.IDDevice" class="btn btn-primary">Controller config</a>
         }
+        @if (hasAnyRole(RoleNames.SimulationManagers))
+        {
+            <a asp-action="Simulation" asp-route-idDevice="@Model.IDDevice" class="btn btn-outline-primary">Simulation Mode</a>
+        }
         <a asp-action="Events" asp-route-idDevice="@Model.IDDevice" class="btn btn-secondary">Events</a>
         <a asp-action="Delete" asp-route-idDevice="@Model.IDDevice" class="btn btn-danger">Delete</a>
         <a asp-action="Fleet" class="btn btn-outline-secondary">Back to List</a>

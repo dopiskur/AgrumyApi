@@ -418,5 +418,52 @@ namespace api.Controllers.API
             Ok(await Repo.DeviceTypeSensorGetAsync());
 
         #endregion
+
+        #region Simulation Mode
+
+        /// Device-facing poll (roadmap #251 modality A) - identity comes from the authenticated apiId, same rule as PushEvent/AckCommand, never a route parameter. No content when Simulation Mode isn't enabled, so firmware has a cheap "nothing to override" signal without parsing a body full of nulls.
+        [HttpGet("Simulation")]
+        [Authorize(Policy = DeviceAuth.SessionPolicy)]
+        public async Task<ActionResult<DeviceSimulation>> DeviceSimulationPoll()
+        {
+            string apiId = HttpContext.DeviceApiId()!;
+            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            if (device is null)
+            {
+                return Unauthorized();
+            }
+
+            DeviceSimulation? sim = await Repo.DeviceSimulationGetAsync(device.IDDevice!.Value);
+            return sim is { Enabled: true } ? Ok(sim) : NoContent();
+        }
+
+        /// Admin read for the Web Simulation page - an empty, disabled DeviceSimulation (not 404) when the device has never had one set, so the form has something to bind to.
+        [HttpGet("Simulation/{idDevice}")]
+        [Authorize(Roles = RoleNames.SimulationManagers)]
+        public async Task<ActionResult<DeviceSimulation>> DeviceSimulationGet(int idDevice)
+        {
+            var (_, error) = await EnsureOwnedDeviceAsync(() => Repo.DeviceGetByIdAsync(idDevice), "Device", forWrite: false);
+            if (error != null)
+            {
+                return error;
+            }
+            return Ok(await Repo.DeviceSimulationGetAsync(idDevice) ?? new DeviceSimulation());
+        }
+
+        [HttpPut("Simulation/{idDevice}")]
+        [Authorize(Roles = RoleNames.SimulationManagers)]
+        public async Task<ActionResult> DeviceSimulationSet(int idDevice, [FromBody] DeviceSimulation value)
+        {
+            var (device, error) = await EnsureOwnedDeviceAsync(() => Repo.DeviceGetByIdAsync(idDevice), "Device", forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            await Repo.DeviceSimulationSetAsync(idDevice, value);
+            await WriteAuditAsync("Device.SimulationSet", device!.TenantID, "Device", idDevice.ToString(), device.DeviceName);
+            return Ok();
+        }
+
+        #endregion
     }
 }

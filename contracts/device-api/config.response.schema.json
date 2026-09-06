@@ -31,6 +31,7 @@
     "firmwareSha256",
     "enabled",
     "emergencyStop",
+    "simulationModeEnabled",
     "deviceConfigSensor",
     "deviceConfigController",
     "commandVersion",
@@ -194,6 +195,13 @@
         "null"
       ],
       "description": "Roadmap #230. Tenant-wide fail-closed switch (Tenant.EmergencyStopActive) - true forces every relay off ahead of any rule, independent of deviceConfigController's own relayEnabled."
+    },
+    "simulationModeEnabled": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Roadmap #251 modality A. True tells firmware to start polling GET /api/Device/Simulation every 5s (or on every wake if sleepDeep) for per-metric sensor-reading overrides, applying them before local controller logic runs - same table/principle for a real device as for a fully virtual one (roadmap #343)."
     },
     "deviceConfigSensor": {
       "description": "Populated only when deviceSensorEnabled is true; otherwise serialized as null (System.Text.Json keeps the key).",

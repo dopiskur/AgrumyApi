@@ -1239,8 +1239,10 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (tenantId, _, _) = await MakeUser(t);
         var d = await MakeDevice(t, tenantId);
 
-        // FK from diagnostic to device is NoAction, not Cascade - a diagnostic row must not block delete.
+        // FKs from diagnostic/controllerData/deviceSimulation to device are all NoAction, not Cascade - none of the three must block delete.
         await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice!.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
+        await _repo.ControllerDataPushAsync(d.IDDevice!.Value, tenantId, new List<ControllerDataPush> { new() { RelayFunction = RelayFunction.Heating, IsOn = true } });
+        await _repo.DeviceSimulationSetAsync(d.IDDevice!.Value, new DeviceSimulation { Enabled = true, Temperature = 20 });
 
         await _repo.DeviceDeleteAsync(d.IDDevice, tenantId);
 
@@ -1249,6 +1251,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.False(await db.DeviceConfigSensors.AnyAsync(c => c.IDDeviceConfigSensor == d.DeviceConfigSensorID));
         Assert.False(await db.DeviceConfigControllers.AnyAsync(c => c.IDDeviceConfigController == d.DeviceConfigControllerID));
         Assert.False(await db.DeviceDiagnostics.AnyAsync(x => x.DeviceID == d.IDDevice));
+        Assert.False(await db.ControllerData.AnyAsync(x => x.DeviceID == d.IDDevice));
+        Assert.False(await db.DeviceSimulations.AnyAsync(x => x.DeviceID == d.IDDevice));
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -1441,6 +1445,30 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(2, states.Count);
         Assert.False(states.Single(s => s.RelayFunction == RelayFunction.Heating).IsOn);
         Assert.True(states.Single(s => s.RelayFunction == RelayFunction.Light).IsOn);
+    }
+
+    // Roadmap #251 modality A: upsert semantics (create on first set, update after) and null-vs-value round-tripping.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceSimulation_SetThenGet_Upserts_AndRoundTripsNulls(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+
+        Assert.Null(await _repo.DeviceSimulationGetAsync(d.IDDevice!.Value));
+
+        await _repo.DeviceSimulationSetAsync(d.IDDevice!.Value, new DeviceSimulation { Enabled = true, Temperature = 26.5, Co2 = 900 });
+        DeviceSimulation? first = await _repo.DeviceSimulationGetAsync(d.IDDevice!.Value);
+        Assert.NotNull(first);
+        Assert.True(first!.Enabled);
+        Assert.Equal(26.5, first.Temperature);
+        Assert.Null(first.Humidity);
+
+        await _repo.DeviceSimulationSetAsync(d.IDDevice!.Value, new DeviceSimulation { Enabled = false, Humidity = 60 });
+        DeviceSimulation? second = await _repo.DeviceSimulationGetAsync(d.IDDevice!.Value);
+        Assert.False(second!.Enabled);
+        Assert.Null(second.Temperature); // overwritten wholesale, not merged
+        Assert.Equal(60, second.Humidity);
     }
 
     // DeviceFleetGetAsync must surface ControllerData without a per-device round trip - see BuildFleetStatusesAsync's relayStates dictionary.

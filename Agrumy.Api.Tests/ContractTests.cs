@@ -24,6 +24,7 @@ public class ContractTests
         "config.response.schema.json",
         "sensordata.request.schema.json",
         "controllerdata.request.schema.json",
+        "simulation.response.schema.json",
     };
 
     private static JsonSchema Load(string file) =>
@@ -46,7 +47,7 @@ public class ContractTests
 
 
     [Fact]
-    public void AllEightSchemaFilesArePresentAndParseAsSchemas()
+    public void AllNineSchemaFilesArePresentAndParseAsSchemas()
     {
         foreach (var f in ExpectedSchemaFiles)
         {
@@ -278,5 +279,13 @@ public class ContractTests
         };
 
         AssertValid("controllerdata.request.schema.json", JsonSerializer.Serialize(entries, Mvc));
+    }
+
+    // Roadmap #251 modality A: only reachable when Enabled is true - the server answers 204 otherwise (DeviceApiController.DeviceSimulationPoll), so this is the only shape that ever reaches the wire.
+    [Fact]
+    public void SimulationResponse_RealSerialization_MatchesSchema()
+    {
+        var sim = new DeviceSimulation { Enabled = true, Temperature = 26.5, Humidity = 55.0, Co2 = 800 };
+        AssertValid("simulation.response.schema.json", JsonSerializer.Serialize(sim, Mvc));
     }
 }

@@ -366,6 +366,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.TenantGetByIdAsync(3)).ReturnsAsync(new Tenant { IDTenant = 3 });
         _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // none pending
         _repo.Setup(r => r.DeviceMarkConfigSentAsync(500, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.DeviceSimulationGetAsync(500)).ReturnsAsync((DeviceSimulation?)null);
 
         // Version mismatch must return the full config from the DB read, not a cache lookup that no longer carries ConfigVersion.
         var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 65 });
@@ -391,6 +392,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.TenantGetByIdAsync(3)).ReturnsAsync(new Tenant { IDTenant = 3 });
         _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>());
         _repo.Setup(r => r.DeviceMarkConfigSentAsync(500, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.DeviceSimulationGetAsync(500)).ReturnsAsync((DeviceSimulation?)null);
 
         var result = await controller.GetConfig(new DeviceConfigPoll { ConfigVersion = 66 });
 
@@ -491,6 +493,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig()); // BuildDeviceConfigAsync always reads this now
         _repo.Setup(r => r.TenantGetByIdAsync(1)).ReturnsAsync(new Tenant { IDTenant = 1 });
         _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // none pending
+        _repo.Setup(r => r.DeviceSimulationGetAsync(500)).ReturnsAsync((DeviceSimulation?)null);
 
         var result = await NewDeviceController().DeviceRegistration(PinRegistration("abc234"));
 
@@ -509,6 +512,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.TenantGetByIdAsync(1)).ReturnsAsync(new Tenant { IDTenant = 1 });
         _repo.Setup(r => r.GetPendingCommandsAsync(500)).ReturnsAsync(new List<DeviceCommand>()); // none pending
         _repo.Setup(r => r.GetPendingCommandsAsync(501)).ReturnsAsync(new List<DeviceCommand>());
+        _repo.Setup(r => r.DeviceSimulationGetAsync(It.IsAny<int>())).ReturnsAsync((DeviceSimulation?)null);
 
         var first = await NewDeviceController().DeviceRegistration(PinRegistration("ABC234"));
         var second = await NewDeviceController().DeviceRegistration(new DeviceRegistration
@@ -545,6 +549,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.TenantGetByIdAsync(1)).ReturnsAsync(new Tenant { IDTenant = 1 });
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
         _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
+        _repo.Setup(r => r.DeviceSimulationGetAsync(900)).ReturnsAsync((DeviceSimulation?)null);
 
         var result = await NewDeviceControllerWithGatewaySecret("shared-secret").DeviceRegistration(new DeviceRegistration
         {
@@ -574,6 +579,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.TenantGetByIdAsync(1)).ReturnsAsync(new Tenant { IDTenant = 1 });
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
         _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
+        _repo.Setup(r => r.DeviceSimulationGetAsync(900)).ReturnsAsync((DeviceSimulation?)null);
 
         var result = await NewDeviceControllerWithGatewaySecret("shared-secret").DeviceRegistration(new DeviceRegistration
         {
@@ -603,6 +609,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.TenantGetByIdAsync(1)).ReturnsAsync(new Tenant { IDTenant = 1 });
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
         _repo.Setup(r => r.GetActiveProvisionCommandsAsync()).ReturnsAsync(new List<DeviceCommand>());
+        _repo.Setup(r => r.DeviceSimulationGetAsync(900)).ReturnsAsync((DeviceSimulation?)null);
 
         var result = await NewDeviceControllerWithGatewaySecret(null).DeviceRegistration(new DeviceRegistration
         {
@@ -628,6 +635,7 @@ public class ApiControllerTests
         _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig());
         _repo.Setup(r => r.TenantGetByIdAsync(1)).ReturnsAsync(new Tenant { IDTenant = 1 });
         _repo.Setup(r => r.GetPendingCommandsAsync(900)).ReturnsAsync(new List<DeviceCommand>());
+        _repo.Setup(r => r.DeviceSimulationGetAsync(900)).ReturnsAsync((DeviceSimulation?)null);
         captured = () => c;
     }
 

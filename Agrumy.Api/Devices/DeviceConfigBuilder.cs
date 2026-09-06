@@ -56,6 +56,7 @@ namespace api.Devices
                 EmergencyStop = tenant?.EmergencyStopActive == true,
                 CommandVersion = device.CommandVersion,
                 PendingCommand = pendingCommand,
+                SimulationModeEnabled = (await repo.DeviceSimulationGetAsync(device.IDDevice!.Value))?.Enabled == true,
             };
 
             // Firmware compares versions itself, so an offer present on every Config sync is fine, and harmless on Register too since ResolveOfferAsync returns null for a freshly-created device.

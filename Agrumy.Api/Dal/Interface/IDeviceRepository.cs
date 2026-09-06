@@ -104,5 +104,13 @@ namespace api.Dal.Interface
 
         /// Sets (or clears, notifiedAt: null) LowBatteryNotifiedAt on one device's diagnostic row.
         Task DeviceLowBatteryNotifiedSetAsync(int deviceID, DateTime? notifiedAt);
+
+        // Simulation Mode (roadmap #251 modality A)
+
+        /// Null when the device has never had a Simulation row created (equivalent to Enabled=false, every field null) - callers should treat both the same way.
+        Task<DeviceSimulation?> DeviceSimulationGetAsync(int deviceID);
+
+        /// Upsert - creates the row on first call for a device, updates every field afterward.
+        Task DeviceSimulationSetAsync(int deviceID, DeviceSimulation value);
     }
 }

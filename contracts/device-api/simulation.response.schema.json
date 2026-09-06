@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/dopiskur/AgrumyService/contracts/device-api/simulation.response.schema.json",
+  "title": "Device Simulation - response  (server -> firmware)",
+  "description": "Roadmap #251 modality A. System.Text.Json serialization of api.Models.DeviceSimulation, returned by GET /api/Device/Simulation only when Simulation Mode is enabled for the polling device (DeviceApiController.DeviceSimulationPoll) - the server answers HTTP 204 with no body otherwise, so firmware never has to parse an all-null object just to learn there is nothing to override. A non-null metric field replaces that reading before SensorController hands values to ActuatorController's rule evaluation; a null field means 'use the real reading'. Credentials travel as HTTP HEADERS: 'apiId' and 'Authorization' (apiAuth token) - same rule as GET/POST on every other device-facing endpoint.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "enabled", "temperature", "soilTemperature", "humidity", "battery", "moisture",
+    "light", "co2", "tvoc", "barometer", "liquidPH", "rainLevel", "waterLevel", "wind"
+  ],
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "description": "Always true on this response - the endpoint returns 204 instead of enabled:false."
+    },
+    "temperature": { "type": ["number", "null"] },
+    "soilTemperature": { "type": ["number", "null"] },
+    "humidity": { "type": ["number", "null"] },
+    "battery": { "type": ["integer", "null"] },
+    "moisture": { "type": ["integer", "null"] },
+    "light": { "type": ["integer", "null"] },
+    "co2": { "type": ["integer", "null"] },
+    "tvoc": { "type": ["integer", "null"] },
+    "barometer": { "type": ["number", "null"] },
+    "liquidPH": {
+      "type": ["number", "null"],
+      "description": "C# property is 'LiquidPH'; camelCase leaves the 'PH' suffix uppercase -> 'liquidPH', same as deviceConfigSensor.sensorPH in config.response.schema.json."
+    },
+    "rainLevel": { "type": ["integer", "null"] },
+    "waterLevel": { "type": ["integer", "null"] },
+    "wind": { "type": ["integer", "null"] }
+  }
+}

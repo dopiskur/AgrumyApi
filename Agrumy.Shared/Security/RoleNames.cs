@@ -19,11 +19,14 @@ namespace api.Security
         public const string GlobalDataReader = "Global Data Reader";
         public const string TenantDataReader = "Tenant Data Reader";
 
+        /// Roadmap #251: manages Simulation Mode overrides without needing full Tenant admin - composable, layered on top of a *Reader base like the grants above.
+        public const string SimulationAdministrator = "Simulation administrator";
+
         public static readonly IReadOnlyList<string> All = new[]
         {
             GlobalAdmin, GlobalReader, GlobalUser, GlobalDevice,
             TenantAdmin, TenantReader, TenantUser, TenantDevice,
-            GlobalDataReader, TenantDataReader,
+            GlobalDataReader, TenantDataReader, SimulationAdministrator,
         };
 
         // Legacy role names - still what every [Authorize(Roles="admin")] check across older call sites looks for; CreateToken derives and adds one of these alongside the real role set so nothing built before the multi-role model breaks.
@@ -53,5 +56,8 @@ namespace api.Security
 
         /// May read server metrics (/metrics, /metrics/prometheus) - RequireRole takes individual names, not a comma-joined [Authorize] string.
         public static readonly string[] MetricsReaders = { GlobalAdmin, GlobalDataReader, TenantDataReader };
+
+        /// May view/edit a device's Simulation Mode overrides (roadmap #251) - tenant scoping still applies inline, same rule as DeviceManagers.
+        public const string SimulationManagers = LegacyAdmin + "," + GlobalAdmin + "," + TenantAdmin + "," + SimulationAdministrator;
     }
 }

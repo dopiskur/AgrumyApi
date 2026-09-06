@@ -17,5 +17,7 @@
         public TimeRange? TimeRange { get; set; } = new TimeRange();
 
         public IList<DeviceEvent>? Events { get; set; }
+        // Roadmap #251 modality A - bound only by the Simulation page.
+        public DeviceSimulation? DeviceSimulation { get; set; }
     }
 }

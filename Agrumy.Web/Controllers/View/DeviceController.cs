@@ -309,6 +309,27 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Details), new { idDevice = deviceView.Device!.IDDevice });
         }
 
+        [Authorize(Roles = RoleNames.SimulationManagers)]
+        public async Task<ActionResult> Simulation(int? idDevice)
+        {
+            var device = await api.DeviceGet(idDevice);
+            return View(new DeviceView
+            {
+                Device = device,
+                DeviceSimulation = await api.DeviceSimulationGet(idDevice!.Value),
+            });
+        }
+
+        [Authorize(Roles = RoleNames.SimulationManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> Simulation(DeviceView deviceView)
+        {
+            int idDevice = deviceView.Device!.IDDevice!.Value;
+            await api.DeviceSimulationSet(idDevice, deviceView.DeviceSimulation!);
+            return RedirectToAction(nameof(Details), new { idDevice });
+        }
+
         [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> EditController(int? idDevice)
         {

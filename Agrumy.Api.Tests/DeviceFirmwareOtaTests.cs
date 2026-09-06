@@ -25,6 +25,7 @@ public class DeviceFirmwareOtaTests
         _repo.Setup(r => r.TenantGetByIdAsync(device.TenantID)).ReturnsAsync(new Tenant { IDTenant = device.TenantID });
         // DeviceRegistration always checks for a pending command before returning.
         _repo.Setup(r => r.GetPendingCommandsAsync(device.IDDevice!.Value)).ReturnsAsync(new List<DeviceCommand>());
+        _repo.Setup(r => r.DeviceSimulationGetAsync(device.IDDevice!.Value)).ReturnsAsync((DeviceSimulation?)null);
 
         var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
         var controller = new DeviceApiController(_repo.Object, _cache.Object,
