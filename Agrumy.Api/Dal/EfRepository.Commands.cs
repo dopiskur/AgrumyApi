@@ -1,135 +1,28 @@
-using api.Dal.Entities;
 using api.Dal.Interface;
 using api.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// ICommandRepository members: raw deviceCommand CRUD.
+    /// ICommandRepository members - forwarded to the standalone EfCommandRepository (roadmap #246) so IRepository's broad consumers keep working unchanged.
     internal partial class EfRepository
     {
-        public async Task<bool> HasActiveCommandAsync(int deviceId, CommandActionType actionType, DateTime utcNow)
-        {
-            int[] activeStatuses = [(int)CommandStatus.Pending, (int)CommandStatus.Acknowledged];
-            return await db.DeviceCommands.AsNoTracking().AnyAsync(c =>
-                c.DeviceID == deviceId &&
-                c.ActionType == (int)actionType &&
-                activeStatuses.Contains(c.Status) &&
-                c.ExpiresAt > utcNow);
-        }
+        public Task<bool> HasActiveCommandAsync(int deviceId, CommandActionType actionType, DateTime utcNow) =>
+            commandRepository.HasActiveCommandAsync(deviceId, actionType, utcNow);
 
-        /// Null return means the ux_deviceCommand_device_activekey unique index rejected the insert (another request won the race) - the caller treats this as a dedup skip, not an error.
-        public async Task<int?> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt, string? payload = null)
-        {
-            var row = new DeviceCommandRow
-            {
-                DeviceID = deviceId,
-                ActionType = (int)actionType,
-                Status = (int)CommandStatus.Pending,
-                ActiveKey = (int)actionType,
-                IssuedAt = issuedAt,
-                ExpiresAt = expiresAt,
-                Payload = payload,
-            };
-            db.DeviceCommands.Add(row);
+        public Task<int?> AddCommandAsync(int deviceId, CommandActionType actionType, DateTime issuedAt, DateTime expiresAt, string? payload = null) =>
+            commandRepository.AddCommandAsync(deviceId, actionType, issuedAt, expiresAt, payload);
 
-            // CommandVersion is deliberately separate from ConfigVersion - bumped here and nowhere else.
-            var device = await db.Devices.FirstOrDefaultAsync(d => d.IDDevice == deviceId);
-            if (device != null)
-            {
-                device.CommandVersion++;
-            }
+        public Task<IList<DeviceCommand>> GetPendingCommandsAsync(int deviceId) => commandRepository.GetPendingCommandsAsync(deviceId);
 
-            try
-            {
-                await db.SaveChangesAsync();
-            }
-            catch (DbUpdateException ex) when (ClassifyException(ex) == DbFailureKind.ConstraintViolation)
-            {
-                // SaveChangesAsync runs both statements in one transaction, so nothing was actually persisted - detach/revert so a later SaveChangesAsync on this context doesn't retry either statement.
-                db.Entry(row).State = EntityState.Detached;
-                if (device != null)
-                {
-                    device.CommandVersion--;
-                }
-                return null;
-            }
-            return row.IDDeviceCommand;
-        }
+        public Task ExpirePendingCommandsAsync(int deviceId, DateTime utcNow) => commandRepository.ExpirePendingCommandsAsync(deviceId, utcNow);
 
-        public async Task<IList<DeviceCommand>> GetPendingCommandsAsync(int deviceId)
-        {
-            var rows = await db.DeviceCommands.AsNoTracking()
-                .Where(c => c.DeviceID == deviceId && c.Status == (int)CommandStatus.Pending)
-                .OrderBy(c => c.IssuedAt)
-                .ToListAsync();
-            return rows.Select(ToDto).ToList();
-        }
+        public Task<IList<DeviceCommand>> GetActiveProvisionCommandsAsync() => commandRepository.GetActiveProvisionCommandsAsync();
 
-        public async Task ExpirePendingCommandsAsync(int deviceId, DateTime utcNow)
-        {
-            // Clears ActiveKey too, same as SetCommandStatusAsync's Expired branch - otherwise the freed dedup slot stays wrongly occupied.
-            await db.DeviceCommands
-                .Where(c => c.DeviceID == deviceId && c.Status == (int)CommandStatus.Pending && c.ExpiresAt <= utcNow)
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(c => c.Status, (int)CommandStatus.Expired)
-                    .SetProperty(c => c.ActiveKey, (int?)null));
-        }
+        public Task<DeviceCommand?> GetCommandByIdAsync(int commandId) => commandRepository.GetCommandByIdAsync(commandId);
 
-        public async Task<IList<DeviceCommand>> GetActiveProvisionCommandsAsync()
-        {
-            int[] activeStatuses = [(int)CommandStatus.Pending, (int)CommandStatus.Acknowledged];
-            var rows = await db.DeviceCommands.AsNoTracking()
-                .Where(c => c.ActionType == (int)CommandActionType.ProvisionDevice && activeStatuses.Contains(c.Status))
-                .ToListAsync();
-            return rows.Select(ToDto).ToList();
-        }
+        public Task SetCommandStatusAsync(int commandId, CommandStatus status, DateTime? executedAt = null) =>
+            commandRepository.SetCommandStatusAsync(commandId, status, executedAt);
 
-        public async Task<DeviceCommand?> GetCommandByIdAsync(int commandId)
-        {
-            var row = await db.DeviceCommands.AsNoTracking().FirstOrDefaultAsync(c => c.IDDeviceCommand == commandId);
-            return row == null ? null : ToDto(row);
-        }
-
-        public async Task SetCommandStatusAsync(int commandId, CommandStatus status, DateTime? executedAt = null)
-        {
-            var row = await db.DeviceCommands.FirstOrDefaultAsync(c => c.IDDeviceCommand == commandId);
-            if (row == null)
-            {
-                return;
-            }
-            row.Status = (int)status;
-            if (executedAt != null)
-            {
-                row.ExecutedAt = executedAt;
-            }
-            // Frees the (DeviceID, ActiveKey) unique slot the moment this row stops being active - Acknowledged keeps it set, only the two terminal states clear it.
-            if (status is CommandStatus.Executed or CommandStatus.Expired)
-            {
-                row.ActiveKey = null;
-            }
-            await db.SaveChangesAsync();
-        }
-
-        /// Bulk-deletes terminal-status (Executed/Expired) rows older than the cutoff since deviceCommand otherwise grows unbounded - Pending/Acknowledged rows are never touched regardless of age.
-        public async Task PurgeOldCommandsAsync(DateTime issuedBeforeUtc, CancellationToken ct = default)
-        {
-            int[] terminalStatuses = [(int)CommandStatus.Executed, (int)CommandStatus.Expired];
-            await db.DeviceCommands
-                .Where(c => terminalStatuses.Contains(c.Status) && c.IssuedAt < issuedBeforeUtc)
-                .ExecuteDeleteAsync(ct);
-        }
-
-        private static DeviceCommand ToDto(DeviceCommandRow c) => new()
-        {
-            IDDeviceCommand = c.IDDeviceCommand,
-            DeviceID = c.DeviceID,
-            ActionType = (CommandActionType)c.ActionType,
-            Status = (CommandStatus)c.Status,
-            IssuedAt = c.IssuedAt,
-            ExpiresAt = c.ExpiresAt,
-            ExecutedAt = c.ExecutedAt,
-            Payload = c.Payload,
-        };
+        public Task PurgeOldCommandsAsync(DateTime issuedBeforeUtc, CancellationToken ct = default) => commandRepository.PurgeOldCommandsAsync(issuedBeforeUtc, ct);
     }
 }
