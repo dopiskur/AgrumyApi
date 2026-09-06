@@ -8,16 +8,16 @@ namespace api.Dal
     {
         public async Task VirtualDeviceRegisterAsync(int deviceID)
         {
-            db.VirtualDevices.Add(new VirtualDeviceRow { DeviceID = deviceID, DateCreated = DateTime.UtcNow });
+            db.DeviceVirtuals.Add(new DeviceVirtualRow { DeviceID = deviceID, DateCreated = DateTime.UtcNow });
             await db.SaveChangesAsync();
         }
 
         public async Task<IList<int>> VirtualDeviceIdsGetAsync() =>
-            await db.VirtualDevices.AsNoTracking().Select(v => v.DeviceID).ToListAsync();
+            await db.DeviceVirtuals.AsNoTracking().Select(v => v.DeviceID).ToListAsync();
 
         public async Task<IList<int>> VirtualDeviceIdsGetAsync(int? tenantID)
         {
-            IQueryable<int> ids = db.VirtualDevices.AsNoTracking()
+            IQueryable<int> ids = db.DeviceVirtuals.AsNoTracking()
                 .Join(db.Devices.AsNoTracking(), v => v.DeviceID, d => d.IDDevice, (v, d) => new { v.DeviceID, d.TenantID })
                 .Where(x => tenantID == null || x.TenantID == tenantID)
                 .Select(x => x.DeviceID);
@@ -28,7 +28,7 @@ namespace api.Dal
         {
             // Synthetic telemetry has no historical value once the device is gone - unlike DeviceDeleteAsync's rule for a REAL device, whose sensorData stays for the record.
             await db.SensorData.Where(s => s.DeviceID == deviceID).ExecuteDeleteAsync();
-            await db.VirtualDevices.Where(v => v.DeviceID == deviceID).ExecuteDeleteAsync();
+            await db.DeviceVirtuals.Where(v => v.DeviceID == deviceID).ExecuteDeleteAsync();
             await DeviceDeleteAsync(deviceID, tenantID);
         }
     }

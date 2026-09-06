@@ -1561,7 +1561,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Null(await _repo.DeviceGetByIdAsync(d.IDDevice));
         await using var db = _fx.NewContext(t);
         Assert.False(await db.SensorData.AnyAsync(s => s.DeviceID == d.IDDevice));
-        Assert.False(await db.VirtualDevices.AnyAsync(v => v.DeviceID == d.IDDevice));
+        Assert.False(await db.DeviceVirtuals.AnyAsync(v => v.DeviceID == d.IDDevice));
     }
 
     // DeviceFleetGetAsync must surface ControllerData without a per-device round trip - see BuildFleetStatusesAsync's relayStates dictionary.

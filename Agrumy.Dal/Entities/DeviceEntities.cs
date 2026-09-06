@@ -202,7 +202,7 @@ namespace api.Dal.Entities
     }
 
     /// Purely a server-internal registry of which device rows VirtualDeviceRunnerBackgroundService is responsible for driving - never exposed on any wire contract, never read by the device-facing endpoints themselves (Register/Authenticate/Config/SensorData/ControllerData have no idea a caller is virtual). A device with no row here is an ordinary, real device.
-    public class VirtualDeviceRow
+    public class DeviceVirtualRow
     {
         public int DeviceID { get; set; }
         public DateTime DateCreated { get; set; }
