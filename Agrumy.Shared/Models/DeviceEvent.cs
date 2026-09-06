@@ -19,13 +19,13 @@ namespace api.Models
         SafetyLimitTripped = 12,
         // Message carries a compact core-dump summary (task/pc/cause/backtrace); full symbolication still needs firmware.elf + addr2line offline.
         Crash = 13,
-        // Wire.endTransmission() failed writing the PCF8574 relay shadow - see #365.
+        // Wire.endTransmission() failed writing the PCF8574 relay shadow.
         I2CFault = 14,
-        // A rule had an unrecognized/over-cap condition and was rejected whole rather than silently truncated - see #367.
+        // A rule had an unrecognized/over-cap condition and was rejected whole rather than silently truncated.
         RuleRejected = 15,
-        // A relay-function evaluator hit a NaN sensor reading - see #368.
+        // A relay-function evaluator hit a NaN sensor reading.
         SensorStale = 16,
-        // ESP.getFreeHeap() dropped below the device's own reboot threshold - see #360, replaces the old raw-failed-config-cycle-count trigger.
+        // ESP.getFreeHeap() dropped below the device's own reboot threshold, replacing the old raw-failed-config-cycle-count trigger.
         LowMemoryReboot = 17,
     }
 

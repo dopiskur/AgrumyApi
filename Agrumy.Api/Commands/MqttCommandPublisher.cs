@@ -35,7 +35,7 @@ namespace api.Commands
             // ConditionConfigJson.Options camelCases properties and leaves ActionType as its int, matching the shape the HTTP config-poll response already sends this same type as.
             byte[] commandBytes = JsonSerializer.SerializeToUtf8Bytes(command, ConditionConfigJson.Options);
 
-            // Roadmap #363: anyone with broker credentials could otherwise command any device on any tenant (MqttUsername/Password are ServerConfig-wide, not per-device) - signing with the TARGET device's own ApiKey means forging a command needs that specific device's credential, not just broker access.
+            // Anyone with broker credentials could otherwise command any device on any tenant (MqttUsername/Password are ServerConfig-wide, not per-device) - signing with the TARGET device's own ApiKey means forging a command needs that specific device's credential, not just broker access.
             JsonNode commandNode = JsonNode.Parse(commandBytes)!;
             string canonical = CanonicalString(commandNode);
             commandNode["sig"] = ComputeSignature(canonical, device.ApiKey ?? "");

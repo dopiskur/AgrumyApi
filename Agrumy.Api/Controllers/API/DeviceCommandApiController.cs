@@ -65,7 +65,7 @@ namespace api.Controllers.API
             return Ok(command);
         }
 
-        /// Roadmap #372: ProvisionDevice/UpdateWifiCredentials payloads carry a WiFi password, registration PIN, and username in plaintext (see api.Models.DiscoveryProvisionPayload/WifiUpdatePayload) - fully redacted here, not partially masked like ServiceController::maskSecret does for apiKey, since a password must never have any real character visible. Null on a non-JSON or non-sensitive payload (plain Reboot/ForceOTA commands carry none) so those pass through unchanged.
+        /// ProvisionDevice/UpdateWifiCredentials payloads carry a WiFi password, registration PIN, and username in plaintext (see api.Models.DiscoveryProvisionPayload/WifiUpdatePayload) - fully redacted here, not partially masked like ServiceController::maskSecret does for apiKey, since a password must never have any real character visible. Null on a non-JSON or non-sensitive payload (plain Reboot/ForceOTA commands carry none) so those pass through unchanged.
         private static string? MaskSensitivePayload(string? payload)
         {
             if (string.IsNullOrEmpty(payload))

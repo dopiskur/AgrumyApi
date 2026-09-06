@@ -293,7 +293,7 @@ namespace api.Controllers.API
             return result.Outcome == IssueCommandOutcome.Success ? Ok() : Conflict(result.Message);
         }
 
-        /// Roadmap #357: GlobalAdmin-only (stricter than the DeviceManagers bar the other actions on this controller use) since this wipes the device and requires physical/captive-portal re-provisioning - the flag rides to the device via a normal config poll AND, since that path is exactly what a broken apiKey would block, via HardResetPending below.
+        /// GlobalAdmin-only (stricter than the DeviceManagers bar the other actions on this controller use) since this wipes the device and requires physical/captive-portal re-provisioning - the flag rides to the device via a normal config poll AND, since that path is exactly what a broken apiKey would block, via HardResetPending below.
         [Authorize(Roles = RoleNames.GlobalAdmin)]
         [HttpPost("HardReset")]
         public async Task<ActionResult> HardResetRequest(int idDevice)
@@ -309,7 +309,7 @@ namespace api.Controllers.API
             return Ok();
         }
 
-        /// Roadmap #357: the ONLY device-facing endpoint reachable with nothing but a still-valid apiId - no apiKey/session required, since this exists specifically for a device whose own apiKey is what's broken. Exposes nothing beyond this one boolean, and self-clears the moment it reports true so a device that successfully wipes never gets asked twice.
+        /// The ONLY device-facing endpoint reachable with nothing but a still-valid apiId - no apiKey/session required, since this exists specifically for a device whose own apiKey is what's broken. Exposes nothing beyond this one boolean, and self-clears the moment it reports true so a device that successfully wipes never gets asked twice.
         [AllowAnonymous]
         [EnableRateLimiting("device-auth")]
         [HttpGet("HardResetPending")]
