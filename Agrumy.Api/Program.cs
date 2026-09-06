@@ -78,7 +78,7 @@ builder.Services.AddScoped<IAuthorizationHandler, DeviceSessionHandler>();
 builder.Services.AddScoped<EfRepository>();
 builder.Services.AddScoped<IRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ISystemRepository>(sp => sp.GetRequiredService<EfRepository>());
-builder.Services.AddScoped<IServerConfigRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<IServerConfigRepository, EfServerConfigRepository>();
 builder.Services.AddScoped<IUserRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ITenantRepository, EfTenantRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();

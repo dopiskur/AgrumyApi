@@ -11,7 +11,7 @@ using Npgsql;
 namespace api.Dal
 {
     /// EF Core implementation of IRepository, split into partial files mirroring its facets (EfRepository.Users.cs, EfRepository.Devices.cs, ...) - this file holds connection plumbing and the ISystemRepository members.
-    internal partial class EfRepository(AgrumyDbContext db, IOptions<AgrumySettings> settingsOptions, ILogger<EfRepository> logger, ICache cache, IAuditLogRepository auditLogRepository, IRefreshTokenRepository refreshTokenRepository, IControllerDataRepository controllerDataRepository, IDiscoveryRepository discoveryRepository, ITenantRepository tenantRepository, IGatewayRepository gatewayRepository) : IRepository
+    internal partial class EfRepository(AgrumyDbContext db, IOptions<AgrumySettings> settingsOptions, ILogger<EfRepository> logger, ICache cache, IAuditLogRepository auditLogRepository, IRefreshTokenRepository refreshTokenRepository, IControllerDataRepository controllerDataRepository, IDiscoveryRepository discoveryRepository, ITenantRepository tenantRepository, IGatewayRepository gatewayRepository, IServerConfigRepository serverConfigRepository) : IRepository
     {
         private readonly AgrumySettings settings = settingsOptions.Value;
 
@@ -90,33 +90,7 @@ namespace api.Dal
                 """;
             await db.Database.ExecuteSqlRawAsync(sql);
 
-            await ApplyRetentionPolicyAsync((await ServerConfigGetAsync(1)).SensorDataRetentionDays);
-        }
-
-        /// PostgreSQL/TimescaleDB side of sensorData retention (MariaDB's equivalent is SensorDataRetentionBackgroundService's daily purge) - add_retention_policy's interval can only change by remove-then-add, so this runs unconditionally on every save.
-        private async Task ApplyRetentionPolicyAsync(int? retentionDays)
-        {
-            if (!db.Database.IsNpgsql())
-            {
-                return;
-            }
-
-            try
-            {
-                await db.Database.ExecuteSqlRawAsync(
-                    """SELECT remove_retention_policy('"sensorData"'::regclass, if_exists => true);""");
-
-                if (retentionDays is > 0)
-                {
-                    await db.Database.ExecuteSqlInterpolatedAsync(
-                        $"""SELECT add_retention_policy('"sensorData"'::regclass, INTERVAL '1 day' * {retentionDays.Value}, if_not_exists => true);""");
-                }
-            }
-            catch (PostgresException ex)
-            {
-                logger.LogWarning(ex,
-                    "Could not apply sensorData retention policy; automatic PostgreSQL retention stays inactive.");
-            }
+            await serverConfigRepository.ApplyRetentionPolicyAsync((await serverConfigRepository.ServerConfigGetAsync(1)).SensorDataRetentionDays);
         }
 
         /// Seeds the IDDeviceUnit=0/IDDeviceUnitZone=0 sentinel pair, also reserving ID 0 so DeviceUnitAddAsync/DeviceUnitZoneAddAsync's MAX+1 never assigns it to a real Unit/Zone.
