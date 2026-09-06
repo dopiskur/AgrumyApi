@@ -56,7 +56,13 @@ namespace api.Dal
             }
 
             row.TenantID = user.TenantID ?? 0;
-            row.Email = user.Email ?? "";
+            string newEmail = user.Email ?? "";
+            // Changing the address invalidates verification of the OLD one - without this an unconfirmed new address inherits the old address's verified status.
+            if (!string.Equals(row.Email, newEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                row.EmailVerified = false;
+            }
+            row.Email = newEmail;
             // DevicePin deliberately NOT written here - the PIN lifecycle lives exclusively in UserSetDevicePinAsync, so an admin edit can never resurrect an expired PIN or hand-craft a weak one.
             row.Username = user.Username;
             row.FirstName = user.FirstName;
@@ -105,6 +111,9 @@ namespace api.Dal
             {
                 return false;
             }
+
+            // userRefreshToken's FK is NoAction (RevokeAllForUserAsync only sets RevokedAt, never deletes rows) - without this, deleting a user who has ever logged in throws a FK violation instead of succeeding. userUserRole's FK is Cascade, so it needs no explicit cleanup here.
+            await db.RefreshTokens.Where(t => t.UserID == idUser).ExecuteDeleteAsync();
 
             int rows = await db.Users.Where(u => u.IDUser == idUser).ExecuteDeleteAsync();
             return rows > 0;

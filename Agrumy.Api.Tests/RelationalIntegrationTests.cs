@@ -740,6 +740,36 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task User_Update_ChangingEmail_ResetsEmailVerified_ButReSavingTheSameOneDoesNot(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, userId, email) = await MakeUser(t);
+        string tokenHash = "hash_" + U();
+        await _repo.UserSetActivationTokenAsync(userId, tokenHash, DateTime.UtcNow.AddHours(1));
+        await _repo.UserActivateAsync(tokenHash);
+        Assert.True((await _repo.UserGetAsync(userId, null, null))!.EmailVerified);
+
+        // Re-saving the SAME email must not clear a verification that already applies to it.
+        await _repo.UserUpdateAsync(new User { IDUser = userId, TenantID = tenantId, Email = email, Enabled = true });
+        Assert.True((await _repo.UserGetAsync(userId, null, null))!.EmailVerified);
+
+        await _repo.UserUpdateAsync(new User { IDUser = userId, TenantID = tenantId, Email = "changed_" + U() + "@x.com", Enabled = true });
+        Assert.False((await _repo.UserGetAsync(userId, null, null))!.EmailVerified);
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task User_Delete_SucceedsWithAnOutstandingRefreshToken_NotAForeignKeyViolation(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (_, userId, _) = await MakeUser(t);
+        await _repo.RefreshTokenAddAsync(userId, "hash_" + U(), DateTime.UtcNow.AddDays(30));
+
+        // Before the fix, userRefreshToken's NoAction FK made this throw a DB exception instead of returning true.
+        Assert.True(await _repo.UserDeleteAsync(userId));
+        Assert.Null(await _repo.UserGetAsync(userId, null, null));
+    }
+
+    [SkippableTheory, MemberData(nameof(Providers))]
     public async Task User_SetDevicePin_Issues_And_Clears(DbProviderKind provider)
     {
         var t = Use(provider);
