@@ -957,6 +957,42 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(fleet.Single(f => f.IDDevice == recognizedKit.IDDevice).ControllerCapable);
     }
 
+    // Roadmap #341: deviceDiagnostic.Kit has a real FK to deviceType.Kit now - a device reporting a genuinely new (non-empty) Kit string the catalog has never seen must not have its heartbeat write fail because of it.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceDiagnosticUpsert_UnrecognizedKit_AutoRegisters_NotBlocksTheWrite(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+        string newKit = "BrandNewBoard_" + U();
+
+        Assert.DoesNotContain(await _repo.DeviceTypeGetAsync(), x => x.Kit == newKit);
+
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice!.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1, Kit = newKit });
+
+        DeviceType registered = Assert.Single(await _repo.DeviceTypeGetAsync(), x => x.Kit == newKit);
+        Assert.False(registered.ControllerCapable); // auto-registered, not curated - capability defaults closed, admin can promote it later
+    }
+
+    // Roadmap #341: ManualKit is the admin fallback for a device whose firmware never auto-reports a Kit; the diagnostic-reported Kit still wins whenever both are present.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceFleetGet_ControllerCapable_FallsBackToManualKit_OnlyWhenNoDiagnosticKit(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+        d.DeviceControllerEnabled = false;
+        d.ManualKit = "KC868-A6";
+        await _repo.DeviceUpdateAsync(d);
+
+        // No diagnostic row at all yet - ManualKit alone should grant capability.
+        Assert.True((await _repo.DeviceFleetGetAsync(tenantId)).Single(f => f.IDDevice == d.IDDevice).ControllerCapable);
+
+        // A real, unrecognized diagnostic Kit now takes priority over ManualKit, even though ManualKit is still a capable one.
+        await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice!.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1, Kit = "esp32dev-unrecognized" });
+        Assert.False((await _repo.DeviceFleetGetAsync(tenantId)).Single(f => f.IDDevice == d.IDDevice).ControllerCapable);
+    }
+
     // DeviceConfig*UpdateAsync must resolve the row to write from idDevice's OWN config-id column, never from the DeviceConfig*.ID* field on the posted payload.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceConfigUpdate_IgnoresTamperedConfigId_NeverWritesAnotherDevicesRow(DbProviderKind provider)
@@ -1426,6 +1462,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Contains(await _repo.DeviceTypeServiceGetAsync(), x => x.IDDeviceTypeService == 1);
         Assert.Contains(await _repo.DeviceTypeRelayGetAsync(), x => x.IDDeviceTypeRelay == 1);
         Assert.Contains(await _repo.DeviceTypeSensorGetAsync(), x => x.IDDeviceTypeSensor == 1);
+        // Roadmap #251 modality B's software-only kit must be seeded from day one - VirtualDevice has no real board to auto-detect it.
+        Assert.Contains(await _repo.DeviceTypeGetAsync(), x => x.Kit == "VirtualDevice" && x.ControllerCapable);
     }
 
     // Roadmap #343: upserted current state, not an appended log - pushing the same RelayFunction twice must update the one row, not add a second.

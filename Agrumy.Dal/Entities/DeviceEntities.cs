@@ -203,6 +203,8 @@ namespace api.Dal.Entities
         public int? DeviceTypeServiceID { get; set; }
         public string? DeviceName { get; set; }
         public string? MacAddress { get; set; }
+        // Roadmap #341: admin-set fallback for a device whose firmware build never reports a Kit (generic esp32dev/esp32s3usbotg) - BuildFleetStatusesAsync's ControllerCapable check falls back to this only when the diagnostic Kit is empty.
+        public string? ManualKit { get; set; }
         public string ApiId { get; set; } = "";
         public string ApiKey { get; set; } = "";
         public string? ServicePoint { get; set; }
@@ -279,11 +281,12 @@ namespace api.Dal.Entities
         public string? Kit { get; set; } // See api.Models.DeviceConfigPoll.Kit.
     }
 
-    /// Catalog of recognized commercial kits and whether each has real wired relay hardware - Kit itself is the key (a build-flag string, e.g. "KC868-A6"), not an auto-increment id.
-    public class DeviceTypeKitRow
+    /// Roadmap #341 (kit-catalog half). Catalog of recognized physical device kits - Kit itself is the key (a build-flag string, e.g. "KC868-A6"), not an auto-increment id. ControllerCapable is unchanged from the pre-#341 DeviceTypeKitRow; PinoutJson is new, an unopinionated per-kit GPIO layout blob (shape TBD per kit, same "structured JSON blob" precedent as deviceUnitZoneRule.Conditions) - null for a kit nobody has documented pinout for yet, including every auto-registered one (see DeviceDiagnosticUpsertAsync).
+    public class DeviceTypeRow
     {
         public string Kit { get; set; } = "";
         public bool ControllerCapable { get; set; }
+        public string? PinoutJson { get; set; }
     }
 
     // Board/Source/FileName/SizeBytes/Sha256/PublishedAt - see api.Models.DeviceFirmware for what each means; DeviceTypeID is the legacy key.

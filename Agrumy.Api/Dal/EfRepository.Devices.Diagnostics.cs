@@ -13,6 +13,13 @@ namespace api.Dal
 
         public async Task DeviceDiagnosticUpsertAsync(int deviceID, int tenantID, DeviceConfigPoll poll)
         {
+            // "" (every generic esp32dev/esp32s3usbotg build) is normalized to null here rather than stored literally - kitCapability lookups already treat them identically, and null is what lets deviceDiagnostic.Kit's FK skip validation entirely for a device with no specific kit.
+            string? kit = string.IsNullOrEmpty(poll.Kit) ? null : poll.Kit;
+            if (kit != null)
+            {
+                await EnsureDeviceTypeRegisteredAsync(kit);
+            }
+
             var row = await db.DeviceDiagnostics.FirstOrDefaultAsync(d => d.DeviceID == deviceID);
             if (row == null)
             {
@@ -28,8 +35,27 @@ namespace api.Dal
             row.FreeHeapBytes = poll.FreeHeap ?? row.FreeHeapBytes;
             row.FirmwareVersion = poll.FirmwareVersion ?? row.FirmwareVersion;
             row.Board = poll.Board ?? row.Board;
-            row.Kit = poll.Kit ?? row.Kit;
+            row.Kit = kit ?? row.Kit;
             await db.SaveChangesAsync();
+        }
+
+        /// Roadmap #341: deviceDiagnostic.Kit now has a real FK to deviceType.Kit - an unrecognized string must never block the device's own heartbeat write because of it, so it's auto-registered here (ControllerCapable=false, no pinout yet) in its own save, BEFORE the diagnostic row. A concurrent duplicate insert from another device reporting the same brand-new kit at the same instant is tolerated, not retried - either writer's row is fine, both want the same values.
+        private async Task EnsureDeviceTypeRegisteredAsync(string kit)
+        {
+            if (await db.DeviceTypes.AsNoTracking().AnyAsync(t => t.Kit == kit))
+            {
+                return;
+            }
+            var candidate = new DeviceTypeRow { Kit = kit, ControllerCapable = false };
+            db.DeviceTypes.Add(candidate);
+            try
+            {
+                await db.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (ClassifyException(ex) == DbFailureKind.ConstraintViolation)
+            {
+                db.Entry(candidate).State = EntityState.Detached; // lost the race - detach so it isn't re-inserted (and re-fails) by the caller's own SaveChangesAsync right after this returns.
+            }
         }
 
         // Short absolute-TTL cache so any number of concurrently open admin tabs share one real fleet query per window instead of each re-running the full per-device scan.
@@ -96,7 +122,7 @@ namespace api.Dal
                 .ToListAsync();
 
             // Kit is a small fixed set of strings - cheap to pull entire and check in memory rather than a per-device join.
-            Dictionary<string, bool> kitCapability = await db.DeviceTypeKits.AsNoTracking()
+            Dictionary<string, bool> kitCapability = await db.DeviceTypes.AsNoTracking()
                 .ToDictionaryAsync(k => k.Kit, k => k.ControllerCapable);
 
             // Units/Zones are a small admin-managed set - same in-memory-lookup reasoning as kitCapability above.
@@ -142,9 +168,9 @@ namespace api.Dal
                     FirmwareVersion = r.Diag?.FirmwareVersion,
                     Board = r.Diag?.Board,
                     Kit = r.Diag?.Kit,
-                    // Admin's explicit DeviceControllerEnabled choice always wins if set - a recognized Kit only adds capability, never takes it away.
+                    // Admin's explicit DeviceControllerEnabled choice always wins if set - a recognized Kit only adds capability, never takes it away. ManualKit is the roadmap #341 fallback for a device whose firmware never auto-reports one; the diagnostic-reported Kit takes priority whenever both are set.
                     ControllerCapable = r.Device.DeviceControllerEnabled == true
-                        || (r.Diag?.Kit is { Length: > 0 } kit && kitCapability.GetValueOrDefault(kit)),
+                        || ((r.Diag?.Kit ?? r.Device.ManualKit) is { Length: > 0 } kit && kitCapability.GetValueOrDefault(kit)),
                     LatestFirmwareVersion = latest,
                     FirmwareUpdateAvailable = FirmwareVersion.IsNewer(latest, r.Diag?.FirmwareVersion),
                     FirmwareUpdatePending = r.Device.FirmwareUpdate == true,

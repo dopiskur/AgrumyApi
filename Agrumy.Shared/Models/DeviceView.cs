@@ -8,6 +8,8 @@
         public DeviceConfigSensor? DeviceConfigSensor { get; set; }
         public DeviceConfigController? DeviceConfigController { get; set; }
         public IEnumerable<DeviceRole>? DeviceRole { get; set; }
+        // Roadmap #341 (kit-catalog half) - backs the Edit form's "Manual Kit" dropdown.
+        public IEnumerable<DeviceType>? DeviceType { get; set; }
         public IEnumerable<DeviceTypeService>? DeviceTypeService { get; set; }
         public IEnumerable<DeviceTypeRelay>? DeviceTypeRelay { get; set; }
         public IEnumerable<DeviceTypeSensor>? DeviceTypeSensor { get; set; }

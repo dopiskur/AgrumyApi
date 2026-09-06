@@ -203,12 +203,13 @@ namespace api.Dal
                     new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.AnalogWaterLevel, SensorName = "Analog water tank", WaterTankLevel = 1 });
             }
 
-            // Any Kit string not in this table falls back to the existing, admin-controlled DeviceRole/DeviceControllerEnabled signal - see DeviceFleetGetAsync.
-            if (!await db.DeviceTypeKits.AnyAsync())
+            // Any Kit string not in this table falls back to the existing, admin-controlled DeviceRole/DeviceControllerEnabled signal - see DeviceFleetGetAsync. VirtualDevice is roadmap #251 modality B's software-only kit, not a real board.
+            if (!await db.DeviceTypes.AnyAsync())
             {
-                db.DeviceTypeKits.AddRange(
-                    new DeviceTypeKitRow { Kit = "KC868-A6", ControllerCapable = true },
-                    new DeviceTypeKitRow { Kit = "ESP32-S3-Relay-6CH", ControllerCapable = true });
+                db.DeviceTypes.AddRange(
+                    new DeviceTypeRow { Kit = "KC868-A6", ControllerCapable = true },
+                    new DeviceTypeRow { Kit = "ESP32-S3-Relay-6CH", ControllerCapable = true },
+                    new DeviceTypeRow { Kit = "VirtualDevice", ControllerCapable = true });
             }
 
             await db.SaveChangesAsync();

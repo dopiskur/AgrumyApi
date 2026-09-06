@@ -60,6 +60,9 @@ namespace api.Dal.Interface
 
         // Device fixed lists
         Task<IList<DeviceRole>> DeviceRoleGetAsync();
+
+        /// Roadmap #341 (kit-catalog half) - the full deviceType catalog, curated entries and auto-registered ones alike.
+        Task<IList<DeviceType>> DeviceTypeGetAsync();
         Task<IList<DeviceTypeService>> DeviceTypeServiceGetAsync();
         Task<IList<DeviceTypeRelay>> DeviceTypeRelayGetAsync();
         Task<IList<DeviceTypeSensor>> DeviceTypeSensorGetAsync();

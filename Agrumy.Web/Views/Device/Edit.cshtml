@@ -9,6 +9,9 @@
     var deviceTypeItems = new SelectList(Model.DeviceRole, nameof(DeviceRole.IDDeviceRole), nameof(DeviceRole.DeviceRoleName), form.DeviceRoleID);
     var deviceTypeSelect = new SelectFieldViewModel { Name = EditField(nameof(form.DeviceRoleID)), Label = "Device role", Items = deviceTypeItems };
 
+    // Roadmap #341 (kit-catalog half) - optional, so unlike the other dropdowns above it needs a blank "not set" choice; the diagnostic-reported Kit (shown read-only below) always wins over this when both are present.
+    var manualKitItems = new SelectList(Model.DeviceType, nameof(DeviceType.Kit), nameof(DeviceType.Kit), form.ManualKit);
+
     var deviceTypeServiceItems = new SelectList(Model.DeviceTypeService, nameof(DeviceTypeService.IDDeviceTypeService), nameof(DeviceTypeService.ServiceType), form.DeviceTypeServiceID);
     var deviceTypeServiceSelect = new SelectFieldViewModel { Name = EditField(nameof(form.DeviceTypeServiceID)), Label = "Service type", Items = deviceTypeServiceItems };
 
@@ -71,6 +74,11 @@
             <div class="mb-3">
                 <label asp-for="Device.MacAddress" class="form-label"></label>
                 <p class="form-control-plaintext">@Html.DisplayFor(m => m.Device!.MacAddress)</p>
+            </div>
+            <div class="mb-3">
+                <label for="DeviceEdit_ManualKit" class="form-label">Manual Kit</label>
+                <div class="form-text">Only used when the device's firmware build never auto-reports a Kit (e.g. a generic esp32dev/esp32s3usbotg build) - see the Details page's Kit row for what was actually auto-detected, if anything.</div>
+                @Html.DropDownList(EditField(nameof(form.ManualKit)), manualKitItems, "-- not set --", new { @class = "form-select" })
             </div>
             <div class="mb-3">
                 <label asp-for="DeviceEdit.ServicePoint" class="form-label"></label>

@@ -402,6 +402,12 @@ namespace api.Controllers.API
         public async Task<ActionResult<IEnumerable<DeviceRole>>> DeviceRoleGet() =>
             Ok(await Repo.DeviceRoleGetAsync());
 
+        /// Roadmap #341 (kit-catalog half) - backs the Web Device Edit form's "Manual Kit" dropdown.
+        [HttpGet("Type")]
+        [Authorize]
+        public async Task<ActionResult<IEnumerable<DeviceType>>> DeviceTypeGet() =>
+            Ok(await Repo.DeviceTypeGetAsync());
+
         [HttpGet("TypeService")]
         [Authorize]
         public async Task<ActionResult<IEnumerable<DeviceTypeService>>> DeviceTypeServiceGet() =>

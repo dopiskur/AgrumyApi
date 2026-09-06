@@ -38,6 +38,7 @@ namespace api.Dal
                 DeviceUnitZoneID = device.DeviceUnitZoneID,
                 DeviceName = device.DeviceName,
                 MacAddress = device.MacAddress,
+                ManualKit = device.ManualKit,
                 ApiId = device.ApiId ?? "",
                 ApiKey = device.ApiKey ?? "",
                 ServicePoint = device.ServicePoint,
@@ -174,6 +175,7 @@ namespace api.Dal
             row.DeviceRoleID = device.DeviceRoleID;
             row.DeviceTypeServiceID = device.DeviceTypeServiceID;
             row.DeviceName = device.DeviceName;
+            row.ManualKit = device.ManualKit;
             row.ServicePoint = device.ServicePoint;
             row.ServicePublicKey = device.ServicePublicKey;
             row.SleepSeconds = device.SleepSeconds;
@@ -204,6 +206,7 @@ namespace api.Dal
             DeviceTypeServiceID = d.DeviceTypeServiceID,
             DeviceName = d.DeviceName,
             MacAddress = d.MacAddress,
+            ManualKit = d.ManualKit,
             ApiId = d.ApiId,
             ApiKey = d.ApiKey,
             ServicePoint = d.ServicePoint,

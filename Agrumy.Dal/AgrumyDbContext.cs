@@ -26,7 +26,7 @@ namespace api.Dal
         public DbSet<DeviceTypeServiceRow> DeviceTypeServices => Set<DeviceTypeServiceRow>();
         public DbSet<DeviceTypeRelayRow> DeviceTypeRelays => Set<DeviceTypeRelayRow>();
         public DbSet<DeviceTypeSensorRow> DeviceTypeSensors => Set<DeviceTypeSensorRow>();
-        public DbSet<DeviceTypeKitRow> DeviceTypeKits => Set<DeviceTypeKitRow>();
+        public DbSet<DeviceTypeRow> DeviceTypes => Set<DeviceTypeRow>();
         public DbSet<DeviceConfigSensorRow> DeviceConfigSensors => Set<DeviceConfigSensorRow>();
         public DbSet<DeviceConfigControllerRow> DeviceConfigControllers => Set<DeviceConfigControllerRow>();
         public DbSet<DeviceConfigControllerRelayRow> DeviceConfigControllerRelays => Set<DeviceConfigControllerRelayRow>();
@@ -213,9 +213,9 @@ namespace api.Dal
                 e.Property(x => x.SensorName).HasMaxLength(128);
             });
 
-            modelBuilder.Entity<DeviceTypeKitRow>(e =>
+            modelBuilder.Entity<DeviceTypeRow>(e =>
             {
-                e.ToTable("deviceTypeKit");
+                e.ToTable("deviceType");
                 e.HasKey(x => x.Kit);
                 e.Property(x => x.Kit).HasMaxLength(64).ValueGeneratedNever();
             });
@@ -274,6 +274,7 @@ namespace api.Dal
                 e.Property(x => x.DeviceName).HasMaxLength(128);
                 e.Property(x => x.MacAddress).HasMaxLength(64); // AgrumyFirmware sends exactly 12 hex chars; the wider cap is for Agrumy.Gateway's free-form MacAddress uniqueness key.
                 e.Property(x => x.FirmwareTargetVersion).HasMaxLength(20); // same cap as deviceFirmware.Version
+                e.Property(x => x.ManualKit).HasMaxLength(64); // same cap as deviceType.Kit
                 e.Property(x => x.ApiId).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ApiKey).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ServicePoint).HasMaxLength(200);
@@ -287,6 +288,8 @@ namespace api.Dal
                 e.HasOne<DeviceConfigSensorRow>().WithMany().HasForeignKey(x => x.DeviceConfigSensorID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceRoleRow>().WithMany().HasForeignKey(x => x.DeviceRoleID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceTypeServiceRow>().WithMany().HasForeignKey(x => x.DeviceTypeServiceID).OnDelete(DeleteBehavior.NoAction);
+                // Admin-chosen from the SAME catalog as deviceDiagnostic.Kit (no auto-registration needed here - the Web dropdown only ever offers existing catalog entries).
+                e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.ManualKit).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<TenantRow>().WithMany().HasForeignKey(x => x.TenantID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
             });
@@ -330,8 +333,10 @@ namespace api.Dal
                 e.Property(x => x.DeviceID).ValueGeneratedNever(); // PK is 1:1 with device, deliberately not ValueGeneratedOnAdd.
                 e.Property(x => x.FirmwareVersion).HasMaxLength(20); // same cap as deviceFirmware.Version
                 e.Property(x => x.Board).HasMaxLength(40);
-                e.Property(x => x.Kit).HasMaxLength(64); // same cap as deviceTypeKit.Kit
+                e.Property(x => x.Kit).HasMaxLength(64); // same cap as deviceType.Kit
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
+                // Roadmap #341: a firmware-reported Kit not yet in the catalog is auto-registered by DeviceDiagnosticUpsertAsync BEFORE this row is written, so the FK never rejects a legitimate device's heartbeat; NULL (never reported / generic build, normalized from "") bypasses the FK entirely.
+                e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.Kit).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<DeviceSimulationRow>(e =>

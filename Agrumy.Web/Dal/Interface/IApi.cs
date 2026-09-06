@@ -97,6 +97,9 @@ namespace api.Dal.Interface
         [Get("/api/Device/Role")]
         Task<IEnumerable<DeviceRole>> DeviceRoleGet();
 
+        [Get("/api/Device/Type")]
+        Task<IEnumerable<DeviceType>> DeviceTypeGet();
+
         [Get("/api/Device/Simulation/{idDevice}")]
         Task<DeviceSimulation> DeviceSimulationGet(int idDevice);
 

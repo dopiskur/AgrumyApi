@@ -184,6 +184,7 @@ namespace api.Controllers.View
             return View(new DeviceView
             {
                 DeviceRole = await api.DeviceRoleGet(),
+                DeviceType = await api.DeviceTypeGet(),
                 DeviceTypeService = await api.DeviceTypeServiceGet(),
                 Device = device,
                 DeviceEdit = device.ToEditForm(),
@@ -199,6 +200,7 @@ namespace api.Controllers.View
             if (!ModelState.IsValid)
             {
                 deviceView.DeviceRole = await api.DeviceRoleGet();
+                deviceView.DeviceType = await api.DeviceTypeGet();
                 deviceView.DeviceTypeService = await api.DeviceTypeServiceGet();
                 deviceView.Device = await api.DeviceGet(form.IDDevice);
                 return View(deviceView);

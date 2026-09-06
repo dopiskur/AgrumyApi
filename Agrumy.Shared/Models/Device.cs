@@ -31,6 +31,8 @@ namespace api.Models
         public string? DeviceName { get; set; }
         [HiddenInput(DisplayValue = true)]
         public string? MacAddress { get; set; }
+        // Roadmap #341: admin-chosen fallback for a device whose firmware build never auto-reports a Kit (generic esp32dev/esp32s3usbotg) - the diagnostic-reported Kit wins whenever both are set (see DeviceFleetStatus.ControllerCapable).
+        public string? ManualKit { get; set; }
         // True only for an Agrumy.Gateway instance, flagged so GatewayApiController.Batch can tell a gateway's own credential from an ordinary device's.
         [HiddenInput(DisplayValue = true)]
         public bool IsGateway { get; set; }
@@ -89,6 +91,7 @@ namespace api.Models
         public int? DeviceTypeServiceID { get; set; } = 0;
         public string? DeviceName { get; set; }
         public string? MacAddress { get; set; }
+        public string? ManualKit { get; set; }
         public bool IsGateway { get; set; }
         public GatewayProfile? GatewayProfile { get; set; }
         public string? ServicePoint { get; set; }
@@ -116,6 +119,7 @@ namespace api.Models
         public int? DeviceRoleID { get; set; }
         public int? DeviceTypeServiceID { get; set; }
         public string? DeviceName { get; set; }
+        public string? ManualKit { get; set; }
         public string? ServicePoint { get; set; }
         public string? ServicePublicKey { get; set; }
         public int? SleepSeconds { get; set; }
@@ -143,6 +147,7 @@ namespace api.Models
             DeviceTypeServiceID = d.DeviceTypeServiceID,
             DeviceName = d.DeviceName,
             MacAddress = d.MacAddress,
+            ManualKit = d.ManualKit,
             IsGateway = d.IsGateway,
             GatewayProfile = d.GatewayProfile,
             ServicePoint = d.ServicePoint,
@@ -178,6 +183,7 @@ namespace api.Models
             DeviceTypeServiceID = dto.DeviceTypeServiceID,
             DeviceName = dto.DeviceName,
             MacAddress = dto.MacAddress,
+            ManualKit = dto.ManualKit,
             IsGateway = dto.IsGateway,
             GatewayProfile = dto.GatewayProfile,
             ServicePoint = dto.ServicePoint,
@@ -204,6 +210,7 @@ namespace api.Models
             target.DeviceRoleID = form.DeviceRoleID;
             target.DeviceTypeServiceID = form.DeviceTypeServiceID;
             target.DeviceName = form.DeviceName;
+            target.ManualKit = form.ManualKit;
             target.ServicePoint = form.ServicePoint;
             target.ServicePublicKey = form.ServicePublicKey;
             target.SleepSeconds = form.SleepSeconds;
@@ -221,6 +228,7 @@ namespace api.Models
             DeviceRoleID = d.DeviceRoleID,
             DeviceTypeServiceID = d.DeviceTypeServiceID,
             DeviceName = d.DeviceName,
+            ManualKit = d.ManualKit,
             ServicePoint = d.ServicePoint,
             ServicePublicKey = d.ServicePublicKey,
             SleepSeconds = d.SleepSeconds,
@@ -486,6 +494,14 @@ namespace api.Models
         public string? DeviceRoleName { get; set; }
         public bool? SensorEnabled { get; set; } = false;
         public bool? ControllerEnabled { get; set; } = false;
+    }
+
+    /// Roadmap #341 (kit-catalog half). One recognized physical device kit - Kit is the key (a build-flag string, e.g. "KC868-A6"), not an auto-increment id. Includes entries auto-registered from an unrecognized firmware-reported Kit (ControllerCapable=false, PinoutJson=null) alongside deliberately-curated ones.
+    public class DeviceType
+    {
+        public string Kit { get; set; } = "";
+        public bool ControllerCapable { get; set; }
+        public string? PinoutJson { get; set; }
     }
 
     public class DeviceTypeService()
