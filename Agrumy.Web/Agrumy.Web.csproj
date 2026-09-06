@@ -24,4 +24,56 @@
     <PackageReference Include="Microsoft.Web.LibraryManager.Build" Version="3.0.114" />
   </ItemGroup>
 
+  <!-- Roadmap #323: libman itself has no SRI/checksum field, so a compromised CDN response would restore silently - this verifies every restored file's SHA-256 against libman-integrity.txt (regenerate it after bumping a libman.json version: see the header comment in that file). -->
+  <UsingTask TaskName="VerifyLibIntegrity" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <LibDir ParameterType="System.String" Required="true" />
+      <ManifestFile ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Security.Cryptography" />
+      <Using Namespace="System.Collections.Generic" />
+      <Code Type="Fragment" Language="cs">
+<![CDATA[
+var expected = new Dictionary<string, string>();
+foreach (var line in File.ReadAllLines(ManifestFile))
+{
+    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
+    var parts = line.Split('\t');
+    if (parts.Length != 2) continue;
+    expected[parts[0]] = parts[1];
+}
+
+using (var sha = SHA256.Create())
+{
+    foreach (var kv in expected)
+    {
+        string path = Path.Combine(LibDir, kv.Key.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(path))
+        {
+            Log.LogError("libman integrity: expected vendored file missing: " + kv.Key);
+            continue;
+        }
+        string actual;
+        using (var stream = File.OpenRead(path))
+        {
+            actual = BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+        }
+        if (!string.Equals(actual, kv.Value, StringComparison.OrdinalIgnoreCase))
+        {
+            Log.LogError("libman integrity mismatch for " + kv.Key + ": expected " + kv.Value + ", got " + actual + " - possible tampered CDN response, or libman-integrity.txt is stale after a libman.json version bump.");
+        }
+    }
+}
+]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="VerifyLibmanIntegrity" AfterTargets="LibraryManagerRestore">
+    <VerifyLibIntegrity LibDir="$(MSBuildProjectDirectory)\wwwroot\lib" ManifestFile="$(MSBuildProjectDirectory)\libman-integrity.txt" />
+  </Target>
+
 </Project>
