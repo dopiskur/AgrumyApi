@@ -90,6 +90,31 @@ public class DeviceFirmwareOtaTests
         _repo.Verify(r => r.DeviceFirmwareLatestGetAsync(It.IsAny<int?>()), Times.Never);
     }
 
+    /// #357: Reset rides along on this same Register/Config response, but - unlike FirmwareUpdate, which waits for the device to confirm the new version before clearing - it clears the instant it's included, since a device that resets() wipes itself before it could ever confirm anything.
+    [Fact]
+    public void ResetFlagSet_ClearsImmediately_NotOnConfirmation()
+    {
+        var device = BaseDevice();
+        device.Reset = true;
+        _repo.Setup(r => r.DeviceHardResetSetAsync(500, false)).Returns(Task.CompletedTask);
+
+        var cfg = RegisterAndGetConfig(device);
+
+        Assert.True(cfg.Reset);
+        _repo.Verify(r => r.DeviceHardResetSetAsync(500, false), Times.Once);
+    }
+
+    [Fact]
+    public void ResetFlagClear_NeverCallsHardResetSet()
+    {
+        var device = BaseDevice();
+        device.Reset = false;
+
+        RegisterAndGetConfig(device);
+
+        // Strict mock: DeviceHardResetSetAsync was never set up - a call to it here would throw.
+    }
+
     [Fact]
     public void FirmwareUpdateFlagSet_ButNoBuildRow_LeavesFieldsNull_NoThrow()
     {

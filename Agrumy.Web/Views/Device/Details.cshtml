@@ -5,6 +5,15 @@
     Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
 }
 
+@if (TempData["HardResetMessage"] is string hardResetMessage)
+{
+    <div class="alert alert-success">@hardResetMessage</div>
+}
+@if (TempData["HardResetError"] is string hardResetError)
+{
+    <div class="alert alert-warning">@hardResetError</div>
+}
+
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">Device</h3>
@@ -145,6 +154,13 @@
         }
         <a asp-action="Events" asp-route-idDevice="@Model.IDDevice" class="btn btn-secondary">Events</a>
         <a asp-action="Delete" asp-route-idDevice="@Model.IDDevice" class="btn btn-danger">Delete</a>
+        @if (hasAnyRole(RoleNames.GlobalAdmin))
+        {
+            <form asp-action="HardReset" asp-route-idDevice="@Model.IDDevice" method="post" class="d-inline"
+                  onsubmit="return confirm('This wipes the device completely (factory reset) - it will need physical/captive-portal re-provisioning afterward. Continue?');">
+                <button type="submit" class="btn btn-danger"><i class="bi bi-exclamation-octagon"></i> Hard Reset</button>
+            </form>
+        }
         <a asp-action="Fleet" class="btn btn-outline-secondary">Back to List</a>
     </div>
 </div>

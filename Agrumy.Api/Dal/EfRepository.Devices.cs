@@ -194,6 +194,10 @@ namespace api.Dal
             db.Devices.Where(d => d.IDDevice == deviceID)
                 .ExecuteUpdateAsync(s => s.SetProperty(d => d.LastFullConfigSentAt, sentAtUtc));
 
+        public Task DeviceHardResetSetAsync(int deviceID, bool pending) =>
+            db.Devices.Where(d => d.IDDevice == deviceID)
+                .ExecuteUpdateAsync(s => s.SetProperty(d => d.Reset, pending));
+
         private static Device ToDto(DeviceRow d) => new()
         {
             IDDevice = d.IDDevice,

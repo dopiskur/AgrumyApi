@@ -314,6 +314,10 @@ namespace api.Dal.Interface
         [Post("/api/Device/WifiUpdate")]
         Task DeviceWifiUpdate([Body] DeviceWifiUpdateRequest request);
 
+        /// GlobalAdmin-only, see DeviceApiController.HardResetRequest - wipes the device on its next reachable poll (normal or, if its apiKey is broken, the apiId-only HardResetPending path).
+        [Post("/api/Device/HardReset")]
+        Task DeviceHardReset(int idDevice);
+
         // ---- SensorData ---------------------------------------------------
 
         [Get("/api/SensorData")]

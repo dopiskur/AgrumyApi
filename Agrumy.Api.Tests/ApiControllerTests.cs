@@ -1733,6 +1733,76 @@ public class ApiControllerTests
         Assert.Equal(403, obj.StatusCode);
     }
 
+    /// #357: the admin-set side - sets the flag and audits, same EnsureOwnedDeviceAsync ownership check as every other write on this controller.
+    [Fact]
+    public async Task HardResetRequest_SetsFlag_AndWritesAudit()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 0, DeviceName = "Greenhouse-1" });
+        _repo.Setup(r => r.DeviceHardResetSetAsync(8, true)).Returns(Task.CompletedTask);
+        AuditLogEntry? written = null;
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>()))
+             .Callback<AuditLogEntry>(e => written = e)
+             .Returns(Task.CompletedTask);
+
+        var controller = NewDeviceController();
+        SetCaller(controller, "admin", 0);
+        var result = await controller.HardResetRequest(8);
+
+        Assert.IsType<OkResult>(result);
+        Assert.Equal("Device.HardResetRequested", written!.Action);
+    }
+
+    [Fact]
+    public async Task HardResetRequest_ForeignTenant_Returns403_AndNeverSetsFlag()
+    {
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 99 });
+
+        var controller = NewDeviceController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantReader, RoleNames.TenantDevice);
+        var result = await controller.HardResetRequest(8);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result).StatusCode);
+        // Strict mock: DeviceHardResetSetAsync was never set up - a call to it here would throw.
+    }
+
+    /// #357: the device-poll side - reachable with apiId alone (no apiKey/session), which is the whole point. Self-clears the moment it reports true.
+    [Fact]
+    public async Task HardResetPending_FlagSet_ReturnsTrue_AndClearsIt()
+    {
+        _repo.Setup(r => r.DeviceGetByApiIdAsync("device-api-id")).ReturnsAsync(new Device { IDDevice = 8, Reset = true });
+        _repo.Setup(r => r.DeviceHardResetSetAsync(8, false)).Returns(Task.CompletedTask);
+
+        var controller = NewDeviceController();
+        var result = await controller.HardResetPending("device-api-id");
+
+        Assert.True(result.Value);
+        _repo.Verify(r => r.DeviceHardResetSetAsync(8, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task HardResetPending_FlagNotSet_ReturnsFalse()
+    {
+        _repo.Setup(r => r.DeviceGetByApiIdAsync("device-api-id")).ReturnsAsync(new Device { IDDevice = 8, Reset = false });
+
+        var controller = NewDeviceController();
+        var result = await controller.HardResetPending("device-api-id");
+
+        Assert.False(result.Value);
+        // Strict mock: DeviceHardResetSetAsync was never set up - "nothing pending" must not attempt a clear-write.
+    }
+
+    /// An unknown apiId must look identical to "not pending" - never confirm whether an apiId exists to an unauthenticated caller.
+    [Fact]
+    public async Task HardResetPending_UnknownApiId_ReturnsFalse_SameShapeAsNotPending()
+    {
+        _repo.Setup(r => r.DeviceGetByApiIdAsync("no-such-id")).ReturnsAsync((Device?)null);
+
+        var controller = NewDeviceController();
+        var result = await controller.HardResetPending("no-such-id");
+
+        Assert.False(result.Value);
+    }
+
 
     [Fact]
     public async Task DeviceConfigControllerUpdate_RelayMappingOnly_Persists()

@@ -194,6 +194,23 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Details), new { idDevice });
         }
 
+        [Authorize(Roles = RoleNames.GlobalAdmin)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> HardReset(int idDevice)
+        {
+            try
+            {
+                await api.DeviceHardReset(idDevice);
+                TempData["HardResetMessage"] = "Hard reset requested - the device will wipe itself and re-provision the next time it's reachable.";
+            }
+            catch (ApiException ex)
+            {
+                TempData["HardResetError"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Details), new { idDevice });
+        }
+
         [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> Edit(int? idDevice)
         {

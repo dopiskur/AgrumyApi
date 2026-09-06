@@ -76,6 +76,9 @@ namespace api.Dal.Interface
         /// Stamps the device row with when a full DeviceConfig body was actually sent - drives DeviceConfigBuilder.NeedsRefreshAsync's periodic heartbeat resend (ServerConfig.ConfigHeartbeatHours).
         Task DeviceMarkConfigSentAsync(int deviceID, DateTime sentAtUtc);
 
+        /// Roadmap #357: sets/clears the admin-triggered hard-reset flag - carried to the device via a normal authenticated config poll (DeviceConfigBuilder) AND, since that path may be exactly what's broken, via DeviceApiController.HardResetPending's apiId-only lookup.
+        Task DeviceHardResetSetAsync(int deviceID, bool pending);
+
         /// Fleet status for every device in the tenant, or everywhere when tenantID is null (caller must check CallerReadsDevicesGlobally first) - Online comes from DeviceFleetStatus.ComputeOnline.
         Task<IList<DeviceFleetStatus>> DeviceFleetGetAsync(int? tenantID);
 

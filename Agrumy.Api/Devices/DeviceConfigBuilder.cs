@@ -59,6 +59,12 @@ namespace api.Devices
                 SimulationModeEnabled = (await repo.DeviceSimulationGetAsync(device.IDDevice!.Value))?.Enabled == true,
             };
 
+            // Fire-once, cleared the instant it's included rather than waiting for a confirmation that can never come back - a device told to reset() wipes itself and restarts before it could ever report anything, so "wait for the device to confirm" (FirmwareUpdate's pattern) would leave this stuck true and re-trigger on every future poll after the device re-registers.
+            if (device.Reset == true)
+            {
+                await repo.DeviceHardResetSetAsync(device.IDDevice!.Value, false);
+            }
+
             // Firmware compares versions itself, so an offer present on every Config sync is fine, and harmless on Register too since ResolveOfferAsync returns null for a freshly-created device.
             DeviceFirmware? firmware = await firmwareCatalog.ResolveOfferAsync(device, board);
             if (firmware != null)

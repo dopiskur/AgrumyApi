@@ -293,6 +293,37 @@ namespace api.Controllers.API
             return result.Outcome == IssueCommandOutcome.Success ? Ok() : Conflict(result.Message);
         }
 
+        /// Roadmap #357: GlobalAdmin-only (stricter than the DeviceManagers bar the other actions on this controller use) since this wipes the device and requires physical/captive-portal re-provisioning - the flag rides to the device via a normal config poll AND, since that path is exactly what a broken apiKey would block, via HardResetPending below.
+        [Authorize(Roles = RoleNames.GlobalAdmin)]
+        [HttpPost("HardReset")]
+        public async Task<ActionResult> HardResetRequest(int idDevice)
+        {
+            var (device, error) = await EnsureOwnedDeviceAsync(
+                () => deviceRepo.DeviceGetByIdAsync(idDevice), "Device", forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            await deviceRepo.DeviceHardResetSetAsync(device!.IDDevice!.Value, true);
+            await WriteAuditAsync("Device.HardResetRequested", device.TenantID, "Device", idDevice.ToString(), device.DeviceName);
+            return Ok();
+        }
+
+        /// Roadmap #357: the ONLY device-facing endpoint reachable with nothing but a still-valid apiId - no apiKey/session required, since this exists specifically for a device whose own apiKey is what's broken. Exposes nothing beyond this one boolean, and self-clears the moment it reports true so a device that successfully wipes never gets asked twice.
+        [AllowAnonymous]
+        [EnableRateLimiting("device-auth")]
+        [HttpGet("HardResetPending")]
+        public async Task<ActionResult<bool>> HardResetPending(string apiId)
+        {
+            Device? device = await deviceRepo.DeviceGetByApiIdAsync(apiId);
+            if (device?.IDDevice is not int idDevice || device.Reset != true)
+            {
+                return false; // unknown apiId and "not pending" look identical - never confirm whether an apiId exists
+            }
+            await deviceRepo.DeviceHardResetSetAsync(idDevice, false);
+            return true;
+        }
+
         /// No identity field in the body by design - deviceID/tenantID come exclusively from the authenticated apiId, same rule as SensorDataApiController.Post.
         [HttpPost("Event")]
         [EnableRateLimiting("device-data")]
