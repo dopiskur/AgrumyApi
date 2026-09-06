@@ -83,6 +83,12 @@ namespace api.Dal
                 await DeviceUnitZoneDeleteAsync(zoneId);
             }
 
+            // Unit-scope rules (DeviceUnitZoneID == null) live directly on the unit, not any of its zones - the zone loop above never touches them, so they'd otherwise survive as orphans after the unit is gone.
+            var unitRuleIds = await db.DeviceUnitZoneRules.AsNoTracking()
+                .Where(r => r.DeviceUnitID == idDeviceUnit && r.DeviceUnitZoneID == null).Select(r => r.IDDeviceUnitZoneRule).ToListAsync();
+            await db.RuleNotificationStates.Where(s => unitRuleIds.Contains(s.RuleID)).ExecuteDeleteAsync();
+            await db.DeviceUnitZoneRules.Where(r => r.DeviceUnitID == idDeviceUnit && r.DeviceUnitZoneID == null).ExecuteDeleteAsync();
+
             await db.DeviceUnits.Where(u => u.IDDeviceUnit == idDeviceUnit).ExecuteDeleteAsync();
         }
 
