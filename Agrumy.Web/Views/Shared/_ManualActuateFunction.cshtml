@@ -1,0 +1,90 @@
+@model api.ViewModels.ManualActuateFunctionViewModel
+@using api.Utils
+@{
+    string fid = $"manualActuate_{Model.RelayFunction}_{Model.ScopeId}";
+    string startAction = Model.IsUnitLevel ? "UnitManualActuateStart" : "ZoneManualActuateStart";
+    string scopeFieldName = Model.IsUnitLevel ? "idDeviceUnit" : "idDeviceUnitZone";
+    // Target mode is always offered at Unit level - individual zones lacking MaxRunSeconds are skipped server-side, not gated here (a Unit can span zones with different or no configured cap).
+    bool targetModeAvailable = Model.IsUnitLevel || Model.MaxRunSeconds is > 0;
+}
+
+<div class="d-flex flex-wrap align-items-start gap-3 py-2 border-bottom">
+    <div style="min-width:8rem"><strong>@Model.Label</strong></div>
+
+    @if (Model.Active is { } active)
+    {
+        <div class="flex-grow-1">
+            <span class="badge text-bg-success">
+                @(active.Mode == ManualOverrideMode.Duration ? "Duration" : $"Target: {active.TargetMetric} {active.TargetThreshold:0.#} (±{active.TargetHysteresis:0.#})")
+            </span>
+            <span class="text-secondary small ms-1">
+                until @TimeZoneHelper.ToUserLocalTime(active.ExpiresAtUtc, Model.DisplayTimeZone).ToString("HH:mm") @Model.DisplayTimeZone
+                @(active.Mode == ManualOverrideMode.Target ? "(safety cutoff, may finish sooner once the target is reached)" : "")
+            </span>
+        </div>
+        <form asp-action="ZoneManualActuateStop" method="post">
+            <input type="hidden" name="idDeviceUnitZone" value="@Model.ScopeId" />
+            <input type="hidden" name="relayFunction" value="@((int)Model.RelayFunction)" />
+            <button type="submit" class="btn btn-sm btn-outline-danger">Stop</button>
+        </form>
+    }
+    else
+    {
+        <form asp-action="@startAction" method="post" class="flex-grow-1">
+            <input type="hidden" name="@scopeFieldName" value="@Model.ScopeId" />
+            <input type="hidden" name="relayFunction" value="@((int)Model.RelayFunction)" />
+
+            <div class="btn-group btn-group-sm mb-1" role="group">
+                <input type="radio" class="btn-check manual-actuate-mode" data-fid="@fid" name="mode" id="@(fid)_mode_duration" value="@((int)ManualOverrideMode.Duration)" checked autocomplete="off" />
+                <label class="btn btn-outline-secondary" for="@(fid)_mode_duration">Duration</label>
+
+                <input type="radio" class="btn-check manual-actuate-mode" data-fid="@fid" name="mode" id="@(fid)_mode_target" value="@((int)ManualOverrideMode.Target)" autocomplete="off" disabled="@(!targetModeAvailable)" />
+                <label class="btn btn-outline-secondary @(!targetModeAvailable ? "disabled" : "")" for="@(fid)_mode_target">Target</label>
+            </div>
+            @if (!targetModeAvailable)
+            {
+                <span class="text-secondary small d-block">Target mode needs a MaxRunSeconds safety limit configured on this zone first.</span>
+            }
+
+            <div id="@(fid)_durationFields" class="d-flex flex-wrap align-items-center gap-1">
+                @foreach (int minutes in new[] { 5, 15, 30, 60 })
+                {
+                    <button type="submit" name="durationMinutes" value="@minutes" class="btn btn-sm btn-outline-primary">@(minutes < 60 ? $"{minutes}min" : "1h")</button>
+                }
+                <span class="text-secondary small">or</span>
+                <input type="number" min="1" name="durationMinutesCustom" class="form-control form-control-sm" style="width:6rem" placeholder="min" />
+                <button type="submit" class="btn btn-sm btn-primary">Start</button>
+            </div>
+
+            <div id="@(fid)_targetFields" class="d-flex flex-wrap align-items-center gap-1" hidden>
+                <select name="targetMetric" class="form-select form-select-sm" style="width:9rem">
+                    @foreach (SensorMetric metric in Model.AllowedTargetMetrics)
+                    {
+                        <option value="@((int)metric)">@metric</option>
+                    }
+                </select>
+                <input type="number" step="any" name="targetThreshold" class="form-control form-control-sm" style="width:7rem" placeholder="target" required />
+                <input type="number" step="any" name="targetHysteresis" class="form-control form-control-sm" style="width:7rem" placeholder="hysteresis" value="2" />
+                <button type="submit" class="btn btn-sm btn-primary">Start</button>
+            </div>
+            @if (!Model.IsUnitLevel && Model.MaxRunSeconds is > 0)
+            {
+                <span class="text-secondary small d-block">Safety cap: @Model.MaxRunSeconds s continuous run, either mode.</span>
+            }
+        </form>
+    }
+</div>
+
+@* Idempotent event-delegation script, safe to inline once per row - a page with all three function rows only wires this listener the first time it runs. *@
+<script>
+    if (!window.__manualActuateModeWired) {
+        window.__manualActuateModeWired = true;
+        document.addEventListener('change', function (e) {
+            if (!e.target.classList.contains('manual-actuate-mode')) return;
+            var fid = e.target.dataset.fid;
+            var isTarget = e.target.value === '@((int)ManualOverrideMode.Target)';
+            document.getElementById(fid + '_durationFields').hidden = isTarget;
+            document.getElementById(fid + '_targetFields').hidden = !isTarget;
+        });
+    }
+</script>

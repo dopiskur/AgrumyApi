@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using api.Commands;
 using api.Dal.Interface;
 using api.Models;
 using api.Security;
@@ -12,7 +13,7 @@ namespace api.Controllers.API
 {
     /// Unit/Zone CRUD, device assignment, and hierarchical dashboard aggregation - ownership checks mirror DeviceApiController.EnsureOwnedDeviceAsync, same CallerReadsDevicesGlobally/CallerManagesDevicesGlobally rules as the rest of the Device domain.
     [Route("/api/DeviceUnit")]
-    public class DeviceUnitApiController(IRepository repo, ICache cache, IOptions<AgrumySettings> settingsOptions) : ApiControllerBase(repo, cache)
+    public class DeviceUnitApiController(IRepository repo, ICache cache, IOptions<AgrumySettings> settingsOptions, ManualActuateService manualActuate) : ApiControllerBase(repo, cache)
     {
         private readonly AgrumySettings settings = settingsOptions.Value;
 
@@ -135,6 +136,14 @@ namespace api.Controllers.API
             if (!SafetyLimitValidation.IsValid(zone.WaterPumpCooldownSeconds))
             {
                 return BadRequest($"WaterPump cooldown must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.");
+            }
+            if (!SafetyLimitValidation.IsValid(zone.HeatingMaxRunSeconds))
+            {
+                return BadRequest($"Heating max run time must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.");
+            }
+            if (!SafetyLimitValidation.IsValid(zone.VentilationMaxRunSeconds))
+            {
+                return BadRequest($"Ventilation max run time must be between 0 (disabled) and {SafetyLimitValidation.MaxReasonableSeconds} seconds.");
             }
 
             zone.TenantID = existing!.TenantID; // payload cannot move a zone to another tenant
@@ -454,6 +463,83 @@ namespace api.Controllers.API
                 return $"conditionConfig does not match the expected shape for {type}.";
             }
         }
+
+        #endregion
+
+        #region Manual actuate (roadmap #219)
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("Zone/ManualActuate")]
+        public async Task<ActionResult<IReadOnlyList<int>>> ZoneManualActuateStart(int idDeviceUnitZone, [FromBody] ManualActuateRequest request)
+        {
+            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceUnitZone, forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            ManualActuateResult result = await manualActuate.StartForZoneAsync(idDeviceUnitZone, request);
+            if (result.Outcome == ManualActuateOutcome.Success)
+            {
+                await WriteAuditAsync("DeviceUnitZone.ManualActuateStarted", zone!.TenantID, "DeviceUnitZone", idDeviceUnitZone.ToString(), $"{request.RelayFunction}/{request.Mode}");
+            }
+            return ManualActuateResponse(result);
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("Unit/ManualActuate")]
+        public async Task<ActionResult<IReadOnlyList<int>>> UnitManualActuateStart(int idDeviceUnit, [FromBody] ManualActuateRequest request)
+        {
+            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceUnit, forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            ManualActuateResult result = await manualActuate.StartForUnitAsync(idDeviceUnit, request);
+            if (result.Outcome == ManualActuateOutcome.Success)
+            {
+                await WriteAuditAsync("DeviceUnit.ManualActuateStarted", unit!.TenantID, "DeviceUnit", idDeviceUnit.ToString(), $"{request.RelayFunction}/{request.Mode}");
+            }
+            return ManualActuateResponse(result);
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("Zone/ManualActuate/Stop")]
+        public async Task<ActionResult> ZoneManualActuateStop(int idDeviceUnitZone, RelayFunction relayFunction)
+        {
+            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceUnitZone, forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            await manualActuate.StopAsync(idDeviceUnitZone, relayFunction);
+            await WriteAuditAsync("DeviceUnitZone.ManualActuateStopped", zone!.TenantID, "DeviceUnitZone", idDeviceUnitZone.ToString(), relayFunction.ToString());
+            return Ok();
+        }
+
+        /// The zone's currently-active manual commands (not yet past ExpiresAtUtc) - what the Web UI polls to render "currently active, X remaining".
+        [Authorize]
+        [HttpGet("Zone/ManualActuate")]
+        public async Task<ActionResult<IList<DeviceManualOverride>>> ZoneManualActuateStatus(int idDeviceUnitZone)
+        {
+            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceUnitZone, forWrite: false);
+            if (error != null)
+            {
+                return error;
+            }
+            Device? controller = await Repo.DeviceUnitZoneGetControllerAsync(idDeviceUnitZone);
+            if (controller?.IDDevice is not int deviceId)
+            {
+                return Ok(Array.Empty<DeviceManualOverride>());
+            }
+            return Ok(await Repo.ManualOverridesActiveForDeviceAsync(deviceId));
+        }
+
+        private ActionResult<IReadOnlyList<int>> ManualActuateResponse(ManualActuateResult result) => result.Outcome switch
+        {
+            ManualActuateOutcome.Success => Ok(result.AffectedDeviceIds),
+            ManualActuateOutcome.TargetNotFound => NotFound(result.Message),
+            _ => BadRequest(result.Message),
+        };
 
         #endregion
 

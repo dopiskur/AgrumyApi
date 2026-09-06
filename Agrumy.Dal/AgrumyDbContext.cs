@@ -36,6 +36,7 @@ namespace api.Dal
         public DbSet<DeviceSimulationRow> DeviceSimulations => Set<DeviceSimulationRow>();
         public DbSet<VirtualDeviceRow> VirtualDevices => Set<VirtualDeviceRow>();
         public DbSet<DeviceCommandRow> DeviceCommands => Set<DeviceCommandRow>();
+        public DbSet<DeviceManualOverrideRow> DeviceManualOverrides => Set<DeviceManualOverrideRow>();
         public DbSet<GatewayDeviceMappingRow> GatewayDeviceMappings => Set<GatewayDeviceMappingRow>();
         public DbSet<DeviceDiscoveryReportRow> DeviceDiscoveryReports => Set<DeviceDiscoveryReportRow>();
 
@@ -315,6 +316,15 @@ namespace api.Dal
                 e.Property(x => x.IDDeviceCommand).ValueGeneratedOnAdd();
                 e.HasIndex(x => new { x.DeviceID, x.Status }).HasDatabaseName("ix_deviceCommand_device_status");
                 e.HasIndex(x => new { x.DeviceID, x.ActiveKey }).IsUnique().HasDatabaseName("ux_deviceCommand_device_activekey"); // See DeviceCommandRow.ActiveKey; both providers allow multiple NULLs through a unique index, avoiding MySQL's unsupported partial-index syntax.
+                e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
+            });
+
+            modelBuilder.Entity<DeviceManualOverrideRow>(e =>
+            {
+                e.ToTable("deviceManualOverride");
+                e.HasKey(x => x.IDDeviceManualOverride);
+                e.Property(x => x.IDDeviceManualOverride).ValueGeneratedOnAdd();
+                e.HasIndex(x => new { x.DeviceID, x.RelayFunction }).IsUnique().HasDatabaseName("ux_deviceManualOverride_device_relayfunction"); // Starting a new command for an already-active function replaces it - one row per (device, function).
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 

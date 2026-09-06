@@ -19,6 +19,52 @@
     </ol>
 </nav>
 
+@if (TempData["Message"] is string manualMessage)
+{
+    <div class="alert alert-success">@manualMessage</div>
+}
+@if (TempData["Error"] is string manualError)
+{
+    <div class="alert alert-warning">@manualError</div>
+}
+
+@{
+    int idUnit = Model.Unit.IDDeviceUnit!.Value;
+    var unitHeatingModel = new ManualActuateFunctionViewModel
+    {
+        ScopeId = idUnit, IsUnitLevel = true, RelayFunction = RelayFunction.Heating, Label = "Heating",
+        AllowedTargetMetrics = [SensorMetric.Temperature],
+    };
+    var unitVentilationModel = new ManualActuateFunctionViewModel
+    {
+        ScopeId = idUnit, IsUnitLevel = true, RelayFunction = RelayFunction.Ventilation, Label = "Ventilation",
+        AllowedTargetMetrics = [SensorMetric.Temperature, SensorMetric.Humidity],
+    };
+    var unitIrrigationModel = new ManualActuateFunctionViewModel
+    {
+        ScopeId = idUnit, IsUnitLevel = true, RelayFunction = RelayFunction.WaterPump, Label = "Irrigation",
+        AllowedTargetMetrics = [SensorMetric.Moisture],
+    };
+}
+
+@if (hasAnyRole(RoleNames.DeviceManagers))
+{
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Manual actuate (all zones)</h3>
+        </div>
+        <div class="card-body">
+            <p class="text-secondary small">
+                Fans out to every zone under this unit that has a controller - a zone with no
+                MaxRunSeconds configured for a Target-mode command is skipped, not failed outright.
+            </p>
+            <partial name="_ManualActuateFunction" model="unitHeatingModel" />
+            <partial name="_ManualActuateFunction" model="unitVentilationModel" />
+            <partial name="_ManualActuateFunction" model="unitIrrigationModel" />
+        </div>
+    </div>
+}
+
 @if (hasAnyRole(RoleNames.DeviceManagers))
 {
     <div class="card">
@@ -32,14 +78,6 @@
             </div>
         </div>
         <div class="card-body">
-            @if (TempData["Message"] is string message)
-            {
-                <div class="alert alert-success">@message</div>
-            }
-            @if (TempData["Error"] is string discoveryError)
-            {
-                <div class="alert alert-warning">@discoveryError</div>
-            }
             <partial name="_DiscoveredDevicesRows" model="Model.DiscoveredDevices" />
         </div>
     </div>

@@ -106,10 +106,12 @@ namespace api.Controllers.View
             bool hasController = dashboard.Devices.Any(d => d.DeviceControllerEnabled == true);
             DeviceUnitZone? zone = null;
             IList<DeviceUnitZoneRule> rules = [];
+            IList<DeviceManualOverride> manualOverrides = [];
             if (hasController)
             {
                 zone = await api.DeviceUnitZoneGetById(idDeviceUnitZone);
                 rules = await api.DeviceUnitZoneRulesGet(idDeviceUnitZone);
+                manualOverrides = await api.DeviceUnitZoneManualActuateStatus(idDeviceUnitZone);
             }
 
             return new ZoneViewModel
@@ -119,6 +121,7 @@ namespace api.Controllers.View
                 DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone,
                 Zone = zone,
                 Rules = rules,
+                ManualOverrides = manualOverrides,
                 DiscoveredDevices = await api.DiscoveryResultsGet(null, idDeviceUnitZone),
                 WifiConfigs = await api.DiscoveryWifiConfigsGet(),
             };
@@ -158,6 +161,62 @@ namespace api.Controllers.View
                 TempData["Error"] = ex.Body;
             }
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone = request.ZoneID });
+        }
+
+        // Roadmap #219. durationMinutes is the admin-facing unit (matches the quick-preset buttons); converted to seconds only for the wire request. TargetMetric/TargetThreshold/TargetHysteresis are ignored server-side for Duration mode and vice versa (api.Commands.ManualActuateService), so posting all six fields regardless of the selected mode is harmless.
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> ZoneManualActuateStart(int idDeviceUnitZone, RelayFunction relayFunction, ManualOverrideMode mode,
+            int? durationMinutes, SensorMetric? targetMetric, double? targetThreshold, double? targetHysteresis)
+        {
+            var request = new ManualActuateRequest(relayFunction, mode, durationMinutes is int m ? m * 60 : null, targetMetric, targetThreshold, targetHysteresis);
+            try
+            {
+                await api.DeviceUnitZoneManualActuateStart(idDeviceUnitZone, request);
+                TempData["Message"] = $"{relayFunction} manually started.";
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> ZoneManualActuateStop(int idDeviceUnitZone, RelayFunction relayFunction)
+        {
+            try
+            {
+                await api.DeviceUnitZoneManualActuateStop(idDeviceUnitZone, relayFunction);
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+        }
+
+        /// Unit-level fan-out - same request shape as the Zone-level trigger above, applied to every zone's controller under this unit.
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> UnitManualActuateStart(int idDeviceUnit, RelayFunction relayFunction, ManualOverrideMode mode,
+            int? durationMinutes, SensorMetric? targetMetric, double? targetThreshold, double? targetHysteresis)
+        {
+            var request = new ManualActuateRequest(relayFunction, mode, durationMinutes is int m ? m * 60 : null, targetMetric, targetThreshold, targetHysteresis);
+            try
+            {
+                IReadOnlyList<int> affected = await api.DeviceUnitManualActuateStart(idDeviceUnit, request);
+                TempData["Message"] = $"{relayFunction} manually started across {affected.Count} zone(s).";
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Zones), new { idDeviceUnit });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -221,12 +280,15 @@ namespace api.Controllers.View
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> SafetyLimitsUpdate(int idDeviceUnitZone, int? waterPumpMaxRunSeconds, int? waterPumpCooldownSeconds, bool skipWaterPumpWhenRainPredicted)
+        public async Task<ActionResult> SafetyLimitsUpdate(int idDeviceUnitZone, int? waterPumpMaxRunSeconds, int? waterPumpCooldownSeconds, bool skipWaterPumpWhenRainPredicted,
+            int? heatingMaxRunSeconds, int? ventilationMaxRunSeconds)
         {
             DeviceUnitZone zone = await api.DeviceUnitZoneGetById(idDeviceUnitZone);
             zone.WaterPumpMaxRunSeconds = waterPumpMaxRunSeconds;
             zone.WaterPumpCooldownSeconds = waterPumpCooldownSeconds;
             zone.SkipWaterPumpWhenRainPredicted = skipWaterPumpWhenRainPredicted;
+            zone.HeatingMaxRunSeconds = heatingMaxRunSeconds;
+            zone.VentilationMaxRunSeconds = ventilationMaxRunSeconds;
             try
             {
                 await api.DeviceUnitZoneUpdate(zone);

@@ -233,6 +233,20 @@ namespace api.Dal.Interface
         [Get("/api/DeviceUnit/Dashboard/Zone")]
         Task<DeviceUnitZoneDashboard> DeviceUnitZoneDashboardGet(int? idDeviceUnitZone);
 
+        // ---- Manual actuate (roadmap #219) ---------------------
+
+        [Post("/api/DeviceUnit/Zone/ManualActuate")]
+        Task<IReadOnlyList<int>> DeviceUnitZoneManualActuateStart(int idDeviceUnitZone, [Body] ManualActuateRequest request);
+
+        [Post("/api/DeviceUnit/Unit/ManualActuate")]
+        Task<IReadOnlyList<int>> DeviceUnitManualActuateStart(int idDeviceUnit, [Body] ManualActuateRequest request);
+
+        [Post("/api/DeviceUnit/Zone/ManualActuate/Stop")]
+        Task DeviceUnitZoneManualActuateStop(int idDeviceUnitZone, RelayFunction relayFunction);
+
+        [Get("/api/DeviceUnit/Zone/ManualActuate")]
+        Task<IList<DeviceManualOverride>> DeviceUnitZoneManualActuateStatus(int idDeviceUnitZone);
+
         // ---- Device commands ---------------------------------
 
         [Post("/api/DeviceCommand")]

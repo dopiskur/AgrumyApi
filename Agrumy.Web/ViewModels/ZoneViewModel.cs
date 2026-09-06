@@ -15,6 +15,9 @@ namespace api.ViewModels
         public DeviceUnitZone? Zone { get; init; }
         public IList<DeviceUnitZoneRule> Rules { get; init; } = [];
 
+        /// Roadmap #219 - currently-active manual commands (not yet past ExpiresAtUtc), same "no controller, no section" condition as Zone/Rules above.
+        public IList<DeviceManualOverride> ManualOverrides { get; init; } = [];
+
         public IList<DiscoveryResult> DiscoveredDevices { get; set; } = [];
         public IList<TenantWifiConfig> WifiConfigs { get; set; } = [];
     }

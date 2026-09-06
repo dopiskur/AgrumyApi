@@ -29,6 +29,10 @@ namespace api.Dal.Entities
         public int? WaterLevelRawEmpty { get; set; }
         public int? WaterLevelRawFull { get; set; }
         public DateTime? TankRefillNotifiedAt { get; set; }
+
+        // See api.Models.DeviceUnitZone's own copy of these for the full explanation (roadmap #219).
+        public int? HeatingMaxRunSeconds { get; set; }
+        public int? VentilationMaxRunSeconds { get; set; }
     }
 
     /// See api.Models.DeviceUnitZoneRule - Conditions is a JSON array of RuleCondition, (de)serialized at the application layer, not a native JSON column type. Exactly one of DeviceUnitZoneID/DeviceUnitID is set for Zone/Unit scope, both null for Global (per-tenant) scope.
@@ -276,6 +280,21 @@ namespace api.Dal.Entities
         public DateTime? ExecutedAt { get; set; }
         public int? ActiveKey { get; set; } // Mirrors ActionType while active, NULL once terminal; backs the unique (DeviceID, ActiveKey) index IssueCommandAsync's dedup relies on.
         public string? Payload { get; set; }
+    }
+
+    /// One active manual actuation (roadmap #219) - upserted on (DeviceID, RelayFunction), so starting a new command for an already-active function replaces it rather than stacking rows.
+    public class DeviceManualOverrideRow
+    {
+        public int IDDeviceManualOverride { get; set; }
+        public int DeviceID { get; set; }
+        public int TenantID { get; set; }
+        public int RelayFunction { get; set; }
+        public int Mode { get; set; }
+        public DateTime StartedAtUtc { get; set; }
+        public DateTime ExpiresAtUtc { get; set; }
+        public int? TargetMetric { get; set; }
+        public double? TargetThreshold { get; set; }
+        public double? TargetHysteresis { get; set; }
     }
 
     /// One row per device, upserted on every config poll (the poll itself is the heartbeat) - keyed by DeviceID (1:1 with device), not an identity column, so the upsert is a plain read-or-insert.

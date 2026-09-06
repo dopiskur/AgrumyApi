@@ -455,6 +455,47 @@ namespace api.Models
         public const int MaxSlots = 8;
     }
 
+    /// Roadmap #219.
+    public enum ManualOverrideMode
+    {
+        Duration = 1,
+        Target = 2,
+    }
+
+    /// One admin-triggered manual actuation (roadmap #219), DB-backed server-side shape - api.Commands.ManualActuateService is the only writer; api.Dal.EfRepository upserts on (DeviceID, RelayFunction). See DeviceManualOverridePush for the narrower wire shape actually sent to the device.
+    public class DeviceManualOverride
+    {
+        [HiddenInput(DisplayValue = true)]
+        public int? IDDeviceManualOverride { get; set; }
+        public int DeviceID { get; set; }
+        public int TenantID { get; set; }
+        public RelayFunction RelayFunction { get; set; }
+        public ManualOverrideMode Mode { get; set; }
+        public DateTime StartedAtUtc { get; set; }
+        /// Hard safety cap regardless of Mode - computed at start time from the zone's own HeatingMaxRunSeconds/VentilationMaxRunSeconds/WaterPumpMaxRunSeconds for RelayFunction.
+        public DateTime ExpiresAtUtc { get; set; }
+        /// Target mode only - Temperature/Humidity/Moisture (roadmap #219's allowed subset), null for Duration.
+        public SensorMetric? TargetMetric { get; set; }
+        public double? TargetThreshold { get; set; }
+        public double? TargetHysteresis { get; set; }
+    }
+
+    /// POST /api/DeviceUnit/Zone/ManualActuate and .../Unit/ManualActuate's request body - api.Commands.ManualActuateService validates/caps it into a DeviceManualOverride. DurationSeconds is Duration-mode only (the admin's requested length, before the zone's MaxRunSeconds caps it); TargetMetric/TargetThreshold/TargetHysteresis are Target-mode only.
+    public sealed record ManualActuateRequest(RelayFunction RelayFunction, ManualOverrideMode Mode, int? DurationSeconds,
+        SensorMetric? TargetMetric, double? TargetThreshold, double? TargetHysteresis);
+
+    /// One admin-triggered manual actuation, on the wire (AgrumyFirmware's ManualOverride mirrors this exactly) - a narrower projection of DeviceManualOverride (drops IDDeviceManualOverride/DeviceID/TenantID/StartedAtUtc, which the device has no use for). ExpiresAtEpoch is the hard safety cap regardless of Mode, computed at start time from the zone's own MaxRunSeconds for RelayFunction.
+    public class DeviceManualOverridePush
+    {
+        public RelayFunction RelayFunction { get; set; }
+        public ManualOverrideMode Mode { get; set; }
+        public long ExpiresAtEpoch { get; set; }
+        /// Target mode only - Temperature/Humidity/Moisture (roadmap #219's allowed subset), null for Duration.
+        public SensorMetric? TargetMetric { get; set; }
+        public double? TargetThreshold { get; set; }
+        public double? TargetHysteresis { get; set; }
+    }
+
     /// What's left of the per-device model after thresholds/schedule/safety-limits moved to the zone (DeviceUnitZone/DeviceUnitZoneRule) - just the relay-pin mapping; Rules/WaterPump* below are populated from the assigned zone by BuildDeviceConfigAsync, not from this row.
     public class DeviceConfigController()
     {
@@ -470,6 +511,9 @@ namespace api.Models
 
         // Final AND-NOT veto over WaterPump (BuildDeviceConfigAsync, from SkipWaterPumpWhenRainPredicted && WeatherRainPredicted) - not a Rule, since OR-combined rules can only add a run reason, never suppress one.
         public bool SkipWaterPumpForRain { get; set; }
+
+        // Roadmap #219 - at most one per manually-triggerable RelayFunction, populated from IManualOverrideRepository.ManualOverridesActiveForDeviceAsync, empty when none are active.
+        public IList<DeviceManualOverridePush> ManualOverrides { get; set; } = [];
 
         // Physical/hardware, stays per-device.
         public bool? RelayEnabled { get; set; }

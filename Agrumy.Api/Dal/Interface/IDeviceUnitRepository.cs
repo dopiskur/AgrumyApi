@@ -124,5 +124,16 @@ namespace api.Dal.Interface
         Task<IList<TankRefillAlertCandidate>> TankRefillAlertCandidatesGetAsync();
 
         Task TankRefillNotifiedSetAsync(int idDeviceUnitZone, DateTime? notifiedAt);
+
+        // ---- Manual actuate (roadmap #219) --------------------------
+
+        /// Upserts on (DeviceID, RelayFunction) - starting a new command for an already-active function replaces it, same "restart the timer" semantics as re-triggering anything else in this system.
+        Task ManualOverrideStartAsync(DeviceManualOverride manualOverride);
+
+        /// A no-op if none is active for (deviceId, relayFunction).
+        Task ManualOverrideStopAsync(int deviceId, RelayFunction relayFunction);
+
+        /// Every override for this device not yet past ExpiresAtUtc - what DeviceConfigBuilder sends on the next poll and the Web UI shows as "currently active".
+        Task<IList<DeviceManualOverride>> ManualOverridesActiveForDeviceAsync(int deviceId);
     }
 }

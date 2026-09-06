@@ -97,7 +97,14 @@ public class ContractTests
         FirmwareUrl = "https://cdn.agrumy.com/firmware/esp32/0.1.2.bin",
         Enabled = true,
         DeviceConfigSensor = new DeviceConfigSensor { IDDeviceConfigSensor = 100029 },
-        DeviceConfigController = new DeviceConfigController { IDDeviceConfigController = 100029 },
+        DeviceConfigController = new DeviceConfigController
+        {
+            IDDeviceConfigController = 100029,
+            ManualOverrides =
+            [
+                new DeviceManualOverridePush { RelayFunction = RelayFunction.Heating, Mode = ManualOverrideMode.Target, ExpiresAtEpoch = 1893456000, TargetMetric = SensorMetric.Temperature, TargetThreshold = 22.0, TargetHysteresis = 1.0 },
+            ],
+        },
     };
 
     [Theory]

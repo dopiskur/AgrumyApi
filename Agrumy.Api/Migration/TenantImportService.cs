@@ -127,6 +127,8 @@ namespace api.Migration
                     TankCapacityLiters = z.TankCapacityLiters,
                     WaterLevelRawEmpty = z.WaterLevelRawEmpty,
                     WaterLevelRawFull = z.WaterLevelRawFull,
+                    HeatingMaxRunSeconds = z.HeatingMaxRunSeconds,
+                    VentilationMaxRunSeconds = z.VentilationMaxRunSeconds,
                 });
                 if (z.IDDeviceUnitZone is int oldId && created.IDDeviceUnitZone is int newId)
                 {

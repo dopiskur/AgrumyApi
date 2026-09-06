@@ -7,26 +7,69 @@
         Rules = Model.Rules,
         RedirectActionName = "Zone",
     };
+
+    int idZone = Model.Zone!.IDDeviceUnitZone!.Value;
+    DeviceManualOverride? ActiveFor(RelayFunction f) => Model.ManualOverrides.FirstOrDefault(o => o.RelayFunction == f);
+
+    var heatingModel = new ManualActuateFunctionViewModel
+    {
+        ScopeId = idZone, RelayFunction = RelayFunction.Heating, Label = "Heating",
+        MaxRunSeconds = Model.Zone.HeatingMaxRunSeconds, AllowedTargetMetrics = [SensorMetric.Temperature],
+        Active = ActiveFor(RelayFunction.Heating), DisplayTimeZone = Model.DisplayTimeZone,
+    };
+    var ventilationModel = new ManualActuateFunctionViewModel
+    {
+        ScopeId = idZone, RelayFunction = RelayFunction.Ventilation, Label = "Ventilation",
+        MaxRunSeconds = Model.Zone.VentilationMaxRunSeconds, AllowedTargetMetrics = [SensorMetric.Temperature, SensorMetric.Humidity],
+        Active = ActiveFor(RelayFunction.Ventilation), DisplayTimeZone = Model.DisplayTimeZone,
+    };
+    var irrigationModel = new ManualActuateFunctionViewModel
+    {
+        ScopeId = idZone, RelayFunction = RelayFunction.WaterPump, Label = "Irrigation",
+        MaxRunSeconds = Model.Zone.WaterPumpMaxRunSeconds, AllowedTargetMetrics = [SensorMetric.Moisture],
+        Active = ActiveFor(RelayFunction.WaterPump), DisplayTimeZone = Model.DisplayTimeZone,
+    };
 }
 
 <partial name="_RuleEditor" model="ruleEditorModel" />
 
 <div class="card mb-3">
     <div class="card-body">
-        <h6 class="fw-semibold">WaterPump safety limits</h6>
+        <h6 class="fw-semibold">Manual actuate</h6>
         <p class="text-secondary small">
-            A hard ceiling the device enforces AFTER any rule above decides the pump should run,
-            independent of it. 0 disables either one.
+            Runs a function right now, bypassing automated rules (and, for WaterPump, the rain-skip
+            veto) until it stops itself or you click Stop.
+        </p>
+        <partial name="_ManualActuateFunction" model="heatingModel" />
+        <partial name="_ManualActuateFunction" model="ventilationModel" />
+        <partial name="_ManualActuateFunction" model="irrigationModel" />
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h6 class="fw-semibold">Safety limits</h6>
+        <p class="text-secondary small">
+            A hard ceiling the device enforces AFTER any rule (or manual command above) decides a
+            function should run, independent of what decided it. 0/blank disables it.
         </p>
         <form asp-action="SafetyLimitsUpdate" method="post" class="d-flex flex-wrap align-items-end gap-2">
             <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
             <div>
-                <label class="form-label small mb-0">Max run seconds</label>
+                <label class="form-label small mb-0">WaterPump max run seconds</label>
                 <input type="number" min="0" name="waterPumpMaxRunSeconds" class="form-control form-control-sm" style="width:10rem" value="@Model.Zone.WaterPumpMaxRunSeconds" />
             </div>
             <div>
-                <label class="form-label small mb-0">Cooldown seconds</label>
+                <label class="form-label small mb-0">WaterPump cooldown seconds</label>
                 <input type="number" min="0" name="waterPumpCooldownSeconds" class="form-control form-control-sm" style="width:10rem" value="@Model.Zone.WaterPumpCooldownSeconds" />
+            </div>
+            <div>
+                <label class="form-label small mb-0">Heating max run seconds</label>
+                <input type="number" min="0" name="heatingMaxRunSeconds" class="form-control form-control-sm" style="width:10rem" value="@Model.Zone.HeatingMaxRunSeconds" />
+            </div>
+            <div>
+                <label class="form-label small mb-0">Ventilation max run seconds</label>
+                <input type="number" min="0" name="ventilationMaxRunSeconds" class="form-control form-control-sm" style="width:10rem" value="@Model.Zone.VentilationMaxRunSeconds" />
             </div>
             <div class="form-check mb-1">
                 <input type="checkbox" class="form-check-input" id="skipWaterPumpWhenRainPredicted" name="skipWaterPumpWhenRainPredicted" value="true" checked="@Model.Zone.SkipWaterPumpWhenRainPredicted" />
@@ -36,6 +79,10 @@
             </div>
             <button type="submit" class="btn btn-sm btn-primary">Save</button>
         </form>
+        <p class="text-secondary small mt-1">
+            Heating/Ventilation max run seconds also gate whether Manual actuate's Target mode is
+            available above - Target mode has no other self-cap, so it needs one of these set first.
+        </p>
         <p class="text-secondary small mt-1">
             When checked, this zone's WaterPump also stays off whenever the install-wide forecast
             (Server Settings &rarr; Weather) predicts rain - a second AND-NOT gate, independent of

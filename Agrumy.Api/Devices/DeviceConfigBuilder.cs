@@ -89,6 +89,18 @@ namespace api.Devices
                     controller.WaterPumpCooldownSeconds = zone?.WaterPumpCooldownSeconds;
                     // Computed here as a single AND-NOT gate, not sent as two separate flags - see DeviceConfigController.SkipWaterPumpForRain's remarks.
                     controller.SkipWaterPumpForRain = zone?.SkipWaterPumpWhenRainPredicted == true && serverConfig.WeatherRainPredicted;
+
+                    // Roadmap #219 - only what's still active (not yet past ExpiresAtUtc) rides along; a naturally-expired command simply stops appearing on the next poll, no explicit "stop" needed.
+                    IList<DeviceManualOverride> activeOverrides = await repo.ManualOverridesActiveForDeviceAsync(device.IDDevice!.Value);
+                    controller.ManualOverrides = activeOverrides.Select(o => new DeviceManualOverridePush
+                    {
+                        RelayFunction = o.RelayFunction,
+                        Mode = o.Mode,
+                        ExpiresAtEpoch = ((DateTimeOffset)DateTime.SpecifyKind(o.ExpiresAtUtc, DateTimeKind.Utc)).ToUnixTimeSeconds(),
+                        TargetMetric = o.TargetMetric,
+                        TargetThreshold = o.TargetThreshold,
+                        TargetHysteresis = o.TargetHysteresis,
+                    }).ToList();
                 }
                 deviceConfig.DeviceConfigController = controller;
             }

@@ -119,6 +119,9 @@ namespace api.Dal
                 TankCapacityLiters = zone.TankCapacityLiters,
                 WaterLevelRawEmpty = zone.WaterLevelRawEmpty,
                 WaterLevelRawFull = zone.WaterLevelRawFull,
+                // Same reasoning as Tank* above - no server-wide default, always taken from the caller.
+                HeatingMaxRunSeconds = zone.HeatingMaxRunSeconds,
+                VentilationMaxRunSeconds = zone.VentilationMaxRunSeconds,
             };
             db.DeviceUnitZones.Add(row);
             await db.SaveChangesAsync();
@@ -140,6 +143,8 @@ namespace api.Dal
             row.TankCapacityLiters = zone.TankCapacityLiters;
             row.WaterLevelRawEmpty = zone.WaterLevelRawEmpty;
             row.WaterLevelRawFull = zone.WaterLevelRawFull;
+            row.HeatingMaxRunSeconds = zone.HeatingMaxRunSeconds;
+            row.VentilationMaxRunSeconds = zone.VentilationMaxRunSeconds;
             await db.SaveChangesAsync();
             await DeviceUnitZoneConfigVersionBumpAsync(idDeviceUnitZone: row.IDDeviceUnitZone);
         }
@@ -739,6 +744,57 @@ namespace api.Dal
                 .ExecuteUpdateAsync(s => s.SetProperty(z => z.TankRefillNotifiedAt, notifiedAt));
         }
 
+        // ---- Manual actuate (roadmap #219) --------------------------
+
+        public async Task ManualOverrideStartAsync(DeviceManualOverride manualOverride)
+        {
+            var row = await db.DeviceManualOverrides
+                .FirstOrDefaultAsync(o => o.DeviceID == manualOverride.DeviceID && o.RelayFunction == (int)manualOverride.RelayFunction);
+            if (row == null)
+            {
+                row = new DeviceManualOverrideRow { DeviceID = manualOverride.DeviceID, RelayFunction = (int)manualOverride.RelayFunction };
+                db.DeviceManualOverrides.Add(row);
+            }
+            row.TenantID = manualOverride.TenantID;
+            row.Mode = (int)manualOverride.Mode;
+            row.StartedAtUtc = manualOverride.StartedAtUtc;
+            row.ExpiresAtUtc = manualOverride.ExpiresAtUtc;
+            row.TargetMetric = (int?)manualOverride.TargetMetric;
+            row.TargetThreshold = manualOverride.TargetThreshold;
+            row.TargetHysteresis = manualOverride.TargetHysteresis;
+            await db.SaveChangesAsync();
+        }
+
+        public async Task ManualOverrideStopAsync(int deviceId, RelayFunction relayFunction)
+        {
+            await db.DeviceManualOverrides
+                .Where(o => o.DeviceID == deviceId && o.RelayFunction == (int)relayFunction)
+                .ExecuteDeleteAsync();
+        }
+
+        public async Task<IList<DeviceManualOverride>> ManualOverridesActiveForDeviceAsync(int deviceId)
+        {
+            DateTime utcNow = DateTime.UtcNow;
+            var rows = await db.DeviceManualOverrides.AsNoTracking()
+                .Where(o => o.DeviceID == deviceId && o.ExpiresAtUtc > utcNow)
+                .ToListAsync();
+            return rows.Select(ToDtoManualOverride).ToList();
+        }
+
+        private static DeviceManualOverride ToDtoManualOverride(DeviceManualOverrideRow o) => new()
+        {
+            IDDeviceManualOverride = o.IDDeviceManualOverride,
+            DeviceID = o.DeviceID,
+            TenantID = o.TenantID,
+            RelayFunction = (RelayFunction)o.RelayFunction,
+            Mode = (ManualOverrideMode)o.Mode,
+            StartedAtUtc = o.StartedAtUtc,
+            ExpiresAtUtc = o.ExpiresAtUtc,
+            TargetMetric = o.TargetMetric is int tm ? (SensorMetric)tm : null,
+            TargetThreshold = o.TargetThreshold,
+            TargetHysteresis = o.TargetHysteresis,
+        };
+
         private static DeviceUnit ToDtoUnit(DeviceUnitRow u) => new()
         {
             IDDeviceUnit = u.IDDeviceUnit,
@@ -758,6 +814,8 @@ namespace api.Dal
             TankCapacityLiters = z.TankCapacityLiters,
             WaterLevelRawEmpty = z.WaterLevelRawEmpty,
             WaterLevelRawFull = z.WaterLevelRawFull,
+            HeatingMaxRunSeconds = z.HeatingMaxRunSeconds,
+            VentilationMaxRunSeconds = z.VentilationMaxRunSeconds,
         };
     }
 }
