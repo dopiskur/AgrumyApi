@@ -309,7 +309,7 @@ install_systemd_unit() {
   rm -f "$tmp"
 }
 
-install_reverse_proxy() {
+install_reverse_proxy_hostname() {
   # $1 = nginx|apache, $2 = api domain, $3 = admin domain
   local kind="$1" api_domain="$2" admin_domain="$3" tmp
   tmp="$(mktemp)"
@@ -340,11 +340,66 @@ install_reverse_proxy() {
   rm -f "$tmp"
 }
 
+# Single domain (or bare IP), /api split by path instead of by hostname.
+install_reverse_proxy_path() {
+  # $1 = nginx|apache, $2 = domain or IP, $3 = yes|no (whether to run certbot - skipped for a bare IP, certs need a real domain)
+  local kind="$1" domain="$2" use_tls="$3" tmp
+  tmp="$(mktemp)"
+  if [ "$kind" = "apache" ]; then
+    ensure_cmd apache2ctl apache2
+    as_root a2enmod proxy proxy_http headers
+    fetch "deploy/apache-path.conf.template" "$tmp"
+    sed -e "s|{{DOMAIN}}|${domain}|g" -e "s|{{API_PORT}}|5000|g" -e "s|{{WEB_PORT}}|5001|g" "$tmp" \
+      | as_root tee /etc/apache2/sites-available/agrumy.conf > /dev/null
+    as_root a2ensite agrumy
+    as_root systemctl reload apache2
+    if [ "$use_tls" = "yes" ]; then
+      ensure_cmd certbot certbot
+      install_pkg python3-certbot-apache
+      as_root certbot --apache -d "$domain" --non-interactive --agree-tos -m "admin@${domain}" || warn "certbot did not complete - re-run 'sudo certbot --apache' by hand once DNS for $domain resolves to this server."
+    fi
+  else
+    ensure_cmd nginx nginx
+    fetch "deploy/nginx-path.conf.template" "$tmp"
+    sed -e "s|{{DOMAIN}}|${domain}|g" -e "s|{{API_PORT}}|5000|g" -e "s|{{WEB_PORT}}|5001|g" "$tmp" \
+      | as_root tee /etc/nginx/sites-available/agrumy.conf > /dev/null
+    as_root ln -sf /etc/nginx/sites-available/agrumy.conf /etc/nginx/sites-enabled/agrumy.conf
+    as_root nginx -t && as_root systemctl reload nginx
+    if [ "$use_tls" = "yes" ]; then
+      ensure_cmd certbot certbot
+      install_pkg python3-certbot-nginx
+      as_root certbot --nginx -d "$domain" --non-interactive --agree-tos -m "admin@${domain}" || warn "certbot did not complete - re-run 'sudo certbot --nginx' by hand once DNS for $domain resolves to this server."
+    fi
+  fi
+  rm -f "$tmp"
+}
+
 install_baremetal() {
-  read -rp "API domain (e.g. api.example.com): " API_DOMAIN
-  [ -z "$API_DOMAIN" ] && err "API domain is required."
-  read -rp "Admin UI domain (e.g. admin.example.com): " ADMIN_DOMAIN
-  [ -z "$ADMIN_DOMAIN" ] && err "Admin UI domain is required."
+  echo
+  echo "1) Hostname-based (two domains, e.g. api.example.com + admin.example.com)"
+  echo "2) Path-based (one domain or IP - /api goes to Agrumy.Api, everything else to Agrumy.Web)"
+  read -rp "Routing [1]: " ROUTING_CHOICE
+  ROUTING_CHOICE="${ROUTING_CHOICE:-1}"
+
+  local scheme="https" api_url="" issuer="" use_tls="yes"
+  if [ "$ROUTING_CHOICE" = "2" ]; then
+    read -rp "Domain or IP this install will answer on (e.g. agrumy.example.com or its bare IP): " ROUTING_DOMAIN
+    [ -z "$ROUTING_DOMAIN" ] && err "A domain or IP is required."
+    # Let's Encrypt cannot issue a cert for a bare IP - fall back to plain HTTP rather than a certbot call that can only fail.
+    if [[ "$ROUTING_DOMAIN" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+      use_tls="no"; scheme="http"
+      warn "Routing by IP - skipping certbot (no TLS cert possible for a bare IP). Agrumy will be served over plain HTTP."
+    fi
+    issuer="${scheme}://${ROUTING_DOMAIN}"
+    api_url="$issuer"
+  else
+    read -rp "API domain (e.g. api.example.com): " API_DOMAIN
+    [ -z "$API_DOMAIN" ] && err "API domain is required."
+    read -rp "Admin UI domain (e.g. admin.example.com): " ADMIN_DOMAIN
+    [ -z "$ADMIN_DOMAIN" ] && err "Admin UI domain is required."
+    issuer="https://${API_DOMAIN}"
+    api_url="https://${API_DOMAIN}"
+  fi
 
   read -rp "Reverse proxy - (n)ginx or (a)pache? [n]: " PROXY_CHOICE
   PROXY_CHOICE="${PROXY_CHOICE:-n}"
@@ -368,9 +423,8 @@ install_baremetal() {
 
   local jwt_secret
   jwt_secret="$(random_secret)"
-  local issuer="https://${API_DOMAIN}"
   write_appsettings_api "$api_dir" "$jwt_secret" "$issuer" "$SERVICE_USER"
-  write_appsettings_web "$web_dir" "$jwt_secret" "$issuer" "https://${API_DOMAIN}" "$keys_dir" "$SERVICE_USER"
+  write_appsettings_web "$web_dir" "$jwt_secret" "$issuer" "$api_url" "$keys_dir" "$SERVICE_USER"
 
   install_systemd_unit "agrumy-api.service.template" "$api_dir" "$SERVICE_USER"
   install_systemd_unit "agrumy-web.service.template" "$web_dir" "$SERVICE_USER"
@@ -378,16 +432,21 @@ install_baremetal() {
   as_root systemctl enable --now agrumy-api.service
   as_root systemctl enable --now agrumy-web.service
 
-  if [ "$PROXY_CHOICE" = "a" ]; then
-    install_reverse_proxy apache "$API_DOMAIN" "$ADMIN_DOMAIN"
-  else
-    install_reverse_proxy nginx "$API_DOMAIN" "$ADMIN_DOMAIN"
-  fi
+  local proxy_kind="nginx"
+  [ "$PROXY_CHOICE" = "a" ] && proxy_kind="apache"
 
   echo
-  echo "Agrumy.Api and Agrumy.Web are installed and running."
-  echo "Next: open https://${API_DOMAIN}/ to finish the database setup wizard."
-  echo "Then: open https://${ADMIN_DOMAIN}/ to set the Global Admin password (roadmap #91)."
+  if [ "$ROUTING_CHOICE" = "2" ]; then
+    install_reverse_proxy_path "$proxy_kind" "$ROUTING_DOMAIN" "$use_tls"
+    echo "Agrumy.Api and Agrumy.Web are installed and running."
+    echo "Next: open ${scheme}://${ROUTING_DOMAIN}/api to finish the database setup wizard (see the service log for the ?token=... value)."
+    echo "Then: open ${scheme}://${ROUTING_DOMAIN}/ to set the Global Admin password (roadmap #91)."
+  else
+    install_reverse_proxy_hostname "$proxy_kind" "$API_DOMAIN" "$ADMIN_DOMAIN"
+    echo "Agrumy.Api and Agrumy.Web are installed and running."
+    echo "Next: open https://${API_DOMAIN}/ to finish the database setup wizard."
+    echo "Then: open https://${ADMIN_DOMAIN}/ to set the Global Admin password (roadmap #91)."
+  fi
 }
 
 # ============================================================================================

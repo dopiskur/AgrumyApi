@@ -25,7 +25,8 @@ namespace api.Setup
 
         public static void MapEndpoints(WebApplication app)
         {
-            app.MapGet("/", (IAntiforgery antiforgery, HttpContext context) =>
+            // Catch-all, not just "/" - a path-based reverse proxy split forwards everything under /api here, not just the bare root.
+            app.MapGet("/{**catchAll}", (IAntiforgery antiforgery, HttpContext context) =>
             {
                 if (!TokenMatches(context))
                 {
@@ -35,7 +36,7 @@ namespace api.Setup
                 return Results.Content(RenderForm(tokens.RequestToken, error: null), "text/html");
             });
 
-            app.MapPost("/", async (
+            app.MapPost("/{**catchAll}", async (
                 HttpContext context,
                 IAntiforgery antiforgery,
                 IWebHostEnvironment env,

@@ -1,0 +1,15 @@
+# Path-based alternative to apache.conf.template - one domain, /api routed to Agrumy.Api,
+# everything else to Agrumy.Web. Unlike nginx, Apache applies ProxyPass rules in listed order, so
+# /api MUST stay before the / catch-all below.
+
+<VirtualHost *:80>
+    ServerName {{DOMAIN}}
+    ProxyPreserveHost On
+    RequestHeader set X-Forwarded-Proto "http"
+
+    ProxyPass /api http://127.0.0.1:{{API_PORT}}/api
+    ProxyPassReverse /api http://127.0.0.1:{{API_PORT}}/api
+
+    ProxyPass / http://127.0.0.1:{{WEB_PORT}}/
+    ProxyPassReverse / http://127.0.0.1:{{WEB_PORT}}/
+</VirtualHost>
