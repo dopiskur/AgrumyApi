@@ -129,7 +129,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             new EfCommandRepository(db), new EfFirmwareRepository(db),
             new EfUserRepository(db, tenantRepository, refreshTokenRepository), deviceRepository,
             new EfSimulationRepository(db, deviceRepository),
-            new EfDeviceUnitRepository(db, settingsOptions, serverConfigRepository, deviceRepository));
+            new EfDeviceUnitRepository(db, settingsOptions, serverConfigRepository, deviceRepository),
+            new EfSensorDataRepository(db));
     }
 
     private sealed class NullCache : ICache

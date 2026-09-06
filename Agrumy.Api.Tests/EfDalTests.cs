@@ -261,7 +261,8 @@ public class ClassifyExceptionTests
         new Mock<IUserRepository>().Object,
         new Mock<IDeviceRepository>().Object,
         new Mock<ISimulationRepository>().Object,
-        new Mock<IDeviceUnitRepository>().Object);
+        new Mock<IDeviceUnitRepository>().Object,
+        new Mock<ISensorDataRepository>().Object);
 
     [Fact]
     public void PlainException_MentioningMissingTable_IsSchemaMissing()
