@@ -31,7 +31,10 @@
 
             <ul class="nav nav-tabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-hysteresis" type="button" role="tab">Relay Hysteresis</button>
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-general" type="button" role="tab">General</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-hysteresis" type="button" role="tab">Relay Hysteresis</button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-safety-limits" type="button" role="tab">Water Pump Safety</button>
@@ -56,7 +59,20 @@
                 </li>
             </ul>
             <div class="tab-content border border-top-0 rounded-bottom p-3 mb-3">
-                <div class="tab-pane fade show active" id="tab-hysteresis" role="tabpanel">
+                <div class="tab-pane fade show active" id="tab-general" role="tabpanel">
+                    <div class="mb-0" style="max-width:16rem">
+                        <label asp-for="ConfigHeartbeatHours" class="form-label"></label>
+                        <input asp-for="ConfigHeartbeatHours" class="form-control" />
+                        <span asp-validation-for="ConfigHeartbeatHours" class="text-danger"></span>
+                        <div class="form-text">
+                            Resends a device's full config even when its ConfigVersion hasn't changed, so a
+                            DST transition, a timezone edit, or a rain-skip flip still reaches it - 0 disables
+                            this and relies on ConfigVersion alone.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="tab-hysteresis" role="tabpanel">
                     <p class="text-secondary">
                         Dead-zone defaults a newly-added device's Controller config is seeded with.
                         Changing these has no effect on devices that already exist -
@@ -395,17 +411,6 @@
                         </div>
                         <div id="testEmailStatus" class="mt-2"></div>
                     </div>
-                </div>
-            </div>
-
-            <div class="mb-3" style="max-width:16rem">
-                <label asp-for="ConfigHeartbeatHours" class="form-label"></label>
-                <input asp-for="ConfigHeartbeatHours" class="form-control" />
-                <span asp-validation-for="ConfigHeartbeatHours" class="text-danger"></span>
-                <div class="form-text">
-                    Resends a device's full config even when its ConfigVersion hasn't changed, so a
-                    DST transition, a timezone edit, or a rain-skip flip still reaches it - 0 disables
-                    this and relies on ConfigVersion alone.
                 </div>
             </div>
 
