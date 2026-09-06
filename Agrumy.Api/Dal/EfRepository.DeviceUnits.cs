@@ -470,6 +470,10 @@ namespace api.Dal
                 .GroupBy(z => z.DeviceUnitID)
                 .ToDictionary(g => g.Key, g => g.Select(z => z.IDDeviceUnitZone).ToList());
 
+            // One SensorData query for every unit's zones combined, not one query per unit in the loop below - a fleet with 20+ units otherwise pulls its whole 24h trend window once per unit.
+            var zoneIdsByUnit = unitRows.ToDictionary(u => u.IDDeviceUnit, u => zonesByUnit.GetValueOrDefault(u.IDDeviceUnit) ?? []);
+            var trendsByUnit = await BuildTrendsByZoneGroupAsync(zoneIdsByUnit);
+
             var result = new List<DeviceUnitDashboard>();
             foreach (var u in unitRows)
             {
@@ -483,7 +487,7 @@ namespace api.Dal
                     DeviceCount = scoped.Count,
                     Averages = Average(scoped),
                     Status = ComputeStatus(scoped),
-                    Trend = await BuildTrendAsync(zoneIds),
+                    Trend = trendsByUnit[u.IDDeviceUnit],
                     ProblemAlerts = alerts.Where(a => a.DeviceUnitID == u.IDDeviceUnit).Select(ToDtoAlert).ToList(),
                 });
             }
@@ -501,6 +505,9 @@ namespace api.Dal
             var snapshots = await GetDeviceSnapshotsAsync(scopedDevices, expiryHours, alertsEnabled);
             var alerts = await GetProblemAlertsAsync(scopedDevices, expiryHours, alertsEnabled);
 
+            // Same batching as DeviceUnitDashboardGetAsync - one query for every zone's trend instead of one per zone in the loop below.
+            var trendsByZone = await BuildTrendsByZoneGroupAsync(zoneRows.ToDictionary(z => z.IDDeviceUnitZone, z => (List<int>)[z.IDDeviceUnitZone]));
+
             var result = new List<DeviceUnitZoneDashboard>();
             foreach (var z in zoneRows)
             {
@@ -513,7 +520,7 @@ namespace api.Dal
                     DeviceCount = scoped.Count,
                     Averages = Average(scoped, z),
                     Status = ComputeStatus(scoped),
-                    Trend = await BuildTrendAsync([z.IDDeviceUnitZone]),
+                    Trend = trendsByZone[z.IDDeviceUnitZone],
                     ProblemAlerts = alerts.Where(a => a.DeviceUnitZoneID == z.IDDeviceUnitZone).Select(ToDtoAlert).ToList(),
                 });
             }
@@ -701,6 +708,63 @@ namespace api.Dal
                 trend.Wind[bucket.Key] = rowsInBucket.Select(r => r.Wind).Average();
             }
             return trend;
+        }
+
+        /// Same 24h hourly-bucket trend as BuildTrendAsync, but for many keys (units, or zones) in one SensorData query instead of one query per key - each zone belongs to exactly one key, so results just get routed by DeviceUnitZoneID after the single fetch.
+        private async Task<Dictionary<TKey, SensorTrend>> BuildTrendsByZoneGroupAsync<TKey>(Dictionary<TKey, List<int>> zoneIdsByKey) where TKey : notnull
+        {
+            var result = zoneIdsByKey.Keys.ToDictionary(k => k, _ => new SensorTrend());
+            var keyByZoneId = new Dictionary<int, TKey>();
+            foreach (var (key, zoneIds) in zoneIdsByKey)
+            {
+                foreach (int zoneId in zoneIds)
+                {
+                    keyByZoneId[zoneId] = key;
+                }
+            }
+            if (keyByZoneId.Count == 0)
+            {
+                return result;
+            }
+
+            DateTime utcNow = DateTime.UtcNow;
+            DateTime cutoff = utcNow.AddHours(-SensorTrend.HourBuckets);
+            var zoneIdList = keyByZoneId.Keys.ToList();
+
+            var rows = await db.SensorData.AsNoTracking()
+                .Where(s => s.DeviceUnitZoneID != null && zoneIdList.Contains(s.DeviceUnitZoneID.Value) && s.DateCreated >= cutoff)
+                .Select(s => new
+                {
+                    s.DeviceUnitZoneID, s.DateCreated, s.Temperature, s.SoilTemperature, s.Humidity, s.Moisture, s.Light,
+                    s.Co2, s.Tvoc, s.Barometer, s.LiquidPH, s.RainLevel, s.WaterLevel, s.Wind,
+                })
+                .ToListAsync();
+
+            var byKeyAndBucket = rows
+                .Where(r => r.DateCreated != null)
+                .Select(r => (Key: keyByZoneId[r.DeviceUnitZoneID!.Value], Bucket: HourBucketIndex(r.DateCreated!.Value, utcNow), Row: r))
+                .Where(x => x.Bucket >= 0 && x.Bucket < SensorTrend.HourBuckets)
+                .GroupBy(x => (x.Key, x.Bucket));
+
+            foreach (var group in byKeyAndBucket)
+            {
+                var trend = result[group.Key.Key];
+                var rowsInBucket = group.Select(x => x.Row).ToList();
+                trend.Temperature[group.Key.Bucket] = rowsInBucket.Select(r => r.Temperature).Average();
+                trend.SoilTemperature[group.Key.Bucket] = rowsInBucket.Select(r => r.SoilTemperature).Average();
+                trend.Humidity[group.Key.Bucket] = rowsInBucket.Select(r => r.Humidity).Average();
+                trend.Vpd[group.Key.Bucket] = rowsInBucket.Select(r => VpdCalculator.Compute(r.Temperature, r.Humidity)).Average();
+                trend.Moisture[group.Key.Bucket] = rowsInBucket.Select(r => r.Moisture).Average();
+                trend.Light[group.Key.Bucket] = rowsInBucket.Select(r => r.Light).Average();
+                trend.Co2[group.Key.Bucket] = rowsInBucket.Select(r => r.Co2).Average();
+                trend.Tvoc[group.Key.Bucket] = rowsInBucket.Select(r => r.Tvoc).Average();
+                trend.Barometer[group.Key.Bucket] = rowsInBucket.Select(r => r.Barometer).Average();
+                trend.LiquidPH[group.Key.Bucket] = rowsInBucket.Select(r => r.LiquidPH).Average();
+                trend.RainLevel[group.Key.Bucket] = rowsInBucket.Select(r => r.RainLevel).Average();
+                trend.WaterLevel[group.Key.Bucket] = rowsInBucket.Select(r => r.WaterLevel).Average();
+                trend.Wind[group.Key.Bucket] = rowsInBucket.Select(r => r.Wind).Average();
+            }
+            return result;
         }
 
         /// 0 = the bucket ending 24h ago, 23 = the current hour - a timestamp outside the 24h window (or, defensively, in the future) falls outside [0, HourBuckets), which the caller filters out.
