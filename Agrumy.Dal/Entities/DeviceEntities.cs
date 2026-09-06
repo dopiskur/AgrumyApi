@@ -1,12 +1,22 @@
 namespace api.Dal.Entities
 {
     /// TenantID null means the shared global sentinel row (IDDeviceFarmUnit=0 "Default", see EfRepository.SeedDeviceFarmUnitSentinelsAsync), not a real per-tenant Unit.
+    /// Roadmap #384 - top-level organizational grouping ABOVE Unit within the same tenant (a physical farm/site); optional, a DeviceFarmUnit not yet assigned to one has DeviceFarmID null.
+    public class DeviceFarmRow
+    {
+        public int IDDeviceFarm { get; set; }
+        public int? TenantID { get; set; }
+        public string? DeviceFarmName { get; set; }
+    }
+
     public class DeviceFarmUnitRow
     {
         public int IDDeviceFarmUnit { get; set; }
         public int? TenantID { get; set; }
         public string? DeviceFarmUnitName { get; set; }
         public bool? ZoneEnabled { get; set; }
+        // Roadmap #384 - optional (a Farm-less Unit stays valid, no default-farm backfill).
+        public int? DeviceFarmID { get; set; }
     }
 
     /// DeviceFarmUnitID is the real "Unit contains many Zones" FK (see db/migrations/2026-09-02-deviceunit-zone-containment.sql) - TenantID null means the shared global sentinel row (IDDeviceFarmUnitZone=0 "Disabled"), same convention as DeviceFarmUnitRow.
@@ -40,6 +50,8 @@ namespace api.Dal.Entities
     {
         public int IDDeviceFarmUnitZoneRule { get; set; }
         public int TenantID { get; set; }
+        // Roadmap #384 - exactly one of DeviceFarmID/DeviceFarmUnitID/DeviceFarmUnitZoneID is set (Farm/Unit/Zone scope); all three null means Global. Enforced in DeviceFarmUnitApiController, not the DB, same as the other two.
+        public int? DeviceFarmID { get; set; }
         public int? DeviceFarmUnitID { get; set; }
         public int? DeviceFarmUnitZoneID { get; set; }
         public int ActionType { get; set; }

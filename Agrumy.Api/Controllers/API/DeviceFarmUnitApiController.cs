@@ -23,6 +23,62 @@ namespace api.Controllers.API
         // Absolute ceiling - must match AgrumyFirmware DeviceModel.h's MAX_CONDITIONS_PER_RULE; unlike MaxRulesPerZone this is a per-rule structural limit, not an admin-configurable soft cap.
         private const int HardMaxConditionsPerRule = 8;
 
+        #region Farm CRUD
+
+        [Authorize]
+        [HttpGet("Farm/All")]
+        public async Task<ActionResult<IList<DeviceFarm>>> DeviceFarmsGet() =>
+            Ok(await deviceFarmUnitRepo.DeviceFarmsGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
+
+        [Authorize]
+        [HttpGet("Farm")]
+        public async Task<ActionResult<DeviceFarm>> DeviceFarmGet(int? idDeviceFarm)
+        {
+            var (farm, error) = await EnsureOwnedFarmAsync(idDeviceFarm, forWrite: false);
+            return error ?? Ok(farm);
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("Farm")]
+        public async Task<ActionResult<DeviceFarm>> DeviceFarmAdd([FromBody] DeviceFarm farm)
+        {
+            farm.TenantID = CallerTenantId; // payload cannot pick another tenant - same rule as every other Add
+            DeviceFarm added = await deviceFarmUnitRepo.DeviceFarmAddAsync(farm);
+            await WriteAuditAsync("DeviceFarm.Created", added.TenantID, "DeviceFarm", added.IDDeviceFarm.ToString()!, added.DeviceFarmName);
+            return Ok(added);
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPut("Farm")]
+        public async Task<ActionResult<bool>> DeviceFarmUpdate([FromBody] DeviceFarm farm)
+        {
+            var (existing, error) = await EnsureOwnedFarmAsync(farm.IDDeviceFarm, forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            farm.TenantID = existing!.TenantID; // payload cannot move a farm to another tenant
+            await deviceFarmUnitRepo.DeviceFarmUpdateAsync(farm);
+            await WriteAuditAsync("DeviceFarm.Updated", existing.TenantID, "DeviceFarm", existing.IDDeviceFarm.ToString()!, farm.DeviceFarmName);
+            return true;
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpDelete("Farm")]
+        public async Task<ActionResult<bool>> DeviceFarmDelete(int? idDeviceFarm)
+        {
+            var (farm, error) = await EnsureOwnedFarmAsync(idDeviceFarm, forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            await deviceFarmUnitRepo.DeviceFarmDeleteAsync(farm!.IDDeviceFarm!.Value);
+            await WriteAuditAsync("DeviceFarm.Deleted", farm.TenantID, "DeviceFarm", idDeviceFarm.ToString()!, farm.DeviceFarmName);
+            return true;
+        }
+
+        #endregion
+
         #region Unit CRUD
 
         [Authorize]
@@ -204,6 +260,22 @@ namespace api.Controllers.API
         }
 
         [Authorize]
+        [HttpGet("Farm/Rule")]
+        public async Task<ActionResult<IList<DeviceFarmUnitZoneRule>>> DeviceFarmRulesGet(int? idDeviceFarm)
+        {
+            if (CallerIsDataReaderOnly)
+            {
+                return StatusCode(403, "Data Reader role cannot view farm rules.");
+            }
+            var (farm, error) = await EnsureOwnedFarmAsync(idDeviceFarm, forWrite: false);
+            if (error != null)
+            {
+                return error;
+            }
+            return Ok(await deviceFarmUnitRepo.RulesGetForFarmAsync(farm!.IDDeviceFarm!.Value));
+        }
+
+        [Authorize]
         [HttpGet("Global/Rule")]
         public async Task<ActionResult<IList<DeviceFarmUnitZoneRule>>> GlobalRulesGet()
         {
@@ -228,6 +300,7 @@ namespace api.Controllers.API
                 return error;
             }
             rule.DeviceFarmUnitID = null;
+            rule.DeviceFarmID = null;
             rule.TenantID = zone!.TenantID ?? CallerTenantId ?? 0;
             return await AddRuleAsync(rule, existingCount: (await deviceFarmUnitRepo.RulesGetForZoneAsync(zone.IDDeviceFarmUnitZone!.Value)).Count, scopeLabel: $"zone {rule.DeviceFarmUnitZoneID}");
         }
@@ -242,8 +315,24 @@ namespace api.Controllers.API
                 return error;
             }
             rule.DeviceFarmUnitZoneID = null;
+            rule.DeviceFarmID = null;
             rule.TenantID = unit!.TenantID ?? CallerTenantId ?? 0;
             return await AddRuleAsync(rule, existingCount: (await deviceFarmUnitRepo.RulesGetForUnitAsync(unit.IDDeviceFarmUnit!.Value)).Count, scopeLabel: $"unit {rule.DeviceFarmUnitID}");
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("Farm/Rule")]
+        public async Task<ActionResult<int>> DeviceFarmRuleAdd([FromBody] DeviceFarmUnitZoneRule rule)
+        {
+            var (farm, error) = await EnsureOwnedFarmAsync(rule.DeviceFarmID, forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            rule.DeviceFarmUnitZoneID = null;
+            rule.DeviceFarmUnitID = null;
+            rule.TenantID = farm!.TenantID ?? CallerTenantId ?? 0;
+            return await AddRuleAsync(rule, existingCount: (await deviceFarmUnitRepo.RulesGetForFarmAsync(farm.IDDeviceFarm!.Value)).Count, scopeLabel: $"farm {rule.DeviceFarmID}");
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -256,11 +345,12 @@ namespace api.Controllers.API
             }
             rule.DeviceFarmUnitZoneID = null;
             rule.DeviceFarmUnitID = null;
+            rule.DeviceFarmID = null;
             rule.TenantID = tenantId;
             return await AddRuleAsync(rule, existingCount: (await deviceFarmUnitRepo.RulesGetForTenantGlobalAsync(tenantId)).Count, scopeLabel: $"tenant {tenantId} (global)");
         }
 
-        /// Shared validate+cap+persist body for all three scopes - the only difference between them is which EnsureOwned*/existing-count call the caller already made.
+        /// Shared validate+cap+persist body for all four scopes - the only difference between them is which EnsureOwned*/existing-count call the caller already made.
         private async Task<ActionResult<int>> AddRuleAsync(DeviceFarmUnitZoneRule rule, int existingCount, string scopeLabel)
         {
             if (await RuleShapeErrorAsync(rule) is string shapeError)
@@ -285,6 +375,10 @@ namespace api.Controllers.API
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpDelete("Unit/Rule")]
         public Task<ActionResult<bool>> DeviceFarmUnitRuleDelete(int? idDeviceFarmUnitZoneRule) => DeleteRuleAsync(idDeviceFarmUnitZoneRule);
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpDelete("Farm/Rule")]
+        public Task<ActionResult<bool>> DeviceFarmRuleDelete(int? idDeviceFarmUnitZoneRule) => DeleteRuleAsync(idDeviceFarmUnitZoneRule);
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpDelete("Global/Rule")]
@@ -314,7 +408,7 @@ namespace api.Controllers.API
             return true;
         }
 
-        /// Resolves ownership from the rule's OWN scope (Zone/Unit/Global), not the caller's route - a rule can only ever have one of those three shapes.
+        /// Resolves ownership from the rule's OWN scope (Zone/Unit/Farm/Global), not the caller's route - a rule can only ever have one of those four shapes.
         private async Task<ActionResult?> EnsureOwnedRuleAsync(DeviceFarmUnitZoneRule rule, bool forWrite)
         {
             if (rule.DeviceFarmUnitZoneID is int idZone)
@@ -324,6 +418,10 @@ namespace api.Controllers.API
             if (rule.DeviceFarmUnitID is int idUnit)
             {
                 return (await EnsureOwnedUnitAsync(idUnit, forWrite)).Error;
+            }
+            if (rule.DeviceFarmID is int idFarm)
+            {
+                return (await EnsureOwnedFarmAsync(idFarm, forWrite)).Error;
             }
             bool crossTenantAllowed = forWrite ? CallerManagesDevicesGlobally : CallerReadsDevicesGlobally;
             return rule.TenantID != CallerTenantId && !crossTenantAllowed
@@ -637,6 +735,10 @@ namespace api.Controllers.API
         }
 
         #endregion
+
+        /// Same shape as DeviceApiController.EnsureOwnedDeviceAsync, for DeviceFarm (roadmap #384).
+        private Task<(DeviceFarm? Farm, ActionResult? Error)> EnsureOwnedFarmAsync(int? idDeviceFarm, bool forWrite) =>
+            EnsureOwnedDeviceEntityAsync(() => deviceFarmUnitRepo.DeviceFarmGetByIdAsync(idDeviceFarm), f => f.TenantID, "Farm", forWrite);
 
         /// Same shape as DeviceApiController.EnsureOwnedDeviceAsync, for DeviceFarmUnit - see ApiControllerBase.EnsureOwnedDeviceEntityAsync for the shared 404/403 logic.
         private Task<(DeviceFarmUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int? idDeviceFarmUnit, bool forWrite) =>

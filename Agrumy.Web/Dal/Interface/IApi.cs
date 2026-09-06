@@ -154,6 +154,23 @@ namespace api.Dal.Interface
         [Delete("/api/Gateway/DeviceMapping")]
         Task GatewayDeviceMappingDelete(int idGatewayDeviceMapping, int idGatewayDevice);
 
+        // ---- Farm (roadmap #384) --------------------------
+
+        [Get("/api/DeviceFarmUnit/Farm/All")]
+        Task<IList<DeviceFarm>> DeviceFarmsGet();
+
+        [Get("/api/DeviceFarmUnit/Farm")]
+        Task<DeviceFarm> DeviceFarmGet(int? idDeviceFarm);
+
+        [Post("/api/DeviceFarmUnit/Farm")]
+        Task<DeviceFarm> DeviceFarmAdd([Body] DeviceFarm farm);
+
+        [Put("/api/DeviceFarmUnit/Farm")]
+        Task DeviceFarmUpdate([Body] DeviceFarm farm);
+
+        [Delete("/api/DeviceFarmUnit/Farm")]
+        Task DeviceFarmDelete(int? idDeviceFarm);
+
         // ---- Unit/Zone -----------------------------------
 
         [Get("/api/DeviceFarmUnit/All")]
@@ -205,6 +222,15 @@ namespace api.Dal.Interface
 
         [Delete("/api/DeviceFarmUnit/Unit/Rule")]
         Task DeviceFarmUnitRuleDelete(int? idDeviceFarmUnitZoneRule);
+
+        [Get("/api/DeviceFarmUnit/Farm/Rule")]
+        Task<IList<DeviceFarmUnitZoneRule>> DeviceFarmRulesGet(int? idDeviceFarm);
+
+        [Post("/api/DeviceFarmUnit/Farm/Rule")]
+        Task<int> DeviceFarmRuleAdd([Body] DeviceFarmUnitZoneRule rule);
+
+        [Delete("/api/DeviceFarmUnit/Farm/Rule")]
+        Task DeviceFarmRuleDelete(int? idDeviceFarmUnitZoneRule);
 
         [Get("/api/DeviceFarmUnit/Global/Rule")]
         Task<IList<DeviceFarmUnitZoneRule>> GlobalRulesGet();

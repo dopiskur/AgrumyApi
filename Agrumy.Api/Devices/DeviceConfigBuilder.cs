@@ -90,8 +90,12 @@ namespace api.Devices
                 {
                     IList<DeviceFarmUnitZoneRule> zoneRules = await repo.RulesGetForZoneAsync(idZone);
                     IList<DeviceFarmUnitZoneRule> unitRules = device.DeviceFarmUnitID is int idUnit ? await repo.RulesGetForUnitAsync(idUnit) : [];
+                    // Farm rules only apply when the device's own Unit is actually assigned to one - a Farm-less Unit sees no Farm-scope rules at all, same "unassigned means no inheritance" rule as Global always applying regardless.
+                    IList<DeviceFarmUnitZoneRule> farmRules = device.DeviceFarmUnitID is int farmUnitId
+                        && (await repo.DeviceFarmUnitGetByIdAsync(farmUnitId))?.DeviceFarmID is int idFarm
+                        ? await repo.RulesGetForFarmAsync(idFarm) : [];
                     IList<DeviceFarmUnitZoneRule> globalRules = await repo.RulesGetForTenantGlobalAsync(device.TenantID);
-                    IList<DeviceFarmUnitZoneRule> rules = RuleHierarchyResolver.ResolveRelayRules(zoneRules, unitRules, globalRules);
+                    IList<DeviceFarmUnitZoneRule> rules = RuleHierarchyResolver.ResolveRelayRules(zoneRules, unitRules, farmRules, globalRules);
                     DateOnly localDate = DateOnly.FromDateTime(DateTime.UtcNow.AddSeconds(utcOffsetSeconds));
                     controller.Rules = AstronomicalRuleResolver.Resolve(rules, serverConfig, localDate, utcOffsetSeconds);
                     DeviceFarmUnitZone? zone = await repo.DeviceFarmUnitZoneGetByIdAsync(idZone);

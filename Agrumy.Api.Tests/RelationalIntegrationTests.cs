@@ -1241,6 +1241,34 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(globalRuleId, Assert.Single(await _repo.RulesGetForTenantGlobalAsync(tenantId)).IDDeviceFarmUnitZoneRule);
     }
 
+    // Roadmap #384 - Farm CRUD, Unit assignment, and Farm-scope rule end to end against a real DB (not just the in-memory RuleHierarchyResolverTests).
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceFarm_UnitAssignment_And_FarmScopeRule_RoundTrip(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var (unit, _) = await MakeUnitAndZone(tenantId);
+
+        DeviceFarm farm = await _repo.DeviceFarmAddAsync(new DeviceFarm { TenantID = tenantId, DeviceFarmName = "Farm_" + U() });
+        Assert.Null((await _repo.DeviceFarmUnitGetByIdAsync(unit.IDDeviceFarmUnit))!.DeviceFarmID);
+
+        unit.DeviceFarmID = farm.IDDeviceFarm;
+        await _repo.DeviceFarmUnitUpdateAsync(unit);
+        Assert.Equal(farm.IDDeviceFarm, (await _repo.DeviceFarmUnitGetByIdAsync(unit.IDDeviceFarmUnit))!.DeviceFarmID);
+
+        int farmRuleId = await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
+        {
+            TenantID = tenantId, DeviceFarmID = farm.IDDeviceFarm!.Value, RelayFunction = RelayFunction.Ventilation,
+            Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(1, 1), ConditionConfigJson.Options), null)],
+        });
+        Assert.Equal(farmRuleId, Assert.Single(await _repo.RulesGetForFarmAsync(farm.IDDeviceFarm!.Value)).IDDeviceFarmUnitZoneRule);
+
+        // Deleting the farm unassigns the unit (stays valid) rather than cascading, and the farm-scope rule goes with the farm.
+        await _repo.DeviceFarmDeleteAsync(farm.IDDeviceFarm!.Value);
+        Assert.Null((await _repo.DeviceFarmUnitGetByIdAsync(unit.IDDeviceFarmUnit))!.DeviceFarmID);
+        Assert.Empty(await _repo.RulesGetForFarmAsync(farm.IDDeviceFarm!.Value));
+    }
+
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task Rule_ConditionsRoundTrip_PreservesAndOrOperatorsInOrder(DbProviderKind provider)
     {

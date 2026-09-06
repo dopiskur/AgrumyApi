@@ -16,6 +16,21 @@ namespace api.Dal.Interface
     /// Unit/Zone facet of the data layer: CRUD, device assignment, and the hierarchical dashboard aggregation - split out from IDeviceRepository as its own sizeable domain.
     public interface IDeviceFarmUnitRepository
     {
+        // ---- Farm CRUD (roadmap #384) -----------------------------------
+
+        /// Every real Farm in the tenant, or every tenant when tenantID is null (caller must check CallerReadsDevicesGlobally).
+        Task<IList<DeviceFarm>> DeviceFarmsGetAsync(int? tenantID);
+
+        /// The Farm with this id (no tenant filter), for ownership checks before an authorized write - or null if none.
+        Task<DeviceFarm?> DeviceFarmGetByIdAsync(int? idDeviceFarm);
+
+        Task<DeviceFarm> DeviceFarmAddAsync(DeviceFarm farm);
+
+        Task DeviceFarmUpdateAsync(DeviceFarm farm);
+
+        /// Unassigns every Unit currently in this Farm (DeviceFarmID set to NULL, same "stays valid, just unassigned" rule as DeviceUnassignFromZoneAsync), then deletes the Farm row - a no-op if the id doesn't exist.
+        Task DeviceFarmDeleteAsync(int idDeviceFarm);
+
         // ---- Unit CRUD -------------------------------------------------
 
         /// Every real Unit in the tenant, or every tenant when tenantID is null (caller must check CallerReadsDevicesGlobally) - never includes the IDDeviceFarmUnit=0 "Default" sentinel.
@@ -83,7 +98,7 @@ namespace api.Dal.Interface
         /// Single-zone detail: roll-up plus the actual device list, null if the zone id doesn't exist.
         Task<DeviceFarmUnitZoneDashboard?> DeviceFarmUnitZoneDashboardGetAsync(int idDeviceFarmUnitZone);
 
-        // ---- Rules (Zone/Unit/Global scope) ------------------------------
+        // ---- Rules (Zone/Unit/Farm/Global scope) ------------------------------
 
         /// Every rule scoped to exactly this zone - several rows may share the same RelayFunction/SensorMetric (OR semantics; Relay-action OR is resolved by the firmware, Notification-action OR by RuleNotificationEvaluator).
         Task<IList<DeviceFarmUnitZoneRule>> RulesGetForZoneAsync(int idDeviceFarmUnitZone);
@@ -91,7 +106,10 @@ namespace api.Dal.Interface
         /// Every rule scoped to exactly this unit (Unit scope, not the union of its zones' own rules).
         Task<IList<DeviceFarmUnitZoneRule>> RulesGetForUnitAsync(int idDeviceFarmUnit);
 
-        /// Every rule at Global (per-tenant) scope - applies to every unit/zone the tenant owns unless a more specific scope overrides it for that function/metric.
+        /// Every rule scoped to exactly this farm (Farm scope, not the union of its units'/zones' own rules) - roadmap #384.
+        Task<IList<DeviceFarmUnitZoneRule>> RulesGetForFarmAsync(int idDeviceFarm);
+
+        /// Every rule at Global (per-tenant) scope - applies to every farm/unit/zone the tenant owns unless a more specific scope overrides it for that function/metric.
         Task<IList<DeviceFarmUnitZoneRule>> RulesGetForTenantGlobalAsync(int tenantId);
 
         /// Every Notification-action rule for the tenant across all three scopes, unresolved (RuleNotificationEvaluator does its own per-zone Zone>Unit>Global resolution).

@@ -13,6 +13,53 @@ namespace api.Controllers.View
     {
         public async Task<ActionResult> Index() => View(await api.DeviceFarmUnitDashboardGet());
 
+        // ---- Farm (roadmap #384) --------------------------------------
+
+        public async Task<ActionResult> Farms() => View(new FarmListViewModel
+        {
+            Farms = await api.DeviceFarmsGet(),
+            Units = await api.DeviceFarmUnitsGet(),
+        });
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> FarmAdd(string deviceFarmName)
+        {
+            await api.DeviceFarmAdd(new DeviceFarm { DeviceFarmName = deviceFarmName });
+            return RedirectToAction(nameof(Farms));
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> FarmRename(int idDeviceFarm, string deviceFarmName)
+        {
+            await api.DeviceFarmUpdate(new DeviceFarm { IDDeviceFarm = idDeviceFarm, DeviceFarmName = deviceFarmName });
+            return RedirectToAction(nameof(Farms));
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> FarmDelete(int idDeviceFarm)
+        {
+            await api.DeviceFarmDelete(idDeviceFarm);
+            return RedirectToAction(nameof(Farms));
+        }
+
+        /// Whole-object PUT semantics (same as UnitRename) - fetches the unit first so DeviceFarmUnitName isn't wiped by a partial payload. idDeviceFarm null unassigns.
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> UnitAssignFarm(int idDeviceFarmUnit, int? idDeviceFarm)
+        {
+            DeviceFarmUnit unit = await api.DeviceFarmUnitGet(idDeviceFarmUnit);
+            unit.DeviceFarmID = idDeviceFarm;
+            await api.DeviceFarmUnitUpdate(unit);
+            return RedirectToAction(nameof(Farms));
+        }
+
         public async Task<ActionResult> IndexCubes() => PartialView("_UnitCubes", await api.DeviceFarmUnitDashboardGet());
 
         public async Task<ActionResult> Zones(int idDeviceFarmUnit)
@@ -369,6 +416,33 @@ namespace api.Controllers.View
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
+        public async Task<ActionResult> DeviceFarmRules(int idDeviceFarm) => View(new RuleEditorViewModel
+        {
+            Scope = RuleScope.Farm,
+            ScopeId = idDeviceFarm,
+            Rules = await api.DeviceFarmRulesGet(idDeviceFarm),
+            RedirectActionName = nameof(DeviceFarmRules),
+        });
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> DeviceFarmRuleAdd(int idDeviceFarm, RuleFormInput input)
+        {
+            await AddRuleAsync(BuildRule(input, null, null, idDeviceFarm), r => api.DeviceFarmRuleAdd(r));
+            return RedirectToAction(nameof(DeviceFarmRules), new { idDeviceFarm });
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> DeviceFarmRuleDelete(int idDeviceFarmUnitZoneRule, int idDeviceFarm)
+        {
+            await DeleteRuleAsync(idDeviceFarmUnitZoneRule, r => api.DeviceFarmRuleDelete(r));
+            return RedirectToAction(nameof(DeviceFarmRules), new { idDeviceFarm });
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> GlobalRules() => View(new RuleEditorViewModel
         {
             Scope = RuleScope.Global,
@@ -419,7 +493,7 @@ namespace api.Controllers.View
         }
 
         /// Builds a DeviceFarmUnitZoneRule from the form input - exactly one of idDeviceFarmUnitZone/idDeviceFarmUnit is non-null for Zone/Unit scope, both null for Global.
-        private static DeviceFarmUnitZoneRule BuildRule(RuleFormInput input, int? idDeviceFarmUnitZone, int? idDeviceFarmUnit)
+        private static DeviceFarmUnitZoneRule BuildRule(RuleFormInput input, int? idDeviceFarmUnitZone, int? idDeviceFarmUnit, int? idDeviceFarm = null)
         {
             var conditions = new List<RuleCondition>();
             foreach (RuleConditionInput slot in input.Conditions)
@@ -433,6 +507,7 @@ namespace api.Controllers.View
             {
                 DeviceFarmUnitZoneID = idDeviceFarmUnitZone,
                 DeviceFarmUnitID = idDeviceFarmUnit,
+                DeviceFarmID = idDeviceFarm,
                 ActionType = input.ActionType,
                 RelayFunction = input.ActionType == ActionType.Relay ? input.RelayFunction : null,
                 SensorMetric = input.ActionType == ActionType.Notification ? input.SensorMetric : null,

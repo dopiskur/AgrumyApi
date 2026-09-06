@@ -18,6 +18,7 @@ namespace api.Dal
         public DbSet<ServerConfigRow> ServerConfigs => Set<ServerConfigRow>();
 
         public DbSet<DeviceRow> Devices => Set<DeviceRow>();
+        public DbSet<DeviceFarmRow> DeviceFarms => Set<DeviceFarmRow>();
         public DbSet<DeviceFarmUnitRow> DeviceFarmUnits => Set<DeviceFarmUnitRow>();
         public DbSet<DeviceFarmUnitZoneRow> DeviceFarmUnitZones => Set<DeviceFarmUnitZoneRow>();
         public DbSet<DeviceFarmUnitZoneRuleRow> DeviceFarmUnitZoneRules => Set<DeviceFarmUnitZoneRuleRow>();
@@ -142,12 +143,22 @@ namespace api.Dal
                 e.Property(x => x.FirmwareCustomRepositoryUrl).HasMaxLength(500);
             });
 
+            // Unlike DeviceFarmUnit/DeviceFarmUnitZone, Farm has no reserved "0" sentinel row (its optionality on DeviceFarmUnit is expressed via a nullable FK, not a sentinel) - plain AUTO_INCREMENT, no app-side Max+1 dance needed.
+            modelBuilder.Entity<DeviceFarmRow>(e =>
+            {
+                e.ToTable("deviceFarm");
+                e.HasKey(x => x.IDDeviceFarm);
+                e.Property(x => x.IDDeviceFarm).ValueGeneratedOnAdd();
+                e.Property(x => x.DeviceFarmName).HasMaxLength(100);
+            });
+
             modelBuilder.Entity<DeviceFarmUnitRow>(e =>
             {
                 e.ToTable("deviceFarmUnit");
                 e.HasKey(x => x.IDDeviceFarmUnit);
                 e.Property(x => x.IDDeviceFarmUnit).ValueGeneratedNever();
                 e.Property(x => x.DeviceFarmUnitName).HasMaxLength(100);
+                e.HasOne<DeviceFarmRow>().WithMany().HasForeignKey(x => x.DeviceFarmID).OnDelete(DeleteBehavior.NoAction).IsRequired(false);
             });
 
             // Real containment FK (Zone -> Unit) - see db/migrations/2026-09-02-deviceunit-zone-containment.sql.
@@ -160,7 +171,7 @@ namespace api.Dal
                 e.HasOne<DeviceFarmUnitRow>().WithMany().HasForeignKey(x => x.DeviceFarmUnitID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            // Several rows may share (scope, RelayFunction/SensorMetric); OR semantics across them, and Zone>Unit>Global precedence, are resolved in EfRepository/RuleHierarchyResolver, not here. Exactly one of DeviceFarmUnitZoneID/DeviceFarmUnitID is set (Global scope: both null) - enforced in DeviceFarmUnitApiController, not the DB.
+            // Several rows may share (scope, RelayFunction/SensorMetric); OR semantics across them, and Zone>Unit>Farm>Global precedence, are resolved in EfRepository/RuleHierarchyResolver, not here. Exactly one of DeviceFarmUnitZoneID/DeviceFarmUnitID/DeviceFarmID is set (Global scope: all three null) - enforced in DeviceFarmUnitApiController, not the DB.
             modelBuilder.Entity<DeviceFarmUnitZoneRuleRow>(e =>
             {
                 e.ToTable("deviceFarmUnitZoneRule");
@@ -169,8 +180,10 @@ namespace api.Dal
                 e.Property(x => x.Conditions).IsRequired();
                 e.HasOne<DeviceFarmUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceFarmUnitZoneID).OnDelete(DeleteBehavior.NoAction).IsRequired(false);
                 e.HasOne<DeviceFarmUnitRow>().WithMany().HasForeignKey(x => x.DeviceFarmUnitID).OnDelete(DeleteBehavior.NoAction).IsRequired(false);
+                e.HasOne<DeviceFarmRow>().WithMany().HasForeignKey(x => x.DeviceFarmID).OnDelete(DeleteBehavior.NoAction).IsRequired(false);
                 e.HasIndex(x => x.DeviceFarmUnitZoneID).HasDatabaseName("ix_deviceFarmUnitZoneRule_zone");
                 e.HasIndex(x => x.DeviceFarmUnitID).HasDatabaseName("ix_deviceFarmUnitZoneRule_unit");
+                e.HasIndex(x => x.DeviceFarmID).HasDatabaseName("ix_deviceFarmUnitZoneRule_farm");
                 e.HasIndex(x => x.TenantID).HasDatabaseName("ix_deviceFarmUnitZoneRule_tenant");
             });
 

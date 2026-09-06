@@ -6,6 +6,7 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
   <data name="Home" xml:space="preserve"><value>Početna</value></data>
   <data name="Dashboard" xml:space="preserve"><value>Nadzorna ploča</value></data>
+  <data name="Farms" xml:space="preserve"><value>Farme</value></data>
   <data name="Fleet" xml:space="preserve"><value>Uređaji</value></data>
   <data name="Reporting" xml:space="preserve"><value>Izvještaji</value></data>
   <data name="WiFi Networks" xml:space="preserve"><value>WiFi mreže</value></data>

@@ -6,7 +6,7 @@ using api.Utils;
 
 namespace api.BackgroundWorkers
 {
-    /// Evaluates every Notification-action rule (roadmap #212) against each zone it reaches (Zone>Unit>Global
+    /// Evaluates every Notification-action rule (roadmap #212) against each zone it reaches (Zone>Unit>Farm>Global
     /// precedence resolved per zone via RuleHierarchyResolver.ResolveNotificationRules, same "more specific
     /// wins" semantics as Relay rules), dispatching one notification per false->true transition - a Relay
     /// rule's OR-across-rules/AND-OR-within-a-rule fold happens on-device, this is the server-side
@@ -49,7 +49,11 @@ namespace api.BackgroundWorkers
                     continue;
                 }
                 var unitScoped = notificationRules.Where(r => r.DeviceFarmUnitID == unitId).ToList();
-                var globalScoped = notificationRules.Where(r => r.DeviceFarmUnitID == null && r.DeviceFarmUnitZoneID == null).ToList();
+                // Farm rules only apply when this Unit is actually assigned to one - a Farm-less Unit sees no Farm-scope rules (roadmap #384).
+                var farmScoped = unit.DeviceFarmID is int unitFarmId
+                    ? notificationRules.Where(r => r.DeviceFarmID == unitFarmId).ToList()
+                    : [];
+                var globalScoped = notificationRules.Where(r => r.DeviceFarmID == null && r.DeviceFarmUnitID == null && r.DeviceFarmUnitZoneID == null).ToList();
 
                 foreach (DeviceFarmUnitZone zone in await unitRepo.DeviceFarmUnitZonesGetAsync(unitId))
                 {
@@ -58,7 +62,7 @@ namespace api.BackgroundWorkers
                         continue;
                     }
                     var zoneScoped = notificationRules.Where(r => r.DeviceFarmUnitZoneID == zoneId).ToList();
-                    IList<DeviceFarmUnitZoneRule> effective = RuleHierarchyResolver.ResolveNotificationRules(zoneScoped, unitScoped, globalScoped);
+                    IList<DeviceFarmUnitZoneRule> effective = RuleHierarchyResolver.ResolveNotificationRules(zoneScoped, unitScoped, farmScoped, globalScoped);
                     if (effective.Count == 0)
                     {
                         continue;

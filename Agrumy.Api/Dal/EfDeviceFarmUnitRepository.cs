@@ -33,6 +33,60 @@ namespace api.Dal
             (int)DeviceEventType.Crash,
         ];
 
+        // ---- Farm CRUD (roadmap #384) -----------------------------------
+
+        public async Task<IList<DeviceFarm>> DeviceFarmsGetAsync(int? tenantID)
+        {
+            IQueryable<DeviceFarmRow> q = db.DeviceFarms.AsNoTracking();
+            if (tenantID != null)
+            {
+                q = q.Where(f => f.TenantID == tenantID);
+            }
+            var rows = await q.OrderBy(f => f.DeviceFarmName).ToListAsync();
+            return rows.Select(ToDtoFarm).ToList();
+        }
+
+        public async Task<DeviceFarm?> DeviceFarmGetByIdAsync(int? idDeviceFarm)
+        {
+            var row = await db.DeviceFarms.AsNoTracking().FirstOrDefaultAsync(f => f.IDDeviceFarm == idDeviceFarm);
+            return row == null ? null : ToDtoFarm(row);
+        }
+
+        public async Task<DeviceFarm> DeviceFarmAddAsync(DeviceFarm farm)
+        {
+            var row = new DeviceFarmRow { TenantID = farm.TenantID, DeviceFarmName = farm.DeviceFarmName };
+            db.DeviceFarms.Add(row);
+            await db.SaveChangesAsync();
+            return ToDtoFarm(row);
+        }
+
+        public async Task DeviceFarmUpdateAsync(DeviceFarm farm)
+        {
+            var row = await db.DeviceFarms.FirstOrDefaultAsync(f => f.IDDeviceFarm == farm.IDDeviceFarm);
+            if (row == null)
+            {
+                return;
+            }
+            // TenantID intentionally not overwritten - same "payload cannot move to another tenant" rule as DeviceFarmUnitUpdateAsync.
+            row.DeviceFarmName = farm.DeviceFarmName;
+            await db.SaveChangesAsync();
+        }
+
+        public async Task DeviceFarmDeleteAsync(int idDeviceFarm)
+        {
+            // Units stay valid, just unassigned - same "delete the parent, keep the child" rule as DeviceUnassignFromZoneAsync, not a cascade delete.
+            await db.DeviceFarmUnits.Where(u => u.DeviceFarmID == idDeviceFarm)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.DeviceFarmID, (int?)null));
+
+            // Farm-scope rules (DeviceFarmID set, DeviceFarmUnitID/DeviceFarmUnitZoneID both null) live directly on the farm - they'd otherwise survive as orphans after the farm is gone.
+            var farmRuleIds = await db.DeviceFarmUnitZoneRules.AsNoTracking()
+                .Where(r => r.DeviceFarmID == idDeviceFarm).Select(r => r.IDDeviceFarmUnitZoneRule).ToListAsync();
+            await db.RuleNotificationStates.Where(s => farmRuleIds.Contains(s.RuleID)).ExecuteDeleteAsync();
+            await db.DeviceFarmUnitZoneRules.Where(r => r.DeviceFarmID == idDeviceFarm).ExecuteDeleteAsync();
+
+            await db.DeviceFarms.Where(f => f.IDDeviceFarm == idDeviceFarm).ExecuteDeleteAsync();
+        }
+
         // ---- Unit CRUD -------------------------------------------------
 
         public async Task<IList<DeviceFarmUnit>> DeviceFarmUnitsGetAsync(int? tenantID)
@@ -58,7 +112,7 @@ namespace api.Dal
             for (int attempt = 0; ; attempt++)
             {
                 int nextId = Math.Max((await db.DeviceFarmUnits.AsNoTracking().Select(u => (int?)u.IDDeviceFarmUnit).MaxAsync() ?? 0) + 1, 1);
-                var row = new DeviceFarmUnitRow { IDDeviceFarmUnit = nextId, TenantID = unit.TenantID, DeviceFarmUnitName = unit.DeviceFarmUnitName };
+                var row = new DeviceFarmUnitRow { IDDeviceFarmUnit = nextId, TenantID = unit.TenantID, DeviceFarmUnitName = unit.DeviceFarmUnitName, DeviceFarmID = unit.DeviceFarmID };
                 db.DeviceFarmUnits.Add(row);
                 try
                 {
@@ -82,6 +136,7 @@ namespace api.Dal
             }
             // TenantID intentionally not overwritten - same "payload cannot move to another tenant" rule as DeviceUpdateAsync.
             row.DeviceFarmUnitName = unit.DeviceFarmUnitName;
+            row.DeviceFarmID = unit.DeviceFarmID;
             await db.SaveChangesAsync();
         }
 
@@ -227,10 +282,19 @@ namespace api.Dal
             return rows.Select(ToDtoRule).ToList();
         }
 
+        public async Task<IList<DeviceFarmUnitZoneRule>> RulesGetForFarmAsync(int idDeviceFarm)
+        {
+            var rows = await db.DeviceFarmUnitZoneRules.AsNoTracking()
+                .Where(r => r.DeviceFarmID == idDeviceFarm)
+                .OrderBy(r => r.RelayFunction).ThenBy(r => r.SensorMetric).ThenBy(r => r.IDDeviceFarmUnitZoneRule)
+                .ToListAsync();
+            return rows.Select(ToDtoRule).ToList();
+        }
+
         public async Task<IList<DeviceFarmUnitZoneRule>> RulesGetForTenantGlobalAsync(int tenantId)
         {
             var rows = await db.DeviceFarmUnitZoneRules.AsNoTracking()
-                .Where(r => r.TenantID == tenantId && r.DeviceFarmUnitID == null && r.DeviceFarmUnitZoneID == null)
+                .Where(r => r.TenantID == tenantId && r.DeviceFarmID == null && r.DeviceFarmUnitID == null && r.DeviceFarmUnitZoneID == null)
                 .OrderBy(r => r.RelayFunction).ThenBy(r => r.SensorMetric).ThenBy(r => r.IDDeviceFarmUnitZoneRule)
                 .ToListAsync();
             return rows.Select(ToDtoRule).ToList();
@@ -256,6 +320,7 @@ namespace api.Dal
             var row = new DeviceFarmUnitZoneRuleRow
             {
                 TenantID = rule.TenantID,
+                DeviceFarmID = rule.DeviceFarmID,
                 DeviceFarmUnitID = rule.DeviceFarmUnitID,
                 DeviceFarmUnitZoneID = rule.DeviceFarmUnitZoneID,
                 ActionType = (int)rule.ActionType,
@@ -274,6 +339,12 @@ namespace api.Dal
             else if (rule.DeviceFarmUnitID is int idUnit)
             {
                 await db.Devices.Where(d => d.DeviceFarmUnitID == idUnit)
+                    .ExecuteUpdateAsync(s => s.SetProperty(d => d.ConfigVersion, d => (d.ConfigVersion ?? 0) + 1));
+            }
+            else if (rule.DeviceFarmID is int idFarm)
+            {
+                var unitIdsInFarm = db.DeviceFarmUnits.AsNoTracking().Where(u => u.DeviceFarmID == idFarm).Select(u => u.IDDeviceFarmUnit);
+                await db.Devices.Where(d => d.DeviceFarmUnitID != null && unitIdsInFarm.Contains(d.DeviceFarmUnitID!.Value))
                     .ExecuteUpdateAsync(s => s.SetProperty(d => d.ConfigVersion, d => (d.ConfigVersion ?? 0) + 1));
             }
             else
@@ -356,6 +427,7 @@ namespace api.Dal
         {
             IDDeviceFarmUnitZoneRule = r.IDDeviceFarmUnitZoneRule,
             TenantID = r.TenantID,
+            DeviceFarmID = r.DeviceFarmID,
             DeviceFarmUnitID = r.DeviceFarmUnitID,
             DeviceFarmUnitZoneID = r.DeviceFarmUnitZoneID,
             ActionType = (ActionType)r.ActionType,
@@ -900,6 +972,14 @@ namespace api.Dal
             IDDeviceFarmUnit = u.IDDeviceFarmUnit,
             TenantID = u.TenantID,
             DeviceFarmUnitName = u.DeviceFarmUnitName,
+            DeviceFarmID = u.DeviceFarmID,
+        };
+
+        private static DeviceFarm ToDtoFarm(DeviceFarmRow f) => new()
+        {
+            IDDeviceFarm = f.IDDeviceFarm,
+            TenantID = f.TenantID,
+            DeviceFarmName = f.DeviceFarmName,
         };
 
         private static DeviceFarmUnitZone ToDtoZone(DeviceFarmUnitZoneRow z) => new()

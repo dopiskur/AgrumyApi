@@ -11,6 +11,8 @@
 -- sensorData) are covered below - deviceUnitZoneRule's own DeviceUnitID/DeviceUnitZoneID columns
 -- have no FK constraint on invent.hr today (EF model has one, never manually migrated onto the
 -- live DB - a pre-existing gap, out of scope here, unaffected either way by a plain column rename).
+-- deviceUnitZoneRule itself is also renamed to deviceFarmUnitZoneRule (AgrumyDbContext.ToTable),
+-- confirmed empty (0 rows) on invent.hr at the time this ran, so the rename carried zero data.
 --
 -- WHY THIS IS MANUAL: see 2026-08-30-user-activation-columns.sql - EnsureSchemaAsync() only
 -- provisions a brand-new (zero-table) database, never alters an existing one.
@@ -33,10 +35,19 @@ ALTER TABLE `sensorData`
 
 ALTER TABLE `deviceUnitZoneRule`
   CHANGE COLUMN `DeviceUnitID` `DeviceFarmUnitID` int(11) DEFAULT NULL,
-  CHANGE COLUMN `DeviceUnitZoneID` `DeviceFarmUnitZoneID` int(11) DEFAULT NULL;
+  CHANGE COLUMN `DeviceUnitZoneID` `DeviceFarmUnitZoneID` int(11) DEFAULT NULL,
+  CHANGE COLUMN `IDDeviceUnitZoneRule` `IDDeviceFarmUnitZoneRule` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `deviceUnitZoneRule`
+  RENAME INDEX `ix_deviceUnitZoneRule_zone` TO `ix_deviceFarmUnitZoneRule_zone`,
+  RENAME INDEX `ix_deviceUnitZoneRule_unit` TO `ix_deviceFarmUnitZoneRule_unit`,
+  RENAME INDEX `ix_deviceUnitZoneRule_tenant` TO `ix_deviceFarmUnitZoneRule_tenant`;
+RENAME TABLE `deviceUnitZoneRule` TO `deviceFarmUnitZoneRule`;
 
 ALTER TABLE `ruleNotificationState`
   CHANGE COLUMN `DeviceUnitZoneID` `DeviceFarmUnitZoneID` int(11) NOT NULL;
+
+ALTER TABLE `sensorData`
+  RENAME INDEX `ix_sensorData_deviceUnitZone_date` TO `ix_sensorData_deviceFarmUnitZone_date`;
 
 ALTER TABLE `deviceUnitZone`
   CHANGE COLUMN `DeviceUnitID` `DeviceFarmUnitID` int(11) NOT NULL;
@@ -62,7 +73,7 @@ ALTER TABLE `sensorData`
   ADD CONSTRAINT `fk_sensorData_deviceFarmUnitZone` FOREIGN KEY (`DeviceFarmUnitZoneID`) REFERENCES `deviceFarmUnitZone` (`IDDeviceFarmUnitZone`) ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 -- Sanity check after running:
---   SHOW CREATE TABLE `deviceFarmUnit`; SHOW CREATE TABLE `deviceFarmUnitZone`;
+--   SHOW CREATE TABLE `deviceFarmUnit`; SHOW CREATE TABLE `deviceFarmUnitZone`; SHOW CREATE TABLE `deviceFarmUnitZoneRule`;
 --   SELECT COUNT(*) FROM `deviceFarmUnit`;      -- expect 3 (matches pre-migration deviceUnit count)
 --   SELECT COUNT(*) FROM `deviceFarmUnitZone`;  -- expect 6 (matches pre-migration deviceUnitZone count)
 --   SELECT COUNT(*) FROM deviceUnit;            -- expect error, table no longer exists

@@ -6,15 +6,16 @@ namespace api.ViewModels
     {
         Zone,
         Unit,
+        Farm,
         Global,
     }
 
-    /// Drives _RuleEditor.cshtml, shared across the Zone page, Unit "Rules" tab, and the tenant-wide Global Rules page (roadmap #212) - the three scopes differ only in which API routes/hidden field they post to.
+    /// Drives _RuleEditor.cshtml, shared across the Zone page, Unit "Rules" tab, the Farm "Rules" tab (roadmap #384), and the tenant-wide Global Rules page (roadmap #212) - the four scopes differ only in which API routes/hidden field they post to.
     public class RuleEditorViewModel
     {
         public required RuleScope Scope { get; init; }
 
-        /// IDDeviceFarmUnitZone for Zone scope, IDDeviceFarmUnit for Unit scope, null for Global (implied by the caller's tenant).
+        /// IDDeviceFarmUnitZone for Zone scope, IDDeviceFarmUnit for Unit scope, IDDeviceFarm for Farm scope, null for Global (implied by the caller's tenant).
         public int? ScopeId { get; init; }
 
         public IList<DeviceFarmUnitZoneRule> Rules { get; init; } = [];
@@ -23,6 +24,7 @@ namespace api.ViewModels
         {
             RuleScope.Zone => "RuleAdd",
             RuleScope.Unit => "UnitRuleAdd",
+            RuleScope.Farm => "DeviceFarmRuleAdd",
             _ => "GlobalRuleAdd",
         };
 
@@ -30,6 +32,7 @@ namespace api.ViewModels
         {
             RuleScope.Zone => "RuleDelete",
             RuleScope.Unit => "UnitRuleDelete",
+            RuleScope.Farm => "DeviceFarmRuleDelete",
             _ => "GlobalRuleDelete",
         };
 
@@ -38,6 +41,7 @@ namespace api.ViewModels
         {
             RuleScope.Zone => "idDeviceFarmUnitZone",
             RuleScope.Unit => "idDeviceFarmUnit",
+            RuleScope.Farm => "idDeviceFarm",
             _ => "",
         };
 

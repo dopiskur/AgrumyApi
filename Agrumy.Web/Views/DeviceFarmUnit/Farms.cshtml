@@ -1,0 +1,97 @@
+@model api.ViewModels.FarmListViewModel
+@{
+    ViewData["Title"] = "Farms";
+    Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
+    bool canManage = hasAnyRole(RoleNames.DeviceManagers);
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Farms</h3>
+        @if (canManage)
+        {
+            <div class="float-end">
+                <form asp-action="FarmAdd" method="post" class="d-flex gap-2">
+                    <input type="text" name="deviceFarmName" class="form-control form-control-sm" placeholder="New farm name" required maxlength="100" />
+                    <button type="submit" class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-plus-lg"></i> Add Farm</button>
+                </form>
+            </div>
+        }
+    </div>
+    <div class="card-body">
+        <p class="text-secondary small">
+            Top-level grouping above <a asp-action="Index">Units</a> within your tenant - a physical
+            farm/site. A unit not yet assigned to one stays fully valid ("unassigned"). Rules set here
+            apply to every unit/zone assigned to this farm unless a more specific unit/zone rule wins
+            (Zone &gt; Unit &gt; Farm &gt; Global).
+        </p>
+        @if (!Model.Farms.Any())
+        {
+            <p class="text-secondary fst-italic">No farm created yet.</p>
+        }
+        else
+        {
+            @foreach (var farm in Model.Farms)
+            {
+                var assignedUnits = Model.Units.Where(u => u.DeviceFarmID == farm.IDDeviceFarm).ToList();
+                var unassignedUnits = Model.Units.Where(u => u.DeviceFarmID == null).ToList();
+                <div class="border rounded p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0">@farm.DeviceFarmName</h5>
+                        <div class="d-flex gap-2">
+                            <a asp-action="DeviceFarmRules" asp-route-idDeviceFarm="@farm.IDDeviceFarm" class="btn btn-sm btn-outline-primary">Rules</a>
+                            @if (canManage)
+                            {
+                                <form asp-action="FarmRename" method="post" class="d-flex gap-1">
+                                    <input type="hidden" name="idDeviceFarm" value="@farm.IDDeviceFarm" />
+                                    <input type="text" name="deviceFarmName" class="form-control form-control-sm" value="@farm.DeviceFarmName" required maxlength="100" />
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Rename</button>
+                                </form>
+                                <form asp-action="FarmDelete" method="post" onsubmit="return confirm('Delete this farm? Its units stay valid, just unassigned.');">
+                                    <input type="hidden" name="idDeviceFarm" value="@farm.IDDeviceFarm" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                    @if (assignedUnits.Count == 0)
+                    {
+                        <p class="text-secondary small fst-italic mb-2">No units assigned.</p>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush mb-2">
+                            @foreach (var unit in assignedUnits)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <span>@unit.DeviceFarmUnitName</span>
+                                    @if (canManage)
+                                    {
+                                        <form asp-action="UnitAssignFarm" method="post">
+                                            <input type="hidden" name="idDeviceFarmUnit" value="@unit.IDDeviceFarmUnit" />
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Unassign</button>
+                                        </form>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+                    @if (canManage && unassignedUnits.Count > 0)
+                    {
+                        <form asp-action="UnitAssignFarm" method="post" class="d-flex gap-2">
+                            <input type="hidden" name="idDeviceFarm" value="@farm.IDDeviceFarm" />
+                            <select name="idDeviceFarmUnit" class="form-select form-select-sm" style="width:auto" required>
+                                <option value="">-- add unit --</option>
+                                @foreach (var unit in unassignedUnits)
+                                {
+                                    <option value="@unit.IDDeviceFarmUnit">@unit.DeviceFarmUnitName</option>
+                                }
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline-primary">Add to farm</button>
+                        </form>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>

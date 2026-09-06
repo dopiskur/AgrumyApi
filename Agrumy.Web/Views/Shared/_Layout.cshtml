@@ -149,6 +149,12 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a asp-area="" asp-controller="DeviceFarmUnit" asp-action="Farms" class="nav-link @(string.Equals(ViewContext.RouteData.Values["action"]?.ToString(), "Farms", StringComparison.OrdinalIgnoreCase) ? "active" : "")">
+                                <i class="nav-icon bi bi-geo-alt"></i>
+                                <p>@Localizer["Farms"]</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a asp-area="" asp-controller="Device" asp-action="Fleet" class="nav-link @navActive("Device")">
                                 <i class="nav-icon bi bi-broadcast"></i>
                                 <p>@Localizer["Fleet"]</p>

@@ -525,6 +525,7 @@
       "required": [
         "idDeviceFarmUnitZoneRule",
         "tenantID",
+        "deviceFarmID",
         "deviceFarmUnitID",
         "deviceFarmUnitZoneID",
         "actionType",
@@ -544,6 +545,13 @@
         "tenantID": {
           "type": "integer",
           "description": "Admin-API/DB concern only - firmware has no notion of tenant."
+        },
+        "deviceFarmID": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Roadmap #384. Set only for a Farm-scope rule - never seen here, since a rule reaching a device is already resolved to a specific Zone (RuleHierarchyResolver)."
         },
         "deviceFarmUnitID": {
           "type": [

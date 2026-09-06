@@ -6,6 +6,16 @@ namespace api.Dal
     /// IDeviceFarmUnitRepository members - forwarded to the standalone EfDeviceFarmUnitRepository (roadmap #246) so IRepository's broad consumers keep working unchanged.
     internal partial class EfRepository
     {
+        public Task<IList<DeviceFarm>> DeviceFarmsGetAsync(int? tenantID) => deviceFarmUnitRepository.DeviceFarmsGetAsync(tenantID);
+
+        public Task<DeviceFarm?> DeviceFarmGetByIdAsync(int? idDeviceFarm) => deviceFarmUnitRepository.DeviceFarmGetByIdAsync(idDeviceFarm);
+
+        public Task<DeviceFarm> DeviceFarmAddAsync(DeviceFarm farm) => deviceFarmUnitRepository.DeviceFarmAddAsync(farm);
+
+        public Task DeviceFarmUpdateAsync(DeviceFarm farm) => deviceFarmUnitRepository.DeviceFarmUpdateAsync(farm);
+
+        public Task DeviceFarmDeleteAsync(int idDeviceFarm) => deviceFarmUnitRepository.DeviceFarmDeleteAsync(idDeviceFarm);
+
         public Task<IList<DeviceFarmUnit>> DeviceFarmUnitsGetAsync(int? tenantID) => deviceFarmUnitRepository.DeviceFarmUnitsGetAsync(tenantID);
 
         public Task<DeviceFarmUnit?> DeviceFarmUnitGetByIdAsync(int? idDeviceFarmUnit) => deviceFarmUnitRepository.DeviceFarmUnitGetByIdAsync(idDeviceFarmUnit);
@@ -31,6 +41,8 @@ namespace api.Dal
         public Task<IList<DeviceFarmUnitZoneRule>> RulesGetForZoneAsync(int idDeviceFarmUnitZone) => deviceFarmUnitRepository.RulesGetForZoneAsync(idDeviceFarmUnitZone);
 
         public Task<IList<DeviceFarmUnitZoneRule>> RulesGetForUnitAsync(int idDeviceFarmUnit) => deviceFarmUnitRepository.RulesGetForUnitAsync(idDeviceFarmUnit);
+
+        public Task<IList<DeviceFarmUnitZoneRule>> RulesGetForFarmAsync(int idDeviceFarm) => deviceFarmUnitRepository.RulesGetForFarmAsync(idDeviceFarm);
 
         public Task<IList<DeviceFarmUnitZoneRule>> RulesGetForTenantGlobalAsync(int tenantId) => deviceFarmUnitRepository.RulesGetForTenantGlobalAsync(tenantId);
 

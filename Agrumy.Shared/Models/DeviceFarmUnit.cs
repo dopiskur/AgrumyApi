@@ -2,6 +2,15 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Models
 {
+    /// Roadmap #384 - top-level organizational grouping ABOVE Unit within the same tenant (a physical farm/site, e.g. separate LoRa networks or gateways naturally map to separate Farms); optional, a DeviceFarmUnit not yet assigned to one has DeviceFarmID null.
+    public class DeviceFarm
+    {
+        [HiddenInput(DisplayValue = true)]
+        public int? IDDeviceFarm { get; set; }
+        public int? TenantID { get; set; }
+        public string? DeviceFarmName { get; set; }
+    }
+
     /// A physical/logical space (e.g. a greenhouse) containing DeviceFarmUnitZones; TenantID null only means the shared IDDeviceFarmUnit=0 "Default" sentinel every unzoned device points at.
     public class DeviceFarmUnit
     {
@@ -9,6 +18,8 @@ namespace api.Models
         public int? IDDeviceFarmUnit { get; set; }
         public int? TenantID { get; set; }
         public string? DeviceFarmUnitName { get; set; }
+        // Roadmap #384 - optional (a Farm-less Unit stays valid, no default-farm backfill).
+        public int? DeviceFarmID { get; set; }
     }
 
     /// A growing zone within one DeviceFarmUnit - "one zone = one controller" at most, may be sensor-only; TenantID is denormalized from DeviceFarmUnit so a zone query needs no join to check ownership.
@@ -117,12 +128,13 @@ namespace api.Models
     /// One entry in a DeviceFarmUnitZoneRule's flat, left-to-right condition list - Operator is the operator BEFORE this condition, null for the first entry, required otherwise.
     public record RuleCondition(ConditionType ConditionType, System.Text.Json.Nodes.JsonNode? ConditionConfig, LogicalOperator? Operator);
 
-    /// One automation rule at exactly one scope - DeviceFarmUnitZoneID set means Zone scope, DeviceFarmUnitID set means Unit scope, both null means Global (per-tenant: every unit/zone the tenant owns). Several rules at the SAME scope for the same RelayFunction/SensorMetric still OR together; within one rule, Conditions fold left-to-right by their own Operator. A more specific scope's rules for a function/metric fully replace (not merge with) a less specific scope's, resolved server-side (api.Devices.RuleHierarchyResolver) before a Relay rule ever reaches firmware.
+    /// One automation rule at exactly one scope - DeviceFarmUnitZoneID set means Zone scope, DeviceFarmUnitID set means Unit scope, DeviceFarmID set means Farm scope, all three null means Global (per-tenant: every farm/unit/zone the tenant owns). Several rules at the SAME scope for the same RelayFunction/SensorMetric still OR together; within one rule, Conditions fold left-to-right by their own Operator. A more specific scope's rules for a function/metric fully replace (not merge with) a less specific scope's - Zone &gt; Unit &gt; Farm &gt; Global - resolved server-side (api.Devices.RuleHierarchyResolver) before a Relay rule ever reaches firmware.
     public class DeviceFarmUnitZoneRule
     {
         [HiddenInput(DisplayValue = true)]
         public int? IDDeviceFarmUnitZoneRule { get; set; }
         public int TenantID { get; set; }
+        public int? DeviceFarmID { get; set; }
         public int? DeviceFarmUnitID { get; set; }
         public int? DeviceFarmUnitZoneID { get; set; }
         public ActionType ActionType { get; set; } = ActionType.Relay;
