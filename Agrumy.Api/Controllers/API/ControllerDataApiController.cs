@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace api.Controllers.API
 {
-    /// Roadmap #343: real-time relay on/off state, parallel to SensorDataController but fired on every actual relay CHANGE rather than a fixed interval - see api.Dal.Entities.ControllerDataRow.
+    /// Real-time relay on/off state, parallel to SensorDataController but fired on every actual relay CHANGE rather than a fixed interval - see api.Dal.Entities.ControllerDataRow.
     [Route("/api/ControllerData")]
     public class ControllerDataApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
     {

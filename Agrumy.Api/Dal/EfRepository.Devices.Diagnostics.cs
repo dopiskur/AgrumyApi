@@ -39,7 +39,7 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
-        /// Roadmap #341: deviceDiagnostic.Kit now has a real FK to deviceType.Kit - an unrecognized string must never block the device's own heartbeat write because of it, so it's auto-registered here (ControllerCapable=false, no pinout yet) in its own save, BEFORE the diagnostic row. A concurrent duplicate insert from another device reporting the same brand-new kit at the same instant is tolerated, not retried - either writer's row is fine, both want the same values.
+        /// deviceDiagnostic.Kit has a real FK to deviceType.Kit - an unrecognized string must never block the device's own heartbeat write because of it, so it's auto-registered here (ControllerCapable=false) in its own save, BEFORE the diagnostic row; a concurrent duplicate insert from another device reporting the same brand-new kit is tolerated, not retried.
         private async Task EnsureDeviceTypeRegisteredAsync(string kit)
         {
             if (await db.DeviceTypes.AsNoTracking().AnyAsync(t => t.Kit == kit))
@@ -131,7 +131,7 @@ namespace api.Dal
             Dictionary<int, string?> zoneNames = await db.DeviceUnitZones.AsNoTracking()
                 .ToDictionaryAsync(z => z.IDDeviceUnitZone, z => z.DeviceUnitZoneName);
 
-            // Roadmap #343: one bulk read of every relay state for devices in this result set, grouped in memory - same reasoning as kitCapability above (a handful of rows per device, not worth a per-device round trip).
+            // One bulk read of every relay state for devices in this result set, grouped in memory - same reasoning as kitCapability above (a handful of rows per device, not worth a per-device round trip).
             var deviceIds = rows.Select(r => r.Device.IDDevice).ToList();
             Dictionary<int, List<ControllerDataStatus>> relayStates = (await db.ControllerData.AsNoTracking()
                 .Where(c => deviceIds.Contains(c.DeviceID))
@@ -168,7 +168,7 @@ namespace api.Dal
                     FirmwareVersion = r.Diag?.FirmwareVersion,
                     Board = r.Diag?.Board,
                     Kit = r.Diag?.Kit,
-                    // Admin's explicit DeviceControllerEnabled choice always wins if set - a recognized Kit only adds capability, never takes it away. ManualKit is the roadmap #341 fallback for a device whose firmware never auto-reports one; the diagnostic-reported Kit takes priority whenever both are set.
+                    // Admin's explicit DeviceControllerEnabled choice always wins if set - a recognized Kit only adds capability, never takes it away. ManualKit is the fallback for a device whose firmware never auto-reports one; the diagnostic-reported Kit takes priority whenever both are set.
                     ControllerCapable = r.Device.DeviceControllerEnabled == true
                         || ((r.Diag?.Kit ?? r.Device.ManualKit) is { Length: > 0 } kit && kitCapability.GetValueOrDefault(kit)),
                     LatestFirmwareVersion = latest,

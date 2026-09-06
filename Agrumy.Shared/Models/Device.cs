@@ -31,7 +31,7 @@ namespace api.Models
         public string? DeviceName { get; set; }
         [HiddenInput(DisplayValue = true)]
         public string? MacAddress { get; set; }
-        // Roadmap #341: admin-chosen fallback for a device whose firmware build never auto-reports a Kit (generic esp32dev/esp32s3usbotg) - the diagnostic-reported Kit wins whenever both are set (see DeviceFleetStatus.ControllerCapable).
+        // Admin-chosen fallback for a device whose firmware build never auto-reports a Kit (generic esp32dev/esp32s3usbotg) - the diagnostic-reported Kit wins whenever both are set (see DeviceFleetStatus.ControllerCapable).
         public string? ManualKit { get; set; }
         // True only for an Agrumy.Gateway instance, flagged so GatewayApiController.Batch can tell a gateway's own credential from an ordinary device's.
         [HiddenInput(DisplayValue = true)]
@@ -293,7 +293,7 @@ namespace api.Models
         public bool? Enabled { get; set; }
         // Tenant-wide fail-closed switch (roadmap #230), from Tenant.EmergencyStopActive - ActuatorController forces every relay off ahead of any rule when set, independent of DeviceConfigController.RelayEnabled.
         public bool? EmergencyStop { get; set; }
-        // Roadmap #251 modality A: true tells firmware to start polling GET /api/Device/Simulation every 5s (or on every wake if SleepDeep) for per-metric overrides, instead of relying on this same, slower Config poll.
+        // True tells firmware to start polling GET /api/Device/Simulation every 5s (or on every wake if SleepDeep) for per-metric overrides, instead of relying on this same, slower Config poll.
         public bool? SimulationModeEnabled { get; set; }
         public DeviceConfigSensor? DeviceConfigSensor { get; set; }
         public DeviceConfigController? DeviceConfigController { get; set; }
@@ -348,7 +348,7 @@ namespace api.Models
         public int? DeviceUnitZoneID { get; set; }
         public string? DeviceUnitName { get; set; }
         public string? DeviceUnitZoneName { get; set; }
-        /// Roadmap #343. Only the relay functions this device has ever reported a state for - empty for a sensor-only device or one whose firmware predates ControllerData.
+        /// Only the relay functions this device has ever reported a state for - empty for a sensor-only device or one whose firmware predates ControllerData.
         public IList<ControllerDataStatus>? RelayStates { get; set; }
 
         // 3 missed polls + fixed grace, not a bare SleepSeconds multiple - a cycle also costs work time (TLS/sensor reads), and grace floors the window when SleepSeconds=0.
@@ -405,7 +405,7 @@ namespace api.Models
 
     }
 
-    /// Roadmap #251 modality A. Per-metric sensor-reading overrides for an already-registered physical device - a null field means "use the real reading", Enabled=false ignores every field regardless of value. Same field set/types as SensorDataPush so an override slots in wherever a real reading would.
+    /// Per-metric sensor-reading overrides for an already-registered physical device (Simulation Mode) - a null field means "use the real reading", Enabled=false ignores every field regardless of value.
     public class DeviceSimulation
     {
         public bool Enabled { get; set; }
@@ -424,7 +424,7 @@ namespace api.Models
         public int? Wind { get; set; }
     }
 
-    /// Slider bounds for the Simulation Mode Web UI - reasonable ranges, not hard physical limits (roadmap #251 only pins Temperature/Humidity/Co2 explicitly; the rest are a first-pass judgment call). Co2's 401-8000 matches the existing outlier guard in EfRepository.SensorData.cs.
+    /// Slider bounds for the Simulation Mode Web UI - reasonable ranges, not hard physical limits, mostly a first-pass judgment call; Co2's 401-8000 matches the existing outlier guard in EfRepository.SensorData.cs.
     public static class SimulationMetricRange
     {
         public static readonly (double Min, double Max) Temperature = (-50, 50);
@@ -496,7 +496,7 @@ namespace api.Models
         public bool? ControllerEnabled { get; set; } = false;
     }
 
-    /// Roadmap #341 (kit-catalog half). One recognized physical device kit - Kit is the key (a build-flag string, e.g. "KC868-A6"), not an auto-increment id. Includes entries auto-registered from an unrecognized firmware-reported Kit (ControllerCapable=false, PinoutJson=null) alongside deliberately-curated ones.
+    /// One recognized physical device kit - Kit is the key (a build-flag string, e.g. "KC868-A6"), not an auto-increment id; includes entries auto-registered from an unrecognized firmware-reported Kit alongside deliberately-curated ones.
     public class DeviceType
     {
         public string Kit { get; set; } = "";

@@ -71,7 +71,7 @@ namespace api.Devices
             }
         }
 
-        // ---- Pure math, mirrors AgrumyFirmware's RelayLogic.cpp exactly - internal so api.Devices.SimulatedRelayEvaluator (roadmap #251 modality B) can reuse it for Relay-action rules without re-deriving the same formulas a third time. ---------------------------------
+        // ---- Pure math, mirrors AgrumyFirmware's RelayLogic.cpp exactly - internal so api.Devices.SimulatedRelayEvaluator can reuse it for Relay-action rules without re-deriving the same formulas a third time. ---------------------------------
 
         internal static bool ComputeThresholdState(bool currentlyOn, double reading, double threshold, double hysteresis, bool turnsOnAboveThreshold)
         {

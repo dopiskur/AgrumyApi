@@ -1,6 +1,6 @@
 namespace api.Simulation
 {
-    /// Roadmap #251 modality B: one tick's full synthetic sensor snapshot for a virtual device - same field set as the real POST /api/SensorData wire shape, produced fresh each tick by SimulatedSensorGenerator.
+    /// One tick's full synthetic sensor snapshot for a virtual device - same field set as the real POST /api/SensorData wire shape, produced fresh each tick by SimulatedSensorGenerator.
     public class SimulatedReading
     {
         public double Temperature { get; set; }

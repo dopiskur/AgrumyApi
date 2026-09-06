@@ -5,7 +5,7 @@ using api.Simulation;
 
 namespace Agrumy.Api.Tests;
 
-/// Roadmap #251 modality B: relay evaluation for a simulated device against the SAME rule shape a real device receives over /api/Device/Config.
+/// Relay evaluation for a simulated device against the SAME rule shape a real device receives over /api/Device/Config.
 public class SimulatedRelayEvaluatorTests
 {
     private static DeviceUnitZoneRule Rule(RelayFunction function, params RuleCondition[] conditions) => new()

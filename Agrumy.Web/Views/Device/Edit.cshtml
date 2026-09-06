@@ -9,7 +9,7 @@
     var deviceTypeItems = new SelectList(Model.DeviceRole, nameof(DeviceRole.IDDeviceRole), nameof(DeviceRole.DeviceRoleName), form.DeviceRoleID);
     var deviceTypeSelect = new SelectFieldViewModel { Name = EditField(nameof(form.DeviceRoleID)), Label = "Device role", Items = deviceTypeItems };
 
-    // Roadmap #341 (kit-catalog half) - optional, so unlike the other dropdowns above it needs a blank "not set" choice; the diagnostic-reported Kit (shown read-only below) always wins over this when both are present.
+    // Optional, so unlike the other dropdowns above it needs a blank "not set" choice; the diagnostic-reported Kit (shown read-only on the Details page) always wins over this when both are present.
     var manualKitItems = new SelectList(Model.DeviceType, nameof(DeviceType.Kit), nameof(DeviceType.Kit), form.ManualKit);
 
     var deviceTypeServiceItems = new SelectList(Model.DeviceTypeService, nameof(DeviceTypeService.IDDeviceTypeService), nameof(DeviceTypeService.ServiceType), form.DeviceTypeServiceID);

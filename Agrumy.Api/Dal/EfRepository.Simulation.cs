@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// ISimulationRepository members - roadmap #251 modality B's virtual-device registry.
+    /// ISimulationRepository members - the virtual-device registry.
     internal partial class EfRepository
     {
         public async Task VirtualDeviceRegisterAsync(int deviceID)

@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.API
 {
-    /// Roadmap #251 modality B: admin-facing create/list/delete for fully virtual devices - the actual per-tick simulation runs in api.BackgroundWorkers.VirtualDeviceRunnerBackgroundService, not here.
+    /// Admin-facing create/list/delete for fully virtual devices - the actual per-tick simulation runs in api.BackgroundWorkers.VirtualDeviceRunnerBackgroundService, not here.
     [Route("/api/Simulation")]
     public class SimulationApiController(IRepository repo, ICache cache, IHttpClientFactory httpClientFactory) : ApiControllerBase(repo, cache)
     {
@@ -46,7 +46,7 @@ namespace api.Controllers.API
             return Ok(created?.ToDto());
         }
 
-        /// Tenant-scoped for everyone including Global admin - roadmap #251's explicit deviation from the usual Global-admin-sees-everything pattern, since a simulation is scoped to the tenant it was created for.
+        /// Tenant-scoped for everyone including Global admin - a deliberate deviation from the usual Global-admin-sees-everything pattern, since a simulation is scoped to the tenant it was created for.
         [Authorize(Roles = RoleNames.SimulationManagers)]
         [HttpGet("Device")]
         public async Task<ActionResult<IList<int>>> ListVirtualDevices() =>

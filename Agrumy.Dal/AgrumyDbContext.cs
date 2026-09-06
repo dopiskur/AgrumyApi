@@ -336,7 +336,7 @@ namespace api.Dal
                 e.Property(x => x.Board).HasMaxLength(40);
                 e.Property(x => x.Kit).HasMaxLength(64); // same cap as deviceType.Kit
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
-                // Roadmap #341: a firmware-reported Kit not yet in the catalog is auto-registered by DeviceDiagnosticUpsertAsync BEFORE this row is written, so the FK never rejects a legitimate device's heartbeat; NULL (never reported / generic build, normalized from "") bypasses the FK entirely.
+                // A firmware-reported Kit not yet in the catalog is auto-registered by DeviceDiagnosticUpsertAsync BEFORE this row is written, so the FK never rejects a legitimate device's heartbeat; NULL (never reported / generic build, normalized from "") bypasses the FK entirely.
                 e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.Kit).OnDelete(DeleteBehavior.NoAction);
             });
 

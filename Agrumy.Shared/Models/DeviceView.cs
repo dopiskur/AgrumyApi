@@ -8,7 +8,7 @@
         public DeviceConfigSensor? DeviceConfigSensor { get; set; }
         public DeviceConfigController? DeviceConfigController { get; set; }
         public IEnumerable<DeviceRole>? DeviceRole { get; set; }
-        // Roadmap #341 (kit-catalog half) - backs the Edit form's "Manual Kit" dropdown.
+        // Backs the Edit form's "Manual Kit" dropdown.
         public IEnumerable<DeviceType>? DeviceType { get; set; }
         public IEnumerable<DeviceTypeService>? DeviceTypeService { get; set; }
         public IEnumerable<DeviceTypeRelay>? DeviceTypeRelay { get; set; }
@@ -19,7 +19,7 @@
         public TimeRange? TimeRange { get; set; } = new TimeRange();
 
         public IList<DeviceEvent>? Events { get; set; }
-        // Roadmap #251 modality A - bound only by the Simulation page.
+        // Bound only by the Simulation page.
         public DeviceSimulation? DeviceSimulation { get; set; }
     }
 }

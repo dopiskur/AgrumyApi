@@ -19,7 +19,7 @@ namespace api.Security
         public const string GlobalDataReader = "Global Data Reader";
         public const string TenantDataReader = "Tenant Data Reader";
 
-        /// Roadmap #251: manages Simulation Mode overrides without needing full Tenant admin - composable, layered on top of a *Reader base like the grants above.
+        /// Manages Simulation Mode overrides without needing full Tenant admin - composable, layered on top of a *Reader base like the grants above.
         public const string SimulationAdministrator = "Simulation administrator";
 
         public static readonly IReadOnlyList<string> All = new[]
@@ -57,7 +57,7 @@ namespace api.Security
         /// May read server metrics (/metrics, /metrics/prometheus) - RequireRole takes individual names, not a comma-joined [Authorize] string.
         public static readonly string[] MetricsReaders = { GlobalAdmin, GlobalDataReader, TenantDataReader };
 
-        /// May view/edit a device's Simulation Mode overrides (roadmap #251) - tenant scoping still applies inline, same rule as DeviceManagers.
+        /// May view/edit a device's Simulation Mode overrides - tenant scoping still applies inline, same rule as DeviceManagers.
         public const string SimulationManagers = LegacyAdmin + "," + GlobalAdmin + "," + TenantAdmin + "," + SimulationAdministrator;
     }
 }

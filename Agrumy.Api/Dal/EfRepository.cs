@@ -203,7 +203,7 @@ namespace api.Dal
                     new DeviceTypeSensorRow { IDDeviceTypeSensor = SensorTypeIds.AnalogWaterLevel, SensorName = "Analog water tank", WaterTankLevel = 1 });
             }
 
-            // Any Kit string not in this table falls back to the existing, admin-controlled DeviceRole/DeviceControllerEnabled signal - see DeviceFleetGetAsync. VirtualDevice is roadmap #251 modality B's software-only kit, not a real board.
+            // Any Kit string not in this table falls back to the existing, admin-controlled DeviceRole/DeviceControllerEnabled signal - see DeviceFleetGetAsync. VirtualDevice is a software-only kit for fully simulated devices, not a real board.
             if (!await db.DeviceTypes.AnyAsync())
             {
                 db.DeviceTypes.AddRange(

@@ -37,7 +37,7 @@ namespace api.Models
         WaterPump = 4,
     }
 
-    /// Roadmap #343. One entry in POST /api/ControllerData's array - sent every time a relay's on/off state actually CHANGES, not on a fixed interval like SensorData. Universal: a real device pushes this alongside a physical relay flip, a simulated one pushes it alongside its calculated equivalent - same wire shape, same table, same downstream logic either way.
+    /// One entry in POST /api/ControllerData's array - sent every time a relay's on/off state actually CHANGES, not on a fixed interval like SensorData; a real device pushes this alongside a physical relay flip, a simulated one alongside its calculated equivalent, same wire shape either way.
     public class ControllerDataPush
     {
         public RelayFunction RelayFunction { get; set; }

@@ -61,7 +61,7 @@ namespace api.Dal.Interface
         // Device fixed lists
         Task<IList<DeviceRole>> DeviceRoleGetAsync();
 
-        /// Roadmap #341 (kit-catalog half) - the full deviceType catalog, curated entries and auto-registered ones alike.
+        /// The full deviceType catalog, curated entries and auto-registered ones alike.
         Task<IList<DeviceType>> DeviceTypeGetAsync();
         Task<IList<DeviceTypeService>> DeviceTypeServiceGetAsync();
         Task<IList<DeviceTypeRelay>> DeviceTypeRelayGetAsync();
@@ -108,7 +108,7 @@ namespace api.Dal.Interface
         /// Sets (or clears, notifiedAt: null) LowBatteryNotifiedAt on one device's diagnostic row.
         Task DeviceLowBatteryNotifiedSetAsync(int deviceID, DateTime? notifiedAt);
 
-        // Simulation Mode (roadmap #251 modality A)
+        // Simulation Mode (per-metric overrides on an existing physical device)
 
         /// Null when the device has never had a Simulation row created (equivalent to Enabled=false, every field null) - callers should treat both the same way.
         Task<DeviceSimulation?> DeviceSimulationGetAsync(int deviceID);

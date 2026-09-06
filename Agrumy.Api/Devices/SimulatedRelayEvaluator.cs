@@ -4,7 +4,7 @@ using api.Simulation;
 
 namespace api.Devices
 {
-    /// Roadmap #251 modality B: decides a simulated device's relay on/off state from the SAME rules a real device would receive over /api/Device/Config, mirroring AgrumyFirmware's ActuatorController::evaluateRule exactly (same per-function metric/direction, same OR-across-rules, same left-to-right AND/OR fold) - reimplemented rather than shared with api.Devices.RuleConditionEvaluator, same reasoning as that class's own comment (a third independent axis: on-device, server-side Notification, and now simulated).
+    /// Decides a simulated device's relay on/off state from the SAME rules a real device would receive over /api/Device/Config, mirroring AgrumyFirmware's ActuatorController::evaluateRule exactly (same per-function metric/direction, same OR-across-rules, same left-to-right AND/OR fold) - reimplemented rather than shared with api.Devices.RuleConditionEvaluator, same reasoning as that class's own comment (a third independent axis: on-device, server-side Notification, and now simulated).
     public static class SimulatedRelayEvaluator
     {
         /// wasOn is the relay's own last-known state (for Threshold's dead-zone latch, same rule as RuleConditionEvaluator's wasRuleTrue) - several rules for the same function OR together, unchanged from AgrumyFirmware's OR-across-rules semantics.

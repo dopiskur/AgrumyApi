@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers.View
 {
-    /// Roadmap #251 modality B - create/list/delete fully virtual devices; the actual simulation loop runs server-side (Agrumy.Api's VirtualDeviceRunnerBackgroundService), this page only manages which devices exist.
+    /// Create/list/delete fully virtual devices - the actual simulation loop runs server-side (Agrumy.Api's VirtualDeviceRunnerBackgroundService), this page only manages which devices exist.
     [Authorize(Roles = RoleNames.SimulationManagers)]
     public class SimulationController(IApi api) : Controller
     {

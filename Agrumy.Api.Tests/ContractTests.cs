@@ -268,7 +268,7 @@ public class ContractTests
         AssertValid("sensordata.request.schema.json", payload);
     }
 
-    // Roadmap #343: real C# serialization of the push DTO, not a hand-written literal - catches a casing/shape drift the compiler would happily accept.
+    // Real C# serialization of the push DTO, not a hand-written literal - catches a casing/shape drift the compiler would happily accept.
     [Fact]
     public void ControllerDataRequest_RealSerialization_MatchesSchema()
     {
@@ -281,7 +281,7 @@ public class ContractTests
         AssertValid("controllerdata.request.schema.json", JsonSerializer.Serialize(entries, Mvc));
     }
 
-    // Roadmap #251 modality A: only reachable when Enabled is true - the server answers 204 otherwise (DeviceApiController.DeviceSimulationPoll), so this is the only shape that ever reaches the wire.
+    // Only reachable when Enabled is true - the server answers 204 otherwise (DeviceApiController.DeviceSimulationPoll), so this is the only shape that ever reaches the wire.
     [Fact]
     public void SimulationResponse_RealSerialization_MatchesSchema()
     {

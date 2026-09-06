@@ -1,6 +1,6 @@
 namespace api.Dal.Interface
 {
-    /// Roadmap #251 modality B: the server-internal registry of which devices are fully virtual, used only by the Simulation admin endpoints and VirtualDeviceRunnerBackgroundService - never consulted by any device-facing endpoint.
+    /// The server-internal registry of which devices are fully virtual, used only by the Simulation admin endpoints and VirtualDeviceRunnerBackgroundService - never consulted by any device-facing endpoint.
     public interface ISimulationRepository
     {
         Task VirtualDeviceRegisterAsync(int deviceID);

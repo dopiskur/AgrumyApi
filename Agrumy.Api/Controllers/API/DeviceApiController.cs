@@ -402,7 +402,7 @@ namespace api.Controllers.API
         public async Task<ActionResult<IEnumerable<DeviceRole>>> DeviceRoleGet() =>
             Ok(await Repo.DeviceRoleGetAsync());
 
-        /// Roadmap #341 (kit-catalog half) - backs the Web Device Edit form's "Manual Kit" dropdown.
+        /// Backs the Web Device Edit form's "Manual Kit" dropdown.
         [HttpGet("Type")]
         [Authorize]
         public async Task<ActionResult<IEnumerable<DeviceType>>> DeviceTypeGet() =>
@@ -427,7 +427,7 @@ namespace api.Controllers.API
 
         #region Simulation Mode
 
-        /// Device-facing poll (roadmap #251 modality A) - identity comes from the authenticated apiId, same rule as PushEvent/AckCommand, never a route parameter. No content when Simulation Mode isn't enabled, so firmware has a cheap "nothing to override" signal without parsing a body full of nulls.
+        /// Device-facing poll - identity comes from the authenticated apiId, same rule as PushEvent/AckCommand, never a route parameter. No content when Simulation Mode isn't enabled, so firmware has a cheap "nothing to override" signal without parsing a body full of nulls.
         [HttpGet("Simulation")]
         [Authorize(Policy = DeviceAuth.SessionPolicy)]
         public async Task<ActionResult<DeviceSimulation>> DeviceSimulationPoll()

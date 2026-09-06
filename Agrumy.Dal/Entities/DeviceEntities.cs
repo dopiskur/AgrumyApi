@@ -171,7 +171,7 @@ namespace api.Dal.Entities
         public int? SensorWind { get; set; }
     }
 
-    /// Roadmap #251 modality A: per-metric sensor-reading overrides for an EXISTING physical device - one row per device, upserted from the Web Simulation page. A null field means "use the real reading"; Enabled=false means every field is ignored regardless of value.
+    /// Per-metric sensor-reading overrides for an EXISTING physical device (Simulation Mode) - one row per device, upserted from the Web Simulation page. A null field means "use the real reading"; Enabled=false means every field is ignored regardless of value.
     public class DeviceSimulationRow
     {
         public int DeviceID { get; set; }
@@ -191,7 +191,7 @@ namespace api.Dal.Entities
         public int? Wind { get; set; }
     }
 
-    /// Roadmap #251 modality B. Purely a server-internal registry of which device rows VirtualDeviceRunnerBackgroundService is responsible for driving - never exposed on any wire contract, never read by the device-facing endpoints themselves (Register/Authenticate/Config/SensorData/ControllerData have no idea a caller is virtual). A device with no row here is an ordinary, real device.
+    /// Purely a server-internal registry of which device rows VirtualDeviceRunnerBackgroundService is responsible for driving - never exposed on any wire contract, never read by the device-facing endpoints themselves (Register/Authenticate/Config/SensorData/ControllerData have no idea a caller is virtual). A device with no row here is an ordinary, real device.
     public class VirtualDeviceRow
     {
         public int DeviceID { get; set; }
@@ -210,7 +210,7 @@ namespace api.Dal.Entities
         public int? DeviceTypeServiceID { get; set; }
         public string? DeviceName { get; set; }
         public string? MacAddress { get; set; }
-        // Roadmap #341: admin-set fallback for a device whose firmware build never reports a Kit (generic esp32dev/esp32s3usbotg) - BuildFleetStatusesAsync's ControllerCapable check falls back to this only when the diagnostic Kit is empty.
+        // Admin-set fallback for a device whose firmware build never reports a Kit (generic esp32dev/esp32s3usbotg) - BuildFleetStatusesAsync's ControllerCapable check falls back to this only when the diagnostic Kit is empty.
         public string? ManualKit { get; set; }
         public string ApiId { get; set; } = "";
         public string ApiKey { get; set; } = "";
@@ -288,7 +288,7 @@ namespace api.Dal.Entities
         public string? Kit { get; set; } // See api.Models.DeviceConfigPoll.Kit.
     }
 
-    /// Roadmap #341 (kit-catalog half). Catalog of recognized physical device kits - Kit itself is the key (a build-flag string, e.g. "KC868-A6"), not an auto-increment id. ControllerCapable is unchanged from the pre-#341 DeviceTypeKitRow; PinoutJson is new, an unopinionated per-kit GPIO layout blob (shape TBD per kit, same "structured JSON blob" precedent as deviceUnitZoneRule.Conditions) - null for a kit nobody has documented pinout for yet, including every auto-registered one (see DeviceDiagnosticUpsertAsync).
+    /// Catalog of recognized physical device kits - Kit itself is the key (a build-flag string, e.g. "KC868-A6"), not an auto-increment id; PinoutJson is an unopinionated per-kit GPIO layout blob, null for a kit nobody has documented pinout for yet, including every auto-registered one (see DeviceDiagnosticUpsertAsync).
     public class DeviceTypeRow
     {
         public string Kit { get; set; } = "";

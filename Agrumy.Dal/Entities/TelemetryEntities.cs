@@ -23,7 +23,7 @@ namespace api.Dal.Entities
         public DateTime? DateCreated { get; set; }
     }
 
-    /// Roadmap #343: current on/off state per (DeviceID, RelayFunction) - one row per pair, upserted on every real state change, not an append-only log. Same table/logic for a real device (physical relay) and a simulated one (calculated), the difference is only where the IsOn decision comes from.
+    /// Current on/off state per (DeviceID, RelayFunction) - one row per pair, upserted on every real state change, not an append-only log. Same table/logic for a real device (physical relay) and a simulated one (calculated), the difference is only where the IsOn decision comes from.
     public class ControllerDataRow
     {
         public int IDControllerData { get; set; }

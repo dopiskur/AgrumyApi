@@ -957,7 +957,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(fleet.Single(f => f.IDDevice == recognizedKit.IDDevice).ControllerCapable);
     }
 
-    // Roadmap #341: deviceDiagnostic.Kit has a real FK to deviceType.Kit now - a device reporting a genuinely new (non-empty) Kit string the catalog has never seen must not have its heartbeat write fail because of it.
+    // deviceDiagnostic.Kit has a real FK to deviceType.Kit - a device reporting a genuinely new (non-empty) Kit string the catalog has never seen must not have its heartbeat write fail because of it.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceDiagnosticUpsert_UnrecognizedKit_AutoRegisters_NotBlocksTheWrite(DbProviderKind provider)
     {
@@ -974,7 +974,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.False(registered.ControllerCapable); // auto-registered, not curated - capability defaults closed, admin can promote it later
     }
 
-    // Roadmap #341: ManualKit is the admin fallback for a device whose firmware never auto-reports a Kit; the diagnostic-reported Kit still wins whenever both are present.
+    // ManualKit is the admin fallback for a device whose firmware never auto-reports a Kit; the diagnostic-reported Kit still wins whenever both are present.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceFleetGet_ControllerCapable_FallsBackToManualKit_OnlyWhenNoDiagnosticKit(DbProviderKind provider)
     {
@@ -1462,11 +1462,11 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Contains(await _repo.DeviceTypeServiceGetAsync(), x => x.IDDeviceTypeService == 1);
         Assert.Contains(await _repo.DeviceTypeRelayGetAsync(), x => x.IDDeviceTypeRelay == 1);
         Assert.Contains(await _repo.DeviceTypeSensorGetAsync(), x => x.IDDeviceTypeSensor == 1);
-        // Roadmap #251 modality B's software-only kit must be seeded from day one - VirtualDevice has no real board to auto-detect it.
+        // VirtualDevice's software-only kit must be seeded from day one - it has no real board to auto-detect it.
         Assert.Contains(await _repo.DeviceTypeGetAsync(), x => x.Kit == "VirtualDevice" && x.ControllerCapable);
     }
 
-    // Roadmap #343: upserted current state, not an appended log - pushing the same RelayFunction twice must update the one row, not add a second.
+    // Upserted current state, not an appended log - pushing the same RelayFunction twice must update the one row, not add a second.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task ControllerDataPush_UpsertsPerDeviceAndRelayFunction_NotAppendOnly(DbProviderKind provider)
     {
@@ -1485,7 +1485,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(states.Single(s => s.RelayFunction == RelayFunction.Light).IsOn);
     }
 
-    // Roadmap #251 modality A: upsert semantics (create on first set, update after) and null-vs-value round-tripping.
+    // Upsert semantics (create on first set, update after) and null-vs-value round-tripping.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceSimulation_SetThenGet_Upserts_AndRoundTripsNulls(DbProviderKind provider)
     {
@@ -1509,7 +1509,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(60, second.Humidity);
     }
 
-    // Roadmap #251 modality B: the registry is purely internal bookkeeping - registering, listing (globally and tenant-scoped), and a delete that also nukes sensorData (unlike an ordinary device delete).
+    // The registry is purely internal bookkeeping - registering, listing (globally and tenant-scoped), and a delete that also nukes sensorData (unlike an ordinary device delete).
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task VirtualDevice_RegisterListDelete_AlsoRemovesSensorData(DbProviderKind provider)
     {

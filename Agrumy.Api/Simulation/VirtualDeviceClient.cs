@@ -6,7 +6,7 @@ using api.Models;
 
 namespace api.Simulation
 {
-    /// Roadmap #251 modality B. Drives one virtual device through the EXACT same HTTP wire protocol a real AgrumyFirmware device uses (Register -> Authenticate -> Config -> SensorData -> ControllerData), against the server's own public address (Option C from the design discussion) - the device-facing endpoints have no idea the caller isn't real hardware.
+    /// Drives one virtual device through the EXACT same HTTP wire protocol a real AgrumyFirmware device uses (Register -> Authenticate -> Config -> SensorData -> ControllerData), against the server's own public address - the device-facing endpoints have no idea the caller isn't real hardware.
     public class VirtualDeviceClient(HttpClient http)
     {
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);

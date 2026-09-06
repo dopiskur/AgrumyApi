@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// IDeviceRepository members: Simulation Mode overrides (roadmap #251 modality A) for an already-registered physical device.
+    /// IDeviceRepository members: Simulation Mode overrides for an already-registered physical device.
     internal partial class EfRepository
     {
         public async Task<DeviceSimulation?> DeviceSimulationGetAsync(int deviceID)
