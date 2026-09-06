@@ -52,11 +52,22 @@ namespace api.Dal
         public async Task<DeviceUnit> DeviceUnitAddAsync(DeviceUnit unit)
         {
             // IDDeviceUnit is ValueGeneratedNever - MySQL's default sql_mode treats an explicit 0 on an AUTO_INCREMENT column as "generate a new value", which would collide with the reserved IDDeviceUnit=0 sentinel (Math.Max(...,1) below keeps 0 free).
-            int nextId = Math.Max((await db.DeviceUnits.AsNoTracking().Select(u => (int?)u.IDDeviceUnit).MaxAsync() ?? 0) + 1, 1);
-            var row = new DeviceUnitRow { IDDeviceUnit = nextId, TenantID = unit.TenantID, DeviceUnitName = unit.DeviceUnitName };
-            db.DeviceUnits.Add(row);
-            await db.SaveChangesAsync();
-            return ToDtoUnit(row);
+            for (int attempt = 0; ; attempt++)
+            {
+                int nextId = Math.Max((await db.DeviceUnits.AsNoTracking().Select(u => (int?)u.IDDeviceUnit).MaxAsync() ?? 0) + 1, 1);
+                var row = new DeviceUnitRow { IDDeviceUnit = nextId, TenantID = unit.TenantID, DeviceUnitName = unit.DeviceUnitName };
+                db.DeviceUnits.Add(row);
+                try
+                {
+                    await db.SaveChangesAsync();
+                    return ToDtoUnit(row);
+                }
+                catch (DbUpdateException) when (attempt < 4)
+                {
+                    // Two concurrent adds computed the same MAX+1 - detach the failed row and retry against a freshly read max, rather than surfacing the PK collision to the caller.
+                    db.Entry(row).State = EntityState.Detached;
+                }
+            }
         }
 
         public async Task DeviceUnitUpdateAsync(DeviceUnit unit)
@@ -111,24 +122,34 @@ namespace api.Dal
 
         public async Task<DeviceUnitZone> DeviceUnitZoneAddAsync(DeviceUnitZone zone)
         {
-            // Same manual max+1 reasoning as DeviceUnitAddAsync.
-            int nextId = Math.Max((await db.DeviceUnitZones.AsNoTracking().Select(z => (int?)z.IDDeviceUnitZone).MaxAsync() ?? 0) + 1, 1);
-            var row = new DeviceUnitZoneRow
+            // Same manual max+1 reasoning, and same collision-retry, as DeviceUnitAddAsync.
+            for (int attempt = 0; ; attempt++)
             {
-                IDDeviceUnitZone = nextId,
-                TenantID = zone.TenantID,
-                DeviceUnitID = zone.DeviceUnitID,
-                DeviceUnitZoneName = zone.DeviceUnitZoneName,
-                WaterPumpMaxRunSeconds = settings.WaterPumpMaxRunSeconds,
-                WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds,
-                // No server-wide default makes sense for a specific tank's own calibration - unlike WaterPumpMaxRunSeconds above, always taken from the caller (null/unset is the correct "no tank tracking yet" state).
-                TankCapacityLiters = zone.TankCapacityLiters,
-                WaterLevelRawEmpty = zone.WaterLevelRawEmpty,
-                WaterLevelRawFull = zone.WaterLevelRawFull,
-            };
-            db.DeviceUnitZones.Add(row);
-            await db.SaveChangesAsync();
-            return ToDtoZone(row);
+                int nextId = Math.Max((await db.DeviceUnitZones.AsNoTracking().Select(z => (int?)z.IDDeviceUnitZone).MaxAsync() ?? 0) + 1, 1);
+                var row = new DeviceUnitZoneRow
+                {
+                    IDDeviceUnitZone = nextId,
+                    TenantID = zone.TenantID,
+                    DeviceUnitID = zone.DeviceUnitID,
+                    DeviceUnitZoneName = zone.DeviceUnitZoneName,
+                    WaterPumpMaxRunSeconds = settings.WaterPumpMaxRunSeconds,
+                    WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds,
+                    // No server-wide default makes sense for a specific tank's own calibration - unlike WaterPumpMaxRunSeconds above, always taken from the caller (null/unset is the correct "no tank tracking yet" state).
+                    TankCapacityLiters = zone.TankCapacityLiters,
+                    WaterLevelRawEmpty = zone.WaterLevelRawEmpty,
+                    WaterLevelRawFull = zone.WaterLevelRawFull,
+                };
+                db.DeviceUnitZones.Add(row);
+                try
+                {
+                    await db.SaveChangesAsync();
+                    return ToDtoZone(row);
+                }
+                catch (DbUpdateException) when (attempt < 4)
+                {
+                    db.Entry(row).State = EntityState.Detached;
+                }
+            }
         }
 
         public async Task DeviceUnitZoneUpdateAsync(DeviceUnitZone zone)
