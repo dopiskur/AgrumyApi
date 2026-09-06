@@ -250,7 +250,6 @@ public class ClassifyExceptionTests
         new AgrumyDbContext(DbOptionsFactory.Build(DbProviderKind.MySql, "server=unused;database=unused;")),
         Options.Create(new AgrumySettings()),
         NullLogger<EfRepository>.Instance,
-        new Mock<ICache>().Object, // ClassifyException never touches the cache - unused here
         new Mock<IAuditLogRepository>().Object,
         new Mock<IRefreshTokenRepository>().Object,
         new Mock<IControllerDataRepository>().Object,
@@ -260,7 +259,8 @@ public class ClassifyExceptionTests
         new Mock<IServerConfigRepository>().Object,
         new Mock<ICommandRepository>().Object,
         new Mock<IFirmwareRepository>().Object,
-        new Mock<IUserRepository>().Object);
+        new Mock<IUserRepository>().Object,
+        new Mock<IDeviceRepository>().Object);
 
     [Fact]
     public void PlainException_MentioningMissingTable_IsSchemaMissing()

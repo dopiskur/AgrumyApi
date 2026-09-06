@@ -5,13 +5,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// IGatewayRepository, extracted out of the EfRepository god class (roadmap #246) - reads db.Devices directly rather than calling into IDeviceRepository, and reuses EfRepository.ToDto for the one DeviceRow-to-Device mapping it needs.
+    /// IGatewayRepository, extracted out of the EfRepository god class (roadmap #246) - reads db.Devices directly rather than calling into IDeviceRepository, and reuses EfDeviceRepository.ToDto for the one DeviceRow-to-Device mapping it needs.
     internal sealed class EfGatewayRepository(AgrumyDbContext db) : IGatewayRepository
     {
         public async Task<IList<Device>> GatewayDevicesGetAllAsync()
         {
             var rows = await db.Devices.AsNoTracking().Where(d => d.IsGateway).ToListAsync();
-            return rows.Select(EfRepository.ToDto).ToList();
+            return rows.Select(EfDeviceRepository.ToDto).ToList();
         }
 
         public async Task<IList<GatewayDeviceMapping>> GatewayDeviceMappingsGetAsync(int idGatewayDevice) =>

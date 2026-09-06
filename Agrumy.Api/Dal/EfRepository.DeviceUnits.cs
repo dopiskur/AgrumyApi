@@ -373,7 +373,7 @@ namespace api.Dal
         {
             var row = await db.Devices.AsNoTracking()
                 .FirstOrDefaultAsync(d => d.DeviceUnitZoneID == idDeviceUnitZone && d.DeviceControllerEnabled == true);
-            return row == null ? null : ToDto(row);
+            return row == null ? null : EfDeviceRepository.ToDto(row);
         }
 
         public async Task<IList<Device>> DeviceUnitGetControllersAsync(int idDeviceUnit)
@@ -381,7 +381,7 @@ namespace api.Dal
             var rows = await db.Devices.AsNoTracking()
                 .Where(d => d.DeviceUnitID == idDeviceUnit && d.DeviceControllerEnabled == true)
                 .ToListAsync();
-            return rows.Select(ToDto).ToList();
+            return rows.Select(EfDeviceRepository.ToDto).ToList();
         }
 
         public async Task<IList<Device>> DeviceUnitZoneGetSensorsAsync(int idDeviceUnitZone)
@@ -389,7 +389,7 @@ namespace api.Dal
             var rows = await db.Devices.AsNoTracking()
                 .Where(d => d.DeviceUnitZoneID == idDeviceUnitZone && d.DeviceSensorEnabled == true && d.DeviceControllerEnabled != true)
                 .ToListAsync();
-            return rows.Select(ToDto).ToList();
+            return rows.Select(EfDeviceRepository.ToDto).ToList();
         }
 
         public async Task<IList<Device>> DeviceUnitGetSensorsAsync(int idDeviceUnit)
@@ -397,7 +397,7 @@ namespace api.Dal
             var rows = await db.Devices.AsNoTracking()
                 .Where(d => d.DeviceUnitID == idDeviceUnit && d.DeviceSensorEnabled == true && d.DeviceControllerEnabled != true)
                 .ToListAsync();
-            return rows.Select(ToDto).ToList();
+            return rows.Select(EfDeviceRepository.ToDto).ToList();
         }
 
         // ---- Device assignment -----------------------------------------
@@ -415,7 +415,7 @@ namespace api.Dal
                 : q.Where(d => d.DeviceSensorEnabled == true);
 
             var rows = await q.ToListAsync();
-            return rows.Select(ToDto).ToList();
+            return rows.Select(EfDeviceRepository.ToDto).ToList();
         }
 
         public async Task DeviceAssignToZoneAsync(int idDevice, int idDeviceUnitZone)
@@ -553,7 +553,7 @@ namespace api.Dal
                 DeviceUnitZoneName = zone.DeviceUnitZoneName,
                 DeviceCount = deviceRows.Count,
                 Averages = Average(snapshots, zone),
-                Devices = deviceRows.Select(ToDto).ToList(),
+                Devices = deviceRows.Select(EfDeviceRepository.ToDto).ToList(),
                 Status = ComputeStatus(snapshots),
                 Trend = await BuildTrendAsync([idDeviceUnitZone]),
                 ProblemAlerts = alerts.Select(ToDtoAlert).ToList(),

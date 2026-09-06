@@ -1,178 +1,21 @@
-using api.Dal.Entities;
-using api.Dal.Interface;
 using api.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// IDeviceRepository members: per-device sensor and controller config reads/writes.
+    /// IDeviceRepository per-device config members - forwarded to the standalone EfDeviceRepository (roadmap #246) so IRepository's broad consumers keep working unchanged.
     internal partial class EfRepository
     {
-        public async Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID)
-        {
-            var row = await db.DeviceConfigSensors.AsNoTracking()
-                .FirstOrDefaultAsync(c => c.IDDeviceConfigSensor == deviceConfigSensorID);
-            return row == null ? null : ToDto(row);
-        }
+        public Task<DeviceConfigSensor?> DeviceConfigSensorGetAsync(int? deviceConfigSensorID) => deviceRepository.DeviceConfigSensorGetAsync(deviceConfigSensorID);
 
-        public async Task<DeviceConfigController?> DeviceConfigControllerGetAsync(int? deviceConfigControllerID)
-        {
-            var row = await db.DeviceConfigControllers.AsNoTracking()
-                .FirstOrDefaultAsync(c => c.IDDeviceConfigController == deviceConfigControllerID);
-            if (row == null)
-            {
-                return null;
-            }
-            IList<DeviceRelaySlot> relays = await db.DeviceConfigControllerRelays.AsNoTracking()
-                .Where(r => r.IDDeviceConfigController == deviceConfigControllerID)
-                .Select(r => new DeviceRelaySlot { Slot = r.Slot, RelayFunction = r.RelayFunction })
-                .ToListAsync();
-            return ToDto(row, relays);
-        }
+        public Task<DeviceConfigController?> DeviceConfigControllerGetAsync(int? deviceConfigControllerID) => deviceRepository.DeviceConfigControllerGetAsync(deviceConfigControllerID);
 
-        public async Task<Device?> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID)
-        {
-            var row = await db.Devices.AsNoTracking()
-                .FirstOrDefaultAsync(d => d.DeviceConfigSensorID == deviceConfigSensorID);
-            return row == null ? null : ToDto(row);
-        }
+        public Task<Device?> DeviceGetByDeviceConfigSensorIdAsync(int? deviceConfigSensorID) => deviceRepository.DeviceGetByDeviceConfigSensorIdAsync(deviceConfigSensorID);
 
-        public async Task<Device?> DeviceGetByDeviceConfigControllerIdAsync(int? deviceConfigControllerID)
-        {
-            var row = await db.Devices.AsNoTracking()
-                .FirstOrDefaultAsync(d => d.DeviceConfigControllerID == deviceConfigControllerID);
-            return row == null ? null : ToDto(row);
-        }
+        public Task<Device?> DeviceGetByDeviceConfigControllerIdAsync(int? deviceConfigControllerID) => deviceRepository.DeviceGetByDeviceConfigControllerIdAsync(deviceConfigControllerID);
 
-        /// Returns null on success, or a validation error message (caller returns 400) without writing anything.
-        public async Task<string?> DeviceConfigControllerUpdateAsync(int? idDevice, DeviceConfigController? cfg)
-        {
-            if (cfg == null)
-            {
-                return null;
-            }
+        public Task<string?> DeviceConfigControllerUpdateAsync(int? idDevice, DeviceConfigController? deviceConfigController) =>
+            deviceRepository.DeviceConfigControllerUpdateAsync(idDevice, deviceConfigController);
 
-            var assignedSlots = cfg.Relays.Where(s => s.RelayFunction != 0).ToList();
-            if (assignedSlots.Any(s => s.Slot < 1 || s.Slot > RelaySlotLimits.MaxSlots))
-            {
-                return $"Relay slot must be between 1 and {RelaySlotLimits.MaxSlots}.";
-            }
-            if (assignedSlots.Select(s => s.Slot).Distinct().Count() != assignedSlots.Count)
-            {
-                return "Duplicate relay slot in request.";
-            }
-
-            // Resolve from idDevice's OWN DeviceConfigControllerID, not cfg.IDDeviceConfigController - a client-supplied id could otherwise overwrite another device's controller config.
-            int? ownConfigControllerId = await db.Devices.AsNoTracking()
-                .Where(d => d.IDDevice == idDevice)
-                .Select(d => d.DeviceConfigControllerID)
-                .FirstOrDefaultAsync();
-
-            // Delete-then-insert in one transaction - a crash between the two would otherwise leave the device with zero relay slots.
-            await using var transaction = await db.Database.BeginTransactionAsync();
-
-            var row = await db.DeviceConfigControllers
-                .FirstOrDefaultAsync(c => c.IDDeviceConfigController == ownConfigControllerId);
-            if (row != null)
-            {
-                // Only the relay-pin mapping lives here now - threshold/hysteresis/interval/schedule config moved to the device's assigned DeviceUnitZone, edited from the Zone page instead.
-                row.RelayEnabled = cfg.RelayEnabled;
-
-                // Wholesale replace: delete every existing slot row for this controller, then insert one row per ASSIGNED slot (RelayFunction 0/Disabled is omitted, not stored) - simpler and less error-prone than diffing against the posted set.
-                await db.DeviceConfigControllerRelays
-                    .Where(r => r.IDDeviceConfigController == ownConfigControllerId)
-                    .ExecuteDeleteAsync();
-                foreach (DeviceRelaySlot slot in assignedSlots)
-                {
-                    db.DeviceConfigControllerRelays.Add(new DeviceConfigControllerRelayRow
-                    {
-                        IDDeviceConfigController = ownConfigControllerId!.Value,
-                        Slot = slot.Slot,
-                        RelayFunction = slot.RelayFunction,
-                    });
-                }
-            }
-
-            var deviceRow = await db.Devices.FirstOrDefaultAsync(d => d.IDDevice == idDevice);
-            if (deviceRow != null)
-            {
-                deviceRow.ConfigVersion = (deviceRow.ConfigVersion ?? 0) + 1;
-            }
-
-            await db.SaveChangesAsync();
-            await transaction.CommitAsync();
-            return null;
-        }
-
-        public async Task DeviceConfigSensorUpdateAsync(int? idDevice, DeviceConfigSensor? cfg)
-        {
-            if (cfg == null)
-            {
-                return;
-            }
-
-            // Same ownership-lookup rule as DeviceConfigControllerUpdateAsync above.
-            int? ownConfigSensorId = await db.Devices.AsNoTracking()
-                .Where(d => d.IDDevice == idDevice)
-                .Select(d => d.DeviceConfigSensorID)
-                .FirstOrDefaultAsync();
-
-            var row = await db.DeviceConfigSensors
-                .FirstOrDefaultAsync(c => c.IDDeviceConfigSensor == ownConfigSensorId);
-            if (row != null)
-            {
-                row.SensorBattery = cfg.SensorBattery;
-                row.BatteryDividerR1 = cfg.BatteryDividerR1;
-                row.BatteryDividerR2 = cfg.BatteryDividerR2;
-                row.SensorTemp = cfg.SensorTemp;
-                row.SensorTempSoil = cfg.SensorTempSoil;
-                row.SensorHumid = cfg.SensorHumid;
-                row.SensorMoist = cfg.SensorMoist;
-                row.SensorLight = cfg.SensorLight;
-                row.SensorCo2 = cfg.SensorCo2;
-                row.SensorTvoc = cfg.SensorTvoc;
-                row.SensorBarometer = cfg.SensorBarometer;
-                row.SensorPH = cfg.SensorPH;
-                row.SensorRainLevel = cfg.SensorRainLevel;
-                row.SensorWaterLevel = cfg.SensorWaterLevel;
-                row.SensorWind = cfg.SensorWind;
-            }
-
-            var deviceRow = await db.Devices.FirstOrDefaultAsync(d => d.IDDevice == idDevice);
-            if (deviceRow != null)
-            {
-                deviceRow.ConfigVersion = (deviceRow.ConfigVersion ?? 0) + 1;
-            }
-
-            await db.SaveChangesAsync();
-        }
-
-        private static DeviceConfigSensor ToDto(DeviceConfigSensorRow c) => new()
-        {
-            IDDeviceConfigSensor = c.IDDeviceConfigSensor,
-            SensorBattery = c.SensorBattery,
-            BatteryDividerR1 = c.BatteryDividerR1,
-            BatteryDividerR2 = c.BatteryDividerR2,
-            SensorTemp = c.SensorTemp,
-            SensorTempSoil = c.SensorTempSoil,
-            SensorHumid = c.SensorHumid,
-            SensorMoist = c.SensorMoist,
-            SensorLight = c.SensorLight,
-            SensorCo2 = c.SensorCo2,
-            SensorTvoc = c.SensorTvoc,
-            SensorBarometer = c.SensorBarometer,
-            SensorPH = c.SensorPH,
-            SensorRainLevel = c.SensorRainLevel,
-            SensorWaterLevel = c.SensorWaterLevel,
-            SensorWind = c.SensorWind,
-        };
-
-        // Relay-pin mapping only - Rules/WaterPumpMaxRunSeconds/WaterPumpCooldownSeconds on the DTO come from the assigned zone via DeviceApiController.BuildDeviceConfigAsync, not this row.
-        private static DeviceConfigController ToDto(DeviceConfigControllerRow c, IList<DeviceRelaySlot> relays) => new()
-        {
-            IDDeviceConfigController = c.IDDeviceConfigController,
-            RelayEnabled = c.RelayEnabled,
-            Relays = relays,
-        };
+        public Task DeviceConfigSensorUpdateAsync(int? iDDevice, DeviceConfigSensor? deviceConfigSensor) => deviceRepository.DeviceConfigSensorUpdateAsync(iDDevice, deviceConfigSensor);
     }
 }
