@@ -36,7 +36,7 @@
 {
                         <tr>
                             <td>@gateway.DeviceName</td>
-                            <td>@(gateway.GatewayProfile?.ToString() ?? "-")</td>
+                            <td>@(gateway.GatewayProfile?.ToString() ?? (gateway.LoRaGatewayEnabled == true ? "LoRaGatewayEnabled (dual-role)" : "-"))</td>
                             <td class="text-secondary small">@gateway.MacAddress</td>
                             <td>
                                 @if (gateway.GatewayProfile == api.Models.GatewayProfile.LoRaGateway)
@@ -45,7 +45,7 @@
                                         DevEUI Mapping
                                     </a>
                                 }
-                                else if (gateway.GatewayProfile == api.Models.GatewayProfile.LoRaPrivateProtocol)
+                                else if (gateway.GatewayProfile == api.Models.GatewayProfile.LoRaPrivateProtocol || gateway.LoRaGatewayEnabled == true)
                                 {
                                     <a asp-action="Mapping" asp-route-idGatewayDevice="@gateway.IDDevice" class="btn btn-sm btn-primary">
                                         Node Address Mapping

@@ -10,7 +10,8 @@ namespace api.Dal
     {
         public async Task<IList<Device>> GatewayDevicesGetAllAsync()
         {
-            var rows = await db.Devices.AsNoTracking().Where(d => d.IsGateway).ToListAsync();
+            // LoRaGatewayEnabled (roadmap #383) lists alongside the classic IsGateway (standalone Agrumy.Gateway) devices - both relay through the same GatewayApiController.Batch path.
+            var rows = await db.Devices.AsNoTracking().Where(d => d.IsGateway || d.LoRaGatewayEnabled == true).ToListAsync();
             return rows.Select(EfDeviceRepository.ToDto).ToList();
         }
 

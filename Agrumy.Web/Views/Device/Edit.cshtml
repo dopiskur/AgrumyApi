@@ -16,6 +16,8 @@
     var deviceTypeServiceSelect = new SelectFieldViewModel { Name = EditField(nameof(form.DeviceTypeServiceID)), Label = "Service type", Items = deviceTypeServiceItems };
 
     var sleepDeepToggle = new EnabledToggleFieldViewModel { Name = EditField(nameof(form.SleepDeepEnabled)), Label = "SleepDeep", Value = form.SleepDeepEnabled };
+    // Roadmap #383 - standalone/dual-role LoRa Gateway relay; firmware only actually starts listening if it detects the LoRa radio chip physically present (see the Details page's event log otherwise).
+    var loRaGatewayToggle = new EnabledToggleFieldViewModel { Name = EditField(nameof(form.LoRaGatewayEnabled)), Label = "LoRa Gateway enabled", Value = form.LoRaGatewayEnabled };
     var batteryToggle = new EnabledToggleFieldViewModel { Name = EditField(nameof(form.BatteryEnabled)), Label = "Device battery", Value = form.BatteryEnabled };
     var debugToggle = new EnabledToggleFieldViewModel { Name = EditField(nameof(form.Debug)), Label = nameof(form.Debug), Value = form.Debug };
     var enabledToggle = new EnabledToggleFieldViewModel { Name = EditField(nameof(form.Enabled)), Label = "Device", Value = form.Enabled };
@@ -112,6 +114,7 @@
             </div>
 
             <partial name="_EnabledToggleField" model="sleepDeepToggle" />
+            <partial name="_EnabledToggleField" model="loRaGatewayToggle" />
             <partial name="_EnabledToggleField" model="batteryToggle" />
             <partial name="_EnabledToggleField" model="debugToggle" />
             <partial name="_EnabledToggleField" model="enabledToggle" />

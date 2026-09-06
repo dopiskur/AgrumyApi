@@ -46,6 +46,7 @@ namespace api.Devices
                 ServicePublicKey = device.ServicePublicKey,
                 SleepSeconds = device.SleepSeconds,
                 SleepDeep = device.SleepDeepEnabled,
+                LoRaGatewayEnabled = device.LoRaGatewayEnabled,
                 UtcOffsetSeconds = utcOffsetSeconds,
                 ServerUtcEpoch = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 DeviceSensorEnabled = device.DeviceSensorEnabled,

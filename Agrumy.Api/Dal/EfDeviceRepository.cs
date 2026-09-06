@@ -184,6 +184,7 @@ namespace api.Dal
             row.ServicePublicKey = device.ServicePublicKey;
             row.SleepSeconds = device.SleepSeconds;
             row.SleepDeepEnabled = device.SleepDeepEnabled;
+            row.LoRaGatewayEnabled = device.LoRaGatewayEnabled;
             row.DeviceSensorEnabled = device.DeviceSensorEnabled;
             row.DeviceControllerEnabled = device.DeviceControllerEnabled;
             row.BatteryEnabled = device.BatteryEnabled;
@@ -222,6 +223,7 @@ namespace api.Dal
             ServicePublicKey = d.ServicePublicKey,
             SleepSeconds = d.SleepSeconds,
             SleepDeepEnabled = d.SleepDeepEnabled,
+            LoRaGatewayEnabled = d.LoRaGatewayEnabled,
             DeviceSensorEnabled = d.DeviceSensorEnabled,
             DeviceControllerEnabled = d.DeviceControllerEnabled,
             BatteryEnabled = d.BatteryEnabled,

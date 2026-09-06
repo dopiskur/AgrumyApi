@@ -228,6 +228,8 @@ namespace api.Dal.Entities
         public string? ServicePublicKey { get; set; }
         public int? SleepSeconds { get; set; }
         public bool? SleepDeepEnabled { get; set; }
+        // Roadmap #383 - see api.Models.Device.LoRaGatewayEnabled.
+        public bool? LoRaGatewayEnabled { get; set; }
         public bool? DeviceSensorEnabled { get; set; }
         public bool? DeviceControllerEnabled { get; set; }
         public bool? BatteryEnabled { get; set; }

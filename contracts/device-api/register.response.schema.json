@@ -18,6 +18,7 @@
     "servicePublicKey",
     "sleepSeconds",
     "sleepDeep",
+    "loRaGatewayEnabled",
     "utcOffsetSeconds",
     "serverUtcEpoch",
     "deviceSensorEnabled",
@@ -113,6 +114,13 @@
         "boolean",
         "null"
       ]
+    },
+    "loRaGatewayEnabled": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Roadmap #383. Lets an ordinary, already-registered device also relay LoRa private-protocol uplinks via its own WiFi/HTTP connection; firmware only actually starts listening if it detects the LoRa radio chip physically present, reporting DeviceEventType.LoRaHardwareNotDetected otherwise."
     },
     "utcOffsetSeconds": {
       "type": [

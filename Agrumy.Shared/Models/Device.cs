@@ -52,6 +52,8 @@ namespace api.Models
 
         public int? SleepSeconds { get; set; } = 60;
         public bool? SleepDeepEnabled { get; set; } = false;
+        // Roadmap #383 - lets an ordinary, already-registered device also relay LoRa private-protocol uplinks via its own WiFi/HTTP connection (GatewayApiController treats it like IsGateway); firmware only actually starts listening if it detects the radio chip physically present.
+        public bool? LoRaGatewayEnabled { get; set; } = false;
 
         [HiddenInput(DisplayValue = true)]
         public bool? DeviceSensorEnabled { get; set; } = false;
@@ -99,6 +101,7 @@ namespace api.Models
         public string? ServicePublicKey { get; set; }
         public int? SleepSeconds { get; set; } = 60;
         public bool? SleepDeepEnabled { get; set; } = false;
+        public bool? LoRaGatewayEnabled { get; set; } = false;
         public bool? DeviceSensorEnabled { get; set; } = false;
         public bool? DeviceControllerEnabled { get; set; } = false;
         public bool? BatteryEnabled { get; set; } = false;
@@ -124,6 +127,7 @@ namespace api.Models
         public string? ServicePublicKey { get; set; }
         public int? SleepSeconds { get; set; }
         public bool? SleepDeepEnabled { get; set; }
+        public bool? LoRaGatewayEnabled { get; set; }
         public bool? DeviceSensorEnabled { get; set; }
         public bool? DeviceControllerEnabled { get; set; }
         public bool? BatteryEnabled { get; set; }
@@ -155,6 +159,7 @@ namespace api.Models
             ServicePublicKey = d.ServicePublicKey,
             SleepSeconds = d.SleepSeconds,
             SleepDeepEnabled = d.SleepDeepEnabled,
+            LoRaGatewayEnabled = d.LoRaGatewayEnabled,
             DeviceSensorEnabled = d.DeviceSensorEnabled,
             DeviceControllerEnabled = d.DeviceControllerEnabled,
             BatteryEnabled = d.BatteryEnabled,
@@ -191,6 +196,7 @@ namespace api.Models
             ServicePublicKey = dto.ServicePublicKey,
             SleepSeconds = dto.SleepSeconds,
             SleepDeepEnabled = dto.SleepDeepEnabled,
+            LoRaGatewayEnabled = dto.LoRaGatewayEnabled,
             DeviceSensorEnabled = dto.DeviceSensorEnabled,
             DeviceControllerEnabled = dto.DeviceControllerEnabled,
             BatteryEnabled = dto.BatteryEnabled,
@@ -215,6 +221,7 @@ namespace api.Models
             target.ServicePublicKey = form.ServicePublicKey;
             target.SleepSeconds = form.SleepSeconds;
             target.SleepDeepEnabled = form.SleepDeepEnabled;
+            target.LoRaGatewayEnabled = form.LoRaGatewayEnabled;
             target.DeviceSensorEnabled = form.DeviceSensorEnabled;
             target.DeviceControllerEnabled = form.DeviceControllerEnabled;
             target.BatteryEnabled = form.BatteryEnabled;
@@ -233,6 +240,7 @@ namespace api.Models
             ServicePublicKey = d.ServicePublicKey,
             SleepSeconds = d.SleepSeconds,
             SleepDeepEnabled = d.SleepDeepEnabled,
+            LoRaGatewayEnabled = d.LoRaGatewayEnabled,
             DeviceSensorEnabled = d.DeviceSensorEnabled,
             DeviceControllerEnabled = d.DeviceControllerEnabled,
             BatteryEnabled = d.BatteryEnabled,
@@ -274,6 +282,8 @@ namespace api.Models
 
         public int? SleepSeconds { get; set; } = 60;
         public bool? SleepDeep { get; set; } = false;
+        // Roadmap #383 - see api.Models.Device.LoRaGatewayEnabled; firmware only actually listens if it detects the LoRa radio chip physically present, reporting DeviceEventType.LoRaHardwareNotDetected otherwise.
+        public bool? LoRaGatewayEnabled { get; set; } = false;
 
         // UTC offset (seconds, positive east) for ServerConfig.ScheduleTimeZone, computed fresh each sync so firmware needs no timezone database of its own; 0 when unconfigured.
         public int? UtcOffsetSeconds { get; set; }

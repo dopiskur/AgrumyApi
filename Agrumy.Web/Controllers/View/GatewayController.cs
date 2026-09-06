@@ -19,7 +19,7 @@ namespace api.Controllers.View
         public async Task<ActionResult> Mapping(int idGatewayDevice)
         {
             DeviceDto gateway = await api.DeviceGet(idGatewayDevice);
-            if (gateway?.IsGateway != true)
+            if (gateway?.IsGateway != true && gateway?.LoRaGatewayEnabled != true)
             {
                 return NotFound();
             }

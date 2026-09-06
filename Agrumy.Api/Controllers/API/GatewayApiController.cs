@@ -29,7 +29,7 @@ namespace api.Controllers.API
             {
                 return (null, NotFound());
             }
-            if (gateway.IsGateway != true)
+            if (gateway.IsGateway != true && gateway.LoRaGatewayEnabled != true)
             {
                 return (null, StatusCode(403, "This device is not registered as a Gateway."));
             }

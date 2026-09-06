@@ -27,6 +27,8 @@ namespace api.Models
         SensorStale = 16,
         // ESP.getFreeHeap() dropped below the device's own reboot threshold, replacing the old raw-failed-config-cycle-count trigger.
         LowMemoryReboot = 17,
+        // LoRaGatewayEnabled was requested but radio.begin() failed - no LoRa chip physically present/wired (roadmap #383).
+        LoRaHardwareNotDetected = 18,
     }
 
     /// Body of POST /api/Device/Event; deliberately has no device/tenant identity field — the caller's apiId (see api.Security.DeviceAuth) is the only trusted source for that.
