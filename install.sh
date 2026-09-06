@@ -340,38 +340,111 @@ install_reverse_proxy_hostname() {
   rm -f "$tmp"
 }
 
+# A bare IP has no real hostname for Let's Encrypt to validate - self-signed is the fallback, not plain HTTP, so local traffic still gets encrypted.
+generate_self_signed_cert() {
+  # $1 = IP, $2 = cert path, $3 = key path
+  local ip="$1" cert_path="$2" key_path="$3"
+  [ -f "$cert_path" ] && return
+  ensure_cmd openssl openssl
+  as_root mkdir -p "$(dirname "$cert_path")"
+  log "Generating a self-signed TLS cert for ${ip} (Let's Encrypt cannot issue one for a bare IP)"
+  as_root openssl req -x509 -newkey rsa:4096 -nodes -days 3650 \
+    -keyout "$key_path" -out "$cert_path" \
+    -subj "/CN=${ip}" -addext "subjectAltName=IP:${ip}"
+  as_root chmod 600 "$key_path"
+}
+
 # Single domain (or bare IP), /api split by path instead of by hostname.
 install_reverse_proxy_path() {
-  # $1 = nginx|apache, $2 = domain or IP, $3 = yes|no (whether to run certbot - skipped for a bare IP, certs need a real domain)
-  local kind="$1" domain="$2" use_tls="$3" tmp
+  # $1 = nginx|apache, $2 = domain or IP, $3 = yes|selfsigned (yes = certbot for a real domain, selfsigned = bare IP)
+  local kind="$1" domain="$2" tls_mode="$3" tmp cert_path key_path
   tmp="$(mktemp)"
+  if [ "$tls_mode" = "selfsigned" ]; then
+    cert_path="/etc/agrumy/tls/agrumy.crt"; key_path="/etc/agrumy/tls/agrumy.key"
+    generate_self_signed_cert "$domain" "$cert_path" "$key_path"
+  fi
+
   if [ "$kind" = "apache" ]; then
     ensure_cmd apache2ctl apache2
-    as_root a2enmod proxy proxy_http headers
-    fetch "deploy/apache-path.conf.template" "$tmp"
-    sed -e "s|{{DOMAIN}}|${domain}|g" -e "s|{{API_PORT}}|5000|g" -e "s|{{WEB_PORT}}|5001|g" "$tmp" \
-      | as_root tee /etc/apache2/sites-available/agrumy.conf > /dev/null
-    as_root a2ensite agrumy
-    as_root systemctl reload apache2
-    if [ "$use_tls" = "yes" ]; then
+    if [ "$tls_mode" = "selfsigned" ]; then
+      as_root a2enmod proxy proxy_http headers ssl
+      fetch "deploy/apache-path-selfsigned.conf.template" "$tmp"
+      sed -e "s|{{DOMAIN}}|${domain}|g" -e "s|{{API_PORT}}|5000|g" -e "s|{{WEB_PORT}}|5001|g" \
+          -e "s|{{CERT_PATH}}|${cert_path}|g" -e "s|{{KEY_PATH}}|${key_path}|g" "$tmp" \
+        | as_root tee /etc/apache2/sites-available/agrumy.conf > /dev/null
+      as_root a2ensite agrumy
+      as_root systemctl reload apache2
+    else
+      as_root a2enmod proxy proxy_http headers
+      fetch "deploy/apache-path.conf.template" "$tmp"
+      sed -e "s|{{DOMAIN}}|${domain}|g" -e "s|{{API_PORT}}|5000|g" -e "s|{{WEB_PORT}}|5001|g" "$tmp" \
+        | as_root tee /etc/apache2/sites-available/agrumy.conf > /dev/null
+      as_root a2ensite agrumy
+      as_root systemctl reload apache2
       ensure_cmd certbot certbot
       install_pkg python3-certbot-apache
       as_root certbot --apache -d "$domain" --non-interactive --agree-tos -m "admin@${domain}" || warn "certbot did not complete - re-run 'sudo certbot --apache' by hand once DNS for $domain resolves to this server."
     fi
   else
     ensure_cmd nginx nginx
-    fetch "deploy/nginx-path.conf.template" "$tmp"
-    sed -e "s|{{DOMAIN}}|${domain}|g" -e "s|{{API_PORT}}|5000|g" -e "s|{{WEB_PORT}}|5001|g" "$tmp" \
-      | as_root tee /etc/nginx/sites-available/agrumy.conf > /dev/null
+    if [ "$tls_mode" = "selfsigned" ]; then
+      fetch "deploy/nginx-path-selfsigned.conf.template" "$tmp"
+      sed -e "s|{{DOMAIN}}|${domain}|g" -e "s|{{API_PORT}}|5000|g" -e "s|{{WEB_PORT}}|5001|g" \
+          -e "s|{{CERT_PATH}}|${cert_path}|g" -e "s|{{KEY_PATH}}|${key_path}|g" "$tmp" \
+        | as_root tee /etc/nginx/sites-available/agrumy.conf > /dev/null
+    else
+      fetch "deploy/nginx-path.conf.template" "$tmp"
+      sed -e "s|{{DOMAIN}}|${domain}|g" -e "s|{{API_PORT}}|5000|g" -e "s|{{WEB_PORT}}|5001|g" "$tmp" \
+        | as_root tee /etc/nginx/sites-available/agrumy.conf > /dev/null
+    fi
     as_root ln -sf /etc/nginx/sites-available/agrumy.conf /etc/nginx/sites-enabled/agrumy.conf
     as_root nginx -t && as_root systemctl reload nginx
-    if [ "$use_tls" = "yes" ]; then
+    if [ "$tls_mode" = "yes" ]; then
       ensure_cmd certbot certbot
       install_pkg python3-certbot-nginx
       as_root certbot --nginx -d "$domain" --non-interactive --agree-tos -m "admin@${domain}" || warn "certbot did not complete - re-run 'sudo certbot --nginx' by hand once DNS for $domain resolves to this server."
     fi
   fi
   rm -f "$tmp"
+}
+
+# Small preset promises "everything on one box" - the local MariaDB server that implies is the one thing bare-metal+Small never actually installed.
+install_local_mariadb() {
+  local creds_file="/opt/agrumy/db-credentials.txt"
+  if has_cmd mysql || has_cmd mariadb; then
+    log "MariaDB client already present - assuming the server is installed."
+  else
+    log "Installing MariaDB server (Small preset runs its own DB on this box)"
+    install_pkg mariadb-server
+  fi
+  as_root systemctl enable --now mariadb 2>/dev/null || as_root systemctl enable --now mysql
+
+  if [ -f "$creds_file" ]; then
+    log "Local Agrumy database already provisioned - reusing existing credentials (${creds_file})."
+    return
+  fi
+
+  local db_password
+  db_password="$(random_secret)"
+  as_root mysql -e "CREATE DATABASE IF NOT EXISTS agrumy;"
+  as_root mysql -e "CREATE USER IF NOT EXISTS 'agrumy'@'localhost' IDENTIFIED BY '${db_password}'; GRANT ALL PRIVILEGES ON agrumy.* TO 'agrumy'@'localhost'; FLUSH PRIVILEGES;"
+
+  as_root mkdir -p /opt/agrumy
+  as_root tee "$creds_file" > /dev/null <<CREDS
+Host: localhost
+Port: 3306
+Database: agrumy
+Username: agrumy
+Password: ${db_password}
+CREDS
+  as_root chmod 600 "$creds_file"
+
+  log "Local MariaDB ready - paste these into the setup wizard (also saved to ${creds_file}):"
+  echo "  Host: localhost"
+  echo "  Port: 3306"
+  echo "  Database: agrumy"
+  echo "  Username: agrumy"
+  echo "  Password: ${db_password}"
 }
 
 install_baremetal() {
@@ -385,10 +458,10 @@ install_baremetal() {
   if [ "$ROUTING_CHOICE" = "2" ]; then
     read -rp "Domain or IP this install will answer on (e.g. agrumy.example.com or its bare IP): " ROUTING_DOMAIN
     [ -z "$ROUTING_DOMAIN" ] && err "A domain or IP is required."
-    # Let's Encrypt cannot issue a cert for a bare IP - fall back to plain HTTP rather than a certbot call that can only fail.
+    # Let's Encrypt cannot issue a cert for a bare IP - self-signed still encrypts local traffic, unlike a plain-HTTP fallback.
     if [[ "$ROUTING_DOMAIN" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
-      use_tls="no"; scheme="http"
-      warn "Routing by IP - skipping certbot (no TLS cert possible for a bare IP). Agrumy will be served over plain HTTP."
+      use_tls="selfsigned"
+      warn "Routing by IP - Let's Encrypt can't issue a cert for it, using a self-signed one instead (your browser will warn once - safe to accept for your own box)."
     fi
     issuer="${scheme}://${ROUTING_DOMAIN}"
     api_url="$issuer"
@@ -417,6 +490,8 @@ install_baremetal() {
   if ! id "$SERVICE_USER" >/dev/null 2>&1; then
     as_root useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
   fi
+
+  [ "$PRESET" = "small" ] && install_local_mariadb
 
   local api_dir="/opt/agrumy/api" web_dir="/opt/agrumy/web" keys_dir="/opt/agrumy/dataprotection-keys"
   as_root mkdir -p "$keys_dir" && as_root chown "${SERVICE_USER}:${SERVICE_USER}" "$keys_dir"

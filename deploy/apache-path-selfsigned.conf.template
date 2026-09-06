@@ -1,0 +1,22 @@
+# Path-based routing over a self-signed cert - see nginx-path-selfsigned.conf.template for why
+# (bare-IP install, no Let's Encrypt option).
+
+<VirtualHost *:80>
+    ServerName {{DOMAIN}}
+    Redirect permanent / https://{{DOMAIN}}/
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName {{DOMAIN}}
+    SSLEngine on
+    SSLCertificateFile {{CERT_PATH}}
+    SSLCertificateKeyFile {{KEY_PATH}}
+    ProxyPreserveHost On
+    RequestHeader set X-Forwarded-Proto "https"
+
+    ProxyPass /api http://127.0.0.1:{{API_PORT}}/api
+    ProxyPassReverse /api http://127.0.0.1:{{API_PORT}}/api
+
+    ProxyPass / http://127.0.0.1:{{WEB_PORT}}/
+    ProxyPassReverse / http://127.0.0.1:{{WEB_PORT}}/
+</VirtualHost>
