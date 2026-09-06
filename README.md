@@ -24,12 +24,8 @@ larger operation - an agricultural cooperative or commercial nursery managing
 several sites - can run the same backend at that scale, without either end
 having to adopt tooling built for the other.
 
-FarmBot is the closest comparison for "I don't have the knowledge or time" -
-and it's a real, shipping product that solves that problem well. But it does
-so at $2,000-$8,000, which excludes exactly the people who'd benefit most from
-it. Agrumy targets the same problem without that price floor: free, open-source
-software running on hardware priced like AliExpress components, not a
-purpose-built appliance.
+Agrumy is free, open-source software that runs on hardware priced like
+AliExpress components, not a purpose-built appliance costing thousands.
 
 **.NET 10 SDK required.**
 
@@ -41,7 +37,8 @@ purpose-built appliance.
 | `Agrumy.Dal` | class library | Data-access model: `AgrumyDbContext`, EF entities (`api.Dal.Entities`), provider selection (`DbProviderKind`, `DbOptionsFactory`). No stored procedures - every query is LINQ. |
 | `Agrumy.Api` | Web API | Device/sensor communication + admin API (`Controllers/API`), the `IRepository` implementation (`Dal/EfRepository`, EF Core over `Agrumy.Dal`), MySQL/MariaDB **or** PostgreSQL, JWT bearer auth, Swagger, startup DB health-check + schema creation on an empty database. |
 | `Agrumy.Web` | MVC app | Admin UI (`Controllers/View`, `Views/`, `wwwroot/`). Talks to `Agrumy.Api` **only over HTTP** (`Dal/ApiRepository` + `HttpClient` with a JWT bearer token). No direct database access. |
-| `Agrumy.Api.Tests` | test project | Integration tests that run the real EF Core stack against both providers in parallel (`AGRUMY_TEST_MYSQL`/`AGRUMY_TEST_POSTGRES` connection strings, both provisioned as CI service containers in `build.yml`), `WebApplicationFactory`-driven HTTP tests covering auth/rate-limiting/exception-handling through the real middleware pipeline, plus unit tests for the alert/schedule/hysteresis evaluators and the #212 rule-engine fold/hierarchy logic. |
+| `Agrumy.Gateway` | standalone process | Optional LoRa/WiFi-repeater gateway - registers as an ordinary device (`api.Models.Device.IsGateway`), then forwards other devices' Config/SensorData/Event/Command traffic to `Agrumy.Api`'s `GatewayApiController` instead of reporting its own sensors. Three profiles (`GatewayProfile`): WiFi repeater (transparent HTTP forwarder), LoRaWAN via ChirpStack MQTT, or the private (non-LoRaWAN) protocol over a serial-attached RadioLib radio. Not needed at all when a device relays LoRa uplinks over its own WiFi instead (see "Gateway" below). |
+| `Agrumy.Api.Tests` | test project | Integration tests that run the real EF Core stack against both providers in parallel (`AGRUMY_TEST_MYSQL`/`AGRUMY_TEST_POSTGRES` connection strings, both provisioned as CI service containers in `build.yml`), `WebApplicationFactory`-driven HTTP tests covering auth/rate-limiting/exception-handling through the real middleware pipeline, plus unit tests for the alert/schedule/hysteresis evaluators and the rule-engine fold/hierarchy logic. |
 
 `db/` holds a historical schema dump (`agrumyDB-final.sql`, `agrumyDB-withData.sql`)
 and old deployment notes (`README.txt`), kept for reference only - the schema is now
@@ -55,8 +52,14 @@ patches applied to the pre-existing legacy database, unrelated to EF.
    generates from My Profile / `POST /api/User/DevicePin`, valid 24 hours and
    reusable for as many devices as needed in that window), and its MAC
    address. The pin has to match and be unexpired; on success the API creates
-   the device row (if it doesn't exist yet) under that user's tenant and hands
-   back an `ApiId`/`ApiKey` pair plus its current config.
+   the device row (if it doesn't exist yet) under that user's account and hands
+   back an `ApiId`/`ApiKey` pair plus its current config. `POST /api/Discovery/Scan`
+   + `POST /api/Discovery/Register` offer a zero-touch alternative: an already
+   set-up sensor-only device scans for nearby unconfigured APs, an admin picks
+   one from the results and supplies (or reuses a saved) WiFi network, and the
+   server queues a `ProvisionDevice` command the scanning device delivers -
+   registration then happens automatically, without anyone touching the new
+   device directly.
 2. **Auth.** The device authenticates with `ApiId`/`ApiKey` via
    `POST /api/Device/Authenticate` (constant-time comparison,
    `DeviceAuthenticationProvider.VerifyDeviceAsync`) and gets back a short-lived
@@ -73,9 +76,13 @@ patches applied to the pre-existing legacy database, unrelated to EF.
    and carries on with the previous config instead of halting, so irrigation/
    climate control keeps running on stale-but-known-good settings through an
    outage; it just won't pick up config *changes* until connectivity comes back.
-   A Notification-action rule (roadmap #212) is the one exception to "control
-   is local to the device" - it has no relay to drive, so it's evaluated
-   server-side instead, by `RuleNotificationEvaluator`.
+   A Notification-action rule is one exception to "control is local to the
+   device" - it has no relay to drive, so it's evaluated server-side instead,
+   by `RuleNotificationEvaluator`. An admin-triggered Manual Actuate override
+   (a zone or unit's relay forced on for a fixed duration, or until a target
+   sensor value is reached) is the other - it rides down on the next config
+   poll same as a rule set, expiring on its own once its safety-capped
+   duration passes.
 5. **Heartbeat and commands.** Every config-poll doubles as a heartbeat -
    `Uptime`/`Rssi`/`FreeHeap`/`FirmwareVersion`/`Board` land in `deviceDiagnostic`
    and drive the Fleet page's online/offline status. The same poll response
@@ -83,65 +90,30 @@ patches applied to the pre-existing legacy database, unrelated to EF.
    /api/DeviceCommand` - Reboot / ForceOTA / ForceConfigSync); the device acts on
    it and reports back via `POST /api/Device/Command/Ack`.
 
-## Why not just use Home Assistant / ESPHome / ThingsBoard?
+## Automation rule engine
 
-Honestly, for a single greenhouse with off-the-shelf sensors, **Home Assistant or
-ESPHome is almost certainly the better choice** - mature device support, a real
-automation/rule engine, a huge community, and no backend to run or firmware to
-maintain yourself. **ThingsBoard** covers similar ground to Agrumy (device
-fleets, telemetry, dashboards) far more completely, with an actual rule engine
-and support for many transport protocols.
+Agrumy's rule engine is deliberately bounded, not general-purpose: each relay
+function (ventilation/light/heating/water-pump) - or, for a Notification-action
+rule, each sensor metric - holds a set of rules, any one of which turning "on"
+wins (OR across rules). Within one rule, up to 8 Threshold/Interval/Schedule/
+Astronomical conditions fold strictly left-to-right by AND/OR ("(A AND B) OR C",
+never "A AND (B OR C)" - no parentheses or operator precedence). Rules live at
+Zone, Unit, Farm, or organization-wide Global scope, in that precedence order -
+the most specific scope defining a rule for a given function/metric wins
+outright, it doesn't merge with a less specific one. A Notification-action rule
+can also fire on another Notification rule's own result ("another rule fired")
+for simple chaining. Threshold's metric/direction is still implicit per relay
+function; a Notification rule picks an explicit sensor metric instead, since
+there's no relay to imply one. Arbitrary nested boolean logic spanning
+different metrics/functions in one condition still needs to be added in C#,
+not configured through the rule editor.
 
-Agrumy's rule engine (roadmap #21, extended by #212) is deliberately bounded,
-not general-purpose: each relay function (ventilation/light/heating/water-pump)
-- or, for a Notification-action rule, each sensor metric - holds a set of
-rules, any one of which turning "on" wins (OR across rules, unchanged since
-#21). Within one rule, up to 8 Threshold/Interval/Schedule/Astronomical
-conditions fold strictly left-to-right by AND/OR ("(A AND B) OR C", never
-"A AND (B OR C)" - no parentheses or operator precedence). Rules live at Zone,
-Unit, or tenant-wide Global scope; the most specific scope defining a rule for
-a given function/metric wins outright, it doesn't merge with a less specific
-one. A Notification-action rule can also fire on another Notification rule's
-own result ("another rule fired") for simple chaining. Threshold's metric/
-direction is still implicit per relay function; a Notification rule picks an
-explicit sensor metric instead, since there's no relay to imply one. If you
-need arbitrary nested boolean logic spanning different metrics/functions in
-one condition, you're still writing C# to add it, not YAML.
-
-Where Agrumy makes sense: you're building (or already run) your own firmware for
-a specific vertical - here, citrus/greenhouse irrigation and micro-climate - and
-want a small, self-hosted backend you fully own and can shape around that one
-domain, rather than adapting a general-purpose platform's data
-model to fit it. It's a starting point for a narrow, vertical-specific product,
-not a general home-automation hub.
-
-## How Agrumy differs from Mycodo / OpenSprinkler
-
-Mycodo and OpenSprinkler are mature, single-install controllers - point one of
-them at one greenhouse or sprinkler system and they do that job well. Agrumy
-targets a different case: a fleet of installations under one backend. Neither
-is "better" here; they're built for different scale.
-
-- **A Unit/Zone hierarchy with a live dashboard.** `GET /api/DeviceUnit/Dashboard`
-  rolls up status across units and zones of devices - neither competitor has a
-  comparable way to organize and view a *fleet*, since they're built around
-  managing one controller/installation at a time.
-- **Fleet-wide commands with server-side fan-out.** `POST /api/DeviceCommand`
-  targets a unit or zone and the server resolves that into the actual set of
-  devices to deliver Reboot/ForceOTA/ForceConfigSync to on their next poll -
-  not something either competitor's single-controller model needs to solve.
-- **Firmware-side native unit tests in CI.** The relay/hysteresis/schedule/
-  safety-limit logic in `AgrumyFirmware` (`test/test_native_*`) runs as native
-  unit tests on every push, independent of real hardware - a level of
-  formalized firmware testing not evident in either competitor's repo.
-- **A configurable firmware distribution source.** Roadmap #94's GitHub/Local/
-  Custom firmware source, with offline-USB-repository support and lazy fetch,
-  has no equivalent in either project.
-
-None of this makes Agrumy a drop-in replacement for either - if you're running
-one greenhouse with off-the-shelf sensors, Mycodo or OpenSprinkler (or Home
-Assistant/ESPHome, see above) is very likely the simpler, more mature choice.
-Agrumy is for when "one greenhouse" becomes "many, under one roof."
+An admin can also override a rule's decision directly for a zone or a whole
+unit - Manual Actuate turns a relay on for a fixed duration, or until a target
+sensor value is reached (Heating/Ventilation/WaterPump only, matched to a
+sensible metric per function), capped by the same max-run-seconds safety limit
+the rule engine itself respects, and expiring on its own without needing a
+second call to turn it back off.
 
 ## Quickstart
 
@@ -185,21 +157,22 @@ listens on (5000 by default, set in `Agrumy.Api/Properties/launchSettings.json`)
 | `JWT:Issuer` | yes | e.g. `https://api.agrumy.com` |
 | `JWT:Audience` | yes | e.g. `agrumy-api` |
 | `Security:EnforceHttps` | no (default `true`) | `false` = serve plain HTTP, no redirect/HSTS - needed while `AgrumyFirmware` firmware still calls `http://` |
-| `Security:KnownProxies` | no (default empty = loopback only) | roadmap #84 - comma-separated IPs of reverse proxies trusted to set `X-Forwarded-For`/`X-Forwarded-Proto` for the rate limiter. Never point this at an untrusted/public address - that lets a client spoof its own IP and dodge rate limiting. |
+| `Security:KnownProxies` | no (default empty = loopback only) | comma-separated IPs of reverse proxies trusted to set `X-Forwarded-For`/`X-Forwarded-Proto` for the rate limiter. Never point this at an untrusted/public address - that lets a client spoof its own IP and dodge rate limiting. |
 | `Startup:FailFastOnDbCheck` | no (default `false`) | `true` = stop the app if the DB check / provisioning fails |
 | `ServerConfig:Reload` | no (default `false`) | `true` = overwrite the DB `serverConfig` row's hysteresis fields from `ServerConfig:Hysteresis` below on every startup, discarding admin-UI edits. Seed-once is the normal mode; flip to `true` only to force a reset, then back to `false`. |
-| `ServerConfig:Hysteresis:*` | no | roadmap #10 - dead-zone margins (`WaterLevel`/`Temperature`/`Humidity`/`Light`) new devices are seeded with |
-| `ServerConfig:BatteryLowThreshold`, `BatteryLowHysteresis` | no (default `20.0`/`5.0`) | roadmap #12 - percent. `LowBatteryAlertEvaluator` alerts at/below the threshold, rearms only once the reading climbs back to threshold+hysteresis |
-| `ServerConfig:EventDedupeMinutes` | no (default `10`) | roadmap #28 - a device repeating the same event type within this window is dropped, not stored |
-| `ServerConfig:ActivationResendCooldownMinutes` | no (default `10`) | roadmap #24 - minimum minutes between "resend activation email" requests |
-| `ServerConfig:AllowSelfServiceTenantCreation` | no (default `false`) | roadmap #64 - `true` lets a registration for an unknown tenant name create that tenant (min. 6 chars) with the registrant as its admin |
-| `Notifications:Email:*` | no (default off) | SMTP alert email (roadmap #6). `Enabled` + `Host` + `FromAddress` are the minimum; `Port`/`UseStartTls`/`Username`/`Password`/`FromName` optional. Disabled or incomplete = channel skipped, not an error. |
+| `ServerConfig:Hysteresis:*` | no | dead-zone margins (`WaterLevel`/`Temperature`/`Humidity`/`Light`) new devices are seeded with |
+| `ServerConfig:BatteryLowThreshold`, `BatteryLowHysteresis` | no (default `20.0`/`5.0`) | percent. `LowBatteryAlertEvaluator` alerts at/below the threshold, rearms only once the reading climbs back to threshold+hysteresis |
+| `ServerConfig:EventDedupeMinutes` | no (default `10`) | a device repeating the same event type within this window is dropped, not stored |
+| `ServerConfig:ActivationResendCooldownMinutes` | no (default `10`) | minimum minutes between "resend activation email" requests |
+| `ServerConfig:MaxRulesPerZone` | no | soft cap on rules per scope (Zone/Unit/Farm/Global), hard-clamped to 32 regardless of this setting to match `AgrumyFirmware`'s own `MAX_RULES` |
+| `ServerConfig:GatewayEnabled`, `GatewayMode`, `GatewayWaitWindowSeconds` | no (default off / `Realtime` / `30`) | enables `POST /api/Gateway/*`. `Realtime` forwards each batched device entry immediately; `Aggregated` holds entries up to the wait-window for a LoRa Class A device's decoupled uplink/downlink cycle |
+| `Notifications:Email:*` | no (default off) | SMTP alert email. `Enabled` + `Host` + `FromAddress` are the minimum; `Port`/`UseStartTls`/`Username`/`Password`/`FromName` optional. Disabled or incomplete = channel skipped, not an error. |
 | `Notifications:Push:*` | no (default off) | FCM push channel - **prepared but inert**. Stays skipped until the Android app registers device tokens and the OAuth step in `FcmPushNotificationChannel` is wired. Leave `Enabled=false`. |
-| `Notifications:Webhook:*` | no (default off) | roadmap #214 - generic HTTP POST channel for notifying an external system. `Enabled` + `Url` (must be `https://`) are the minimum; optional `Secret` adds an `X-Agrumy-Signature` HMAC-SHA256 header the receiver can verify. `Url` goes through the same `SsrfGuard` as firmware fetches before every send. |
-| `Notifications:OfflineCheckIntervalMinutes` | no (default `5`) | roadmap #40 - how often `OfflineAlertBackgroundService` sweeps every device for a newly-offline one and notifies its tenant's admins via whatever `Notifications:*` channels are configured above |
-| `Notifications:BatteryCheckIntervalMinutes` | no (default `30`) | roadmap #12 - how often `LowBatteryAlertEvaluator` sweeps every device's latest battery telemetry; longer than the offline interval by default since a battery drains over hours/days, not seconds |
-| `Notifications:RuleCheckIntervalMinutes` | no (default `5`) | roadmap #212 - how often `RuleNotificationEvaluator` sweeps Notification-action rules (the server-side counterpart to the on-device Relay-action rule engine, since firmware has no way to send a notification itself) |
-| `Firmware:LocalPath` | no (default `firmware-store`) | roadmap #94 - directory the **Local** firmware repository stores/serves `.bin` files from (`GET /api/Firmware/Download/{file}`). Relative = under the content root; must be writable by the service user. |
+| `Notifications:Webhook:*` | no (default off) | generic HTTP POST channel for notifying an external system. `Enabled` + `Url` (must be `https://`) are the minimum; optional `Secret` adds an `X-Agrumy-Signature` HMAC-SHA256 header the receiver can verify. `Url` goes through the same `SsrfGuard` as firmware fetches before every send. |
+| `Notifications:OfflineCheckIntervalMinutes` | no (default `5`) | how often `OfflineAlertBackgroundService` sweeps every device for a newly-offline one and notifies its admins via whatever `Notifications:*` channels are configured above |
+| `Notifications:BatteryCheckIntervalMinutes` | no (default `30`) | how often `LowBatteryAlertEvaluator` sweeps every device's latest battery telemetry; longer than the offline interval by default since a battery drains over hours/days, not seconds |
+| `Notifications:RuleCheckIntervalMinutes` | no (default `5`) | how often `RuleNotificationEvaluator` sweeps Notification-action rules (the server-side counterpart to the on-device Relay-action rule engine, since firmware has no way to send a notification itself) |
+| `Firmware:LocalPath` | no (default `firmware-store`) | directory the **Local** firmware repository stores/serves `.bin` files from (`GET /api/Firmware/Download/{file}`). Relative = under the content root; must be writable by the service user. |
 | `Firmware:GitHubRepository` | no (default `dopiskur/AgrumyFirmware`) | `owner/name` whose GitHub Releases feed the catalog - only seeds the `serverConfig` row, the live value is edited on the Server Settings page |
 | `Firmware:GitHubToken` | no | optional GitHub API token; public repositories need none |
 | `WebView:Enabled`, `WebView:ApiService` | no | present in `appsettings.json.example` as a documented switch for a possible combined API+UI deployment, but **not currently read by any code** - `Agrumy.Web` is what actually serves the admin UI today |
@@ -209,8 +182,8 @@ listens on (5000 by default, set in `Agrumy.Api/Properties/launchSettings.json`)
 | Key | Required | Notes |
 | --- | --- | --- |
 | `WebView:ApiService` | yes | base URL of `Agrumy.Api` (default `http://localhost:5000`) |
-| `JWT:SecureKey`, `JWT:Issuer`, `JWT:Audience` | yes | **must be identical** to `Agrumy.Api`'s values (roadmap #48), otherwise cookie tokens fail validation and every page redirects to login |
-| `DataProtection:KeyPath` | no (default: a `dataprotection-keys` dir next to, not inside, the app folder) | roadmap #79 - where cookie-auth/antiforgery encryption keys persist. Must sit outside anything a redeploy wipes (not `bin/`), and be read/write for the account the service actually runs as. |
+| `JWT:SecureKey`, `JWT:Issuer`, `JWT:Audience` | yes | **must be identical** to `Agrumy.Api`'s values, otherwise cookie tokens fail validation and every page redirects to login |
+| `DataProtection:KeyPath` | no (default: a `dataprotection-keys` dir next to, not inside, the app folder) | where cookie-auth/antiforgery encryption keys persist. Must sit outside anything a redeploy wipes (not `bin/`), and be read/write for the account the service actually runs as. |
 
 ## Database & schema provisioning
 
@@ -225,11 +198,11 @@ environment, no repeated work against an existing one. Whether a *failed* check
 stops the app or just logs a warning is controlled by `Startup:FailFastOnDbCheck`
 (see Configuration above).
 
-`EnsureSchemaAsync` also seeds rows, never just tables (roadmap #91, continuing the
-#66 role-catalog pattern): the four `deviceType*` lookup tables get the product's
-fixed catalog (device types, service types, relay types, sensor types) if empty,
-and a completely empty `user` table gets exactly one bootstrap **Global Admin**
-account (`TenantID=0`, `PwdHash`/`PwdSalt` left `NULL` on purpose). A `NULL`
+`EnsureSchemaAsync` also seeds rows, never just tables: the four `deviceType*`
+lookup tables get the product's fixed catalog (device types, service types,
+relay types, sensor types) if empty, and a completely empty `user` table gets
+exactly one bootstrap **Global Admin** account (`PwdHash`/`PwdSalt` left `NULL`
+on purpose). A `NULL`
 password hash means nothing can log in as that account yet -
 `POST /api/User/BootstrapSetPassword` is the one-shot call that gives it a real
 password (Agrumy.Web shows a "set password" screen instead of the login form while
@@ -263,7 +236,7 @@ database and is not part of this.
   values must be cleaned before such data can be loaded into PostgreSQL; for
   MySQL itself, add `AllowZeroDateTime=True;ConvertZeroDateTime=True` to the
   connection string if the data contains any.
-- **TimescaleDB (roadmap #14, tiered-hybrid deployment).** The provider choice
+- **TimescaleDB (tiered-hybrid deployment).** The provider choice
   *is* the deployment-size choice: MariaDB/MySQL is the small-deployment tier
   and stays an ordinary table, no code path runs for it. Choosing PostgreSQL
   is choosing the large-deployment tier - on every startup,
@@ -281,7 +254,7 @@ database and is not part of this.
 
 ## API endpoints
 
-**Versioning (roadmap #215):** every route below is implicitly API version `1.0`
+**Versioning:** every route below is implicitly API version `1.0`
 (`ApiControllerBase` carries `[ApiVersion("1.0")]`, inherited by every controller) served at the
 same unversioned URL it always has - `AssumeDefaultVersionWhenUnspecified` means device firmware
 and `Agrumy.Web`'s Refit client keep working with zero version info in the request. A future
@@ -292,14 +265,13 @@ URL segment; an unsupported version gets `400` with an `api-supported-versions` 
 
 All routes below are under `Agrumy.Api`. `[Authorize]` requires a JWT bearer
 token from `POST /api/User/Login`. Most write/admin endpoints require one of
-the **composable roles** in `api.Security.RoleNames` (roadmap #66/#91) rather
-than a single `admin` flag - `UserManagers`/`DeviceManagers` match any of
-`LegacyAdmin`, `GlobalAdmin`, `GlobalUser`/`GlobalDevice`, `TenantAdmin`,
-`TenantUser`/`TenantDevice`; `Admins` matches `LegacyAdmin`/`GlobalAdmin`/
-`TenantAdmin`; a handful of server-wide actions (below) require the literal
-`admin` role, i.e. Global admin only, because they cross every tenant at once.
-Device endpoints use the separate apiId/apiKey/apiAuth scheme described in
-"How it works", not JWT.
+the **composable roles** in `api.Security.RoleNames` rather than a single
+`admin` flag - each of `UserManagers`/`DeviceManagers`/`Admins` matches a Global
+tier (crosses every account on the server) and an account-scoped tier, each
+split further into Admin/User/Device sub-roles; a handful of server-wide
+actions (below) require the literal `admin` role, i.e. Global admin only,
+because they cross every account at once. Device endpoints use the separate
+apiId/apiKey/apiAuth scheme described in "How it works", not JWT.
 
 **User** (`UserApiController`, `api/User`)
 
@@ -311,17 +283,17 @@ Device endpoints use the separate apiId/apiKey/apiAuth scheme described in
 | `POST /api/User/Login` | rate-limited, no auth | Returns a JWT access token + refresh token |
 | `POST /api/User/RefreshToken` | rate-limited, no auth | Silent renewal - rotates the refresh token, detects reuse of an already-rotated one |
 | `POST /api/User/RevokeRefreshToken` | rate-limited, no auth | Logout - invalidates one refresh token |
-| `GET /api/User/BootstrapPending` | no auth | Roadmap #91: true while the fresh-install bootstrap Global Admin still has no password |
-| `POST /api/User/BootstrapSetPassword` | rate-limited, no auth | Roadmap #91: one-shot - sets the bootstrap Global Admin's password, then this always returns 403 |
+| `GET /api/User/BootstrapPending` | no auth | True while the fresh-install bootstrap Global Admin still has no password |
+| `POST /api/User/BootstrapSetPassword` | rate-limited, no auth | One-shot - sets the bootstrap Global Admin's password, then this always returns 403 |
 | `POST /api/User/ChangePassword` | rate-limited, JWT (self) | Change the caller's own password (old password required) |
-| `PUT /api/User/Profile` | JWT (self) | Roadmap #71: update the caller's own display name / IANA time zone |
-| `POST /api/User/DevicePin` | JWT (self) | Roadmap #70/#76: issue/reuse the caller's still-valid 6-char device-registration PIN (24h expiry, multi-use within that window) |
+| `PUT /api/User/Profile` | JWT (self) | Update the caller's own display name / IANA time zone |
+| `POST /api/User/DevicePin` | JWT (self) | Issue/reuse the caller's still-valid 6-char device-registration PIN (24h expiry, multi-use within that window) |
 | `GET /api/User/All`, `GET /api/User/Self`, `GET /api/User` | JWT | List users / fetch own record / fetch a user by id |
 | `POST /api/User`, `PUT /api/User` | UserManagers | Create / update a user |
 | `DELETE /api/User` | UserManagers | Delete a user (ids 0 and 1 are protected) |
 | `GET /api/User/Roles`, `GET /api/User/UserRoles` | UserManagers | List available roles / a user's assigned roles |
 | `PUT /api/User/UserRoles` | Admins | Set a user's roles |
-| `GET /api/User/Group/All`, `GET /api/User/Group` | UserManagers | List / fetch tenant user groups |
+| `GET /api/User/Group/All`, `GET /api/User/Group` | UserManagers | List / fetch an account's user groups |
 | `POST /api/User/Group`, `DELETE /api/User/Group` | Admins | Create / delete a user group |
 
 **Device** (`DeviceApiController`, `api/Device`)
@@ -333,34 +305,78 @@ Device endpoints use the separate apiId/apiKey/apiAuth scheme described in
 | `POST /api/Device/Config` | apiId/apiAuth | Config-version-checked config sync; also carries any queued `DeviceCommand` and diagnostic heartbeat fields |
 | `POST /api/Device/Event`, `POST /api/Device/Command/Ack` | apiId/apiAuth | Device pushes an event / acknowledges a command |
 | `GET /api/Device/All`, `GET /api/Device` | JWT | List devices / fetch one |
-| `GET /api/Device/Fleet` | JWT | Roadmap #7/#8: every device's latest diagnostic + online/offline status |
+| `GET /api/Device/Fleet` | JWT | Every device's latest diagnostic + online/offline status |
 | `GET /api/Device/Events` | JWT | A device's event log |
 | `PUT /api/Device`, `DELETE /api/Device` | DeviceManagers | Update / delete a device |
 | `GET/PUT /api/Device/Sensor`, `GET/PUT /api/Device/Controller` | JWT (PUT DeviceManagers) | Read/update a device's sensor or controller config |
 | `POST /api/Device/FirmwareUpdate`, `DELETE /api/Device/FirmwareUpdate` | DeviceManagers | Queue / cancel an OTA update for one device |
 | `GET /api/Device/Type`, `TypeService`, `TypeRelay`, `TypeSensor` | JWT | Fixed lookup lists used to build device config forms |
 
-**DeviceCommand** (`DeviceCommandApiController`, roadmap #34)
+**DeviceCommand** (`DeviceCommandApiController`)
 
 | Endpoint | Auth | Purpose |
 | --- | --- | --- |
 | `POST /api/DeviceCommand` | DeviceManagers | Queue Reboot / ForceOTA / ForceConfigSync for one or more devices; delivered on the device's next config poll |
 
-**DeviceUnit** (`DeviceUnitApiController`, roadmap #81/#82, `api/DeviceUnit`)
+**DeviceFarmUnit** (`DeviceFarmUnitApiController`, `api/DeviceFarmUnit`) - the Farm > Unit > Zone fleet hierarchy
 
 | Endpoint | Auth | Purpose |
 | --- | --- | --- |
-| `GET /api/DeviceUnit/All`, `GET /api/DeviceUnit` | JWT | List units / fetch one |
-| `POST /api/DeviceUnit`, `PUT /api/DeviceUnit`, `DELETE /api/DeviceUnit` | DeviceManagers | Create / update / delete a unit |
-| `GET /api/DeviceUnit/Zone` | JWT | Zones under a unit |
-| `POST/PUT/DELETE /api/DeviceUnit/Zone` | DeviceManagers | Create / update / delete a zone |
-| `GET /api/DeviceUnit/Unassigned` | DeviceManagers | Devices not yet placed in any zone |
-| `POST /api/DeviceUnit/Assign`, `POST /api/DeviceUnit/Unassign` | DeviceManagers | Place / remove a device from a zone |
-| `GET /api/DeviceUnit/Zone/Rule`, `GET /api/DeviceUnit/Unit/Rule`, `GET /api/DeviceUnit/Global/Rule` | JWT | Roadmap #21/#212: a zone/unit/tenant's automation rules - Zone > Unit > Global precedence, the most specific scope defining a rule for a function/metric wins outright, it doesn't merge with a less specific one |
-| `POST/DELETE` on the same three routes | DeviceManagers | Add / remove one rule - each rule is a flat, left-to-right AND/OR-folded list of up to 8 conditions (Threshold/Interval/Schedule/Astronomical for the Relay action; the same plus RuleTriggered, "another rule fired," for the Notification action). Several rules per function/metric still OR together, no whole-list replace; delete returns 409 if another rule's RuleTriggered condition still references it |
-| `GET /api/DeviceUnit/Dashboard`, `Dashboard/Zones`, `Dashboard/Zone` | JWT | Roadmap #116: hierarchical dashboard rollups (per-unit, per-zone-list, per-zone) |
+| `GET /api/DeviceFarmUnit/Farm/All`, `GET .../Farm` | JWT | List farms / fetch one |
+| `POST/PUT/DELETE /api/DeviceFarmUnit/Farm` | DeviceManagers | Create / update / delete a farm - the top tier above Unit |
+| `GET /api/DeviceFarmUnit/All`, `GET /api/DeviceFarmUnit` | JWT | List units / fetch one |
+| `POST /api/DeviceFarmUnit`, `PUT /api/DeviceFarmUnit`, `DELETE /api/DeviceFarmUnit` | DeviceManagers | Create / update / delete a unit |
+| `GET /api/DeviceFarmUnit/Zone`, `GET .../ZoneById` | JWT | Zones under a unit / a single zone by id |
+| `POST/PUT/DELETE /api/DeviceFarmUnit/Zone` | DeviceManagers | Create / update / delete a zone |
+| `GET /api/DeviceFarmUnit/Unassigned` | DeviceManagers | Devices not yet placed in any zone |
+| `POST /api/DeviceFarmUnit/Assign`, `POST .../Unassign` | DeviceManagers | Place / remove a device from a zone |
+| `GET .../Zone/Rule`, `GET .../Unit/Rule`, `GET .../Farm/Rule`, `GET .../Global/Rule` | JWT | A zone/unit/farm/account's automation rules - see "Automation rule engine" above for the Zone > Unit > Farm > Global precedence |
+| `POST/DELETE` on the same four routes | DeviceManagers | Add / remove one rule - up to 8 conditions each, see "Automation rule engine"; delete returns 409 if another rule's RuleTriggered condition still references it |
+| `POST /api/DeviceFarmUnit/Zone/ManualActuate`, `POST .../Zone/ManualActuate/Stop`, `POST .../Unit/ManualActuate`, `GET .../Zone/ManualActuate` | JWT (POST DeviceManagers) | Start / stop / check a Manual Actuate override for a zone or unit - see "Automation rule engine" |
+| `GET /api/DeviceFarmUnit/Dashboard`, `Dashboard/Zones`, `Dashboard/Zone` | JWT | Hierarchical dashboard rollups (per-unit, per-zone-list, per-zone) |
 
-**Firmware** (`FirmwareApiController`, roadmap #94/#93, `api/Firmware`)
+**Gateway** (`GatewayApiController`, `api/Gateway`) - lets one WiFi-connected device relay other devices' traffic instead of reporting its own sensors, so a fleet of LoRa-only nodes (or a WiFi repeater setup) needs no direct internet reach of their own
+
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
+| `POST /api/Gateway/Batch` | apiId/apiKey (gateway device) | Runs a batch of other devices' Config/SensorData/Event/CommandAck requests through the same logic each single-device endpoint uses; one bad entry never fails the rest |
+| `POST /api/Gateway/RelayUplink` | apiId/apiKey (gateway device) | The WiFi-relay counterpart to Batch for one already RF-decoded LoRa private-protocol frame, resolved against the gateway's own device mappings |
+| `GET /api/Gateway/DeviceMapping` | apiId/apiKey (gateway device) | The calling gateway's own address->device forwarding table, including secrets it needs to reconstruct each device's request |
+| `GET /api/Gateway/All` | DeviceManagers | List every device registered as a gateway |
+| `GET /api/Gateway/DeviceMapping/All`, `POST/DELETE /api/Gateway/DeviceMapping` | DeviceManagers | Admin CRUD for one gateway's node-address-to-device mappings |
+
+**Discovery** (`DiscoveryApiController`, `api/Discovery`) - zero-touch provisioning: a scanning device finds nearby unconfigured devices, an admin registers them without touching them directly
+
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
+| `POST /api/Discovery/Report` | apiId/apiAuth (device) | A scanning device reports one nearby unconfigured access point it found |
+| `POST /api/Discovery/Scan` | DeviceManagers | Fan out a "scan for devices" command to every sensor-only device in a zone/unit/whole fleet |
+| `GET /api/Discovery/Results` | JWT | Aggregated scan results (optionally scoped to a unit/zone) |
+| `GET/POST/PUT/DELETE /api/Discovery/WifiConfigs` | JWT / DeviceManagers | Saved WiFi networks the Register step can offer instead of asking for credentials each time (passwords only returned to a caller who manages devices) |
+| `POST /api/Discovery/Register` | DeviceManagers | Resolves WiFi credentials + a fresh device PIN and queues a provisioning command at the winning scanning device |
+
+**Simulation** (`SimulationApiController`, `api/Simulation`) - fully virtual devices for testing without real hardware
+
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
+| `POST /api/Simulation/Device` | Simulation managers | Registers a virtual device through the same `POST /api/Device/Register` flow a real device uses, then tags it so `VirtualDeviceRunnerBackgroundService` starts driving it (fake sensor readings via `SimulatedSensorGenerator`, self-HTTP config polls via `VirtualDeviceClient`) |
+| `GET /api/Simulation/Device` | Simulation managers | List the caller's virtual device ids |
+| `DELETE /api/Simulation/Device/{idDevice}` | Simulation managers | Stop and remove a virtual device |
+
+**ControllerData** (`ControllerDataApiController`, `api/ControllerData`) - real-time relay state, parallel to SensorData but fired on every actual relay change rather than a fixed interval
+
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
+| `POST /api/ControllerData` | apiId/apiAuth (device) | Device pushes its relay on/off state changes |
+| `GET /api/ControllerData` | JWT | A device's relay-state history |
+
+**AuditLog** (`AuditLogApiController`, `api/AuditLog`)
+
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
+| `GET /api/AuditLog` | Admins | Read-only admin-action trail (who did what, to what, when) - a Global admin sees everything, an account-scoped admin only their own account's history |
+
+**Firmware** (`FirmwareApiController`, `api/Firmware`)
 
 | Endpoint | Auth | Purpose |
 | --- | --- | --- |
@@ -374,7 +390,7 @@ Device endpoints use the separate apiId/apiKey/apiAuth scheme described in
 | `GET /api/Firmware/DownloadZip` | DeviceManagers | Visible catalog + manifest.json packaged as a ZIP |
 | `GET /api/Firmware/Download/{fileName}` | no auth | Serves a `.bin` from the Local store (device OTA download) |
 
-**`Download` is anonymous by design** (roadmap #245) - a device's OTA fetch is a bare HTTP GET
+**`Download` is anonymous by design** - a device's OTA fetch is a bare HTTP GET
 with no auth headers, the same as a public GitHub release asset. This is only safe because
 `fileName` is unpredictable in the sense that matters: it must match `FirmwareVersion`'s
 release convention (`agrumy-{board}-v{semver}.bin`), i.e. a caller must already know a real
@@ -388,10 +404,10 @@ next step - not required today.
 
 | Endpoint | Auth | Purpose |
 | --- | --- | --- |
-| `GET /api/ServerConfig`, `PUT /api/ServerConfig` | admin | Global defaults (hysteresis, alert thresholds, firmware source, etc.) - Global admin only, applies across every tenant |
+| `GET /api/ServerConfig`, `PUT /api/ServerConfig` | admin | Global defaults (hysteresis, alert thresholds, firmware source, etc.) - Global admin only, applies across every account |
 | `GET /api/ServerConfig/Public` | no auth | The subset of server config safe to expose pre-login (e.g. registration open/closed) |
 
-**DataMaintenance** (`DataMaintenanceApiController`, roadmap #126, `api/DataMaintenance`)
+**DataMaintenance** (`DataMaintenanceApiController`, `api/DataMaintenance`)
 
 | Endpoint | Auth | Purpose |
 | --- | --- | --- |
@@ -403,7 +419,7 @@ next step - not required today.
 | Endpoint | Auth | Purpose |
 | --- | --- | --- |
 | `GET /api/SensorData` | JWT | Sensor readings for a device over a time range |
-| `POST /api/SensorData` | rate-limited | Device telemetry push (includes `Battery` since roadmap #12) |
+| `POST /api/SensorData` | rate-limited | Device telemetry push (includes `Battery`) |
 | `DELETE /api/SensorData` | JWT admin | Bulk-delete sensor data for a device/time range |
 
 ## Practical advantages
@@ -415,45 +431,61 @@ things that make Agrumy easier to trust and run day-to-day:
   its last-saved config (see "Control is local to the device" above) - a lost
   connection to the API doesn't stop irrigation/climate control, it just delays
   picking up config changes.
-- **109 native firmware unit tests in CI**, no hardware required
+- **A Farm > Unit > Zone hierarchy with a live dashboard.** `GET
+  /api/DeviceFarmUnit/Dashboard` rolls up status across an entire fleet of
+  installations, not just one controller.
+- **Fleet-wide commands with server-side fan-out.** `POST /api/DeviceCommand`
+  targets a unit or zone and the server resolves that into the actual set of
+  devices to deliver Reboot/ForceOTA/ForceConfigSync to on their next poll.
+- **Zero-touch device provisioning.** `POST /api/Discovery/Scan` +
+  `POST /api/Discovery/Register` let an already-configured sensor-only device
+  find and register a brand-new one over WiFi, no direct access to the new
+  device needed.
+- **LoRa reach without extra bridge hardware.** A device can relay other
+  LoRa-only nodes' uplinks over its own WiFi connection (`POST
+  /api/Gateway/RelayUplink`), or a dedicated `Agrumy.Gateway` process can do
+  the same over LoRaWAN/ChirpStack or a private radio protocol.
+- **Simulation Mode.** Fully virtual devices, driven by a real background
+  worker calling the real registration/config/sensor endpoints, let a whole
+  fleet be tested and demoed without any physical hardware.
+- **13 native firmware unit tests in CI**, no hardware required
   (`AgrumyFirmware/test/test_native_*`) - relay/hysteresis/schedule/safety-limit/
-  AND-OR-fold logic is regression-tested on every push, not just checked by hand
-  on a bench.
+  AND-OR-fold/discovery/LoRa/manual-override logic is regression-tested on
+  every push, not just checked by hand on a bench; the threshold-evaluation
+  suite runs against a `threshold_vectors.csv` shared verbatim between this
+  repo and `AgrumyFirmware`, so both sides agree on the same inputs/outputs.
 - **Contract-first device↔API.** Every device request/response shape is a JSON
   Schema in `contracts/device-api/`, checked against both the firmware and the
   API's actual field usage (`AgrumyFirmware/tools/contract-check`) - firmware and
   server can't silently drift apart on wire format.
 - **OTA plus fully offline firmware distribution.** The same firmware catalog
-  (roadmap #94) that drives normal OTA updates also supports offline USB
-  installs and Local/Custom repository sources - useful anywhere internet
-  access to GitHub isn't guaranteed.
+  that drives normal OTA updates also supports offline USB installs and
+  Local/Custom repository sources - useful anywhere internet access to GitHub
+  isn't guaranteed.
 - **One-line self-hosted install** (see below) - no config file to hand-write,
   no database to prepare first, safe to re-run.
 - **On-device safety limits, not just server-side policy.** `ActuatorController`
   enforces cooldown/max-run ordering for every relay function directly on the
   device, so a bad or delayed config can't leave a pump or heater running
   unbounded even during an outage.
-- **A predictable, bounded rule model, not a hidden DSL.** Threshold/Interval/
-  Schedule/Astronomical conditions fold left-to-right by AND/OR (roadmap #212)
-  - never nested or precedence-based - and a Zone/Unit/Global rule hierarchy
-  plus a Notification action type cover most real automation needs without
-  becoming a general rule engine to learn (see "Why not just use Home
-  Assistant" above for what this deliberately doesn't try to be).
+- **A predictable, bounded rule model, not a hidden DSL.** See "Automation rule
+  engine" above - fold-based AND/OR conditions and a Zone/Unit/Farm/Global rule
+  hierarchy cover most real automation needs without becoming a general rule
+  engine to learn.
 - **Battery-powered devices as a first-class case**, not an afterthought -
-  battery telemetry, low-battery alerting (roadmap #12) and deep sleep for
-  sensor-only nodes are built in, not bolted on.
+  battery telemetry, low-battery alerting and deep sleep for sensor-only nodes
+  are built in, not bolted on.
 - **A tiered storage strategy that scales down as well as up.** Plain MySQL/
-  MariaDB for a small deployment, TimescaleDB hypertables for a large one
-  (roadmap #14) - the same schema and queries either way, chosen by one config
-  value.
+  MariaDB for a small deployment, TimescaleDB hypertables for a large one -
+  the same schema and queries either way, chosen by one config value.
 - **A clear vertical focus.** Agrumy isn't trying to be a general home-automation
   hub - every model and rule is shaped around greenhouse/citrus micro-climate
   and irrigation specifically, not a generic "IoT platform."
-- **Crop-specific configuration templates are on the roadmap** (#60/#61) - the
+- **Crop-specific configuration templates are planned, not yet built** - the
   goal is that setting up a new zone eventually starts from agronomy know-how
   already built into the product, not a blank set of thresholds to guess at.
 
-## Self-hosted install (roadmap #30)
+## Self-hosted install
 
 For anyone standing up their own instance (not the maintainer's own alpha
 deployment - see "Deployment" below for that), one command handles
@@ -468,8 +500,8 @@ Hitting Enter at every prompt is a complete install: `1` (Quick install) ->
 `1.1` (Simple/Small) -> `c` (Container). `install.sh` only asks two things:
 
 1. **Quick or Custom.** Quick just picks Simple/Small (MariaDB, no Redis) or
-   Large/Scaled (PostgreSQL+TimescaleDB, Redis) - the roadmap #14 deployment
-   tiers. Custom asks each option individually (DB provider, TimescaleDB,
+   Large/Scaled (PostgreSQL+TimescaleDB, Redis) - the two deployment tiers.
+   Custom asks each option individually (DB provider, TimescaleDB,
    Redis) for combinations neither preset covers.
 2. **Container or bare-metal.**
    - **Container** (Docker or Podman - installed automatically if neither is
@@ -481,20 +513,21 @@ Hitting Enter at every prompt is a complete install: `1` (Quick install) ->
    - **Bare-metal/standalone** downloads the latest tagged release (see
      `.github/workflows/release.yml`) as self-contained `linux-x64` binaries -
      no .NET runtime needed on the target - and installs them as systemd
-     services behind nginx or Apache with a certbot TLS cert. This path never
+     services behind nginx or Apache with a certbot TLS cert, picking between
+     a hostname split (`api.` / `admin.` subdomains) or a path-based layout
+     (one domain or IP, `/api` routed to `Agrumy.Api` and everything else to
+     `Agrumy.Web`) for the reverse-proxy config it generates. This path never
      asks about the database up front - `Agrumy.Api` boots into a minimal
      setup wizard the first time `appsettings.json` has no
      `ConnectionStrings:DefaultConnection` (`Agrumy.Api/Setup/SetupWizard.cs`);
      saving a connection there restarts the service, and the existing
-     bootstrap Global Admin wizard (roadmap #91) takes over from there
-     unchanged.
+     bootstrap Global Admin wizard takes over from there unchanged.
 
-**Bare-metal first boot: keep the port firewalled off until setup completes**
-(roadmap #248) - the setup wizard is protected against CSRF, not against
-network access, so whoever reaches it first can submit the database
-connection. `install.sh` doesn't open the firewall for you; leave it closed
-(or restricted to your own IP) until the wizard and bootstrap Global Admin
-step are both done.
+**Bare-metal first boot: keep the port firewalled off until setup completes** -
+the setup wizard is protected against CSRF, not against network access, so
+whoever reaches it first can submit the database connection. `install.sh`
+doesn't open the firewall for you; leave it closed (or restricted to your own
+IP) until the wizard and bootstrap Global Admin step are both done.
 
 Safe to re-run - every step checks whether it's already done before acting, so
 re-running later (e.g. to turn on Redis) doesn't repeat completed steps or
