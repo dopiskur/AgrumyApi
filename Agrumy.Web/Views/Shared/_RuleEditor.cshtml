@@ -2,9 +2,8 @@
 @model api.ViewModels.RuleEditorViewModel
 @{
     // Roadmap #212: AND/OR condition groups, Notification action, Zone/Unit/Global scope - shared
-    // across the Zone page, the Unit "Rules" tab, and the tenant-wide Global Rules page. The UI
-    // exposes up to 2 conditions per rule (RuleFormInput.Condition1/Condition2); the API/DB allow up
-    // to 8 - a wider builder is a straightforward follow-up, not a hard ceiling here.
+    // across the Zone page, the Unit "Rules" tab, and the tenant-wide Global Rules page. Renders
+    // RuleFormInput.MaxConditionsPerRule condition slots, matching the API/DB ceiling.
     var relayRules = Model.Rules.Where(r => r.ActionType == api.Models.ActionType.Relay).ToList();
     var notificationRules = Model.Rules.Where(r => r.ActionType == api.Models.ActionType.Notification).ToList();
     var rulesByFunction = relayRules.GroupBy(r => r.RelayFunction!.Value).ToDictionary(g => g.Key, g => g.ToList());
@@ -111,8 +110,10 @@
                         }
                         <input type="hidden" name="ActionType" value="@((int)api.Models.ActionType.Relay)" />
                         <input type="hidden" name="RelayFunction" value="@((int)function)" />
-                        <partial name="_RuleConditionFields" model="new RuleConditionFieldsModel(1, false, notificationRules)" />
-                        <partial name="_RuleConditionFields" model="new RuleConditionFieldsModel(2, false, notificationRules)" />
+                        @for (int slot = 1; slot <= RuleFormInput.MaxConditionsPerRule; slot++)
+                        {
+                            <partial name="_RuleConditionFields" model="new RuleConditionFieldsModel(slot, false, notificationRules)" />
+                        }
                         <button type="submit" class="btn btn-sm btn-primary mt-2">Add rule</button>
                     </form>
                 </details>
@@ -217,8 +218,10 @@
                         <input type="text" name="NotificationBody" class="form-control form-control-sm" style="width:20rem" />
                     </div>
                 </div>
-                <partial name="_RuleConditionFields" model="new RuleConditionFieldsModel(1, true, notificationRules)" />
-                <partial name="_RuleConditionFields" model="new RuleConditionFieldsModel(2, true, notificationRules)" />
+                @for (int slot = 1; slot <= RuleFormInput.MaxConditionsPerRule; slot++)
+                {
+                    <partial name="_RuleConditionFields" model="new RuleConditionFieldsModel(slot, true, notificationRules)" />
+                }
                 <button type="submit" class="btn btn-sm btn-primary mt-2">Add notification rule</button>
             </form>
         </details>

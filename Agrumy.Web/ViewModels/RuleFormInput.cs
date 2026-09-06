@@ -20,15 +20,17 @@ namespace api.ViewModels
         public int? ReferencedRuleId { get; set; }
     }
 
-    /// Bound from DeviceUnitController's RuleAdd/UnitRuleAdd/GlobalRuleAdd forms - up to 2 conditions per rule in the UI (the API/DB allow up to 8; a wider builder is a straightforward follow-up, not a hard limit here).
+    /// Bound from DeviceUnitController's RuleAdd/UnitRuleAdd/GlobalRuleAdd forms - Conditions[0]..[MaxConditionsPerRule-1] (indexed list binding), matching the API's HardMaxConditionsPerRule.
     public class RuleFormInput
     {
+        /// Mirrors DeviceUnitApiController's private HardMaxConditionsPerRule (=8, itself mirroring AgrumyFirmware's MAX_CONDITIONS_PER_RULE) - no shared constant between the two projects today.
+        public const int MaxConditionsPerRule = 8;
+
         public ActionType ActionType { get; set; } = api.Models.ActionType.Relay;
         public RelayFunction? RelayFunction { get; set; }
         public SensorMetric? SensorMetric { get; set; }
         public string? NotificationSubject { get; set; }
         public string? NotificationBody { get; set; }
-        public RuleConditionInput Condition1 { get; set; } = new();
-        public RuleConditionInput Condition2 { get; set; } = new();
+        public List<RuleConditionInput> Conditions { get; set; } = [];
     }
 }
