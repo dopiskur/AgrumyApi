@@ -23,6 +23,7 @@ public class ContractTests
         "config.request.schema.json",
         "config.response.schema.json",
         "sensordata.request.schema.json",
+        "controllerdata.request.schema.json",
     };
 
     private static JsonSchema Load(string file) =>
@@ -45,7 +46,7 @@ public class ContractTests
 
 
     [Fact]
-    public void AllSevenSchemaFilesArePresentAndParseAsSchemas()
+    public void AllEightSchemaFilesArePresentAndParseAsSchemas()
     {
         foreach (var f in ExpectedSchemaFiles)
         {
@@ -264,5 +265,18 @@ public class ContractTests
             """;
 
         AssertValid("sensordata.request.schema.json", payload);
+    }
+
+    // Roadmap #343: real C# serialization of the push DTO, not a hand-written literal - catches a casing/shape drift the compiler would happily accept.
+    [Fact]
+    public void ControllerDataRequest_RealSerialization_MatchesSchema()
+    {
+        var entries = new List<ControllerDataPush>
+        {
+            new() { RelayFunction = RelayFunction.Heating, IsOn = true, DateCreated = new DateTime(2026, 9, 6, 12, 0, 0, DateTimeKind.Utc) },
+            new() { RelayFunction = RelayFunction.WaterPump, IsOn = false, DateCreated = null },
+        };
+
+        AssertValid("controllerdata.request.schema.json", JsonSerializer.Serialize(entries, Mvc));
     }
 }

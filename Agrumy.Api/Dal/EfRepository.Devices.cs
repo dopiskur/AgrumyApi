@@ -72,8 +72,9 @@ namespace api.Dal
             }
 
             await using var tx = await db.Database.BeginTransactionAsync();
-            // Diagnostics first: its FK to device is NoAction, so leaving the row would block the delete.
+            // Diagnostics/ControllerData first: both FKs to device are NoAction, so leaving either would block the delete.
             await db.DeviceDiagnostics.Where(x => x.DeviceID == idDevice).ExecuteDeleteAsync();
+            await db.ControllerData.Where(x => x.DeviceID == idDevice).ExecuteDeleteAsync();
             await db.Devices.Where(d => d.IDDevice == idDevice && d.TenantID == tenantID).ExecuteDeleteAsync();
             if (target.DeviceConfigSensorID != null)
             {

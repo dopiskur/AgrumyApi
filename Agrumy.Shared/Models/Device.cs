@@ -338,6 +338,8 @@ namespace api.Models
         public int? DeviceUnitZoneID { get; set; }
         public string? DeviceUnitName { get; set; }
         public string? DeviceUnitZoneName { get; set; }
+        /// Roadmap #343. Only the relay functions this device has ever reported a state for - empty for a sensor-only device or one whose firmware predates ControllerData.
+        public IList<ControllerDataStatus>? RelayStates { get; set; }
 
         // 3 missed polls + fixed grace, not a bare SleepSeconds multiple - a cycle also costs work time (TLS/sensor reads), and grace floors the window when SleepSeconds=0.
         public const int OfflineMissedPolls = 3;

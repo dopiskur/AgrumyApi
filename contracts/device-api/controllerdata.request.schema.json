@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/dopiskur/AgrumyService/contracts/device-api/controllerdata.request.schema.json",
+  "title": "ControllerData - request  (firmware -> POST /api/ControllerData)",
+  "description": "Roadmap #343. A JSON ARRAY, one entry per RelayFunction whose on/off state actually CHANGED - sent immediately on the transition, unlike SensorData's fixed polling interval. Several entries can ride in one call when more than one relay changes in the same evaluation tick. Universal: a real device pushes this next to flipping the physical relay, a simulated one pushes it next to its calculated equivalent - the server stores/serves both identically (api.Dal.Entities.ControllerDataRow is upserted per (deviceID, relayFunction), not appended). There is no response body beyond HTTP 200. Credentials travel as HTTP HEADERS: 'apiId' and 'Authorization' (apiAuth token from POST /api/Device/Authenticate) - same rule as POST /api/SensorData.",
+  "type": "array",
+  "maxItems": 32,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["relayFunction", "isOn", "dateCreated"],
+    "properties": {
+      "relayFunction": {
+        "type": "integer",
+        "description": "1=Ventilation, 2=Light, 3=Heating, 4=WaterPump (api.Models.RelayFunction) - same convention as deviceUnitZoneRule.relayFunction in config.response.schema.json."
+      },
+      "isOn": {
+        "type": "boolean",
+        "description": "The relay's new state after this transition."
+      },
+      "dateCreated": {
+        "type": ["string", "null"],
+        "description": "Firmware-side timestamp of the transition; null when the clock is not yet set, in which case the server stamps its own UTC clock instead (api.Dal.EfRepository.ControllerDataPushAsync)."
+      }
+    }
+  }
+}

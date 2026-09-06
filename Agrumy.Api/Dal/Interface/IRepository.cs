@@ -14,7 +14,8 @@ namespace api.Dal.Interface
         ISensorDataRepository,
         IAuditLogRepository,
         IGatewayRepository,
-        IDiscoveryRepository
+        IDiscoveryRepository,
+        IControllerDataRepository
     {
     }
 }

@@ -1424,6 +1424,41 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Contains(await _repo.DeviceTypeSensorGetAsync(), x => x.IDDeviceTypeSensor == 1);
     }
 
+    // Roadmap #343: upserted current state, not an appended log - pushing the same RelayFunction twice must update the one row, not add a second.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task ControllerDataPush_UpsertsPerDeviceAndRelayFunction_NotAppendOnly(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+
+        await _repo.ControllerDataPushAsync(d.IDDevice!.Value, tenantId,
+            new List<ControllerDataPush> { new() { RelayFunction = RelayFunction.Heating, IsOn = true } });
+        await _repo.ControllerDataPushAsync(d.IDDevice!.Value, tenantId,
+            new List<ControllerDataPush> { new() { RelayFunction = RelayFunction.Heating, IsOn = false }, new() { RelayFunction = RelayFunction.Light, IsOn = true } });
+
+        IList<ControllerDataStatus> states = await _repo.ControllerDataGetAsync(d.IDDevice!.Value);
+        Assert.Equal(2, states.Count);
+        Assert.False(states.Single(s => s.RelayFunction == RelayFunction.Heating).IsOn);
+        Assert.True(states.Single(s => s.RelayFunction == RelayFunction.Light).IsOn);
+    }
+
+    // DeviceFleetGetAsync must surface ControllerData without a per-device round trip - see BuildFleetStatusesAsync's relayStates dictionary.
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task DeviceFleetGet_IncludesRelayStates(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+        await _repo.ControllerDataPushAsync(d.IDDevice!.Value, tenantId,
+            new List<ControllerDataPush> { new() { RelayFunction = RelayFunction.WaterPump, IsOn = true } });
+
+        IList<DeviceFleetStatus> fleet = await _repo.DeviceFleetGetAsync(tenantId);
+        DeviceFleetStatus status = fleet.Single(f => f.IDDevice == d.IDDevice);
+        Assert.NotNull(status.RelayStates);
+        Assert.True(status.RelayStates!.Single(r => r.RelayFunction == RelayFunction.WaterPump).IsOn);
+    }
+
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task SensorDataPush_Parses_String_Measurements_And_Fills_Missing_Date(DbProviderKind provider)
     {

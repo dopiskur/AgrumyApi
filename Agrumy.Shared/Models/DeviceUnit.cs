@@ -37,6 +37,22 @@ namespace api.Models
         WaterPump = 4,
     }
 
+    /// Roadmap #343. One entry in POST /api/ControllerData's array - sent every time a relay's on/off state actually CHANGES, not on a fixed interval like SensorData. Universal: a real device pushes this alongside a physical relay flip, a simulated one pushes it alongside its calculated equivalent - same wire shape, same table, same downstream logic either way.
+    public class ControllerDataPush
+    {
+        public RelayFunction RelayFunction { get; set; }
+        public bool IsOn { get; set; }
+        public DateTime? DateCreated { get; set; }
+    }
+
+    /// Current on/off state for one RelayFunction on one device - GET /api/ControllerData's shape, and what DeviceFleetStatus.RelayStates carries.
+    public class ControllerDataStatus
+    {
+        public RelayFunction RelayFunction { get; set; }
+        public bool IsOn { get; set; }
+        public DateTime? DateChanged { get; set; }
+    }
+
     /// Which measured quantity a Notification-action Threshold condition reads - mirrors SensorAverages' fields (a DeviceUnitZoneRule.RelayFunction implies its metric/direction instead, so Relay-action rules never set this).
     public enum SensorMetric
     {

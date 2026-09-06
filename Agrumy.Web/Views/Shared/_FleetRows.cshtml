@@ -79,6 +79,19 @@
             }
         </td>
         <td class="d-none d-md-table-cell">@(item.Battery?.ToString() ?? "-")</td>
+        <td class="d-none d-md-table-cell">
+            @if (item.RelayStates is { Count: > 0 } relays)
+            {
+                foreach (var relay in relays.OrderBy(r => r.RelayFunction))
+                {
+                    <span class="badge @(relay.IsOn ? "text-bg-success" : "text-bg-light border") me-1" title="@relay.RelayFunction @(relay.IsOn ? "on" : "off")">@relay.RelayFunction</span>
+                }
+            }
+            else
+            {
+                <span class="text-secondary">-</span>
+            }
+        </td>
         <td>
             <div class="btn-group btn-group-sm" role="group" aria-label="Device actions">
                 <a asp-controller="SensorData" asp-action="Index" asp-route-idDevice="@item.IDDevice" class="btn btn-success" title="Sensor data" aria-label="Sensor data"><i class="bi bi-graph-up"></i></a>

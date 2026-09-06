@@ -38,6 +38,7 @@ namespace api.Dal
         public DbSet<DeviceDiscoveryReportRow> DeviceDiscoveryReports => Set<DeviceDiscoveryReportRow>();
 
         public DbSet<SensorDataRow> SensorData => Set<SensorDataRow>();
+        public DbSet<ControllerDataRow> ControllerData => Set<ControllerDataRow>();
         public DbSet<SensorDataReportRow> SensorDataReports => Set<SensorDataReportRow>();
         public DbSet<EventDeviceRow> EventDevices => Set<EventDeviceRow>();
         public DbSet<EventServiceRow> EventServices => Set<EventServiceRow>();
@@ -361,6 +362,15 @@ namespace api.Dal
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceUnitZoneID).OnDelete(DeleteBehavior.NoAction);
+            });
+
+            modelBuilder.Entity<ControllerDataRow>(e =>
+            {
+                e.ToTable("controllerData");
+                e.HasKey(x => x.IDControllerData);
+                e.Property(x => x.IDControllerData).ValueGeneratedOnAdd();
+                e.HasIndex(x => new { x.DeviceID, x.RelayFunction }).IsUnique().HasDatabaseName("ux_controllerData_device_relayFunction");
+                e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<SensorDataReportRow>(e =>

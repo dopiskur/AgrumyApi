@@ -105,6 +105,14 @@ namespace api.Dal
             Dictionary<int, string?> zoneNames = await db.DeviceUnitZones.AsNoTracking()
                 .ToDictionaryAsync(z => z.IDDeviceUnitZone, z => z.DeviceUnitZoneName);
 
+            // Roadmap #343: one bulk read of every relay state for devices in this result set, grouped in memory - same reasoning as kitCapability above (a handful of rows per device, not worth a per-device round trip).
+            var deviceIds = rows.Select(r => r.Device.IDDevice).ToList();
+            Dictionary<int, List<ControllerDataStatus>> relayStates = (await db.ControllerData.AsNoTracking()
+                .Where(c => deviceIds.Contains(c.DeviceID))
+                .ToListAsync())
+                .GroupBy(c => c.DeviceID)
+                .ToDictionary(g => g.Key, g => g.Select(c => new ControllerDataStatus { RelayFunction = (RelayFunction)c.RelayFunction, IsOn = c.IsOn, DateChanged = c.DateChanged }).ToList());
+
             // One catalog read, newest version per board picked in memory by semver (not DateAdded).
             FirmwareSource activeSource = (await ServerConfigGetAsync()).FirmwareSource;
             var visible = new HashSet<int> { (int)activeSource, (int)FirmwareSource.Local };
@@ -147,6 +155,7 @@ namespace api.Dal
                     DeviceUnitZoneID = r.Device.DeviceUnitZoneID,
                     DeviceUnitName = r.Device.DeviceUnitID is int uid ? unitNames.GetValueOrDefault(uid) : null,
                     DeviceUnitZoneName = r.Device.DeviceUnitZoneID is int zid ? zoneNames.GetValueOrDefault(zid) : null,
+                    RelayStates = relayStates.GetValueOrDefault(r.Device.IDDevice),
                 };
             }).ToList();
         }
