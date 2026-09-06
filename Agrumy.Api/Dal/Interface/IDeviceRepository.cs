@@ -55,7 +55,8 @@ namespace api.Dal.Interface
 
         // Device UPDATE
         Task DeviceUpdateAsync(Device? device);
-        Task DeviceConfigControllerUpdateAsync(int? idDevice, DeviceConfigController? deviceConfigController);
+        /// Returns null on success, or a validation error message (caller returns 400) without writing anything.
+        Task<string?> DeviceConfigControllerUpdateAsync(int? idDevice, DeviceConfigController? deviceConfigController);
         Task DeviceConfigSensorUpdateAsync(int? iDDevice, DeviceConfigSensor? deviceConfigSensor);
 
         // Device fixed lists
