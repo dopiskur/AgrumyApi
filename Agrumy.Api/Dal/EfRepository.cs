@@ -11,7 +11,7 @@ using Npgsql;
 namespace api.Dal
 {
     /// EF Core implementation of IRepository, split into partial files mirroring its facets (EfRepository.Users.cs, EfRepository.Devices.cs, ...) - this file holds connection plumbing and the ISystemRepository members.
-    internal partial class EfRepository(AgrumyDbContext db, IOptions<AgrumySettings> settingsOptions, ILogger<EfRepository> logger, ICache cache) : IRepository
+    internal partial class EfRepository(AgrumyDbContext db, IOptions<AgrumySettings> settingsOptions, ILogger<EfRepository> logger, ICache cache, IAuditLogRepository auditLogRepository) : IRepository
     {
         private readonly AgrumySettings settings = settingsOptions.Value;
 
