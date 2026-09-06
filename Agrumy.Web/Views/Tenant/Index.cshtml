@@ -40,9 +40,18 @@
                     <td>
                         @if (User.IsInRole(RoleNames.GlobalAdmin))
                         {
-                            <div class="btn-group btn-group-sm" role="group" aria-label="Tenant actions">
-                                <a asp-action="Edit" asp-route-idTenant="@item.IDTenant" class="btn btn-primary" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
-                                <a asp-action="Export" asp-route-idTenant="@item.IDTenant" class="btn btn-outline-secondary" title="Export" aria-label="Export"><i class="bi bi-download"></i></a>
+                            <div class="d-flex align-items-center gap-1">
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Tenant actions">
+                                    <a asp-action="Edit" asp-route-idTenant="@item.IDTenant" class="btn btn-primary" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
+                                    <button type="submit" form="export-form-@item.IDTenant" class="btn btn-outline-secondary" title="Export" aria-label="Export"><i class="bi bi-download"></i></button>
+                                </div>
+                                <form id="export-form-@item.IDTenant" asp-action="Export" method="get" class="d-flex align-items-center">
+                                    <input type="hidden" name="idTenant" value="@item.IDTenant" />
+                                    <div class="form-check form-check-inline m-0" title="Include this tenant's full sensor data history in the export - can be large and slow for a long-running installation">
+                                        <input class="form-check-input" type="checkbox" name="includeSensorData" value="true" id="includeSensorData-@item.IDTenant" />
+                                        <label class="form-check-label small text-muted" for="includeSensorData-@item.IDTenant">+ sensor data</label>
+                                    </div>
+                                </form>
                             </div>
                         }
                     </td>

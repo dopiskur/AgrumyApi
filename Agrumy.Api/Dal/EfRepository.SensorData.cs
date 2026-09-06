@@ -367,6 +367,9 @@ namespace api.Dal
 
         public async Task<IList<SensorData>> SensorDataExportGetAsync(int tenantID, DateTime? sinceUtc)
         {
+            // Dirty reads are fine for an export snapshot - avoids InnoDB gap-locking a live device's concurrent SensorDataPushAsync inserts on what can be a huge table (Postgres treats this as ReadCommitted regardless, MVCC readers never block writers there anyway).
+            await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadUncommitted);
+
             IQueryable<SensorDataRow> q = db.SensorData.AsNoTracking().Where(s => s.TenantID == tenantID);
             if (sinceUtc is DateTime since)
             {
