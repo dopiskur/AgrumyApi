@@ -110,9 +110,26 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Skip.If(t is null, $"No integration database configured for {provider}.");
         _db?.Dispose();
         _db = new AgrumyDbContext(DbOptionsFactory.Build(t!.Provider, t.ConnectionString));
-        // NullCache: these tests verify query/translation correctness against the real engine, not cache behavior.
-        _repo = new EfRepository(_db, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance, new EfAuditLogRepository(_db), new EfRefreshTokenRepository(_db), new EfControllerDataRepository(_db), new EfDiscoveryRepository(_db), new EfTenantRepository(_db), new EfGatewayRepository(_db), new EfServerConfigRepository(_db, Options.Create(new AgrumySettings()), NullLogger<EfServerConfigRepository>.Instance), new EfCommandRepository(_db), new EfFirmwareRepository(_db), new EfUserRepository(_db, new EfTenantRepository(_db), new EfRefreshTokenRepository(_db)), new EfDeviceRepository(_db, Options.Create(new AgrumySettings()), new NullCache(), new EfServerConfigRepository(_db, Options.Create(new AgrumySettings()), NullLogger<EfServerConfigRepository>.Instance)), new EfSimulationRepository(_db, new EfDeviceRepository(_db, Options.Create(new AgrumySettings()), new NullCache(), new EfServerConfigRepository(_db, Options.Create(new AgrumySettings()), NullLogger<EfServerConfigRepository>.Instance))));
+        _repo = BuildRepository(_db);
         return t;
+    }
+
+    // NullCache: these tests verify query/translation correctness against the real engine, not cache behavior. Every Ef*Repository is stateless over its AgrumyDbContext, so constructing several against the same db is cheap and side-effect-free.
+    private static EfRepository BuildRepository(AgrumyDbContext db)
+    {
+        var settingsOptions = Options.Create(new AgrumySettings());
+        var serverConfigRepository = new EfServerConfigRepository(db, settingsOptions, NullLogger<EfServerConfigRepository>.Instance);
+        var deviceRepository = new EfDeviceRepository(db, settingsOptions, new NullCache(), serverConfigRepository);
+        var tenantRepository = new EfTenantRepository(db);
+        var refreshTokenRepository = new EfRefreshTokenRepository(db);
+
+        return new EfRepository(db, NullLogger<EfRepository>.Instance,
+            new EfAuditLogRepository(db), refreshTokenRepository, new EfControllerDataRepository(db),
+            new EfDiscoveryRepository(db), tenantRepository, new EfGatewayRepository(db), serverConfigRepository,
+            new EfCommandRepository(db), new EfFirmwareRepository(db),
+            new EfUserRepository(db, tenantRepository, refreshTokenRepository), deviceRepository,
+            new EfSimulationRepository(db, deviceRepository),
+            new EfDeviceUnitRepository(db, settingsOptions, serverConfigRepository, deviceRepository));
     }
 
     private sealed class NullCache : ICache
@@ -515,8 +532,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
         await using var dbA = _fx.NewContext(t);
         await using var dbB = _fx.NewContext(t);
-        var repoA = new EfRepository(dbA, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance, new EfAuditLogRepository(dbA), new EfRefreshTokenRepository(dbA), new EfControllerDataRepository(dbA), new EfDiscoveryRepository(dbA), new EfTenantRepository(dbA), new EfGatewayRepository(dbA), new EfServerConfigRepository(dbA, Options.Create(new AgrumySettings()), NullLogger<EfServerConfigRepository>.Instance), new EfCommandRepository(dbA), new EfFirmwareRepository(dbA), new EfUserRepository(dbA, new EfTenantRepository(dbA), new EfRefreshTokenRepository(dbA)), new EfDeviceRepository(dbA, Options.Create(new AgrumySettings()), new NullCache(), new EfServerConfigRepository(dbA, Options.Create(new AgrumySettings()), NullLogger<EfServerConfigRepository>.Instance)), new EfSimulationRepository(dbA, new EfDeviceRepository(dbA, Options.Create(new AgrumySettings()), new NullCache(), new EfServerConfigRepository(dbA, Options.Create(new AgrumySettings()), NullLogger<EfServerConfigRepository>.Instance))));
-        var repoB = new EfRepository(dbB, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance, new EfAuditLogRepository(dbB), new EfRefreshTokenRepository(dbB), new EfControllerDataRepository(dbB), new EfDiscoveryRepository(dbB), new EfTenantRepository(dbB), new EfGatewayRepository(dbB), new EfServerConfigRepository(dbB, Options.Create(new AgrumySettings()), NullLogger<EfServerConfigRepository>.Instance), new EfCommandRepository(dbB), new EfFirmwareRepository(dbB), new EfUserRepository(dbB, new EfTenantRepository(dbB), new EfRefreshTokenRepository(dbB)), new EfDeviceRepository(dbB, Options.Create(new AgrumySettings()), new NullCache(), new EfServerConfigRepository(dbB, Options.Create(new AgrumySettings()), NullLogger<EfServerConfigRepository>.Instance)), new EfSimulationRepository(dbB, new EfDeviceRepository(dbB, Options.Create(new AgrumySettings()), new NullCache(), new EfServerConfigRepository(dbB, Options.Create(new AgrumySettings()), NullLogger<EfServerConfigRepository>.Instance))));
+        var repoA = BuildRepository(dbA);
+        var repoB = BuildRepository(dbB);
 
         bool[] results = await Task.WhenAll(
             repoA.RefreshTokenRotateAsync(userId, oldHash, hashA, DateTime.UtcNow.AddDays(30)),
