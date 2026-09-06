@@ -38,7 +38,17 @@ namespace api.Gateway.Registration
             string json = JsonSerializer.Serialize(newState, WriteOptions);
             string tempPath = path + ".tmp";
             File.WriteAllText(tempPath, json);
+            RestrictToOwner(tempPath);
             File.Move(tempPath, path, overwrite: true);
+        }
+
+        // Contains this gateway's live ApiKey in plaintext - explicit 0600 rather than trusting the OS/umask default, since File.Move preserves the source file's mode across the rename.
+        private static void RestrictToOwner(string filePath)
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(filePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
         }
     }
 }
