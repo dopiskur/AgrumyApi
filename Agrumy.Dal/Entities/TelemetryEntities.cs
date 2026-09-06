@@ -43,6 +43,13 @@ namespace api.Dal.Entities
         public string? SensorData { get; set; }
     }
 
+    /// Catalog of api.Models.DeviceEventType values, seeded 1:1 from that enum - backs EventDeviceRow.EventID and EventServiceRow.EventID so a future event type has one source of truth instead of a magic-number agreement.
+    public class EventTypeRow
+    {
+        public int IDEventType { get; set; }
+        public string EventTypeName { get; set; } = "";
+    }
+
     public class EventDeviceRow
     {
         public int IDEventDevice { get; set; }
@@ -57,7 +64,7 @@ namespace api.Dal.Entities
     public class EventServiceRow
     {
         public int IDEventService { get; set; }
-        public int ServiceID { get; set; }
+        public int ServiceID { get; set; } // FKs to DeviceTypeServiceRow, the existing HTTP/HTTPS/MQTT catalog - this table has no live writer yet, but the naming already matches that catalog.
         public int EventID { get; set; }
         public DateTime? Date { get; set; }
         public string? Message { get; set; }

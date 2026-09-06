@@ -42,6 +42,7 @@ namespace api.Dal
         public DbSet<SensorDataRow> SensorData => Set<SensorDataRow>();
         public DbSet<ControllerDataRow> ControllerData => Set<ControllerDataRow>();
         public DbSet<SensorDataReportRow> SensorDataReports => Set<SensorDataReportRow>();
+        public DbSet<EventTypeRow> EventTypes => Set<EventTypeRow>();
         public DbSet<EventDeviceRow> EventDevices => Set<EventDeviceRow>();
         public DbSet<EventServiceRow> EventServices => Set<EventServiceRow>();
 
@@ -409,12 +410,21 @@ namespace api.Dal
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 
+            modelBuilder.Entity<EventTypeRow>(e =>
+            {
+                e.ToTable("eventType");
+                e.HasKey(x => x.IDEventType);
+                e.Property(x => x.IDEventType).ValueGeneratedNever(); // Fixed catalog, mirrors api.Models.DeviceEventType's own numeric values.
+                e.Property(x => x.EventTypeName).HasMaxLength(64);
+            });
+
             modelBuilder.Entity<EventDeviceRow>(e =>
             {
                 e.ToTable("eventDevice");
                 e.HasKey(x => x.IDEventDevice);
                 e.Property(x => x.IDEventDevice).ValueGeneratedOnAdd();
                 e.HasIndex(x => new { x.DeviceID, x.Date }).HasDatabaseName("ix_eventDevice_device_date"); // Every device-events read/problem-alert scan filters DeviceID plus a Date range.
+                e.HasOne<EventTypeRow>().WithMany().HasForeignKey(x => x.EventID).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<EventServiceRow>(e =>
@@ -422,6 +432,8 @@ namespace api.Dal
                 e.ToTable("eventService");
                 e.HasKey(x => x.IDEventService);
                 e.Property(x => x.IDEventService).ValueGeneratedOnAdd();
+                e.HasOne<EventTypeRow>().WithMany().HasForeignKey(x => x.EventID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeServiceRow>().WithMany().HasForeignKey(x => x.ServiceID).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<AuditLogRow>(e =>

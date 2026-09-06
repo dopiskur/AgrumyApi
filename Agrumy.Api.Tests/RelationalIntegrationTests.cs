@@ -50,6 +50,8 @@ public sealed class RelationalIntegrationFixture
         if (!db.DeviceUnitZones.Any())
             db.DeviceUnitZones.Add(new DeviceUnitZoneRow { IDDeviceUnitZone = 0, TenantID = null, DeviceUnitID = 0, DeviceUnitZoneName = "Disabled" });
 
+        if (!db.EventTypes.Any())
+            db.EventTypes.AddRange(Enum.GetValues<DeviceEventType>().Select(t => new EventTypeRow { IDEventType = (int)t, EventTypeName = t.ToString() }));
         if (!db.DeviceTypeServices.Any())
             db.DeviceTypeServices.Add(new DeviceTypeServiceRow { IDDeviceTypeService = 1, ServiceType = "HTTPS" });
         if (!db.DeviceTypeRelays.Any())

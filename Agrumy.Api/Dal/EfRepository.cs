@@ -38,6 +38,7 @@ namespace api.Dal
             }
 
             await SeedDeviceTypeLookupsAsync(db);
+            await SeedEventTypeLookupAsync(db);
             await SeedDeviceUnitSentinelsAsync(db);
             await SeedDefaultTenantAsync(db);
             string? bootstrapSecret = await SeedBootstrapAdminAsync(db);
@@ -213,6 +214,17 @@ namespace api.Dal
             }
 
             await db.SaveChangesAsync();
+        }
+
+        /// Mirrors DeviceEventType exactly (reflection, not a hand-copied list) so the catalog can never drift from the enum it backs.
+        private static async Task SeedEventTypeLookupAsync(AgrumyDbContext db)
+        {
+            if (!await db.EventTypes.AnyAsync())
+            {
+                db.EventTypes.AddRange(Enum.GetValues<DeviceEventType>()
+                    .Select(t => new EventTypeRow { IDEventType = (int)t, EventTypeName = t.ToString() }));
+                await db.SaveChangesAsync();
+            }
         }
 
         /// A genuinely empty user table gets exactly one row: a Global Admin at TenantID=0 with PwdHash/PwdSalt left NULL (see UserRow.PwdHash) for Agrumy.Web's first-run "set password" screen to activate - returns the plaintext setup secret once, or null if no row was created.
