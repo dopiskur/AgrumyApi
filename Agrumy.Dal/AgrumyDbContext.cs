@@ -222,7 +222,7 @@ namespace api.Dal
                 e.HasKey(x => x.IDDeviceType);
                 e.Property(x => x.IDDeviceType).ValueGeneratedOnAdd();
                 e.Property(x => x.Kit).HasMaxLength(64).IsRequired();
-                // FKs below still target Kit (business logic - auto-registration, dropdowns - is keyed by Kit, not the new numeric PK), so it needs its own unique index now that it isn't the PK.
+                // Kit itself is a display-only catalog name now (roadmap #385) - every referencing table has a real numeric FK to IDDeviceType instead. Still unique so auto-registration/dropdowns can look a kit up by name without duplicates.
                 e.HasIndex(x => x.Kit).IsUnique().HasDatabaseName("ux_deviceType_kit");
             });
 
@@ -280,7 +280,6 @@ namespace api.Dal
                 e.Property(x => x.DeviceName).HasMaxLength(128);
                 e.Property(x => x.MacAddress).HasMaxLength(64); // AgrumyFirmware sends exactly 12 hex chars; the wider cap is for Agrumy.Gateway's free-form MacAddress uniqueness key.
                 e.Property(x => x.FirmwareTargetVersion).HasMaxLength(20); // same cap as deviceFirmware.Version
-                e.Property(x => x.ManualKit).HasMaxLength(64); // same cap as deviceType.Kit
                 e.Property(x => x.ApiId).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ApiKey).HasMaxLength(128).IsRequired();
                 e.Property(x => x.ServicePoint).HasMaxLength(200);
@@ -294,8 +293,8 @@ namespace api.Dal
                 e.HasOne<DeviceConfigSensorRow>().WithMany().HasForeignKey(x => x.DeviceConfigSensorID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceRoleRow>().WithMany().HasForeignKey(x => x.DeviceRoleID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceTypeServiceRow>().WithMany().HasForeignKey(x => x.DeviceTypeServiceID).OnDelete(DeleteBehavior.NoAction);
-                // Admin-chosen from the SAME catalog as deviceDiagnostic.Kit (no auto-registration needed here - the Web dropdown only ever offers existing catalog entries).
-                e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.ManualKit).HasPrincipalKey(t => t.Kit).OnDelete(DeleteBehavior.NoAction);
+                // Admin-chosen from the SAME catalog as deviceDiagnostic.DeviceTypeID (no auto-registration needed here - the Web dropdown only ever offers existing catalog entries).
+                e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.ManualDeviceTypeID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<TenantRow>().WithMany().HasForeignKey(x => x.TenantID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
             });
@@ -348,10 +347,9 @@ namespace api.Dal
                 e.Property(x => x.DeviceID).ValueGeneratedNever(); // PK is 1:1 with device, deliberately not ValueGeneratedOnAdd.
                 e.Property(x => x.FirmwareVersion).HasMaxLength(20); // same cap as deviceFirmware.Version
                 e.Property(x => x.Board).HasMaxLength(40);
-                e.Property(x => x.Kit).HasMaxLength(64); // same cap as deviceType.Kit
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
                 // A firmware-reported Kit not yet in the catalog is auto-registered by DeviceDiagnosticUpsertAsync BEFORE this row is written, so the FK never rejects a legitimate device's heartbeat; NULL (never reported / generic build, normalized from "") bypasses the FK entirely.
-                e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.Kit).HasPrincipalKey(t => t.Kit).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.DeviceTypeID).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<DeviceSimulationRow>(e =>

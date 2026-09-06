@@ -220,8 +220,8 @@ namespace api.Dal.Entities
         public int? DeviceTypeServiceID { get; set; }
         public string? DeviceName { get; set; }
         public string? MacAddress { get; set; }
-        // Admin-set fallback for a device whose firmware build never reports a Kit (generic esp32dev/esp32s3usbotg) - BuildFleetStatusesAsync's ControllerCapable check falls back to this only when the diagnostic Kit is empty.
-        public string? ManualKit { get; set; }
+        // Admin-set fallback for a device whose firmware build never reports a Kit (generic esp32dev/esp32s3usbotg) - BuildFleetStatusesAsync's ControllerCapable check falls back to this only when the diagnostic DeviceTypeID is unset. Real FK to deviceType.IDDeviceType, not the Kit string.
+        public int? ManualDeviceTypeID { get; set; }
         public string ApiId { get; set; } = "";
         public string ApiKey { get; set; } = "";
         public string? ServicePoint { get; set; }
@@ -310,10 +310,11 @@ namespace api.Dal.Entities
         public DateTime? LowBatteryNotifiedAt { get; set; } // Same dedup-by-streak rule as OfflineNotifiedAt, but for LowBatteryAlertEvaluator.
         public string? FirmwareVersion { get; set; }
         public string? Board { get; set; } // See api.Models.DeviceConfigPoll.Board.
-        public string? Kit { get; set; } // See api.Models.DeviceConfigPoll.Kit.
+        // Real FK to deviceType.IDDeviceType, resolved from the firmware-reported Kit string (api.Models.DeviceConfigPoll.Kit) by DeviceDiagnosticUpsertAsync - the wire protocol still carries a string, only storage is numeric.
+        public int? DeviceTypeID { get; set; }
     }
 
-    /// Catalog of recognized physical device kits - Kit itself is the key (a build-flag string, e.g. "KC868-A6"), not an auto-increment id; PinoutJson is an unopinionated per-kit GPIO layout blob, null for a kit nobody has documented pinout for yet, including every auto-registered one (see DeviceDiagnosticUpsertAsync).
+    /// Catalog of recognized physical device kits - IDDeviceType is the real PK, Kit a unique display/build-flag string (e.g. "KC868-A6") every referencing table now FKs to by id, not by name. PinoutJson is an unopinionated per-kit GPIO layout blob, null for a kit nobody has documented pinout for yet, including every auto-registered one (see DeviceDiagnosticUpsertAsync).
     public class DeviceTypeRow
     {
         public int IDDeviceType { get; set; }

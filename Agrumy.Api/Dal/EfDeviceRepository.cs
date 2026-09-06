@@ -42,7 +42,7 @@ namespace api.Dal
                 DeviceUnitZoneID = device.DeviceUnitZoneID,
                 DeviceName = device.DeviceName,
                 MacAddress = device.MacAddress,
-                ManualKit = device.ManualKit,
+                ManualDeviceTypeID = device.ManualDeviceTypeID,
                 ApiId = device.ApiId ?? "",
                 ApiKey = device.ApiKey ?? "",
                 ServicePoint = device.ServicePoint,
@@ -179,7 +179,7 @@ namespace api.Dal
             row.DeviceRoleID = device.DeviceRoleID;
             row.DeviceTypeServiceID = device.DeviceTypeServiceID;
             row.DeviceName = device.DeviceName;
-            row.ManualKit = device.ManualKit;
+            row.ManualDeviceTypeID = device.ManualDeviceTypeID;
             row.ServicePoint = device.ServicePoint;
             row.ServicePublicKey = device.ServicePublicKey;
             row.SleepSeconds = device.SleepSeconds;
@@ -215,7 +215,7 @@ namespace api.Dal
             DeviceTypeServiceID = d.DeviceTypeServiceID,
             DeviceName = d.DeviceName,
             MacAddress = d.MacAddress,
-            ManualKit = d.ManualKit,
+            ManualDeviceTypeID = d.ManualDeviceTypeID,
             ApiId = d.ApiId,
             ApiKey = d.ApiKey,
             ServicePoint = d.ServicePoint,
@@ -485,12 +485,9 @@ namespace api.Dal
 
         public async Task DeviceDiagnosticUpsertAsync(int deviceID, int tenantID, DeviceConfigPoll poll)
         {
-            // "" (every generic esp32dev/esp32s3usbotg build) is normalized to null here rather than stored literally - kitCapability lookups already treat them identically, and null is what lets deviceDiagnostic.Kit's FK skip validation entirely for a device with no specific kit.
+            // "" (every generic esp32dev/esp32s3usbotg build) is normalized to null here rather than resolved to a DeviceTypeID - a device with no specific kit stores no FK at all.
             string? kit = string.IsNullOrEmpty(poll.Kit) ? null : poll.Kit;
-            if (kit != null)
-            {
-                await EnsureDeviceTypeRegisteredAsync(kit);
-            }
+            int? deviceTypeId = kit != null ? await EnsureDeviceTypeRegisteredAsync(kit) : null;
 
             var row = await db.DeviceDiagnostics.FirstOrDefaultAsync(d => d.DeviceID == deviceID);
             if (row == null)
@@ -507,26 +504,29 @@ namespace api.Dal
             row.FreeHeapBytes = poll.FreeHeap ?? row.FreeHeapBytes;
             row.FirmwareVersion = poll.FirmwareVersion ?? row.FirmwareVersion;
             row.Board = poll.Board ?? row.Board;
-            row.Kit = kit ?? row.Kit;
+            row.DeviceTypeID = deviceTypeId ?? row.DeviceTypeID;
             await db.SaveChangesAsync();
         }
 
-        /// deviceDiagnostic.Kit has a real FK to deviceType.Kit - an unrecognized string must never block the device's own heartbeat write because of it, so it's auto-registered here (ControllerCapable=false) in its own save, BEFORE the diagnostic row; a concurrent duplicate insert from another device reporting the same brand-new kit is tolerated, not retried.
-        private async Task EnsureDeviceTypeRegisteredAsync(string kit)
+        /// deviceDiagnostic.DeviceTypeID has a real FK to deviceType.IDDeviceType - an unrecognized Kit string must never block the device's own heartbeat write because of it, so it's auto-registered here (ControllerCapable=false) in its own save, BEFORE the diagnostic row; a concurrent duplicate insert from another device reporting the same brand-new kit is tolerated by re-fetching the winner's id, not retried.
+        private async Task<int> EnsureDeviceTypeRegisteredAsync(string kit)
         {
-            if (await db.DeviceTypes.AsNoTracking().AnyAsync(t => t.Kit == kit))
+            int? existingId = await db.DeviceTypes.AsNoTracking().Where(t => t.Kit == kit).Select(t => (int?)t.IDDeviceType).FirstOrDefaultAsync();
+            if (existingId is int id)
             {
-                return;
+                return id;
             }
             var candidate = new DeviceTypeRow { Kit = kit, ControllerCapable = false };
             db.DeviceTypes.Add(candidate);
             try
             {
                 await db.SaveChangesAsync();
+                return candidate.IDDeviceType;
             }
             catch (DbUpdateException ex) when (DbExceptionClassifier.Classify(ex) == DbFailureKind.ConstraintViolation)
             {
                 db.Entry(candidate).State = EntityState.Detached; // lost the race - detach so it isn't re-inserted (and re-fails) by the caller's own SaveChangesAsync right after this returns.
+                return await db.DeviceTypes.AsNoTracking().Where(t => t.Kit == kit).Select(t => t.IDDeviceType).FirstAsync();
             }
         }
 
@@ -593,9 +593,9 @@ namespace api.Dal
                 })
                 .ToListAsync();
 
-            // Kit is a small fixed set of strings - cheap to pull entire and check in memory rather than a per-device join.
-            Dictionary<string, bool> kitCapability = await db.DeviceTypes.AsNoTracking()
-                .ToDictionaryAsync(k => k.Kit, k => k.ControllerCapable);
+            // DeviceType catalog is a small fixed set - cheap to pull entire and check in memory rather than a per-device join.
+            Dictionary<int, DeviceTypeRow> deviceTypesById = await db.DeviceTypes.AsNoTracking()
+                .ToDictionaryAsync(k => k.IDDeviceType);
 
             // Units/Zones are a small admin-managed set - same in-memory-lookup reasoning as kitCapability above.
             Dictionary<int, string?> unitNames = await db.DeviceUnits.AsNoTracking()
@@ -639,10 +639,10 @@ namespace api.Dal
                     FreeHeapBytes = r.Diag?.FreeHeapBytes,
                     FirmwareVersion = r.Diag?.FirmwareVersion,
                     Board = r.Diag?.Board,
-                    Kit = r.Diag?.Kit,
-                    // Admin's explicit DeviceControllerEnabled choice always wins if set - a recognized Kit only adds capability, never takes it away. ManualKit is the fallback for a device whose firmware never auto-reports one; the diagnostic-reported Kit takes priority whenever both are set.
+                    Kit = r.Diag?.DeviceTypeID is int diagTypeId && deviceTypesById.TryGetValue(diagTypeId, out var diagType) ? diagType.Kit : null,
+                    // Admin's explicit DeviceControllerEnabled choice always wins if set - a recognized DeviceType only adds capability, never takes it away. ManualDeviceTypeID is the fallback for a device whose firmware never auto-reports one; the diagnostic-reported DeviceTypeID takes priority whenever both are set.
                     ControllerCapable = r.Device.DeviceControllerEnabled == true
-                        || ((r.Diag?.Kit ?? r.Device.ManualKit) is { Length: > 0 } kit && kitCapability.GetValueOrDefault(kit)),
+                        || ((r.Diag?.DeviceTypeID ?? r.Device.ManualDeviceTypeID) is int effectiveTypeId && deviceTypesById.TryGetValue(effectiveTypeId, out var effectiveType) && effectiveType.ControllerCapable),
                     LatestFirmwareVersion = latest,
                     FirmwareUpdateAvailable = FirmwareVersion.IsNewer(latest, r.Diag?.FirmwareVersion),
                     FirmwareUpdatePending = r.Device.FirmwareUpdate == true,

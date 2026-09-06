@@ -31,8 +31,8 @@ namespace api.Models
         public string? DeviceName { get; set; }
         [HiddenInput(DisplayValue = true)]
         public string? MacAddress { get; set; }
-        // Admin-chosen fallback for a device whose firmware build never auto-reports a Kit (generic esp32dev/esp32s3usbotg) - the diagnostic-reported Kit wins whenever both are set (see DeviceFleetStatus.ControllerCapable).
-        public string? ManualKit { get; set; }
+        // Admin-chosen fallback for a device whose firmware build never auto-reports a Kit (generic esp32dev/esp32s3usbotg) - the diagnostic-reported DeviceTypeID wins whenever both are set (see DeviceFleetStatus.ControllerCapable). Real FK to DeviceType.IDDeviceType, not the Kit string.
+        public int? ManualDeviceTypeID { get; set; }
         // True only for an Agrumy.Gateway instance, flagged so GatewayApiController.Batch can tell a gateway's own credential from an ordinary device's.
         [HiddenInput(DisplayValue = true)]
         public bool IsGateway { get; set; }
@@ -91,7 +91,7 @@ namespace api.Models
         public int? DeviceTypeServiceID { get; set; } = 0;
         public string? DeviceName { get; set; }
         public string? MacAddress { get; set; }
-        public string? ManualKit { get; set; }
+        public int? ManualDeviceTypeID { get; set; }
         public bool IsGateway { get; set; }
         public GatewayProfile? GatewayProfile { get; set; }
         public string? ServicePoint { get; set; }
@@ -119,7 +119,7 @@ namespace api.Models
         public int? DeviceRoleID { get; set; }
         public int? DeviceTypeServiceID { get; set; }
         public string? DeviceName { get; set; }
-        public string? ManualKit { get; set; }
+        public int? ManualDeviceTypeID { get; set; }
         public string? ServicePoint { get; set; }
         public string? ServicePublicKey { get; set; }
         public int? SleepSeconds { get; set; }
@@ -147,7 +147,7 @@ namespace api.Models
             DeviceTypeServiceID = d.DeviceTypeServiceID,
             DeviceName = d.DeviceName,
             MacAddress = d.MacAddress,
-            ManualKit = d.ManualKit,
+            ManualDeviceTypeID = d.ManualDeviceTypeID,
             IsGateway = d.IsGateway,
             GatewayProfile = d.GatewayProfile,
             ServicePoint = d.ServicePoint,
@@ -183,7 +183,7 @@ namespace api.Models
             DeviceTypeServiceID = dto.DeviceTypeServiceID,
             DeviceName = dto.DeviceName,
             MacAddress = dto.MacAddress,
-            ManualKit = dto.ManualKit,
+            ManualDeviceTypeID = dto.ManualDeviceTypeID,
             IsGateway = dto.IsGateway,
             GatewayProfile = dto.GatewayProfile,
             ServicePoint = dto.ServicePoint,
@@ -210,7 +210,7 @@ namespace api.Models
             target.DeviceRoleID = form.DeviceRoleID;
             target.DeviceTypeServiceID = form.DeviceTypeServiceID;
             target.DeviceName = form.DeviceName;
-            target.ManualKit = form.ManualKit;
+            target.ManualDeviceTypeID = form.ManualDeviceTypeID;
             target.ServicePoint = form.ServicePoint;
             target.ServicePublicKey = form.ServicePublicKey;
             target.SleepSeconds = form.SleepSeconds;
@@ -228,7 +228,7 @@ namespace api.Models
             DeviceRoleID = d.DeviceRoleID,
             DeviceTypeServiceID = d.DeviceTypeServiceID,
             DeviceName = d.DeviceName,
-            ManualKit = d.ManualKit,
+            ManualDeviceTypeID = d.ManualDeviceTypeID,
             ServicePoint = d.ServicePoint,
             ServicePublicKey = d.ServicePublicKey,
             SleepSeconds = d.SleepSeconds,

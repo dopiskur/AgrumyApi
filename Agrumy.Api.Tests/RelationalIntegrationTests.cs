@@ -1007,7 +1007,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.True(fleet.Single(f => f.IDDevice == recognizedKit.IDDevice).ControllerCapable);
     }
 
-    // deviceDiagnostic.Kit has a real FK to deviceType.Kit - a device reporting a genuinely new (non-empty) Kit string the catalog has never seen must not have its heartbeat write fail because of it.
+    // deviceDiagnostic.DeviceTypeID has a real FK to deviceType.IDDeviceType - a device reporting a genuinely new (non-empty) Kit string the catalog has never seen must not have its heartbeat write fail because of it.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceDiagnosticUpsert_UnrecognizedKit_AutoRegisters_NotBlocksTheWrite(DbProviderKind provider)
     {
@@ -1024,21 +1024,24 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.False(registered.ControllerCapable); // auto-registered, not curated - capability defaults closed, admin can promote it later
     }
 
-    // ManualKit is the admin fallback for a device whose firmware never auto-reports a Kit; the diagnostic-reported Kit still wins whenever both are present.
+    // ManualDeviceTypeID is the admin fallback for a device whose firmware never auto-reports a Kit; the diagnostic-reported DeviceTypeID still wins whenever both are present.
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceFleetGet_ControllerCapable_FallsBackToManualKit_OnlyWhenNoDiagnosticKit(DbProviderKind provider)
+    public async Task DeviceFleetGet_ControllerCapable_FallsBackToManualDeviceTypeID_OnlyWhenNoDiagnosticDeviceType(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var d = await MakeDevice(t, tenantId);
         d.DeviceControllerEnabled = false;
-        d.ManualKit = "KC868-A6";
+        var capableType = new DeviceTypeRow { Kit = "CapableKit_" + U(), ControllerCapable = true };
+        _db!.DeviceTypes.Add(capableType);
+        await _db.SaveChangesAsync();
+        d.ManualDeviceTypeID = capableType.IDDeviceType;
         await _repo.DeviceUpdateAsync(d);
 
-        // No diagnostic row at all yet - ManualKit alone should grant capability.
+        // No diagnostic row at all yet - ManualDeviceTypeID alone should grant capability.
         Assert.True((await _repo.DeviceFleetGetAsync(tenantId)).Single(f => f.IDDevice == d.IDDevice).ControllerCapable);
 
-        // A real, unrecognized diagnostic Kit now takes priority over ManualKit, even though ManualKit is still a capable one.
+        // A real, unrecognized diagnostic Kit now takes priority over ManualDeviceTypeID, even though ManualDeviceTypeID is still a capable one.
         await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice!.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1, Kit = "esp32dev-unrecognized" });
         Assert.False((await _repo.DeviceFleetGetAsync(tenantId)).Single(f => f.IDDevice == d.IDDevice).ControllerCapable);
     }

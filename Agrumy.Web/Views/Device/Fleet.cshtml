@@ -118,11 +118,11 @@
                     {
                         <div class="mb-3">
                             <label class="form-label" for="registerKitSelect">Kit (optional)</label>
-                            <select class="form-select" name="ManualKit" id="registerKitSelect">
+                            <select class="form-select" name="ManualDeviceTypeID" id="registerKitSelect">
                                 <option value="">-- not set --</option>
                                 @foreach (var deviceType in Model.DeviceTypes)
                                 {
-                                    <option value="@deviceType.Kit">@deviceType.Kit</option>
+                                    <option value="@deviceType.IDDeviceType">@deviceType.Kit</option>
                                 }
                             </select>
                         </div>
