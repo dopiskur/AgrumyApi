@@ -150,7 +150,7 @@ public class UserProfileTests
 
     private UserApiController NewController(string? email)
     {
-        var controller = new UserApiController(_repo.Object, _cache.Object, new api.BackgroundWorkers.BackgroundJobQueue(), TestSettings);
+        var controller = new UserApiController(_repo.Object, _repo.Object, _repo.Object, _repo.Object, _repo.Object, _cache.Object, new api.BackgroundWorkers.BackgroundJobQueue(), TestSettings);
         var claims = new List<Claim> { new("TenantID", "1") };
         if (email != null)
         {

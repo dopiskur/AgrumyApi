@@ -12,16 +12,18 @@ using Microsoft.Extensions.Options;
 namespace api.Controllers.API
 {
     [Route("/api/Device")]
-    public class DeviceApiController(IRepository repo, ICache cache, CommandQueueService commandQueue, FirmwareCatalogService firmwareCatalog, DeviceConfigBuilder configBuilder, IOptions<AgrumySettings> settingsOptions) : ApiControllerBase(repo, cache)
+    public class DeviceApiController(IDeviceRepository deviceRepo, IDeviceUnitRepository deviceUnitRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, CommandQueueService commandQueue, FirmwareCatalogService firmwareCatalog, DeviceConfigBuilder configBuilder, IOptions<AgrumySettings> settingsOptions) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         private readonly AgrumySettings settings = settingsOptions.Value;
+        // Separate field, not the primary-constructor parameter directly - a parameter used both here and in the base(...) call trips CS9107 (ambiguous double-capture).
+        private readonly IUserRepository users = userRepo;
 
         #region websvc api
 
         [Authorize]
         [HttpGet("All")]
         public async Task<ActionResult<IEnumerable<DeviceDto>>> DevicesGet() =>
-            Ok((CallerReadsDevicesGlobally ? await Repo.DevicesGetAllAsync() : await Repo.DevicesGetAsync(CallerTenantId))
+            Ok((CallerReadsDevicesGlobally ? await deviceRepo.DevicesGetAllAsync() : await deviceRepo.DevicesGetAsync(CallerTenantId))
                 .Select(d => d.ToDto()));
 
         [Authorize]
@@ -30,8 +32,8 @@ namespace api.Controllers.API
         {
             // A Global reader/Device/admin sees any tenant's device - DeviceGetAsync's tenant filter would hide it, so use the unfiltered by-id lookup for them.
             Device? device = CallerReadsDevicesGlobally
-                ? await Repo.DeviceGetByIdAsync(idDevice)
-                : await Repo.DeviceGetAsync(CallerTenantId, idDevice, null, null);
+                ? await deviceRepo.DeviceGetByIdAsync(idDevice)
+                : await deviceRepo.DeviceGetAsync(CallerTenantId, idDevice, null, null);
             return device is null ? NotFound() : Ok(device.ToDto());
         }
 
@@ -40,7 +42,7 @@ namespace api.Controllers.API
         public async Task<ActionResult<bool>> DeviceUpdate([FromBody] DeviceDto device)
         {
             var (existing, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(device.IDDevice), "Device", forWrite: true);
+                () => deviceRepo.DeviceGetByIdAsync(device.IDDevice), "Device", forWrite: true);
             if (error != null)
             {
                 return error;
@@ -49,7 +51,7 @@ namespace api.Controllers.API
             Device internalDevice = device.ToDevice();
             internalDevice.TenantID = existing!.TenantID; // payload cannot move a device to another tenant
 
-            await Repo.DeviceUpdateAsync(internalDevice);
+            await deviceRepo.DeviceUpdateAsync(internalDevice);
             await WriteAuditAsync("Device.Updated", existing.TenantID, "Device", existing.IDDevice.ToString()!, existing.DeviceName);
             return true;
         }
@@ -59,14 +61,14 @@ namespace api.Controllers.API
         public async Task<ActionResult<bool>> DeviceDelete(int? idDevice)
         {
             var (device, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(idDevice), "Device", forWrite: true);
+                () => deviceRepo.DeviceGetByIdAsync(idDevice), "Device", forWrite: true);
             if (error != null)
             {
                 return error;
             }
 
             // The device's OWN tenant, not the caller's - a Global admin/Device deleting a foreign tenant's device would otherwise silently match zero rows.
-            await Repo.DeviceDeleteAsync(idDevice, device!.TenantID);
+            await deviceRepo.DeviceDeleteAsync(idDevice, device!.TenantID);
             await WriteAuditAsync("Device.Deleted", device.TenantID, "Device", idDevice.ToString()!, device.DeviceName);
             return true;
         }
@@ -80,13 +82,13 @@ namespace api.Controllers.API
                 return StatusCode(403, "Data Reader role cannot view device configuration.");
             }
             var (_, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByDeviceConfigSensorIdAsync(deviceConfigSensorID), "Sensor config", forWrite: false);
+                () => deviceRepo.DeviceGetByDeviceConfigSensorIdAsync(deviceConfigSensorID), "Sensor config", forWrite: false);
             if (error != null)
             {
                 return error;
             }
 
-            return Ok(await Repo.DeviceConfigSensorGetAsync(deviceConfigSensorID));
+            return Ok(await deviceRepo.DeviceConfigSensorGetAsync(deviceConfigSensorID));
         }
 
         [Authorize]
@@ -98,27 +100,27 @@ namespace api.Controllers.API
                 return StatusCode(403, "Data Reader role cannot view device configuration.");
             }
             var (_, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByDeviceConfigControllerIdAsync(deviceConfigControllerID), "Controller config", forWrite: false);
+                () => deviceRepo.DeviceGetByDeviceConfigControllerIdAsync(deviceConfigControllerID), "Controller config", forWrite: false);
             if (error != null)
             {
                 return error;
             }
 
-            return Ok(await Repo.DeviceConfigControllerGetAsync(deviceConfigControllerID));
+            return Ok(await deviceRepo.DeviceConfigControllerGetAsync(deviceConfigControllerID));
         }
 
         /// Read-only status of every device at once, open to any authenticated caller; tenant scoping mirrors DevicesGet, with global readers seeing all tenants.
         [Authorize]
         [HttpGet("Fleet")]
         public async Task<ActionResult<IList<DeviceFleetStatus>>> DeviceFleetGet() =>
-            Ok(await Repo.DeviceFleetGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
+            Ok(await deviceRepo.DeviceFleetGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
 
         /// Same status DeviceFleetGet carries for one device, without scanning the whole fleet - for a single-device detail page.
         [Authorize]
         [HttpGet("FleetStatus")]
         public async Task<ActionResult<DeviceFleetStatus>> DeviceFleetStatusGet(int idDevice)
         {
-            DeviceFleetStatus? status = await Repo.DeviceFleetStatusGetAsync(idDevice, CallerReadsDevicesGlobally ? null : CallerTenantId);
+            DeviceFleetStatus? status = await deviceRepo.DeviceFleetStatusGetAsync(idDevice, CallerReadsDevicesGlobally ? null : CallerTenantId);
             return status is null ? NotFound() : Ok(status);
         }
 
@@ -128,14 +130,14 @@ namespace api.Controllers.API
         public async Task<ActionResult<IList<DeviceEvent>>> DeviceEventsGet(int? idDevice)
         {
             var (device, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(idDevice), "Device", forWrite: false);
+                () => deviceRepo.DeviceGetByIdAsync(idDevice), "Device", forWrite: false);
             if (error != null)
             {
                 return error;
             }
 
             // The device's own tenant (== the caller's for a tenant-scoped caller; the ensure call above already authorized a cross-tenant global reader).
-            return Ok(await Repo.EventDeviceGetAsync(device!.IDDevice, device.TenantID));
+            return Ok(await deviceRepo.EventDeviceGetAsync(device!.IDDevice, device.TenantID));
         }
 
         /// Dismisses one non-critical problem alert (see api.Dal.EfRepository.ComputeStatus) so it stops keeping its device's Unit/Zone Orange - only EventDeviceRow.AcknowledgedAt is set, the event row itself stays for history.
@@ -143,7 +145,7 @@ namespace api.Controllers.API
         [HttpPut("Event/{idEventDevice}/Acknowledge")]
         public async Task<ActionResult<bool>> DeviceEventAcknowledge(int idEventDevice)
         {
-            bool updated = await Repo.EventDeviceAcknowledgeAsync(idEventDevice, CallerManagesDevicesGlobally ? null : CallerTenantId);
+            bool updated = await deviceRepo.EventDeviceAcknowledgeAsync(idEventDevice, CallerManagesDevicesGlobally ? null : CallerTenantId);
             if (!updated)
             {
                 return NotFound();
@@ -161,13 +163,13 @@ namespace api.Controllers.API
             }
 
             var (_, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice), "Device", forWrite: true);
+                () => deviceRepo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice), "Device", forWrite: true);
             if (error != null)
             {
                 return error;
             }
 
-            await Repo.DeviceConfigSensorUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Sensor);
+            await deviceRepo.DeviceConfigSensorUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Sensor);
             return true;
         }
 
@@ -182,13 +184,13 @@ namespace api.Controllers.API
             }
 
             var (_, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice), "Device", forWrite: true);
+                () => deviceRepo.DeviceGetByIdAsync(deviceUpdate.Device.IDDevice), "Device", forWrite: true);
             if (error != null)
             {
                 return error;
             }
 
-            string? problem = await Repo.DeviceConfigControllerUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Controller);
+            string? problem = await deviceRepo.DeviceConfigControllerUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Controller);
             if (problem != null)
             {
                 return BadRequest(problem);
@@ -214,20 +216,20 @@ namespace api.Controllers.API
         {
             string apiId = HttpContext.DeviceApiId()!;
 
-            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            Device? device = await deviceRepo.DeviceGetByApiIdAsync(apiId);
             if (device is null)
             {
                 return NotFound();
             }
 
-            await Repo.DeviceDiagnosticUpsertAsync(device.IDDevice!.Value, device.TenantID, value);
+            await deviceRepo.DeviceDiagnosticUpsertAsync(device.IDDevice!.Value, device.TenantID, value);
 
             // The heartbeat is also how the server learns an OTA actually took - the first poll reporting the requested version fulfils the request (flags cleared, event logged).
             if (await firmwareCatalog.NoteHeartbeatAsync(device, value.FirmwareVersion, value.Board))
             {
                 device.FirmwareUpdate = false;
                 device.FirmwareTargetVersion = null;
-                await Repo.EventDevicePushAsync(device.IDDevice.Value, device.TenantID, DeviceEventType.FirmwareUpdated, "version=" + value.FirmwareVersion);
+                await deviceRepo.EventDevicePushAsync(device.IDDevice.Value, device.TenantID, DeviceEventType.FirmwareUpdated, "version=" + value.FirmwareVersion);
             }
 
             // Compared against the device row read above (not a stale/absent session-cache copy) - config-unchanged alone is no longer enough to skip the response, since a pending command must ride along on this same poll.
@@ -238,7 +240,7 @@ namespace api.Controllers.API
             }
 
             DeviceConfig config = await configBuilder.BuildAsync(device, pendingCommand, value.Board);
-            await Repo.DeviceMarkConfigSentAsync(device.IDDevice.Value, DateTime.UtcNow);
+            await deviceRepo.DeviceMarkConfigSentAsync(device.IDDevice.Value, DateTime.UtcNow);
             return Ok(config);
         }
 
@@ -248,7 +250,7 @@ namespace api.Controllers.API
         public async Task<ActionResult> FirmwareUpdateRequest([FromBody] DeviceFirmwareUpdateRequest request)
         {
             var (device, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(request.IdDevice), "Device", forWrite: true);
+                () => deviceRepo.DeviceGetByIdAsync(request.IdDevice), "Device", forWrite: true);
             if (error != null)
             {
                 return error;
@@ -262,7 +264,7 @@ namespace api.Controllers.API
         public async Task<ActionResult> FirmwareUpdateCancel(int idDevice)
         {
             var (_, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(idDevice), "Device", forWrite: true);
+                () => deviceRepo.DeviceGetByIdAsync(idDevice), "Device", forWrite: true);
             if (error != null)
             {
                 return error;
@@ -282,7 +284,7 @@ namespace api.Controllers.API
             }
 
             var (device, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(request.IdDevice), "Device", forWrite: true);
+                () => deviceRepo.DeviceGetByIdAsync(request.IdDevice), "Device", forWrite: true);
             if (error != null)
             {
                 return error;
@@ -303,13 +305,13 @@ namespace api.Controllers.API
             }
 
             string apiId = HttpContext.DeviceApiId()!;
-            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            Device? device = await deviceRepo.DeviceGetByApiIdAsync(apiId);
             if (device is null)
             {
                 return Unauthorized();
             }
 
-            await Repo.EventDevicePushAsync(device.IDDevice!.Value, device.TenantID, eventType, value.Message);
+            await deviceRepo.EventDevicePushAsync(device.IDDevice!.Value, device.TenantID, eventType, value.Message);
 
             // The device's post-execution confirmation rides on this same event-push endpoint - CommandId links it back to the specific command row.
             if (eventType == DeviceEventType.CommandExecuted && value.CommandId is int commandId)
@@ -327,7 +329,7 @@ namespace api.Controllers.API
         public async Task<ActionResult> AckCommand([FromBody] CommandAckRequest value)
         {
             string apiId = HttpContext.DeviceApiId()!;
-            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            Device? device = await deviceRepo.DeviceGetByApiIdAsync(apiId);
             if (device is null)
             {
                 return Unauthorized();
@@ -347,13 +349,13 @@ namespace api.Controllers.API
             }
 
             // Expiry and match failures share one generic 401 - a distinct "pin expired" reply would confirm the email exists to an unauthenticated caller.
-            User? user = await Repo.UserGetAsync(null, value.Email, null);
+            User? user = await users.UserGetAsync(null, value.Email, null);
             if (user is null || !AuthenticationProvider.VerifyPin(user.DevicePin, user.DevicePinExpires, value.DevicePin))
             {
                 return StatusCode(401, "Wrong user or pin");
             }
 
-            Device? device = await Repo.DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
+            Device? device = await deviceRepo.DeviceGetAsync(user.TenantID, null, null, value.MacAddress);
             if (device is null)
             {
                 // A client merely holding a valid user email+PIN (the same bar every ordinary device meets) must not be able to claim gateway status on its own say-so - only honored when it also proves it's the real Agrumy.Gateway via this shared secret.
@@ -364,7 +366,7 @@ namespace api.Controllers.API
                 // This mac may be the target of an earlier Discovery/Register call whose queued ProvisionDevice command carries the DeviceName/Zone the admin picked then.
                 DiscoveryProvisionPayload? provision = await commandQueue.ConsumePendingProvisionAsync(value.MacAddress);
 
-                device = await Repo.DeviceAddAsync(new Device
+                device = await deviceRepo.DeviceAddAsync(new Device
                 {
                     ConfigVersion = 1,
                     TenantID = user.TenantID ?? 0,
@@ -384,7 +386,7 @@ namespace api.Controllers.API
 
                 if (provision?.ZoneID is int zoneId)
                 {
-                    await Repo.DeviceAssignToZoneAsync(device.IDDevice!.Value, zoneId);
+                    await deviceUnitRepo.DeviceAssignToZoneAsync(device.IDDevice!.Value, zoneId);
                 }
             }
 
@@ -400,7 +402,7 @@ namespace api.Controllers.API
         public async Task<ActionResult<DeviceAuthentication>> ReqAuth()
         {
             string apiId = HttpContext.DeviceApiId()!;
-            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            Device? device = await deviceRepo.DeviceGetByApiIdAsync(apiId);
             if (device is null)
             {
                 return NotFound();
@@ -424,28 +426,28 @@ namespace api.Controllers.API
         [HttpGet("Role")]
         [Authorize]
         public async Task<ActionResult<IEnumerable<DeviceRole>>> DeviceRoleGet() =>
-            Ok(await Repo.DeviceRoleGetAsync());
+            Ok(await deviceRepo.DeviceRoleGetAsync());
 
         /// Backs the Web Device Edit form's "Manual Kit" dropdown.
         [HttpGet("Type")]
         [Authorize]
         public async Task<ActionResult<IEnumerable<DeviceType>>> DeviceTypeGet() =>
-            Ok(await Repo.DeviceTypeGetAsync());
+            Ok(await deviceRepo.DeviceTypeGetAsync());
 
         [HttpGet("TypeService")]
         [Authorize]
         public async Task<ActionResult<IEnumerable<DeviceTypeService>>> DeviceTypeServiceGet() =>
-            Ok(await Repo.DeviceTypeServiceGetAsync());
+            Ok(await deviceRepo.DeviceTypeServiceGetAsync());
 
         [HttpGet("TypeRelay")]
         [Authorize]
         public async Task<ActionResult<IEnumerable<DeviceTypeRelay>>> DeviceTypeRelayGet() =>
-            Ok(await Repo.DeviceTypeRelayGetAsync());
+            Ok(await deviceRepo.DeviceTypeRelayGetAsync());
 
         [HttpGet("TypeSensor")]
         [Authorize]
         public async Task<ActionResult<IEnumerable<DeviceTypeSensor>>> DeviceTypeSensorGet() =>
-            Ok(await Repo.DeviceTypeSensorGetAsync());
+            Ok(await deviceRepo.DeviceTypeSensorGetAsync());
 
         #endregion
 
@@ -457,13 +459,13 @@ namespace api.Controllers.API
         public async Task<ActionResult<DeviceSimulation>> DeviceSimulationPoll()
         {
             string apiId = HttpContext.DeviceApiId()!;
-            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            Device? device = await deviceRepo.DeviceGetByApiIdAsync(apiId);
             if (device is null)
             {
                 return Unauthorized();
             }
 
-            DeviceSimulation? sim = await Repo.DeviceSimulationGetAsync(device.IDDevice!.Value);
+            DeviceSimulation? sim = await deviceRepo.DeviceSimulationGetAsync(device.IDDevice!.Value);
             return sim is { Enabled: true } ? Ok(sim) : NoContent();
         }
 
@@ -472,24 +474,24 @@ namespace api.Controllers.API
         [Authorize(Roles = RoleNames.SimulationManagers)]
         public async Task<ActionResult<DeviceSimulation>> DeviceSimulationGet(int idDevice)
         {
-            var (_, error) = await EnsureOwnedDeviceAsync(() => Repo.DeviceGetByIdAsync(idDevice), "Device", forWrite: false);
+            var (_, error) = await EnsureOwnedDeviceAsync(() => deviceRepo.DeviceGetByIdAsync(idDevice), "Device", forWrite: false);
             if (error != null)
             {
                 return error;
             }
-            return Ok(await Repo.DeviceSimulationGetAsync(idDevice) ?? new DeviceSimulation());
+            return Ok(await deviceRepo.DeviceSimulationGetAsync(idDevice) ?? new DeviceSimulation());
         }
 
         [HttpPut("Simulation/{idDevice}")]
         [Authorize(Roles = RoleNames.SimulationManagers)]
         public async Task<ActionResult> DeviceSimulationSet(int idDevice, [FromBody] DeviceSimulation value)
         {
-            var (device, error) = await EnsureOwnedDeviceAsync(() => Repo.DeviceGetByIdAsync(idDevice), "Device", forWrite: true);
+            var (device, error) = await EnsureOwnedDeviceAsync(() => deviceRepo.DeviceGetByIdAsync(idDevice), "Device", forWrite: true);
             if (error != null)
             {
                 return error;
             }
-            await Repo.DeviceSimulationSetAsync(idDevice, value);
+            await deviceRepo.DeviceSimulationSetAsync(idDevice, value);
             await WriteAuditAsync("Device.SimulationSet", device!.TenantID, "Device", idDevice.ToString(), device.DeviceName);
             return Ok();
         }

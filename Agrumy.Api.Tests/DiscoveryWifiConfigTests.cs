@@ -21,7 +21,7 @@ public class DiscoveryWifiConfigTests
 
     private DiscoveryApiController NewController(int? tenantId, params string[] roles)
     {
-        var controller = new DiscoveryApiController(_repo.Object, _cache.Object,
+        var controller = new DiscoveryApiController(_repo.Object, _repo.Object, _repo.Object, _repo.Object, _repo.Object, _repo.Object, _cache.Object,
             new CommandQueueService(_repo.Object, _repo.Object, _repo.Object, new NoOpMqttCommandPublisher()), Options.Create(new AgrumySettings()));
         var claims = new List<Claim> { new("TenantID", tenantId?.ToString() ?? "") };
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));

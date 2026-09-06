@@ -13,8 +13,8 @@ namespace api.Controllers.API
     [Route("api/DataMaintenance")]
     [Authorize(Roles = RoleNames.LegacyAdmin)]
     public class DataMaintenanceApiController(
-        IRepository repo, ICache cache, AgrumyDbContext db, BackgroundJobQueue jobQueue, ILogger<DataMaintenanceApiController> logger)
-        : ApiControllerBase(repo, cache)
+        IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, AgrumyDbContext db, BackgroundJobQueue jobQueue, ILogger<DataMaintenanceApiController> logger)
+        : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         /// Lets Agrumy.Web decide whether to show the MariaDB-only "shrink files on disk?" dialog before confirming a Purge - Postgres/TimescaleDB reclaims disk space automatically.
         [HttpGet("Provider")]

@@ -29,7 +29,7 @@ public class GatewayApiControllerTests
     private GatewayApiController NewJwtController()
     {
         var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
-        return new GatewayApiController(_repo.Object, _cache.Object,
+        return new GatewayApiController(_repo.Object, _repo.Object, _repo.Object, _repo.Object, _repo.Object, _repo.Object, _cache.Object,
             new CommandQueueService(_repo.Object, _repo.Object, _repo.Object, new NoOpMqttCommandPublisher()), catalog,
             new api.Devices.DeviceConfigBuilder(_repo.Object, catalog));
     }

@@ -11,7 +11,7 @@ namespace api.Controllers.API
 {
     /// The firmware catalog and its population paths - every write is Global admin only (install-wide, same rule as ServerConfigApiController), reads are open to device managers for the per-device update UI, Download is anonymous on purpose (see its own comment).
     [Route("/api/Firmware")]
-    public class FirmwareApiController(IRepository repo, ICache cache, FirmwareCatalogService catalog, IOptions<AgrumySettings> settings) : ApiControllerBase(repo, cache)
+    public class FirmwareApiController(IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, FirmwareCatalogService catalog, IOptions<AgrumySettings> settings) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpGet]

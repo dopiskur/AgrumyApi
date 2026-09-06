@@ -15,15 +15,16 @@ namespace api.Controllers.API
     /// Agrumy.Gateway's own endpoints - a gateway is a device row like any other (see api.Models.Device.IsGateway) that authenticates the same way (DeviceAuth.ApiKeyPolicy, its own apiId/apiKey), just forwarding OTHER devices' traffic through Batch instead of reporting its own sensors.
     [Route("/api/Gateway")]
     public class GatewayApiController(
-        IRepository repo, ICache cache, CommandQueueService commandQueue,
+        IDeviceRepository deviceRepo, IServerConfigRepository serverConfigRepo, ISensorDataRepository sensorDataRepo, IGatewayRepository gatewayRepo,
+        IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, CommandQueueService commandQueue,
         FirmwareCatalogService firmwareCatalog, DeviceConfigBuilder configBuilder)
-        : ApiControllerBase(repo, cache)
+        : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         /// The caller's own device row, already confirmed to be a gateway - null (with the ActionResult already set) covers every failure mode, so every action below is one guard clause instead of repeating the same checks.
         private async Task<(Device? gateway, ActionResult? error)> GetCallerGatewayAsync()
         {
             string apiId = HttpContext.DeviceApiId()!;
-            Device? gateway = await Repo.DeviceGetByApiIdAsync(apiId);
+            Device? gateway = await deviceRepo.DeviceGetByApiIdAsync(apiId);
             if (gateway is null)
             {
                 return (null, NotFound());
@@ -32,7 +33,7 @@ namespace api.Controllers.API
             {
                 return (null, StatusCode(403, "This device is not registered as a Gateway."));
             }
-            ServerConfig serverConfig = await Repo.ServerConfigGetAsync(1);
+            ServerConfig serverConfig = await serverConfigRepo.ServerConfigGetAsync(1);
             if (!serverConfig.GatewayEnabled)
             {
                 return (null, StatusCode(403, "Gateway support is disabled server-wide (Server Settings -> Gateway)."));
@@ -60,7 +61,7 @@ namespace api.Controllers.API
                 return BadRequest($"Batch too large: {request.Entries.Count} entries, max {MaxBatchEntries}.");
             }
 
-            ServerConfig serverConfig = await Repo.ServerConfigGetAsync(1);
+            ServerConfig serverConfig = await serverConfigRepo.ServerConfigGetAsync(1);
             var results = new List<GatewayBatchEntryResult>(request.Entries.Count);
             foreach (GatewayBatchEntry entry in request.Entries)
             {
@@ -77,7 +78,7 @@ namespace api.Controllers.API
 
         private async Task<GatewayBatchEntryResult> RunEntryAsync(GatewayBatchEntry entry, int gatewayTenantId)
         {
-            Device? device = await Repo.DeviceGetByApiIdAsync(entry.DeviceApiId);
+            Device? device = await deviceRepo.DeviceGetByApiIdAsync(entry.DeviceApiId);
             if (device is null || !DeviceAuth.ConstantTimeEquals(entry.DeviceApiKey, device.ApiKey))
             {
                 return new GatewayBatchEntryResult { Success = false, StatusCode = 401, Error = "Unknown device or apiKey mismatch." };
@@ -110,13 +111,13 @@ namespace api.Controllers.API
         {
             DeviceConfigPoll poll = payload.Deserialize<DeviceConfigPoll>() ?? new DeviceConfigPoll();
 
-            await Repo.DeviceDiagnosticUpsertAsync(device.IDDevice!.Value, device.TenantID, poll);
+            await deviceRepo.DeviceDiagnosticUpsertAsync(device.IDDevice!.Value, device.TenantID, poll);
 
             if (await firmwareCatalog.NoteHeartbeatAsync(device, poll.FirmwareVersion, poll.Board))
             {
                 device.FirmwareUpdate = false;
                 device.FirmwareTargetVersion = null;
-                await Repo.EventDevicePushAsync(device.IDDevice.Value, device.TenantID, DeviceEventType.FirmwareUpdated, "version=" + poll.FirmwareVersion);
+                await deviceRepo.EventDevicePushAsync(device.IDDevice.Value, device.TenantID, DeviceEventType.FirmwareUpdated, "version=" + poll.FirmwareVersion);
             }
 
             PendingCommand? pendingCommand = await commandQueue.GetPendingCommandAsync(device.IDDevice.Value);
@@ -126,7 +127,7 @@ namespace api.Controllers.API
             }
 
             DeviceConfig config = await configBuilder.BuildAsync(device, pendingCommand, poll.Board);
-            await Repo.DeviceMarkConfigSentAsync(device.IDDevice!.Value, DateTime.UtcNow);
+            await deviceRepo.DeviceMarkConfigSentAsync(device.IDDevice!.Value, DateTime.UtcNow);
             return new GatewayBatchEntryResult { Success = true, StatusCode = 200, Config = config };
         }
 
@@ -136,7 +137,7 @@ namespace api.Controllers.API
             JsonArray jsonArray = JsonNode.Parse(payload.GetRawText()) as JsonArray
                 ?? throw new JsonException("SensorData payload must be a JSON array.");
 
-            await Repo.SensorDataPushAsync(jsonArray, device.IDDevice!.Value, device.TenantID,
+            await sensorDataRepo.SensorDataPushAsync(jsonArray, device.IDDevice!.Value, device.TenantID,
                 device.DeviceUnitID, device.DeviceUnitZoneID);
 
             return new GatewayBatchEntryResult { Success = true, StatusCode = 200 };
@@ -151,7 +152,7 @@ namespace api.Controllers.API
                 return new GatewayBatchEntryResult { Success = false, StatusCode = 400, Error = $"Unknown eventType: {push.EventType}" };
             }
 
-            await Repo.EventDevicePushAsync(device.IDDevice!.Value, device.TenantID, eventType, push.Message);
+            await deviceRepo.EventDevicePushAsync(device.IDDevice!.Value, device.TenantID, eventType, push.Message);
 
             if (eventType == DeviceEventType.CommandExecuted && push.CommandId is int commandId)
             {
@@ -180,7 +181,7 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            return Ok(await Repo.GatewayDeviceMappingsWithSecretsGetAsync(gateway!.IDDevice!.Value));
+            return Ok(await gatewayRepo.GatewayDeviceMappingsWithSecretsGetAsync(gateway!.IDDevice!.Value));
         }
 
         // ---- admin (Gateway Devices page) ---------------------------------------------------
@@ -188,11 +189,11 @@ namespace api.Controllers.API
         [HttpGet("All")]
         [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult<IList<DeviceDto>>> GatewaysGetAll() =>
-            Ok((await Repo.GatewayDevicesGetAllAsync()).Select(d => d.ToDto()).ToList());
+            Ok((await gatewayRepo.GatewayDevicesGetAllAsync()).Select(d => d.ToDto()).ToList());
 
         /// Looks the gateway device up and checks the caller may touch it - same shared 404/403 logic every other Device-domain controller uses (ApiControllerBase.EnsureOwnedDeviceEntityAsync).
         private Task<(Device? Gateway, ActionResult? Error)> EnsureOwnedGatewayAsync(int idGatewayDevice, bool forWrite) =>
-            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceGetByIdAsync(idGatewayDevice), d => d.TenantID, "Gateway", forWrite);
+            EnsureOwnedDeviceEntityAsync(() => deviceRepo.DeviceGetByIdAsync(idGatewayDevice), d => d.TenantID, "Gateway", forWrite);
 
         [HttpGet("DeviceMapping/All")]
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -203,7 +204,7 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            return Ok(await Repo.GatewayDeviceMappingsGetAsync(idGatewayDevice));
+            return Ok(await gatewayRepo.GatewayDeviceMappingsGetAsync(idGatewayDevice));
         }
 
         [HttpPost("DeviceMapping")]
@@ -219,7 +220,7 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            bool added = await Repo.GatewayDeviceMappingAddAsync(idGateway, value.DevEUI.Trim().ToUpperInvariant(), idDevice, gateway!.TenantID);
+            bool added = await gatewayRepo.GatewayDeviceMappingAddAsync(idGateway, value.DevEUI.Trim().ToUpperInvariant(), idDevice, gateway!.TenantID);
             return added ? Ok(true) : Conflict("That DevEUI is already mapped for this gateway, or IDDevice does not exist or belongs to a different tenant than the gateway.");
         }
 
@@ -232,7 +233,7 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            return Ok(await Repo.GatewayDeviceMappingDeleteAsync(idGatewayDeviceMapping, idGatewayDevice));
+            return Ok(await gatewayRepo.GatewayDeviceMappingDeleteAsync(idGatewayDeviceMapping, idGatewayDevice));
         }
     }
 }

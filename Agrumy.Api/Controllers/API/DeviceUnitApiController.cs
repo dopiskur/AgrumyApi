@@ -13,7 +13,7 @@ namespace api.Controllers.API
 {
     /// Unit/Zone CRUD, device assignment, and hierarchical dashboard aggregation - ownership checks mirror DeviceApiController.EnsureOwnedDeviceAsync, same CallerReadsDevicesGlobally/CallerManagesDevicesGlobally rules as the rest of the Device domain.
     [Route("/api/DeviceUnit")]
-    public class DeviceUnitApiController(IRepository repo, ICache cache, IOptions<AgrumySettings> settingsOptions, ManualActuateService manualActuate) : ApiControllerBase(repo, cache)
+    public class DeviceUnitApiController(IDeviceUnitRepository deviceUnitRepo, IDeviceRepository deviceRepo, IServerConfigRepository serverConfigRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, IOptions<AgrumySettings> settingsOptions, ManualActuateService manualActuate) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         private readonly AgrumySettings settings = settingsOptions.Value;
 
@@ -28,7 +28,7 @@ namespace api.Controllers.API
         [Authorize]
         [HttpGet("All")]
         public async Task<ActionResult<IList<DeviceUnit>>> DeviceUnitsGet() =>
-            Ok(await Repo.DeviceUnitsGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
+            Ok(await deviceUnitRepo.DeviceUnitsGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
 
         [Authorize]
         [HttpGet]
@@ -43,7 +43,7 @@ namespace api.Controllers.API
         public async Task<ActionResult<DeviceUnit>> DeviceUnitAdd([FromBody] DeviceUnit unit)
         {
             unit.TenantID = CallerTenantId; // payload cannot pick another tenant - same rule as every other Add
-            DeviceUnit added = await Repo.DeviceUnitAddAsync(unit);
+            DeviceUnit added = await deviceUnitRepo.DeviceUnitAddAsync(unit);
             await WriteAuditAsync("DeviceUnit.Created", added.TenantID, "DeviceUnit", added.IDDeviceUnit.ToString()!, added.DeviceUnitName);
             return Ok(added);
         }
@@ -58,7 +58,7 @@ namespace api.Controllers.API
                 return error;
             }
             unit.TenantID = existing!.TenantID; // payload cannot move a unit to another tenant
-            await Repo.DeviceUnitUpdateAsync(unit);
+            await deviceUnitRepo.DeviceUnitUpdateAsync(unit);
             await WriteAuditAsync("DeviceUnit.Updated", existing.TenantID, "DeviceUnit", existing.IDDeviceUnit.ToString()!, unit.DeviceUnitName);
             return true;
         }
@@ -72,7 +72,7 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            await Repo.DeviceUnitDeleteAsync(unit!.IDDeviceUnit!.Value);
+            await deviceUnitRepo.DeviceUnitDeleteAsync(unit!.IDDeviceUnit!.Value);
             await WriteAuditAsync("DeviceUnit.Deleted", unit.TenantID, "DeviceUnit", idDeviceUnit.ToString()!, unit.DeviceUnitName);
             return true;
         }
@@ -91,7 +91,7 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            return Ok(await Repo.DeviceUnitZonesGetAsync(unit!.IDDeviceUnit!.Value));
+            return Ok(await deviceUnitRepo.DeviceUnitZonesGetAsync(unit!.IDDeviceUnit!.Value));
         }
 
         /// Single zone by id, so a caller that needs to patch one field can fetch-then-resubmit the whole object - DeviceUnitZoneUpdateAsync overwrites unconditionally, it does not merge.
@@ -113,7 +113,7 @@ namespace api.Controllers.API
                 return error;
             }
             zone.TenantID = unit!.TenantID; // the owning unit's tenant, not necessarily the caller's (a Global admin may add to another tenant's unit)
-            DeviceUnitZone added = await Repo.DeviceUnitZoneAddAsync(zone);
+            DeviceUnitZone added = await deviceUnitRepo.DeviceUnitZoneAddAsync(zone);
             await WriteAuditAsync("DeviceUnitZone.Created", added.TenantID, "DeviceUnitZone", added.IDDeviceUnitZone.ToString()!, added.DeviceUnitZoneName);
             return Ok(added);
         }
@@ -148,7 +148,7 @@ namespace api.Controllers.API
 
             zone.TenantID = existing!.TenantID; // payload cannot move a zone to another tenant
             zone.DeviceUnitID = existing.DeviceUnitID; // ...or to another unit - rename only
-            await Repo.DeviceUnitZoneUpdateAsync(zone);
+            await deviceUnitRepo.DeviceUnitZoneUpdateAsync(zone);
             await WriteAuditAsync("DeviceUnitZone.Updated", existing.TenantID, "DeviceUnitZone", existing.IDDeviceUnitZone.ToString()!, zone.DeviceUnitZoneName);
             return true;
         }
@@ -162,7 +162,7 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            await Repo.DeviceUnitZoneDeleteAsync(zone!.IDDeviceUnitZone!.Value);
+            await deviceUnitRepo.DeviceUnitZoneDeleteAsync(zone!.IDDeviceUnitZone!.Value);
             await WriteAuditAsync("DeviceUnitZone.Deleted", zone.TenantID, "DeviceUnitZone", idDeviceUnitZone.ToString()!, zone.DeviceUnitZoneName);
             return true;
         }
@@ -184,7 +184,7 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            return Ok(await Repo.RulesGetForZoneAsync(zone!.IDDeviceUnitZone!.Value));
+            return Ok(await deviceUnitRepo.RulesGetForZoneAsync(zone!.IDDeviceUnitZone!.Value));
         }
 
         [Authorize]
@@ -200,7 +200,7 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            return Ok(await Repo.RulesGetForUnitAsync(unit!.IDDeviceUnit!.Value));
+            return Ok(await deviceUnitRepo.RulesGetForUnitAsync(unit!.IDDeviceUnit!.Value));
         }
 
         [Authorize]
@@ -215,7 +215,7 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Caller has no tenant.");
             }
-            return Ok(await Repo.RulesGetForTenantGlobalAsync(tenantId));
+            return Ok(await deviceUnitRepo.RulesGetForTenantGlobalAsync(tenantId));
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -229,7 +229,7 @@ namespace api.Controllers.API
             }
             rule.DeviceUnitID = null;
             rule.TenantID = zone!.TenantID ?? CallerTenantId ?? 0;
-            return await AddRuleAsync(rule, existingCount: (await Repo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value)).Count, scopeLabel: $"zone {rule.DeviceUnitZoneID}");
+            return await AddRuleAsync(rule, existingCount: (await deviceUnitRepo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value)).Count, scopeLabel: $"zone {rule.DeviceUnitZoneID}");
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -243,7 +243,7 @@ namespace api.Controllers.API
             }
             rule.DeviceUnitZoneID = null;
             rule.TenantID = unit!.TenantID ?? CallerTenantId ?? 0;
-            return await AddRuleAsync(rule, existingCount: (await Repo.RulesGetForUnitAsync(unit.IDDeviceUnit!.Value)).Count, scopeLabel: $"unit {rule.DeviceUnitID}");
+            return await AddRuleAsync(rule, existingCount: (await deviceUnitRepo.RulesGetForUnitAsync(unit.IDDeviceUnit!.Value)).Count, scopeLabel: $"unit {rule.DeviceUnitID}");
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -257,7 +257,7 @@ namespace api.Controllers.API
             rule.DeviceUnitZoneID = null;
             rule.DeviceUnitID = null;
             rule.TenantID = tenantId;
-            return await AddRuleAsync(rule, existingCount: (await Repo.RulesGetForTenantGlobalAsync(tenantId)).Count, scopeLabel: $"tenant {tenantId} (global)");
+            return await AddRuleAsync(rule, existingCount: (await deviceUnitRepo.RulesGetForTenantGlobalAsync(tenantId)).Count, scopeLabel: $"tenant {tenantId} (global)");
         }
 
         /// Shared validate+cap+persist body for all three scopes - the only difference between them is which EnsureOwned*/existing-count call the caller already made.
@@ -267,13 +267,13 @@ namespace api.Controllers.API
             {
                 return BadRequest(shapeError);
             }
-            int configuredMax = (await Repo.ServerConfigGetAsync(1)).MaxRulesPerZone ?? settings.MaxRulesPerZone;
+            int configuredMax = (await serverConfigRepo.ServerConfigGetAsync(1)).MaxRulesPerZone ?? settings.MaxRulesPerZone;
             int effectiveMax = Math.Min(configuredMax, HardMaxRulesPerZone);
             if (existingCount >= effectiveMax)
             {
                 return BadRequest($"This scope already has {existingCount} rules, the configured maximum ({effectiveMax}). Remove one before adding another.");
             }
-            int idRule = await Repo.RuleAddAsync(rule);
+            int idRule = await deviceUnitRepo.RuleAddAsync(rule);
             await WriteAuditAsync("DeviceUnitZoneRule.Created", rule.TenantID, "DeviceUnitZoneRule", idRule.ToString(), $"{scopeLabel}, {rule.ActionType}/{rule.RelayFunction}{rule.SensorMetric}");
             return Ok(idRule);
         }
@@ -293,7 +293,7 @@ namespace api.Controllers.API
         /// One shared delete body regardless of which scope route it came in through - ownership is resolved from the rule's OWN scope fields, not the route.
         private async Task<ActionResult<bool>> DeleteRuleAsync(int? idRule)
         {
-            DeviceUnitZoneRule? rule = await Repo.RuleGetByIdAsync(idRule);
+            DeviceUnitZoneRule? rule = await deviceUnitRepo.RuleGetByIdAsync(idRule);
             if (rule == null)
             {
                 return NotFound();
@@ -303,13 +303,13 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            var referencing = await Repo.RulesReferencingAsync(idRule!.Value, rule.TenantID);
+            var referencing = await deviceUnitRepo.RulesReferencingAsync(idRule!.Value, rule.TenantID);
             if (referencing.Count > 0)
             {
                 string names = string.Join(", ", referencing.Select(r => $"#{r.IDDeviceUnitZoneRule}"));
                 return Conflict($"Cannot delete: still referenced by another rule's \"another rule fired\" condition ({names}). Remove that condition first.");
             }
-            await Repo.RuleDeleteAsync(idRule.Value);
+            await deviceUnitRepo.RuleDeleteAsync(idRule.Value);
             await WriteAuditAsync("DeviceUnitZoneRule.Deleted", rule.TenantID, "DeviceUnitZoneRule", idRule.ToString()!, $"{rule.ActionType}/{rule.RelayFunction}{rule.SensorMetric}");
             return true;
         }
@@ -383,7 +383,7 @@ namespace api.Controllers.API
                 if (condition.ConditionType == ConditionType.RuleTriggered)
                 {
                     var config = condition.ConditionConfig?.Deserialize<RuleTriggeredConditionConfig>(ConditionConfigJson.Options);
-                    DeviceUnitZoneRule? referenced = config == null ? null : await Repo.RuleGetByIdAsync(config.ReferencedRuleId);
+                    DeviceUnitZoneRule? referenced = config == null ? null : await deviceUnitRepo.RuleGetByIdAsync(config.ReferencedRuleId);
                     if (referenced == null || referenced.TenantID != rule.TenantID || referenced.ActionType != ActionType.Notification)
                     {
                         return $"Condition {i + 1}: referenced rule must exist, belong to the same tenant, and be a Notification-action rule.";
@@ -526,12 +526,12 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            Device? controller = await Repo.DeviceUnitZoneGetControllerAsync(idDeviceUnitZone);
+            Device? controller = await deviceUnitRepo.DeviceUnitZoneGetControllerAsync(idDeviceUnitZone);
             if (controller?.IDDevice is not int deviceId)
             {
                 return Ok(Array.Empty<DeviceManualOverride>());
             }
-            return Ok(await Repo.ManualOverridesActiveForDeviceAsync(deviceId));
+            return Ok(await deviceUnitRepo.ManualOverridesActiveForDeviceAsync(deviceId));
         }
 
         private ActionResult<IReadOnlyList<int>> ManualActuateResponse(ManualActuateResult result) => result.Outcome switch
@@ -549,7 +549,7 @@ namespace api.Controllers.API
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpGet("Unassigned")]
         public async Task<ActionResult<IList<DeviceDto>>> DeviceUnassignedGet(bool controllerCapable) =>
-            Ok((await Repo.DeviceUnassignedGetAsync(CallerManagesDevicesGlobally ? null : CallerTenantId, controllerCapable))
+            Ok((await deviceUnitRepo.DeviceUnassignedGetAsync(CallerManagesDevicesGlobally ? null : CallerTenantId, controllerCapable))
                 .Select(d => d.ToDto()).ToList());
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -557,7 +557,7 @@ namespace api.Controllers.API
         public async Task<ActionResult<bool>> DeviceAssign([FromBody] DeviceZoneAssignment body)
         {
             var (device, deviceError) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(body.IDDevice), "Device", forWrite: true);
+                () => deviceRepo.DeviceGetByIdAsync(body.IDDevice), "Device", forWrite: true);
             if (deviceError != null)
             {
                 return deviceError;
@@ -576,12 +576,12 @@ namespace api.Controllers.API
             }
 
             // A zone has at most one controller (not required, but capped at one).
-            if (device!.DeviceControllerEnabled == true && await Repo.DeviceUnitZoneHasControllerAsync(body.IDDeviceUnitZone))
+            if (device!.DeviceControllerEnabled == true && await deviceUnitRepo.DeviceUnitZoneHasControllerAsync(body.IDDeviceUnitZone))
             {
                 return Conflict("This zone already has a controller assigned.");
             }
 
-            await Repo.DeviceAssignToZoneAsync(body.IDDevice, body.IDDeviceUnitZone);
+            await deviceUnitRepo.DeviceAssignToZoneAsync(body.IDDevice, body.IDDeviceUnitZone);
             await WriteAuditAsync("Device.AssignedToZone", device.TenantID, "Device", body.IDDevice.ToString(), $"zone {body.IDDeviceUnitZone}");
             return true;
         }
@@ -591,12 +591,12 @@ namespace api.Controllers.API
         public async Task<ActionResult<bool>> DeviceUnassign(int? idDevice)
         {
             var (device, error) = await EnsureOwnedDeviceAsync(
-                () => Repo.DeviceGetByIdAsync(idDevice), "Device", forWrite: true);
+                () => deviceRepo.DeviceGetByIdAsync(idDevice), "Device", forWrite: true);
             if (error != null)
             {
                 return error;
             }
-            await Repo.DeviceUnassignFromZoneAsync(device!.IDDevice!.Value);
+            await deviceUnitRepo.DeviceUnassignFromZoneAsync(device!.IDDevice!.Value);
             await WriteAuditAsync("Device.UnassignedFromZone", device.TenantID, "Device", idDevice.ToString()!, null);
             return true;
         }
@@ -609,7 +609,7 @@ namespace api.Controllers.API
         [Authorize]
         [HttpGet("Dashboard")]
         public async Task<ActionResult<IList<DeviceUnitDashboard>>> DeviceUnitDashboardGet() =>
-            Ok(await Repo.DeviceUnitDashboardGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
+            Ok(await deviceUnitRepo.DeviceUnitDashboardGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
 
         [Authorize]
         [HttpGet("Dashboard/Zones")]
@@ -620,7 +620,7 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            return Ok(await Repo.DeviceUnitZoneDashboardListGetAsync(unit!.IDDeviceUnit!.Value));
+            return Ok(await deviceUnitRepo.DeviceUnitZoneDashboardListGetAsync(unit!.IDDeviceUnit!.Value));
         }
 
         [Authorize]
@@ -632,7 +632,7 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            DeviceUnitZoneDashboard? dashboard = await Repo.DeviceUnitZoneDashboardGetAsync(zone!.IDDeviceUnitZone!.Value);
+            DeviceUnitZoneDashboard? dashboard = await deviceUnitRepo.DeviceUnitZoneDashboardGetAsync(zone!.IDDeviceUnitZone!.Value);
             return dashboard is null ? NotFound() : Ok(dashboard);
         }
 
@@ -640,11 +640,11 @@ namespace api.Controllers.API
 
         /// Same shape as DeviceApiController.EnsureOwnedDeviceAsync, for DeviceUnit - see ApiControllerBase.EnsureOwnedDeviceEntityAsync for the shared 404/403 logic.
         private Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int? idDeviceUnit, bool forWrite) =>
-            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite);
+            EnsureOwnedDeviceEntityAsync(() => deviceUnitRepo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite);
 
         /// Same shape as EnsureOwnedUnitAsync, for DeviceUnitZone.
         private Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int? idDeviceUnitZone, bool forWrite) =>
-            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone), z => z.TenantID, "Zone", forWrite);
+            EnsureOwnedDeviceEntityAsync(() => deviceUnitRepo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone), z => z.TenantID, "Zone", forWrite);
 
         /// Same shape as EnsureOwnedUnitAsync, for Device.
         private Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(

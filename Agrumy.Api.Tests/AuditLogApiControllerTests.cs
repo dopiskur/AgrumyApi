@@ -17,7 +17,7 @@ public class AuditLogApiControllerTests
 
     private AuditLogApiController NewController(int? tenantId, params string[] roles)
     {
-        var controller = new AuditLogApiController(_repo.Object, _cache.Object);
+        var controller = new AuditLogApiController(_repo.Object, _repo.Object, _cache.Object);
         var claims = new List<Claim> { new("TenantID", tenantId.ToString() ?? "") };
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
         controller.ControllerContext = new ControllerContext

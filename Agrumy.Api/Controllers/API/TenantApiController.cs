@@ -10,7 +10,7 @@ namespace api.Controllers.API
 {
     /// Tenant Management CRUD - write is Global admin only since a tenant has no meaningful self-management of its own existence, unlike Device/User management; [Authorize] stays at the wide RoleNames.LegacyAdmin/TenantReaders net (same reasoning as ServerConfigApiController), the precise decision is the inline CallerIsGlobalAdmin/GlobalReader check.
     [Route("/api/Tenant")]
-    public class TenantApiController(IRepository repo, ICache cache, TenantExportService exportService, TenantImportService importService) : ApiControllerBase(repo, cache)
+    public class TenantApiController(ITenantRepository tenantRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, TenantExportService exportService, TenantImportService importService) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         [Authorize(Roles = RoleNames.TenantReaders)]
         [HttpGet("All")]
@@ -20,7 +20,7 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Tenant Management requires the Global admin or Global reader role");
             }
-            return Ok(await Repo.TenantsGetAllAsync());
+            return Ok(await tenantRepo.TenantsGetAllAsync());
         }
 
         [Authorize(Roles = RoleNames.TenantReaders)]
@@ -31,7 +31,7 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Tenant Management requires the Global admin or Global reader role");
             }
-            Tenant? tenant = await Repo.TenantGetByIdAsync(idTenant);
+            Tenant? tenant = await tenantRepo.TenantGetByIdAsync(idTenant);
             return tenant is null ? NotFound() : Ok(tenant);
         }
 
@@ -47,7 +47,7 @@ namespace api.Controllers.API
             {
                 return BadRequest("Tenant name is required.");
             }
-            return Ok(await Repo.TenantAddAsync(tenant.TenantName.Trim()));
+            return Ok(await tenantRepo.TenantAddAsync(tenant.TenantName.Trim()));
         }
 
         [Authorize(Roles = RoleNames.LegacyAdmin)]
@@ -82,7 +82,7 @@ namespace api.Controllers.API
                 tenant.ScheduleTimeZone = null;
             }
 
-            await Repo.TenantUpdateAsync(tenant);
+            await tenantRepo.TenantUpdateAsync(tenant);
             return Ok();
         }
 
@@ -98,7 +98,7 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Emergency stop requires managing devices in this tenant.");
             }
-            await Repo.TenantEmergencyStopSetAsync(targetTenantId, true);
+            await tenantRepo.TenantEmergencyStopSetAsync(targetTenantId, true);
             await WriteAuditAsync("Tenant.EmergencyStopActivated", targetTenantId, "Tenant", targetTenantId.ToString(), null);
             return Ok();
         }
@@ -112,7 +112,7 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Emergency stop requires managing devices in this tenant.");
             }
-            await Repo.TenantEmergencyStopSetAsync(targetTenantId, false);
+            await tenantRepo.TenantEmergencyStopSetAsync(targetTenantId, false);
             await WriteAuditAsync("Tenant.EmergencyStopCleared", targetTenantId, "Tenant", targetTenantId.ToString(), null);
             return Ok();
         }
@@ -127,7 +127,7 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Emergency stop requires managing devices in this tenant.");
             }
-            Tenant? tenant = await Repo.TenantGetByIdAsync(targetTenantId);
+            Tenant? tenant = await tenantRepo.TenantGetByIdAsync(targetTenantId);
             return Ok(tenant?.EmergencyStopActive ?? false);
         }
 

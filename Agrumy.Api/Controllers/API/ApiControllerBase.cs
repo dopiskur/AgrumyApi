@@ -7,17 +7,19 @@ using System.Security.Claims;
 
 namespace api.Controllers.API
 {
-    /// Shared base for the JSON API controllers - data-access/cache injection and caller identity off the JWT; <see cref="api.Filters.DbExceptionFilter"/> turns data-access exceptions into responses so actions don't catch them individually.
+    /// Shared base for the JSON API controllers - cache injection and caller identity off the JWT; <see cref="api.Filters.DbExceptionFilter"/> turns data-access exceptions into responses so actions don't catch them individually. Only takes the two facets WriteAuditAsync itself needs - controllers inject whichever wider/narrower repository facets their own actions call, not through this base.
     [ApiController]
     [ApiVersion("1.0")]
     public abstract class ApiControllerBase : ControllerBase
     {
-        protected IRepository Repo { get; }
+        private readonly IUserRepository userRepo;
+        private readonly IAuditLogRepository auditLogRepo;
         protected ICache Cache { get; }
 
-        protected ApiControllerBase(IRepository repo, ICache cache)
+        protected ApiControllerBase(IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache)
         {
-            Repo = repo;
+            this.userRepo = userRepo;
+            this.auditLogRepo = auditLogRepo;
             Cache = cache;
         }
 
@@ -122,8 +124,8 @@ namespace api.Controllers.API
         protected async Task WriteAuditAsync(string action, int? targetTenantId, string targetType, string targetId, string? details)
         {
             string? actorEmail = User.Identity?.Name;
-            User? actor = string.IsNullOrEmpty(actorEmail) ? null : await Repo.UserGetAsync(null, actorEmail, null);
-            await Repo.AuditLogAddAsync(new AuditLogEntry
+            User? actor = string.IsNullOrEmpty(actorEmail) ? null : await userRepo.UserGetAsync(null, actorEmail, null);
+            await auditLogRepo.AuditLogAddAsync(new AuditLogEntry
             {
                 TimestampUtc = DateTime.UtcNow,
                 TenantID = targetTenantId,

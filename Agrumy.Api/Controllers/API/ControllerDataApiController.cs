@@ -9,7 +9,7 @@ namespace api.Controllers.API
 {
     /// Real-time relay on/off state, parallel to SensorDataController but fired on every actual relay CHANGE rather than a fixed interval - see api.Dal.Entities.ControllerDataRow.
     [Route("/api/ControllerData")]
-    public class ControllerDataApiController(IRepository repo, ICache cache) : ApiControllerBase(repo, cache)
+    public class ControllerDataApiController(IControllerDataRepository controllerDataRepo, IDeviceRepository deviceRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         private const int MaxBatchSize = 32; // one entry per RelayFunction at most - generous headroom over RelaySlotLimits.MaxSlots.
 
@@ -24,13 +24,13 @@ namespace api.Controllers.API
             }
 
             string apiId = HttpContext.DeviceApiId()!;
-            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            Device? device = await deviceRepo.DeviceGetByApiIdAsync(apiId);
             if (device is null)
             {
                 return Unauthorized();
             }
 
-            await Repo.ControllerDataPushAsync(device.IDDevice!.Value, device.TenantID, entries);
+            await controllerDataRepo.ControllerDataPushAsync(device.IDDevice!.Value, device.TenantID, entries);
             return Ok();
         }
 
@@ -38,7 +38,7 @@ namespace api.Controllers.API
         [HttpGet]
         public async Task<ActionResult<IList<ControllerDataStatus>>> Get(int idDevice)
         {
-            Device? device = await Repo.DeviceGetByIdAsync(idDevice);
+            Device? device = await deviceRepo.DeviceGetByIdAsync(idDevice);
             if (device is null)
             {
                 return NotFound();
@@ -48,7 +48,7 @@ namespace api.Controllers.API
                 return StatusCode(403, "Device belongs to a different tenant");
             }
 
-            return Ok(await Repo.ControllerDataGetAsync(idDevice));
+            return Ok(await controllerDataRepo.ControllerDataGetAsync(idDevice));
         }
     }
 }

@@ -12,8 +12,10 @@ namespace api.Controllers.API
 {
     /// "Scan for new devices" - device-facing report intake, the admin scan trigger, the aggregated results list, and Register (PIN + WiFi credentials to the winning scanning device).
     [Route("/api/Discovery")]
-    public class DiscoveryApiController(IRepository repo, ICache cache, CommandQueueService commandQueue, IOptions<AgrumySettings> settings) : ApiControllerBase(repo, cache)
+    public class DiscoveryApiController(IDiscoveryRepository discoveryRepo, IDeviceRepository deviceRepo, IDeviceUnitRepository deviceUnitRepo, ITenantRepository tenantRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, CommandQueueService commandQueue, IOptions<AgrumySettings> settings) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
+        // Separate field, not the primary-constructor parameter directly - a parameter used both here and in the base(...) call trips CS9107 (ambiguous double-capture).
+        private readonly IUserRepository users = userRepo;
         /// No identity field in the body by design - the scanning device comes exclusively from the authenticated apiId, same rule as DeviceApiController.PushEvent.
         [HttpPost("Report")]
         [EnableRateLimiting("device-data")]
@@ -26,13 +28,13 @@ namespace api.Controllers.API
             }
 
             string apiId = HttpContext.DeviceApiId()!;
-            Device? device = await Repo.DeviceGetByApiIdAsync(apiId);
+            Device? device = await deviceRepo.DeviceGetByApiIdAsync(apiId);
             if (device is null)
             {
                 return Unauthorized();
             }
 
-            await Repo.DiscoveryReportAddAsync(device.IDDevice!.Value, value.DiscoveredApMac, value.Rssi);
+            await discoveryRepo.DiscoveryReportAddAsync(device.IDDevice!.Value, value.DiscoveredApMac, value.Rssi);
             return Ok();
         }
 
@@ -79,7 +81,7 @@ namespace api.Controllers.API
                 return Ok(new List<TenantWifiConfig>());
             }
             bool includePassword = CallerManagesDevices(tenantId);
-            IList<TenantWifiConfig> configs = await Repo.TenantWifiConfigsGetAsync(tenantId);
+            IList<TenantWifiConfig> configs = await tenantRepo.TenantWifiConfigsGetAsync(tenantId);
             return Ok(configs.Select(c => new TenantWifiConfig { IDTenantWifiConfig = c.IDTenantWifiConfig, TenantID = c.TenantID, Ssid = c.Ssid, Password = includePassword ? c.Password : null }).ToList());
         }
 
@@ -96,7 +98,7 @@ namespace api.Controllers.API
                 return BadRequest("Ssid is required.");
             }
             config.TenantID = tenantId;
-            return Ok(await Repo.TenantWifiConfigAddAsync(config));
+            return Ok(await tenantRepo.TenantWifiConfigAddAsync(config));
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -114,7 +116,7 @@ namespace api.Controllers.API
             }
             config.IDTenantWifiConfig = idTenantWifiConfig;
             config.TenantID = existing!.TenantID; // payload cannot move it to another tenant
-            await Repo.TenantWifiConfigUpdateAsync(config);
+            await tenantRepo.TenantWifiConfigUpdateAsync(config);
             return Ok();
         }
 
@@ -127,7 +129,7 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            await Repo.TenantWifiConfigDeleteAsync(idTenantWifiConfig);
+            await tenantRepo.TenantWifiConfigDeleteAsync(idTenantWifiConfig);
             return Ok();
         }
 
@@ -154,7 +156,7 @@ namespace api.Controllers.API
             }
 
             int? tenantId = CallerReadsDevicesGlobally ? null : CallerTenantId;
-            return Ok(await Repo.DiscoveryResultsGetAsync(tenantId, unitID, zoneID));
+            return Ok(await discoveryRepo.DiscoveryResultsGetAsync(tenantId, unitID, zoneID));
         }
 
         /// Resolves the winning scanning device for DiscoveredApMac, resolves WiFi credentials (0/1/many saved TenantWifiConfig rows - see api.Models.DiscoveryRegisterRequest), (re)issues the caller's own device-PIN, and queues a ProvisionDevice command carrying both plus DeviceName/UnitID/ZoneID to that device, applied once it completes its own real registration (see CommandQueueService.ConsumePendingProvisionAsync).
@@ -185,14 +187,14 @@ namespace api.Controllers.API
             }
 
             int? callerTenantId = CallerManagesDevicesGlobally ? null : CallerTenantId;
-            DiscoveryResult? winner = await Repo.DiscoveryResultGetAsync(request.DiscoveredApMac, callerTenantId);
+            DiscoveryResult? winner = await discoveryRepo.DiscoveryResultGetAsync(request.DiscoveredApMac, callerTenantId);
             if (winner is null)
             {
                 return NotFound($"No scan report found for {request.DiscoveredApMac}.");
             }
 
             string ssid, wifiPassword;
-            IList<TenantWifiConfig> wifiConfigs = await Repo.TenantWifiConfigsGetAsync(winner.TenantID);
+            IList<TenantWifiConfig> wifiConfigs = await tenantRepo.TenantWifiConfigsGetAsync(winner.TenantID);
             if (wifiConfigs.Count == 0)
             {
                 if (string.IsNullOrWhiteSpace(request.Ssid) || string.IsNullOrWhiteSpace(request.WifiPassword))
@@ -203,7 +205,7 @@ namespace api.Controllers.API
                 wifiPassword = request.WifiPassword;
                 if (request.SaveWifiForLater)
                 {
-                    await Repo.TenantWifiConfigAddAsync(new TenantWifiConfig { TenantID = winner.TenantID, Ssid = ssid, Password = wifiPassword });
+                    await tenantRepo.TenantWifiConfigAddAsync(new TenantWifiConfig { TenantID = winner.TenantID, Ssid = ssid, Password = wifiPassword });
                 }
             }
             else if (wifiConfigs.Count == 1)
@@ -230,7 +232,7 @@ namespace api.Controllers.API
             {
                 return Unauthorized();
             }
-            User? caller = await Repo.UserGetAsync(null, callerName, null);
+            User? caller = await users.UserGetAsync(null, callerName, null);
             if (caller?.IDUser is not int callerUserId)
             {
                 return NotFound();
@@ -238,7 +240,7 @@ namespace api.Controllers.API
 
             string pin = AuthenticationProvider.GetPin();
             DateTime pinExpiresAt = DateTime.UtcNow.AddHours(AuthenticationProvider.PinValidHours);
-            await Repo.UserSetDevicePinAsync(callerUserId, pin, pinExpiresAt);
+            await users.UserSetDevicePinAsync(callerUserId, pin, pinExpiresAt);
 
             string payloadJson = JsonSerializer.Serialize(new DiscoveryProvisionPayload
             {
@@ -263,13 +265,13 @@ namespace api.Controllers.API
         }
 
         private Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int idDeviceUnitZone, bool forWrite) =>
-            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone), z => z.TenantID, "Zone", forWrite);
+            EnsureOwnedDeviceEntityAsync(() => deviceUnitRepo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone), z => z.TenantID, "Zone", forWrite);
 
         private Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int idDeviceUnit, bool forWrite) =>
-            EnsureOwnedDeviceEntityAsync(() => Repo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite);
+            EnsureOwnedDeviceEntityAsync(() => deviceUnitRepo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite);
 
         private Task<(TenantWifiConfig? Config, ActionResult? Error)> EnsureOwnedWifiConfigAsync(int idTenantWifiConfig) =>
-            EnsureOwnedDeviceEntityAsync(() => Repo.TenantWifiConfigGetByIdAsync(idTenantWifiConfig), c => (int?)c.TenantID, "WiFi network", forWrite: true);
+            EnsureOwnedDeviceEntityAsync(() => tenantRepo.TenantWifiConfigGetByIdAsync(idTenantWifiConfig), c => (int?)c.TenantID, "WiFi network", forWrite: true);
 
         /// Same precedence as FirmwareApiController.PublicBaseUrl (WebView:ApiService, else the request's own host), but host-only - api.Models.DeviceConfig.ServicePoint has no scheme, firmware prepends http(s):// itself.
         private string PublicHost

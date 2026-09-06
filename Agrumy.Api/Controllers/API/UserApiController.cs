@@ -14,9 +14,13 @@ using Microsoft.Extensions.Options;
 namespace api.Controllers.API
 {
     [Route("api/User")]
-    public class UserApiController(IRepository repo, ICache cache, BackgroundJobQueue jobQueue, IOptions<AgrumySettings> settingsOptions)
-        : ApiControllerBase(repo, cache)
+    public class UserApiController(
+        IUserRepository userRepo, ITenantRepository tenantRepo, IRefreshTokenRepository refreshTokenRepo, IServerConfigRepository serverConfigRepo, IAuditLogRepository auditLogRepo,
+        ICache cache, BackgroundJobQueue jobQueue, IOptions<AgrumySettings> settingsOptions)
+        : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
+        // Separate field, not the primary-constructor parameter directly - a parameter used both here and in the base(...) call trips CS9107 (ambiguous double-capture).
+        private readonly IUserRepository userRepository = userRepo;
         private const int AccessTokenMinutes = 120;
         private const int RefreshTokenDays = 30;
         private const int ActivationTokenValidHours = 24;
@@ -38,8 +42,8 @@ namespace api.Controllers.API
         /// Looks up a user + their password secret by email or username (whichever <paramref name="login"/> looks like); either element is null when nothing matches.
         private async Task<(User? user, UserSecret? secret)> LookupAsync(string? login) =>
             FieldValidator.IsValidEmail(login)
-                ? (await Repo.UserGetAsync(null, login, null), await Repo.UserSecretGetAsync(null, login, null))
-                : (await Repo.UserGetAsync(null, null, login), await Repo.UserSecretGetAsync(null, null, login));
+                ? (await userRepository.UserGetAsync(null, login, null), await userRepository.UserSecretGetAsync(null, login, null))
+                : (await userRepository.UserGetAsync(null, null, login), await userRepository.UserSecretGetAsync(null, null, login));
 
         // ---- registration / auth ---------------------------------------------------
 
@@ -49,13 +53,13 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-            ServerConfig serverConfig = await Repo.ServerConfigGetAsync(1);
+            ServerConfig serverConfig = await serverConfigRepo.ServerConfigGetAsync(1);
             if (PasswordPolicy.Validate(value.Password, serverConfig) is string passwordError)
             {
                 return BadRequest(passwordError);
             }
 
-            bool isNewTenant = !await Repo.TenantGetAsync(value.TenantName!);
+            bool isNewTenant = !await tenantRepo.TenantGetAsync(value.TenantName!);
             if (isNewTenant)
             {
                 if (!serverConfig.AllowSelfServiceTenantCreation)
@@ -89,8 +93,8 @@ namespace api.Controllers.API
             string startingRole = isNewTenant ? RoleNames.TenantAdmin : RoleNames.TenantReader;
 
             // One transaction (tenant create + user add + activation token + starting role) so a crash partway never leaves a user row with no role; sets user.TenantID on the same object this method returns.
-            await Repo.RegisterUserAsync(user, userSecret,
-                existingTenantId: isNewTenant ? null : await Repo.TenantGetIdAsync(value.TenantName!),
+            await userRepository.RegisterUserAsync(user, userSecret,
+                existingTenantId: isNewTenant ? null : await tenantRepo.TenantGetIdAsync(value.TenantName!),
                 newTenantName: isNewTenant ? value.TenantName : null,
                 activationTokenHash: hash,
                 activationTokenExpiresAtUtc: DateTime.UtcNow.AddHours(ActivationTokenValidHours),
@@ -111,21 +115,21 @@ namespace api.Controllers.API
                 return BadRequest("Missing activation token.");
             }
 
-            User? user = await Repo.UserActivateAsync(HashToken(token));
+            User? user = await userRepository.UserActivateAsync(HashToken(token));
             if (user is null)
             {
                 return StatusCode(400, "Activation link is invalid or has expired.");
             }
 
             // TenantID==0 has no owning admin to approve joiners, and a new tenant's own creator already holds TenantAdmin from registration - either way, proven email ownership alone is enough here.
-            if (user.TenantID != 0 && !(await Repo.UserRoleNamesGetAsync(user.IDUser!.Value)).Contains(RoleNames.TenantAdmin))
+            if (user.TenantID != 0 && !(await userRepository.UserRoleNamesGetAsync(user.IDUser!.Value)).Contains(RoleNames.TenantAdmin))
             {
                 NotifyTenantAdminsOfPendingApproval(user);
                 return Ok("Email verified. Your tenant administrator has been notified and must approve your account before you can sign in.");
             }
 
             user.Enabled = true;
-            await Repo.UserUpdateAsync(user);
+            await userRepository.UserUpdateAsync(user);
             return Ok("Email verified. You can now sign in.");
         }
 
@@ -140,9 +144,9 @@ namespace api.Controllers.API
             var (user, _) = await LookupAsync(value.Login);
             if (user?.IDUser is int idUser && user.EmailVerified != true)
             {
-                int cooldownMinutes = (await Repo.ServerConfigGetAsync(1)).ActivationResendCooldownMinutes ?? settings.ActivationResendCooldownMinutes;
+                int cooldownMinutes = (await serverConfigRepo.ServerConfigGetAsync(1)).ActivationResendCooldownMinutes ?? settings.ActivationResendCooldownMinutes;
                 var (plaintext, hash) = GenerateOpaqueToken();
-                bool issued = await Repo.UserIssueActivationTokenAsync(idUser, hash, DateTime.UtcNow.AddHours(ActivationTokenValidHours), cooldownMinutes);
+                bool issued = await userRepository.UserIssueActivationTokenAsync(idUser, hash, DateTime.UtcNow.AddHours(ActivationTokenValidHours), cooldownMinutes);
                 if (issued)
                 {
                     SendActivationEmail(user.Email, plaintext);
@@ -176,9 +180,9 @@ namespace api.Controllers.API
             string subject = $"{user.Email} ({user.Username}) verified their email and is waiting for your approval before they can sign in.";
             jobQueue.Enqueue(async (services, ct) =>
             {
-                IRepository jobRepo = services.GetRequiredService<IRepository>();
+                IUserRepository jobUserRepo = services.GetRequiredService<IUserRepository>();
                 INotificationDispatcher jobNotifications = services.GetRequiredService<INotificationDispatcher>();
-                IList<User> admins = await jobRepo.TenantAdminsGetAsync(tenantId);
+                IList<User> admins = await jobUserRepo.TenantAdminsGetAsync(tenantId);
                 foreach (User admin in admins)
                 {
                     if (string.IsNullOrWhiteSpace(admin.Email)) { continue; }
@@ -190,7 +194,7 @@ namespace api.Controllers.API
         /// The full set of role-claim values this user's token should carry: real roles from userUserRole plus a prepended legacy admin/user alias so old [Authorize(Roles=...)]/CallerRole checks (ApiControllerBase.CallerRole reads only the FIRST claim) still work - empty only if userUserRole has nothing for this user.
         private async Task<IReadOnlyList<string>> ResolveCallerTokenRolesAsync(User user)
         {
-            IReadOnlyList<string> roleNames = await Repo.UserRoleNamesGetAsync(user.IDUser!.Value);
+            IReadOnlyList<string> roleNames = await userRepository.UserRoleNamesGetAsync(user.IDUser!.Value);
             if (roleNames.Count == 0)
             {
                 return Array.Empty<string>();
@@ -236,7 +240,7 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-            if (PasswordPolicy.Validate(value.NewPassword, await Repo.ServerConfigGetAsync(1)) is string passwordError)
+            if (PasswordPolicy.Validate(value.NewPassword, await serverConfigRepo.ServerConfigGetAsync(1)) is string passwordError)
             {
                 return BadRequest(passwordError);
             }
@@ -254,7 +258,7 @@ namespace api.Controllers.API
 
             var newSecret = new UserSecret { PwdSalt = AuthenticationProvider.GetSalt() };
             newSecret.PwdHash = AuthenticationProvider.GetHash(value.NewPassword!, newSecret.PwdSalt); // [Required], guaranteed by ModelState.IsValid above
-            await Repo.UserSetPasswordAsync(user.Email, newSecret); // also clears MustChangePassword
+            await userRepository.UserSetPasswordAsync(user.Email, newSecret); // also clears MustChangePassword
 
             if (user.Enabled != true)
             {
@@ -274,7 +278,7 @@ namespace api.Controllers.API
 
             string token = JwtTokenProvider.CreateToken(SecureKey!, AccessTokenMinutes, user.Email!, tokenRoles, user.TenantID.ToString()!, settings.JwtIssuer, settings.JwtAudience);
             var (refreshToken, refreshTokenHash) = GenerateOpaqueToken();
-            await Repo.RefreshTokenAddAsync(user.IDUser!.Value, refreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
+            await refreshTokenRepo.RefreshTokenAddAsync(user.IDUser!.Value, refreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
 
             return (new UserLoginResult { IDUser = user.IDUser, Email = user.Email, Token = token, RefreshToken = refreshToken, TimeZone = user.TimeZone }, null);
         }
@@ -287,7 +291,7 @@ namespace api.Controllers.API
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
             string incomingHash = HashToken(value.RefreshToken!);
-            RefreshTokenInfo? stored = await Repo.RefreshTokenGetAsync(incomingHash);
+            RefreshTokenInfo? stored = await refreshTokenRepo.RefreshTokenGetAsync(incomingHash);
             if (stored is null)
             {
                 return StatusCode(401, "Unknown refresh token");
@@ -295,7 +299,7 @@ namespace api.Controllers.API
             if (stored.RevokedAt is not null)
             {
                 // This exact token was already rotated (or explicitly revoked) - someone presenting it again means it leaked, so kill every session for this user, not just this one.
-                await Repo.RefreshTokenRevokeAllForUserAsync(stored.UserID);
+                await refreshTokenRepo.RefreshTokenRevokeAllForUserAsync(stored.UserID);
                 return StatusCode(401, "Refresh token already used; all sessions for this user were revoked.");
             }
             if (stored.ExpiresAt < DateTime.UtcNow)
@@ -303,7 +307,7 @@ namespace api.Controllers.API
                 return StatusCode(401, "Refresh token expired");
             }
 
-            User? user = await Repo.UserGetAsync(stored.UserID, null, null);
+            User? user = await userRepository.UserGetAsync(stored.UserID, null, null);
             if (user is null)
             {
                 return StatusCode(401, "User no longer exists");
@@ -321,11 +325,11 @@ namespace api.Controllers.API
             }
 
             var (newRefreshToken, newRefreshTokenHash) = GenerateOpaqueToken();
-            bool rotated = await Repo.RefreshTokenRotateAsync(stored.UserID, incomingHash, newRefreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
+            bool rotated = await refreshTokenRepo.RefreshTokenRotateAsync(stored.UserID, incomingHash, newRefreshTokenHash, DateTime.UtcNow.AddDays(RefreshTokenDays));
             if (!rotated)
             {
                 // Lost the atomic rotate race - indistinguishable from genuine token reuse, so every session for this user dies.
-                await Repo.RefreshTokenRevokeAllForUserAsync(stored.UserID);
+                await refreshTokenRepo.RefreshTokenRevokeAllForUserAsync(stored.UserID);
                 return StatusCode(401, "Refresh token already used; all sessions for this user were revoked.");
             }
 
@@ -340,7 +344,7 @@ namespace api.Controllers.API
         {
             if (!string.IsNullOrWhiteSpace(value.RefreshToken))
             {
-                await Repo.RefreshTokenRevokeAsync(HashToken(value.RefreshToken));
+                await refreshTokenRepo.RefreshTokenRevokeAsync(HashToken(value.RefreshToken));
             }
             return Ok();
         }
@@ -348,7 +352,7 @@ namespace api.Controllers.API
         /// Lets the anonymous Agrumy.Web login page decide, on every load, whether to show the normal login form or the first-run "set password" screen.
         [HttpGet("BootstrapPending")]
         [AllowAnonymous]
-        public async Task<ActionResult<bool>> BootstrapPending() => Ok(await Repo.BootstrapAdminPendingAsync());
+        public async Task<ActionResult<bool>> BootstrapPending() => Ok(await userRepository.BootstrapAdminPendingAsync());
 
         /// The only way the fresh-install bootstrap Global Admin (seeded with PwdHash=NULL) gets a real password (see BootstrapAdminSetPasswordAsync for why it can never be replayed) - SetupSecret gates this beyond rate limiting alone, so a random visitor can't take over the account first.
         [HttpPost("BootstrapSetPassword")]
@@ -358,7 +362,7 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-            if (PasswordPolicy.Validate(value.NewPassword, await Repo.ServerConfigGetAsync(1)) is string passwordError)
+            if (PasswordPolicy.Validate(value.NewPassword, await serverConfigRepo.ServerConfigGetAsync(1)) is string passwordError)
             {
                 return BadRequest(passwordError);
             }
@@ -366,7 +370,7 @@ namespace api.Controllers.API
             string salt = AuthenticationProvider.GetSalt();
             var secret = new UserSecret { PwdSalt = salt, PwdHash = AuthenticationProvider.GetHash(value.NewPassword!, salt) };
 
-            return await Repo.BootstrapAdminSetPasswordAsync(secret, value.SetupSecret!)
+            return await userRepository.BootstrapAdminSetPasswordAsync(secret, value.SetupSecret!)
                 ? Ok()
                 : StatusCode(403, "No pending bootstrap admin, or the setup secret was wrong.");
         }
@@ -389,7 +393,7 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "The new password must be different from the old password");
             }
-            if (PasswordPolicy.Validate(value.NewPassword, await Repo.ServerConfigGetAsync(1)) is string passwordError)
+            if (PasswordPolicy.Validate(value.NewPassword, await serverConfigRepo.ServerConfigGetAsync(1)) is string passwordError)
             {
                 return BadRequest(passwordError);
             }
@@ -405,7 +409,7 @@ namespace api.Controllers.API
             secret.PwdSalt = AuthenticationProvider.GetSalt();
             secret.PwdHash = AuthenticationProvider.GetHash(value.NewPassword!, secret.PwdSalt); // [Required], guaranteed by ModelState.IsValid above
 
-            return await Repo.UserSetPasswordAsync(user.Email, secret)
+            return await userRepository.UserSetPasswordAsync(user.Email, secret)
                 ? Ok("Password changed successfully for: " + user.Email)
                 : StatusCode(403, "Password change failed for: " + user.Email);
         }
@@ -421,7 +425,7 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Data Reader role cannot view user accounts.");
             }
-            IList<User> users = CallerReadsUsersGlobally ? await Repo.UsersGetAllAsync() : await Repo.UsersGetAsync(CallerTenantId);
+            IList<User> users = CallerReadsUsersGlobally ? await userRepository.UsersGetAllAsync() : await userRepository.UsersGetAsync(CallerTenantId);
             // DevicePin is a live credential, not a profile field - only its owner (GetUserSelf) should see it, not this list.
             foreach (User user in users)
             {
@@ -441,11 +445,11 @@ namespace api.Controllers.API
             {
                 return Unauthorized();
             }
-            User? user = await Repo.UserGetAsync(null, name, null);
+            User? user = await userRepository.UserGetAsync(null, name, null);
             return user is null ? NotFound() : Ok(user);
         }
 
-        /// Self-scoped counterpart to the admin-only UserUpdate: identity comes ONLY from the JWT, and Enabled/TenantID stay untouchable since Repo.UserProfileSetAsync writes nothing but FirstName/LastName/TimeZone.
+        /// Self-scoped counterpart to the admin-only UserUpdate: identity comes ONLY from the JWT, and Enabled/TenantID stay untouchable since userRepository.UserProfileSetAsync writes nothing but FirstName/LastName/TimeZone.
         [HttpPut("Profile")]
         [Authorize]
         public async Task<ActionResult<bool>> UserProfileSet([FromBody] UserProfileUpdate value)
@@ -467,7 +471,7 @@ namespace api.Controllers.API
                 timeZone = iana;
             }
 
-            return await Repo.UserProfileSetAsync(name, value.FirstName, value.LastName, timeZone)
+            return await userRepository.UserProfileSetAsync(name, value.FirstName, value.LastName, timeZone)
                 ? Ok(true)
                 : NotFound();
         }
@@ -483,7 +487,7 @@ namespace api.Controllers.API
                 return Unauthorized();
             }
 
-            User? user = await Repo.UserGetAsync(null, name, null);
+            User? user = await userRepository.UserGetAsync(null, name, null);
             if (user?.IDUser is not int idUser)
             {
                 return NotFound();
@@ -491,7 +495,7 @@ namespace api.Controllers.API
 
             string pin = AuthenticationProvider.GetPin();
             DateTime expiresAt = DateTime.UtcNow.AddHours(AuthenticationProvider.PinValidHours);
-            await Repo.UserSetDevicePinAsync(idUser, pin, expiresAt);
+            await userRepository.UserSetDevicePinAsync(idUser, pin, expiresAt);
 
             return Ok(new DevicePinResult { DevicePin = pin, ExpiresAt = expiresAt });
         }
@@ -504,7 +508,7 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Data Reader role cannot view user accounts.");
             }
-            User? user = await Repo.UserGetAsync(idUser, null, null);
+            User? user = await userRepository.UserGetAsync(idUser, null, null);
             if (user is null)
             {
                 return NotFound();
@@ -528,7 +532,7 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-            if (PasswordPolicy.Validate(value.Password, await Repo.ServerConfigGetAsync(1)) is string passwordError)
+            if (PasswordPolicy.Validate(value.Password, await serverConfigRepo.ServerConfigGetAsync(1)) is string passwordError)
             {
                 return BadRequest(passwordError);
             }
@@ -554,12 +558,12 @@ namespace api.Controllers.API
             var userSecret = new UserSecret { PwdSalt = AuthenticationProvider.GetSalt() };
             userSecret.PwdHash = AuthenticationProvider.GetHash(value.Password!, userSecret.PwdSalt); // [Required], guaranteed by ModelState.IsValid above
 
-            await Repo.UserAddAsync(user, userSecret);
+            await userRepository.UserAddAsync(user, userSecret);
 
-            User? added = await Repo.UserGetAsync(null, value.Email, null);
+            User? added = await userRepository.UserGetAsync(null, value.Email, null);
             if (added?.IDUser is int idUser)
             {
-                await Repo.UserRolesSetAsync(idUser, roleNames!);
+                await userRepository.UserRolesSetAsync(idUser, roleNames!);
                 await WriteAuditAsync("User.Created", user.TenantID, "User", idUser.ToString(), $"roles: {string.Join(", ", roleNames!)}");
             }
 
@@ -590,7 +594,7 @@ namespace api.Controllers.API
         {
             if (!ModelState.IsValid) { return BadRequest(ModelState); }
 
-            User? user = await Repo.UserGetAsync(value.IDUser, null, null);
+            User? user = await userRepository.UserGetAsync(value.IDUser, null, null);
             if (user is null)
             {
                 return NotFound();
@@ -600,7 +604,7 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
             }
-            if (!CallerOutranksTarget(await Repo.UserRoleNamesGetAsync(user.IDUser!.Value)))
+            if (!CallerOutranksTarget(await userRepository.UserRoleNamesGetAsync(user.IDUser!.Value)))
             {
                 return StatusCode(403, "Not allowed to manage a user with equal or higher privilege.");
             }
@@ -609,13 +613,13 @@ namespace api.Controllers.API
 
             if (value.Password != null)
             {
-                if (PasswordPolicy.Validate(value.Password, await Repo.ServerConfigGetAsync(1)) is string passwordError)
+                if (PasswordPolicy.Validate(value.Password, await serverConfigRepo.ServerConfigGetAsync(1)) is string passwordError)
                 {
                     return BadRequest(passwordError);
                 }
                 // Admin/self edit - no old-password check here, so the fresh salt+hash fully replace whatever was there; no need to read the current secret first.
                 string salt = AuthenticationProvider.GetSalt();
-                await Repo.UserSetPasswordAsync(user.Email, new UserSecret
+                await userRepository.UserSetPasswordAsync(user.Email, new UserSecret
                 {
                     PwdSalt = salt,
                     PwdHash = AuthenticationProvider.GetHash(value.Password, salt),
@@ -630,14 +634,14 @@ namespace api.Controllers.API
             if (value.Enabled != null) { user.Enabled = value.Enabled; }
             if (value.TenantID != null && CallerManagesUsersGlobally) { user.TenantID = value.TenantID; } // cross-tenant reassignment stays a Global-admin-only power
 
-            await Repo.UserUpdateAsync(user);
+            await userRepository.UserUpdateAsync(user);
 
             if (enabledBefore != user.Enabled)
             {
                 await WriteAuditAsync("User.EnabledChanged", user.TenantID, "User", user.IDUser.ToString()!, $"{enabledBefore} -> {user.Enabled}");
                 if (enabledBefore == true && user.Enabled == false)
                 {
-                    await Repo.RevokeUserTokensAsync(user.IDUser!.Value);
+                    await userRepository.RevokeUserTokensAsync(user.IDUser!.Value);
                 }
             }
 
@@ -651,8 +655,8 @@ namespace api.Controllers.API
                 {
                     return StatusCode(403, $"Not allowed to assign role \"{disallowed}\".");
                 }
-                IReadOnlyList<string> rolesBefore = await Repo.UserRoleNamesGetAsync(user.IDUser!.Value);
-                await Repo.UserRolesSetAsync(user.IDUser!.Value, value.RoleNames);
+                IReadOnlyList<string> rolesBefore = await userRepository.UserRoleNamesGetAsync(user.IDUser!.Value);
+                await userRepository.UserRolesSetAsync(user.IDUser!.Value, value.RoleNames);
                 await WriteAuditAsync("User.RolesChanged", user.TenantID, "User", user.IDUser.ToString()!,
                     $"[{string.Join(", ", rolesBefore)}] -> [{string.Join(", ", value.RoleNames)}]");
             }
@@ -669,7 +673,7 @@ namespace api.Controllers.API
                 return Unauthorized("Deleting default user is not allowed");
             }
 
-            User? targetUser = await Repo.UserGetAsync(idUser, null, null);
+            User? targetUser = await userRepository.UserGetAsync(idUser, null, null);
             if (targetUser is null)
             {
                 return NotFound("User not found");
@@ -678,12 +682,12 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
             }
-            if (!CallerOutranksTarget(await Repo.UserRoleNamesGetAsync(targetUser.IDUser!.Value)))
+            if (!CallerOutranksTarget(await userRepository.UserRoleNamesGetAsync(targetUser.IDUser!.Value)))
             {
                 return StatusCode(403, "Not allowed to manage a user with equal or higher privilege.");
             }
 
-            bool deleted = await Repo.UserDeleteAsync(idUser);
+            bool deleted = await userRepository.UserDeleteAsync(idUser);
             if (deleted)
             {
                 await WriteAuditAsync("User.Deleted", targetUser.TenantID, "User", idUser.ToString()!, targetUser.Email);
@@ -694,7 +698,7 @@ namespace api.Controllers.API
         [HttpGet("Roles")]
         [Authorize(Roles = RoleNames.UserManagers)]
         public async Task<ActionResult<IEnumerable<UserRole>>> UserRoleGet() =>
-            Ok(await Repo.UserRoleGetAsync());
+            Ok(await userRepository.UserRoleGetAsync());
 
         // ---- composable roles -------------------------------------
 
@@ -708,7 +712,7 @@ namespace api.Controllers.API
         [Authorize(Roles = RoleNames.UserManagers)]
         public async Task<ActionResult<IReadOnlyList<string>>> UserRolesGet(int idUser)
         {
-            User? target = await Repo.UserGetAsync(idUser, null, null);
+            User? target = await userRepository.UserGetAsync(idUser, null, null);
             if (target is null)
             {
                 return NotFound();
@@ -717,7 +721,7 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Target user belongs to a different tenant");
             }
-            return Ok(await Repo.UserRoleNamesGetAsync(idUser));
+            return Ok(await userRepository.UserRoleNamesGetAsync(idUser));
         }
 
         // Role GRANTING deliberately stays admin-only (RoleNames.Admins, not UserManagers) - a Tenant User could otherwise hand themselves Tenant admin, since managing users must not imply managing privileges.
@@ -725,7 +729,7 @@ namespace api.Controllers.API
         [Authorize(Roles = RoleNames.Admins)]
         public async Task<ActionResult> UserRolesSet([FromBody] UserRolesUpdate value)
         {
-            User? target = await Repo.UserGetAsync(value.IDUser, null, null);
+            User? target = await userRepository.UserGetAsync(value.IDUser, null, null);
             if (target is null)
             {
                 return NotFound();
@@ -742,8 +746,8 @@ namespace api.Controllers.API
                 return StatusCode(403, $"Not allowed to assign role \"{disallowed}\".");
             }
 
-            IReadOnlyList<string> rolesBefore = await Repo.UserRoleNamesGetAsync(value.IDUser);
-            await Repo.UserRolesSetAsync(value.IDUser, value.RoleNames);
+            IReadOnlyList<string> rolesBefore = await userRepository.UserRoleNamesGetAsync(value.IDUser);
+            await userRepository.UserRolesSetAsync(value.IDUser, value.RoleNames);
             await WriteAuditAsync("User.RolesChanged", target.TenantID, "User", value.IDUser.ToString(),
                 $"[{string.Join(", ", rolesBefore)}] -> [{string.Join(", ", value.RoleNames)}]");
             return Ok();

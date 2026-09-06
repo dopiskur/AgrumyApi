@@ -28,7 +28,7 @@ public class DeviceFirmwareOtaTests
         _repo.Setup(r => r.DeviceSimulationGetAsync(device.IDDevice!.Value)).ReturnsAsync((DeviceSimulation?)null);
 
         var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
-        var controller = new DeviceApiController(_repo.Object, _cache.Object,
+        var controller = new DeviceApiController(_repo.Object, _repo.Object, _repo.Object, _repo.Object, _cache.Object,
             new CommandQueueService(_repo.Object, _repo.Object, _repo.Object, new NoOpMqttCommandPublisher()), catalog,
             new api.Devices.DeviceConfigBuilder(_repo.Object, catalog),
             Microsoft.Extensions.Options.Options.Create(new AgrumySettings()));

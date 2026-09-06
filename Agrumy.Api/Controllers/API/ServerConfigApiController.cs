@@ -10,7 +10,7 @@ namespace api.Controllers.API
 {
     /// Server-wide settings, admin-only; there is exactly one row (id 1), auto-created on first read.
     [Route("api/ServerConfig")]
-    public class ServerConfigApiController(IRepository repo, ICache cache, IEnumerable<INotificationChannel> notificationChannels) : ApiControllerBase(repo, cache)
+    public class ServerConfigApiController(IServerConfigRepository serverConfigRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, IEnumerable<INotificationChannel> notificationChannels) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         // These are SERVER-WIDE settings, so Global admin only. The attribute stays at the wider RoleNames.LegacyAdmin gate so an account the multi-role migration missed reaches the inline check, where CallerIsGlobalAdmin's legacy fallback (tenant-0 admin) still lets it through.
 
@@ -22,7 +22,7 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Server-wide settings require the Global admin role");
             }
-            return Ok(await Repo.ServerConfigGetAsync(1));
+            return Ok(await serverConfigRepo.ServerConfigGetAsync(1));
         }
 
         [HttpPut]
@@ -147,7 +147,7 @@ namespace api.Controllers.API
             }
 
             config.IDServerConfig = 1; // single global row - the form never chooses this
-            await Repo.ServerConfigUpdateAsync(config);
+            await serverConfigRepo.ServerConfigUpdateAsync(config);
             await WriteAuditAsync("ServerConfig.Updated", null, "ServerConfig", "1", null);
             return Ok();
         }
@@ -185,7 +185,7 @@ namespace api.Controllers.API
         [AllowAnonymous]
         public async Task<ActionResult<PublicServerConfig>> GetPublic()
         {
-            ServerConfig config = await Repo.ServerConfigGetAsync(1);
+            ServerConfig config = await serverConfigRepo.ServerConfigGetAsync(1);
             return Ok(new PublicServerConfig { AllowSelfServiceTenantCreation = config.AllowSelfServiceTenantCreation });
         }
     }

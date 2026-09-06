@@ -9,8 +9,10 @@ namespace api.Controllers.API
 {
     /// Admin-facing create/list/delete for fully virtual devices - the actual per-tick simulation runs in api.BackgroundWorkers.VirtualDeviceRunnerBackgroundService, not here.
     [Route("/api/Simulation")]
-    public class SimulationApiController(IRepository repo, ICache cache, IHttpClientFactory httpClientFactory) : ApiControllerBase(repo, cache)
+    public class SimulationApiController(ISimulationRepository simulationRepo, IDeviceRepository deviceRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, IHttpClientFactory httpClientFactory) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
+        // Separate field, not the primary-constructor parameter directly - a parameter used both here and in the base(...) call trips CS9107 (ambiguous double-capture).
+        private readonly IUserRepository users = userRepo;
         /// Creates the device via the SAME POST /api/Device/Register a real device calls after WiFi setup (Option C design - the endpoint never learns the caller isn't real hardware), then tags it in the virtual-device registry so the background runner picks it up. Deliberately bare - no Name/Unit/Zone here, an admin configures those afterward through the ordinary Device Edit/Fleet UI, same as any freshly-registered real device.
         [Authorize(Roles = RoleNames.SimulationManagers)]
         [HttpPost("Device")]
@@ -21,14 +23,14 @@ namespace api.Controllers.API
             {
                 return Unauthorized();
             }
-            User? caller = await Repo.UserGetAsync(null, callerName, null);
+            User? caller = await users.UserGetAsync(null, callerName, null);
             if (caller?.IDUser is not int callerUserId)
             {
                 return NotFound();
             }
 
             string pin = AuthenticationProvider.GetPin();
-            await Repo.UserSetDevicePinAsync(callerUserId, pin, DateTime.UtcNow.AddHours(AuthenticationProvider.PinValidHours));
+            await users.UserSetDevicePinAsync(callerUserId, pin, DateTime.UtcNow.AddHours(AuthenticationProvider.PinValidHours));
 
             // "02" is a locally-administered MAC prefix (IEEE 802-2014 sec 8.2.2) - guaranteed to never collide with a real vendor OUI a physical device might report.
             string mac = "02" + Guid.NewGuid().ToString("N")[..10].ToUpperInvariant();
@@ -40,9 +42,9 @@ namespace api.Controllers.API
                 return StatusCode(502, "Virtual device registration did not return a device id.");
             }
 
-            await Repo.VirtualDeviceRegisterAsync(deviceId);
+            await simulationRepo.VirtualDeviceRegisterAsync(deviceId);
             // ApiId/ApiKey stay internal - same rule as every other device-facing GET, never returned to an admin caller (DeviceDto has no property for either).
-            Device? created = await Repo.DeviceGetByIdAsync(deviceId);
+            Device? created = await deviceRepo.DeviceGetByIdAsync(deviceId);
             return Ok(created?.ToDto());
         }
 
@@ -50,13 +52,13 @@ namespace api.Controllers.API
         [Authorize(Roles = RoleNames.SimulationManagers)]
         [HttpGet("Device")]
         public async Task<ActionResult<IList<int>>> ListVirtualDevices() =>
-            Ok(await Repo.VirtualDeviceIdsGetAsync(CallerTenantId));
+            Ok(await simulationRepo.VirtualDeviceIdsGetAsync(CallerTenantId));
 
         [Authorize(Roles = RoleNames.SimulationManagers)]
         [HttpDelete("Device/{idDevice}")]
         public async Task<ActionResult> DeleteVirtualDevice(int idDevice)
         {
-            Device? device = await Repo.DeviceGetByIdAsync(idDevice);
+            Device? device = await deviceRepo.DeviceGetByIdAsync(idDevice);
             if (device is null)
             {
                 return NotFound();
@@ -66,7 +68,7 @@ namespace api.Controllers.API
                 return StatusCode(403, "Device belongs to a different tenant");
             }
 
-            await Repo.VirtualDeviceDeleteAsync(idDevice, device.TenantID);
+            await simulationRepo.VirtualDeviceDeleteAsync(idDevice, device.TenantID);
             return Ok();
         }
     }

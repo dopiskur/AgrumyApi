@@ -34,13 +34,13 @@ public class ApiControllerTests
     private DeviceApiController NewDeviceController()
     {
         var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
-        return new(_repo.Object, _cache.Object,
+        return new(_repo.Object, _repo.Object, _repo.Object, _repo.Object, _cache.Object,
             new CommandQueueService(_repo.Object, _repo.Object, _repo.Object, new NoOpMqttCommandPublisher()), catalog,
             new api.Devices.DeviceConfigBuilder(_repo.Object, catalog), TestSettings);
     }
-    private UserApiController NewUserController() => new(_repo.Object, _cache.Object, _jobQueue, TestSettings);
+    private UserApiController NewUserController() => new(_repo.Object, _repo.Object, _repo.Object, _repo.Object, _repo.Object, _cache.Object, _jobQueue, TestSettings);
     private DeviceCommandApiController NewDeviceCommandController() =>
-        new(_repo.Object, _cache.Object, new CommandQueueService(_repo.Object, _repo.Object, _repo.Object, new NoOpMqttCommandPublisher()));
+        new(_repo.Object, _repo.Object, _repo.Object, _repo.Object, _repo.Object, _cache.Object, new CommandQueueService(_repo.Object, _repo.Object, _repo.Object, new NoOpMqttCommandPublisher()));
 
     /// UserApiController enqueues notification jobs instead of dispatching them inline (roadmap #305) - this runs the one job a test expects to have been queued against a fake scope resolving the same mocks, then lets the test assert on _notifications/_repo as before.
     private async Task RunOneQueuedJobAsync()
@@ -49,14 +49,15 @@ public class ApiControllerTests
         IServiceProvider services = new ServiceCollection()
             .AddSingleton(_notifications.Object)
             .AddSingleton(_repo.Object)
+            .AddSingleton<IUserRepository>(_repo.Object)
             .BuildServiceProvider();
         await job(services, CancellationToken.None);
     }
 
     private void AssertNoJobWasQueued() =>
         Assert.False(_jobQueue.Reader.TryRead(out _), "Expected no background job to have been enqueued.");
-    private DeviceUnitApiController NewDeviceUnitController() => new(_repo.Object, _cache.Object, TestSettings, new api.Commands.ManualActuateService(_repo.Object));
-    private TenantApiController NewTenantController() => new(_repo.Object, _cache.Object,
+    private DeviceUnitApiController NewDeviceUnitController() => new(_repo.Object, _repo.Object, _repo.Object, _repo.Object, _repo.Object, _cache.Object, TestSettings, new api.Commands.ManualActuateService(_repo.Object));
+    private TenantApiController NewTenantController() => new(_repo.Object, _repo.Object, _repo.Object, _cache.Object,
         new api.Migration.TenantExportService(_repo.Object), new api.Migration.TenantImportService(_repo.Object));
 
     /// Gives a bare (non-DI-constructed) controller the JWT claims an [Authorize] action reads via HttpContext.User.
@@ -532,7 +533,7 @@ public class ApiControllerTests
     private DeviceApiController NewDeviceControllerWithGatewaySecret(string? serverSecret)
     {
         var catalog = FirmwareTestSupport.NewCatalog(_repo.Object);
-        return new(_repo.Object, _cache.Object,
+        return new(_repo.Object, _repo.Object, _repo.Object, _repo.Object, _cache.Object,
             new CommandQueueService(_repo.Object, _repo.Object, _repo.Object, new NoOpMqttCommandPublisher()), catalog,
             new api.Devices.DeviceConfigBuilder(_repo.Object, catalog),
             Options.Create(new AgrumySettings { GatewayRegistrationSecret = serverSecret }));
@@ -1657,8 +1658,8 @@ public class ApiControllerTests
     }
 
 
-    private ServerConfigApiController NewServerConfigController() => new(_repo.Object, _cache.Object, []);
-    private SensorDataController NewSensorDataController() => new(_repo.Object, _cache.Object);
+    private ServerConfigApiController NewServerConfigController() => new(_repo.Object, _repo.Object, _repo.Object, _cache.Object, []);
+    private SensorDataController NewSensorDataController() => new(_repo.Object, _repo.Object, _repo.Object, _repo.Object, _cache.Object);
 
     [Fact]
     public async Task DeviceUpdate_TenantDevice_OwnTenant_Succeeds()
@@ -2032,7 +2033,7 @@ public class ApiControllerTests
         var email = new Mock<INotificationChannel>(MockBehavior.Strict);
         email.SetupGet(c => c.Name).Returns("email");
         email.Setup(c => c.SendAsync(It.IsAny<Notification>(), default)).ReturnsAsync(NotificationResult.Ok("sent"));
-        var controller = new ServerConfigApiController(_repo.Object, _cache.Object, [email.Object]);
+        var controller = new ServerConfigApiController(_repo.Object, _repo.Object, _repo.Object, _cache.Object, [email.Object]);
         SetCaller(controller, "admin", 0);
 
         var result = await controller.TestEmail("grower@example.com");
@@ -2047,7 +2048,7 @@ public class ApiControllerTests
         var email = new Mock<INotificationChannel>(MockBehavior.Strict);
         email.SetupGet(c => c.Name).Returns("email");
         email.Setup(c => c.SendAsync(It.IsAny<Notification>(), default)).ReturnsAsync(NotificationResult.Skipped("email channel disabled or missing Host/FromAddress"));
-        var controller = new ServerConfigApiController(_repo.Object, _cache.Object, [email.Object]);
+        var controller = new ServerConfigApiController(_repo.Object, _repo.Object, _repo.Object, _cache.Object, [email.Object]);
         SetCaller(controller, "admin", 0);
 
         var result = await controller.TestEmail("grower@example.com");
