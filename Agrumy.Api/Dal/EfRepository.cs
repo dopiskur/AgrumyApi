@@ -118,12 +118,12 @@ namespace api.Dal
             if (db.Database.IsMySql())
             {
                 await db.Database.ExecuteSqlRawAsync("SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode, ',NO_AUTO_VALUE_ON_ZERO'))");
-                await db.Database.ExecuteSqlRawAsync("INSERT INTO tenant (IDTenant, TenantName) VALUES (0, 'Default')");
+                await db.Database.ExecuteSqlRawAsync("INSERT INTO tenant (IDTenant, TenantName, EmergencyStopActive) VALUES (0, 'Default', 0)");
             }
             else
             {
                 // Npgsql created columns as case-sensitive quoted identifiers - unquoted here would fold to lowercase and miss the real column.
-                await db.Database.ExecuteSqlRawAsync("INSERT INTO tenant (\"IDTenant\", \"TenantName\") VALUES (0, 'Default')");
+                await db.Database.ExecuteSqlRawAsync("INSERT INTO tenant (\"IDTenant\", \"TenantName\", \"EmergencyStopActive\") VALUES (0, 'Default', false)");
             }
             await tx.CommitAsync();
         }
