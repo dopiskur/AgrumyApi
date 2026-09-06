@@ -32,6 +32,8 @@ namespace api.Models
         public string? DeviceName { get; set; }
         public int? UnitID { get; set; }
         public int? ZoneID { get; set; }
+        /// Same catalog as Device.ManualKit - lets the admin pick a kit at first-registration instead of only afterwards via Device -> Edit.
+        public string? ManualKit { get; set; }
 
         public int? WifiConfigId { get; set; }
         public string? Ssid { get; set; }
@@ -66,6 +68,7 @@ namespace api.Models
         public string? DeviceName { get; set; }
         public int? UnitID { get; set; }
         public int? ZoneID { get; set; }
+        public string? ManualKit { get; set; }
         /// This API's own host (see DiscoveryApiController.PublicHost) - not the scanning device's own, possibly-stale deviceConfig.servicePoint.
         public string? ServicePoint { get; set; }
     }

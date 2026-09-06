@@ -413,6 +413,7 @@ namespace api.Controllers.API
                     DeviceControllerEnabled = false,
                     IsGateway = provenGateway,
                     GatewayProfile = provenGateway ? value.GatewayProfile : null,
+                    ManualKit = provision?.ManualKit,
                 });
 
                 if (provision?.ZoneID is int zoneId)

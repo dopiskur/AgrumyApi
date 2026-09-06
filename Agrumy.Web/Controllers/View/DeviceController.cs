@@ -27,6 +27,7 @@ namespace api.Controllers.View
                 Zones = zones,
                 DiscoveredDevices = await api.DiscoveryResultsGet(null, null),
                 WifiConfigs = await api.DiscoveryWifiConfigsGet(),
+                DeviceTypes = (await api.DeviceTypeGet()).ToList(),
             });
         }
 

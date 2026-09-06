@@ -181,7 +181,11 @@ namespace api.Dal
                 db.DeviceTypes.AddRange(
                     new DeviceTypeRow { Kit = "KC868-A6", ControllerCapable = true },
                     new DeviceTypeRow { Kit = "ESP32-S3-Relay-6CH", ControllerCapable = true },
-                    new DeviceTypeRow { Kit = "VirtualDevice", ControllerCapable = true });
+                    new DeviceTypeRow { Kit = "VirtualDevice", ControllerCapable = true },
+                    new DeviceTypeRow { Kit = "Heltec V3", ControllerCapable = false },
+                    new DeviceTypeRow { Kit = "Heltec V4", ControllerCapable = false },
+                    new DeviceTypeRow { Kit = "ESP32Dev", ControllerCapable = false },
+                    new DeviceTypeRow { Kit = "LILYGO T-ETH-ELite ESP32-S3 (SX1302)", ControllerCapable = false });
             }
 
             await db.SaveChangesAsync();

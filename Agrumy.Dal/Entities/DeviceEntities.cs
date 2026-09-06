@@ -316,6 +316,7 @@ namespace api.Dal.Entities
     /// Catalog of recognized physical device kits - Kit itself is the key (a build-flag string, e.g. "KC868-A6"), not an auto-increment id; PinoutJson is an unopinionated per-kit GPIO layout blob, null for a kit nobody has documented pinout for yet, including every auto-registered one (see DeviceDiagnosticUpsertAsync).
     public class DeviceTypeRow
     {
+        public int IDDeviceType { get; set; }
         public string Kit { get; set; } = "";
         public bool ControllerCapable { get; set; }
         public string? PinoutJson { get; set; }

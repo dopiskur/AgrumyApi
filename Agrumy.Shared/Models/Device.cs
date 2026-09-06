@@ -543,6 +543,7 @@ namespace api.Models
     /// One recognized physical device kit - Kit is the key (a build-flag string, e.g. "KC868-A6"), not an auto-increment id; includes entries auto-registered from an unrecognized firmware-reported Kit alongside deliberately-curated ones.
     public class DeviceType
     {
+        public int IDDeviceType { get; set; }
         public string Kit { get; set; } = "";
         public bool ControllerCapable { get; set; }
         public string? PinoutJson { get; set; }

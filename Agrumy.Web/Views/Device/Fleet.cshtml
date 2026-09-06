@@ -114,6 +114,19 @@
                         <label class="form-label" for="registerDeviceName">Name (optional)</label>
                         <input type="text" name="DeviceName" id="registerDeviceName" class="form-control" maxlength="128" />
                     </div>
+                    @if (Model.DeviceTypes.Count > 0)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label" for="registerKitSelect">Kit (optional)</label>
+                            <select class="form-select" name="ManualKit" id="registerKitSelect">
+                                <option value="">-- not set --</option>
+                                @foreach (var deviceType in Model.DeviceTypes)
+                                {
+                                    <option value="@deviceType.Kit">@deviceType.Kit</option>
+                                }
+                            </select>
+                        </div>
+                    }
                     @if (Model.Units.Count > 0)
                     {
                         <div class="mb-3">

@@ -9,5 +9,6 @@ namespace api.ViewModels
         public IList<DeviceUnitZone> Zones { get; set; } = new List<DeviceUnitZone>();
         public IList<DiscoveryResult> DiscoveredDevices { get; set; } = new List<DiscoveryResult>();
         public IList<TenantWifiConfig> WifiConfigs { get; set; } = new List<TenantWifiConfig>();
+        public IList<DeviceType> DeviceTypes { get; set; } = new List<DeviceType>();
     }
 }

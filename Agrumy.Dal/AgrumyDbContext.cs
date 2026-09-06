@@ -219,8 +219,11 @@ namespace api.Dal
             modelBuilder.Entity<DeviceTypeRow>(e =>
             {
                 e.ToTable("deviceType");
-                e.HasKey(x => x.Kit);
-                e.Property(x => x.Kit).HasMaxLength(64).ValueGeneratedNever();
+                e.HasKey(x => x.IDDeviceType);
+                e.Property(x => x.IDDeviceType).ValueGeneratedOnAdd();
+                e.Property(x => x.Kit).HasMaxLength(64).IsRequired();
+                // FKs below still target Kit (business logic - auto-registration, dropdowns - is keyed by Kit, not the new numeric PK), so it needs its own unique index now that it isn't the PK.
+                e.HasIndex(x => x.Kit).IsUnique().HasDatabaseName("ux_deviceType_kit");
             });
 
             modelBuilder.Entity<DeviceConfigControllerRow>(e =>
@@ -292,7 +295,7 @@ namespace api.Dal
                 e.HasOne<DeviceRoleRow>().WithMany().HasForeignKey(x => x.DeviceRoleID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceTypeServiceRow>().WithMany().HasForeignKey(x => x.DeviceTypeServiceID).OnDelete(DeleteBehavior.NoAction);
                 // Admin-chosen from the SAME catalog as deviceDiagnostic.Kit (no auto-registration needed here - the Web dropdown only ever offers existing catalog entries).
-                e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.ManualKit).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.ManualKit).HasPrincipalKey(t => t.Kit).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<TenantRow>().WithMany().HasForeignKey(x => x.TenantID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
             });
@@ -348,7 +351,7 @@ namespace api.Dal
                 e.Property(x => x.Kit).HasMaxLength(64); // same cap as deviceType.Kit
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
                 // A firmware-reported Kit not yet in the catalog is auto-registered by DeviceDiagnosticUpsertAsync BEFORE this row is written, so the FK never rejects a legitimate device's heartbeat; NULL (never reported / generic build, normalized from "") bypasses the FK entirely.
-                e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.Kit).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.Kit).HasPrincipalKey(t => t.Kit).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<DeviceSimulationRow>(e =>

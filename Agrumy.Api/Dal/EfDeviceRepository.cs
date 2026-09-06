@@ -258,7 +258,7 @@ namespace api.Dal
         public async Task<IList<DeviceType>> DeviceTypeGetAsync()
         {
             return await db.DeviceTypes.AsNoTracking()
-                .Select(k => new DeviceType { Kit = k.Kit, ControllerCapable = k.ControllerCapable, PinoutJson = k.PinoutJson })
+                .Select(k => new DeviceType { IDDeviceType = k.IDDeviceType, Kit = k.Kit, ControllerCapable = k.ControllerCapable, PinoutJson = k.PinoutJson })
                 .ToListAsync();
         }
 
