@@ -1,129 +1,34 @@
-using api.Dal.Entities;
 using api.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// ITenantRepository members.
+    /// ITenantRepository members - forwarded to the standalone EfTenantRepository (roadmap #246) so IRepository's broad consumers keep working unchanged.
     internal partial class EfRepository
     {
-        public async Task<bool> TenantGetAsync(string tenantName)
-        {
-            return await db.Tenants.AsNoTracking().AnyAsync(t => t.TenantName == tenantName);
-        }
+        public Task<bool> TenantGetAsync(string tenantName) => tenantRepository.TenantGetAsync(tenantName);
 
-        public async Task<int?> TenantGetIdAsync(string tenantName)
-        {
-            return await db.Tenants.AsNoTracking()
-                .Where(t => t.TenantName == tenantName)
-                .Select(t => (int?)t.IDTenant)
-                .FirstOrDefaultAsync();
-        }
+        public Task<int?> TenantGetIdAsync(string tenantName) => tenantRepository.TenantGetIdAsync(tenantName);
 
-        public async Task<int> TenantAddAsync(string tenantName)
-        {
-            var row = new TenantRow { TenantName = tenantName };
-            db.Tenants.Add(row);
-            await db.SaveChangesAsync();
-            return row.IDTenant;
-        }
+        public Task<int> TenantAddAsync(string tenantName) => tenantRepository.TenantAddAsync(tenantName);
 
-        public async Task<IList<Tenant>> TenantsGetAllAsync()
-        {
-            return await db.Tenants.AsNoTracking()
-                .OrderBy(t => t.TenantName)
-                .Select(t => new Tenant { IDTenant = t.IDTenant, TenantName = t.TenantName, ScheduleTimeZone = t.ScheduleTimeZone, EmergencyStopActive = t.EmergencyStopActive })
-                .ToListAsync();
-        }
+        public Task<IList<Tenant>> TenantsGetAllAsync() => tenantRepository.TenantsGetAllAsync();
 
-        public async Task<Tenant?> TenantGetByIdAsync(int idTenant)
-        {
-            var row = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.IDTenant == idTenant);
-            return row == null ? null : new Tenant { IDTenant = row.IDTenant, TenantName = row.TenantName, ScheduleTimeZone = row.ScheduleTimeZone, EmergencyStopActive = row.EmergencyStopActive };
-        }
+        public Task<Tenant?> TenantGetByIdAsync(int idTenant) => tenantRepository.TenantGetByIdAsync(idTenant);
 
-        public async Task TenantUpdateAsync(Tenant tenant)
-        {
-            var row = await db.Tenants.FirstOrDefaultAsync(t => t.IDTenant == tenant.IDTenant);
-            if (row == null)
-            {
-                return;
-            }
-            row.TenantName = tenant.TenantName ?? row.TenantName;
-            row.ScheduleTimeZone = tenant.ScheduleTimeZone;
-            // EmergencyStopActive deliberately NOT written here - TenantEmergencyStopSetAsync is its only writer, so a stale rename/timezone form post can't silently clear or set it.
-            await db.SaveChangesAsync();
-        }
+        public Task TenantUpdateAsync(Tenant tenant) => tenantRepository.TenantUpdateAsync(tenant);
 
-        /// The only writer of EmergencyStopActive - also bumps ConfigVersion for every device in the tenant so the change reaches them on their VERY NEXT poll instead of waiting for ConfigHeartbeatHours, since a fail-closed safety switch can't tolerate that latency.
-        public async Task TenantEmergencyStopSetAsync(int idTenant, bool active)
-        {
-            var row = await db.Tenants.FirstOrDefaultAsync(t => t.IDTenant == idTenant);
-            if (row == null)
-            {
-                return;
-            }
-            row.EmergencyStopActive = active;
-            await db.SaveChangesAsync();
+        public Task TenantEmergencyStopSetAsync(int idTenant, bool active) => tenantRepository.TenantEmergencyStopSetAsync(idTenant, active);
 
-            await db.Devices.Where(d => d.TenantID == idTenant)
-                .ExecuteUpdateAsync(s => s.SetProperty(d => d.ConfigVersion, d => (d.ConfigVersion ?? 0) + 1));
-        }
+        public Task<bool> TenantZeroIsEmptyAsync() => tenantRepository.TenantZeroIsEmptyAsync();
 
-        public async Task<bool> TenantZeroIsEmptyAsync()
-        {
-            if (await db.Devices.AsNoTracking().AnyAsync(d => d.TenantID == 0))
-            {
-                return false;
-            }
-            var tenant0Users = await db.Users.AsNoTracking().Where(u => u.TenantID == 0)
-                .Select(u => u.PwdHash).ToListAsync();
-            return tenant0Users.Count == 0 || (tenant0Users.Count == 1 && tenant0Users[0] == null);
-        }
+        public Task<IList<TenantWifiConfig>> TenantWifiConfigsGetAsync(int tenantID) => tenantRepository.TenantWifiConfigsGetAsync(tenantID);
 
-        public async Task<IList<TenantWifiConfig>> TenantWifiConfigsGetAsync(int tenantID)
-        {
-            return await db.TenantWifiConfigs.AsNoTracking()
-                .Where(c => c.TenantID == tenantID)
-                .Select(c => new TenantWifiConfig
-                {
-                    IDTenantWifiConfig = c.IDTenantWifiConfig,
-                    TenantID = c.TenantID,
-                    Ssid = c.Ssid,
-                    Password = c.Password,
-                })
-                .ToListAsync();
-        }
+        public Task<TenantWifiConfig> TenantWifiConfigAddAsync(TenantWifiConfig config) => tenantRepository.TenantWifiConfigAddAsync(config);
 
-        public async Task<TenantWifiConfig> TenantWifiConfigAddAsync(TenantWifiConfig config)
-        {
-            var row = new TenantWifiConfigRow { TenantID = config.TenantID, Ssid = config.Ssid, Password = config.Password ?? "" };
-            db.TenantWifiConfigs.Add(row);
-            await db.SaveChangesAsync();
-            return new TenantWifiConfig { IDTenantWifiConfig = row.IDTenantWifiConfig, TenantID = row.TenantID, Ssid = row.Ssid, Password = row.Password };
-        }
+        public Task<TenantWifiConfig?> TenantWifiConfigGetByIdAsync(int idTenantWifiConfig) => tenantRepository.TenantWifiConfigGetByIdAsync(idTenantWifiConfig);
 
-        public async Task<TenantWifiConfig?> TenantWifiConfigGetByIdAsync(int idTenantWifiConfig)
-        {
-            var row = await db.TenantWifiConfigs.AsNoTracking().FirstOrDefaultAsync(c => c.IDTenantWifiConfig == idTenantWifiConfig);
-            return row == null ? null : new TenantWifiConfig { IDTenantWifiConfig = row.IDTenantWifiConfig, TenantID = row.TenantID, Ssid = row.Ssid, Password = row.Password };
-        }
+        public Task TenantWifiConfigUpdateAsync(TenantWifiConfig config) => tenantRepository.TenantWifiConfigUpdateAsync(config);
 
-        public async Task TenantWifiConfigUpdateAsync(TenantWifiConfig config)
-        {
-            var row = await db.TenantWifiConfigs.FirstOrDefaultAsync(c => c.IDTenantWifiConfig == config.IDTenantWifiConfig);
-            if (row == null)
-            {
-                return;
-            }
-            row.Ssid = config.Ssid;
-            row.Password = config.Password ?? "";
-            await db.SaveChangesAsync();
-        }
-
-        public async Task TenantWifiConfigDeleteAsync(int idTenantWifiConfig)
-        {
-            await db.TenantWifiConfigs.Where(c => c.IDTenantWifiConfig == idTenantWifiConfig).ExecuteDeleteAsync();
-        }
+        public Task TenantWifiConfigDeleteAsync(int idTenantWifiConfig) => tenantRepository.TenantWifiConfigDeleteAsync(idTenantWifiConfig);
     }
 }
