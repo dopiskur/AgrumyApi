@@ -150,3 +150,7 @@
 </div>
 
 <partial name="_DeviceFirmware" model="(DeviceFirmwareViewModel)ViewBag.Firmware" />
+@if (hasAnyRole(RoleNames.DeviceManagers))
+{
+    <partial name="_DeviceWifiUpdate" model="Model.IDDevice!.Value" />
+}

@@ -178,6 +178,23 @@ namespace api.Controllers.View
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> WifiUpdate(int idDevice, string ssid, string wifiPassword)
+        {
+            try
+            {
+                await api.DeviceWifiUpdate(new DeviceWifiUpdateRequest { IdDevice = idDevice, Ssid = ssid, WifiPassword = wifiPassword });
+                TempData["WifiMessage"] = "WiFi switch requested - the device will verify it can still reach this server before applying it, and stays on its current network otherwise.";
+            }
+            catch (ApiException ex)
+            {
+                TempData["WifiError"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Details), new { idDevice });
+        }
+
+        [Authorize(Roles = RoleNames.DeviceManagers)]
         public async Task<ActionResult> Edit(int? idDevice)
         {
             DeviceDto device = await api.DeviceGet(idDevice);

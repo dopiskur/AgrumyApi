@@ -109,6 +109,34 @@ namespace api.Commands
             return new IssueCommandResult(IssueCommandOutcome.AllDuplicates, [], "A provisioning command is already pending for this device.");
         }
 
+        /// Issues an UpdateWifiCredentials command to one already-registered device - same single-device dedup as IssueToTargetsAsync, but with a payload (new Ssid/WifiPassword) so it can't reuse that shared helper.
+        public async Task<IssueCommandResult> IssueWifiUpdateCommandAsync(int deviceId, string ssid, string wifiPassword)
+        {
+            DateTime utcNow = DateTime.UtcNow;
+            if (await commandRepo.HasActiveCommandAsync(deviceId, CommandActionType.UpdateWifiCredentials, utcNow))
+            {
+                return new IssueCommandResult(IssueCommandOutcome.AllDuplicates, [], "A WiFi update is already pending for this device.");
+            }
+            DateTime expiresAt = utcNow + DefaultExpiry;
+            string payloadJson = JsonSerializer.Serialize(new WifiUpdatePayload { Ssid = ssid, WifiPassword = wifiPassword });
+            if (await commandRepo.AddCommandAsync(deviceId, CommandActionType.UpdateWifiCredentials, utcNow, expiresAt, payloadJson) is int newCommandId)
+            {
+                Device? target = await deviceRepo.DeviceGetByIdAsync(deviceId);
+                if (target != null)
+                {
+                    await mqttPublisher.PublishAsync(target, new PendingCommand
+                    {
+                        IDDeviceCommand = newCommandId,
+                        ActionType = CommandActionType.UpdateWifiCredentials,
+                        ExpiresAt = expiresAt,
+                        Payload = payloadJson,
+                    });
+                }
+                return new IssueCommandResult(IssueCommandOutcome.Success, [newCommandId]);
+            }
+            return new IssueCommandResult(IssueCommandOutcome.AllDuplicates, [], "A WiFi update is already pending for this device.");
+        }
+
         /// Finds the active ProvisionDevice command whose payload targeted this MacAddress and marks it Executed so a later re-registration of the same mac never reapplies a stale intent; null when this mac never went through that discovery/registration flow.
         public async Task<DiscoveryProvisionPayload?> ConsumePendingProvisionAsync(string macAddress)
         {

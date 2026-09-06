@@ -271,6 +271,26 @@ namespace api.Controllers.API
             return Ok();
         }
 
+        /// Queues an UpdateWifiCredentials command carrying the new Ssid/WifiPassword - see api.Models.WifiUpdatePayload for what the device does with it (verify-then-persist, fall back to the old network on failure).
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost("WifiUpdate")]
+        public async Task<ActionResult> WifiUpdateRequest([FromBody] DeviceWifiUpdateRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Ssid))
+            {
+                return BadRequest("Ssid is required.");
+            }
+
+            var (device, error) = await EnsureOwnedDeviceAsync(
+                () => Repo.DeviceGetByIdAsync(request.IdDevice), "Device", forWrite: true);
+            if (error != null)
+            {
+                return error;
+            }
+            IssueCommandResult result = await commandQueue.IssueWifiUpdateCommandAsync(device!.IDDevice!.Value, request.Ssid, request.WifiPassword);
+            return result.Outcome == IssueCommandOutcome.Success ? Ok() : Conflict(result.Message);
+        }
+
         /// No identity field in the body by design - deviceID/tenantID come exclusively from the authenticated apiId, same rule as SensorDataApiController.Post.
         [HttpPost("Event")]
         [EnableRateLimiting("device-data")]

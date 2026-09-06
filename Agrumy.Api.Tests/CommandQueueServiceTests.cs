@@ -296,6 +296,48 @@ public class CommandQueueServiceTests
         // Strict mock: SetCommandStatusAsync was never set up - a cross-device execute confirmation must not call it.
     }
 
+    [Fact]
+    public async Task IssueWifiUpdate_Success_PublishesPayloadCarryingCommand()
+    {
+        DateTime before = DateTime.UtcNow;
+        _commands.Setup(c => c.HasActiveCommandAsync(500, CommandActionType.UpdateWifiCredentials, It.IsAny<DateTime>())).ReturnsAsync(false);
+        _commands.Setup(c => c.AddCommandAsync(500, CommandActionType.UpdateWifiCredentials, It.IsAny<DateTime>(), It.IsAny<DateTime>(),
+            It.Is<string?>(p => p != null && p.Contains("NewSsid") && p.Contains("NewPass")))).ReturnsAsync(9);
+        _devices.Setup(d => d.DeviceGetByIdAsync(500)).ReturnsAsync(ControllerDevice(500));
+
+        var result = await NewService().IssueWifiUpdateCommandAsync(500, "NewSsid", "NewPass");
+
+        Assert.Equal(IssueCommandOutcome.Success, result.Outcome);
+        Assert.Equal([9], result.CreatedCommandIds);
+        _commands.Verify(c => c.AddCommandAsync(500, CommandActionType.UpdateWifiCredentials,
+            It.Is<DateTime>(d => d >= before), It.Is<DateTime>(d => d > before), It.IsAny<string?>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task IssueWifiUpdate_AlreadyPendingForDevice_ReturnsAllDuplicates()
+    {
+        _commands.Setup(c => c.HasActiveCommandAsync(500, CommandActionType.UpdateWifiCredentials, It.IsAny<DateTime>())).ReturnsAsync(true);
+
+        var result = await NewService().IssueWifiUpdateCommandAsync(500, "NewSsid", "NewPass");
+
+        Assert.Equal(IssueCommandOutcome.AllDuplicates, result.Outcome);
+        Assert.Empty(result.CreatedCommandIds);
+        // Strict mock: AddCommandAsync was never set up - a call to it here would throw.
+    }
+
+    [Fact]
+    public async Task IssueWifiUpdate_LosingTheDbLevelDedupRace_IsTreatedAsAllDuplicates_NotACrash()
+    {
+        _commands.Setup(c => c.HasActiveCommandAsync(500, CommandActionType.UpdateWifiCredentials, It.IsAny<DateTime>())).ReturnsAsync(false);
+        _commands.Setup(c => c.AddCommandAsync(500, CommandActionType.UpdateWifiCredentials, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<string?>()))
+            .ReturnsAsync((int?)null);
+
+        var result = await NewService().IssueWifiUpdateCommandAsync(500, "NewSsid", "NewPass");
+
+        Assert.Equal(IssueCommandOutcome.AllDuplicates, result.Outcome);
+        Assert.Empty(result.CreatedCommandIds);
+    }
+
     private static string ProvisionPayloadJson(string discoveredApMac, string? deviceName = null, int? zoneId = null) =>
         System.Text.Json.JsonSerializer.Serialize(new DiscoveryProvisionPayload
         {

@@ -1,0 +1,29 @@
+@model int
+<div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">WiFi network</h3></div>
+    <div class="card-body">
+        @if (TempData["WifiMessage"] is string message)
+        {
+            <div class="alert alert-success">@message</div>
+        }
+        @if (TempData["WifiError"] is string error)
+        {
+            <div class="alert alert-warning">@error</div>
+        }
+        <p class="text-secondary small">The device connects to the new network and verifies it can still reach this server before switching - it stays on its current network if that check fails.</p>
+        <form asp-action="WifiUpdate" method="post" class="row g-2 align-items-end">
+            <input type="hidden" name="idDevice" value="@Model" />
+            <div class="col-auto">
+                <label class="form-label">SSID</label>
+                <input type="text" name="ssid" class="form-control" required maxlength="32" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label">Password</label>
+                <input type="password" name="wifiPassword" class="form-control" maxlength="64" />
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-wifi"></i> Switch network</button>
+            </div>
+        </form>
+    </div>
+</div>

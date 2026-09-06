@@ -7,6 +7,7 @@ namespace api.Models
         ForceConfigSync = 3,
         ScanForDevices = 4,
         ProvisionDevice = 5,
+        UpdateWifiCredentials = 6,
     }
 
     /// Device acknowledges before executing, so a command stuck at Acknowledged (never reaching Executed) means it took the command but crashed or lost power before confirming the outcome.
@@ -60,5 +61,20 @@ namespace api.Models
     public class CommandAckRequest
     {
         public int CommandId { get; set; }
+    }
+
+    /// Body of POST /api/Device/WifiUpdate - single device only, no Zone/Unit fan-out (each physical device has its own AP to switch, unlike a firmware/config push).
+    public class DeviceWifiUpdateRequest
+    {
+        public int IdDevice { get; set; }
+        public string Ssid { get; set; } = "";
+        public string WifiPassword { get; set; } = "";
+    }
+
+    /// The DeviceCommand.Payload JSON for an UpdateWifiCredentials command - the target device connects to this AP, verifies it can still reach this same server before persisting it, and falls back to its previously-saved network otherwise (see ServiceController::switchWifiNetwork).
+    public class WifiUpdatePayload
+    {
+        public string Ssid { get; set; } = "";
+        public string WifiPassword { get; set; } = "";
     }
 }

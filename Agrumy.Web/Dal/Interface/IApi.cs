@@ -311,6 +311,9 @@ namespace api.Dal.Interface
         [Delete("/api/Device/FirmwareUpdate")]
         Task DeviceFirmwareUpdateCancel(int idDevice);
 
+        [Post("/api/Device/WifiUpdate")]
+        Task DeviceWifiUpdate([Body] DeviceWifiUpdateRequest request);
+
         // ---- SensorData ---------------------------------------------------
 
         [Get("/api/SensorData")]
