@@ -115,6 +115,10 @@ namespace api.Dal
                 DeviceUnitZoneName = zone.DeviceUnitZoneName,
                 WaterPumpMaxRunSeconds = settings.WaterPumpMaxRunSeconds,
                 WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds,
+                // No server-wide default makes sense for a specific tank's own calibration - unlike WaterPumpMaxRunSeconds above, always taken from the caller (null/unset is the correct "no tank tracking yet" state).
+                TankCapacityLiters = zone.TankCapacityLiters,
+                WaterLevelRawEmpty = zone.WaterLevelRawEmpty,
+                WaterLevelRawFull = zone.WaterLevelRawFull,
             };
             db.DeviceUnitZones.Add(row);
             await db.SaveChangesAsync();
@@ -133,6 +137,9 @@ namespace api.Dal
             row.WaterPumpMaxRunSeconds = zone.WaterPumpMaxRunSeconds;
             row.WaterPumpCooldownSeconds = zone.WaterPumpCooldownSeconds;
             row.SkipWaterPumpWhenRainPredicted = zone.SkipWaterPumpWhenRainPredicted;
+            row.TankCapacityLiters = zone.TankCapacityLiters;
+            row.WaterLevelRawEmpty = zone.WaterLevelRawEmpty;
+            row.WaterLevelRawFull = zone.WaterLevelRawFull;
             await db.SaveChangesAsync();
             await DeviceUnitZoneConfigVersionBumpAsync(idDeviceUnitZone: row.IDDeviceUnitZone);
         }
@@ -477,7 +484,7 @@ namespace api.Dal
                     IDDeviceUnit = z.DeviceUnitID,
                     DeviceUnitZoneName = z.DeviceUnitZoneName,
                     DeviceCount = scoped.Count,
-                    Averages = Average(scoped),
+                    Averages = Average(scoped, z),
                     Status = ComputeStatus(scoped),
                     Trend = await BuildTrendAsync([z.IDDeviceUnitZone]),
                     ProblemAlerts = alerts.Where(a => a.DeviceUnitZoneID == z.IDDeviceUnitZone).Select(ToDtoAlert).ToList(),
@@ -506,7 +513,7 @@ namespace api.Dal
                 IDDeviceUnit = zone.DeviceUnitID,
                 DeviceUnitZoneName = zone.DeviceUnitZoneName,
                 DeviceCount = deviceRows.Count,
-                Averages = Average(snapshots),
+                Averages = Average(snapshots, zone),
                 Devices = deviceRows.Select(ToDto).ToList(),
                 Status = ComputeStatus(snapshots),
                 Trend = await BuildTrendAsync([idDeviceUnitZone]),
@@ -667,23 +674,70 @@ namespace api.Dal
         private static int HourBucketIndex(DateTime dateCreated, DateTime utcNow) =>
             SensorTrend.HourBuckets - 1 - (int)Math.Floor((utcNow - dateCreated).TotalHours);
 
-        /// Per-sensor-type average across snapshots - LINQ's nullable Average() already ignores nulls and returns null (not an exception) for an all-null source, exactly "no device reported this type".
-        private static SensorAverages Average(IReadOnlyCollection<UnitZoneDeviceSnapshot> snapshots) => new()
+        /// Per-sensor-type average across snapshots - LINQ's nullable Average() already ignores nulls and returns null (not an exception) for an all-null source, exactly "no device reported this type". zone is only passed at Zone granularity - a Unit rollup passes null since it may span zones with different (or no) tank calibration, and TankFillPercent/VolumeLiters stay null there.
+        private static SensorAverages Average(IReadOnlyCollection<UnitZoneDeviceSnapshot> snapshots, DeviceUnitZoneRow? zone = null)
         {
-            Temperature = snapshots.Select(s => s.Temperature).Average(),
-            SoilTemperature = snapshots.Select(s => s.SoilTemperature).Average(),
-            Humidity = snapshots.Select(s => s.Humidity).Average(),
-            Vpd = snapshots.Select(s => s.Vpd).Average(),
-            Moisture = snapshots.Select(s => s.Moisture).Average(),
-            Light = snapshots.Select(s => s.Light).Average(),
-            Co2 = snapshots.Select(s => s.Co2).Average(),
-            Tvoc = snapshots.Select(s => s.Tvoc).Average(),
-            Barometer = snapshots.Select(s => s.Barometer).Average(),
-            LiquidPH = snapshots.Select(s => s.LiquidPH).Average(),
-            RainLevel = snapshots.Select(s => s.RainLevel).Average(),
-            WaterLevel = snapshots.Select(s => s.WaterLevel).Average(),
-            Wind = snapshots.Select(s => s.Wind).Average(),
-        };
+            double? waterLevel = snapshots.Select(s => s.WaterLevel).Average();
+            // Fill fraction is linear, so averaging raw WaterLevel first and calibrating once is equivalent to calibrating per device then averaging.
+            (double? tankFillPercent, double? tankVolumeLiters) = zone == null
+                ? (null, null)
+                : TankCalculator.Compute(waterLevel, zone.WaterLevelRawEmpty, zone.WaterLevelRawFull, zone.TankCapacityLiters);
+
+            return new SensorAverages
+            {
+                Temperature = snapshots.Select(s => s.Temperature).Average(),
+                SoilTemperature = snapshots.Select(s => s.SoilTemperature).Average(),
+                Humidity = snapshots.Select(s => s.Humidity).Average(),
+                Vpd = snapshots.Select(s => s.Vpd).Average(),
+                Moisture = snapshots.Select(s => s.Moisture).Average(),
+                Light = snapshots.Select(s => s.Light).Average(),
+                Co2 = snapshots.Select(s => s.Co2).Average(),
+                Tvoc = snapshots.Select(s => s.Tvoc).Average(),
+                Barometer = snapshots.Select(s => s.Barometer).Average(),
+                LiquidPH = snapshots.Select(s => s.LiquidPH).Average(),
+                RainLevel = snapshots.Select(s => s.RainLevel).Average(),
+                WaterLevel = waterLevel,
+                Wind = snapshots.Select(s => s.Wind).Average(),
+                TankFillPercent = tankFillPercent,
+                TankVolumeLiters = tankVolumeLiters,
+            };
+        }
+
+        // ---- Tank refill alert (roadmap #234) --------------------------
+
+        public async Task<IList<TankRefillAlertCandidate>> TankRefillAlertCandidatesGetAsync()
+        {
+            var zones = await db.DeviceUnitZones.AsNoTracking()
+                .Where(z => z.IDDeviceUnitZone != 0 && z.TenantID != null
+                    && z.TankCapacityLiters != null && z.WaterLevelRawEmpty != null && z.WaterLevelRawFull != null)
+                .ToListAsync();
+
+            var result = new List<TankRefillAlertCandidate>();
+            foreach (var z in zones)
+            {
+                // Latest reading per device in the zone (portable scalar subquery, same shape as LowBatteryAlertCandidatesGetAsync's Battery column), averaged client-side.
+                var latestPerDevice = await db.Devices.AsNoTracking()
+                    .Where(d => d.DeviceUnitZoneID == z.IDDeviceUnitZone)
+                    .Select(d => db.SensorData.AsNoTracking()
+                        .Where(s => s.DeviceID == d.IDDevice)
+                        .OrderByDescending(s => s.DateCreated)
+                        .Select(s => (int?)s.WaterLevel)
+                        .FirstOrDefault())
+                    .ToListAsync();
+                double? waterLevel = latestPerDevice.Select(w => (double?)w).Average();
+
+                result.Add(new TankRefillAlertCandidate(
+                    z.IDDeviceUnitZone, z.TenantID!.Value, z.DeviceUnitZoneName,
+                    waterLevel, z.WaterLevelRawEmpty, z.WaterLevelRawFull, z.TankCapacityLiters, z.TankRefillNotifiedAt));
+            }
+            return result;
+        }
+
+        public async Task TankRefillNotifiedSetAsync(int idDeviceUnitZone, DateTime? notifiedAt)
+        {
+            await db.DeviceUnitZones.Where(z => z.IDDeviceUnitZone == idDeviceUnitZone)
+                .ExecuteUpdateAsync(s => s.SetProperty(z => z.TankRefillNotifiedAt, notifiedAt));
+        }
 
         private static DeviceUnit ToDtoUnit(DeviceUnitRow u) => new()
         {
@@ -701,6 +755,9 @@ namespace api.Dal
             WaterPumpMaxRunSeconds = z.WaterPumpMaxRunSeconds,
             WaterPumpCooldownSeconds = z.WaterPumpCooldownSeconds,
             SkipWaterPumpWhenRainPredicted = z.SkipWaterPumpWhenRainPredicted,
+            TankCapacityLiters = z.TankCapacityLiters,
+            WaterLevelRawEmpty = z.WaterLevelRawEmpty,
+            WaterLevelRawFull = z.WaterLevelRawFull,
         };
     }
 }

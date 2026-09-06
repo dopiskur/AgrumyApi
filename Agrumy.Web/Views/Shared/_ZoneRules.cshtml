@@ -43,3 +43,30 @@
         </p>
     </div>
 </div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h6 class="fw-semibold">Tank calibration</h6>
+        <p class="text-secondary small">
+            Translates this zone's raw WaterLevel readings into a fill percent/volume shown above,
+            and drives the low-tank refill alert. Leave all three blank to disable tank tracking
+            for this zone.
+        </p>
+        <form asp-action="TankCalibrationUpdate" method="post" class="d-flex flex-wrap align-items-end gap-2">
+            <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
+            <div>
+                <label class="form-label small mb-0">Tank capacity (liters)</label>
+                <input type="number" min="0" step="any" name="tankCapacityLiters" class="form-control form-control-sm" style="width:10rem" value="@Model.Zone.TankCapacityLiters" />
+            </div>
+            <div>
+                <label class="form-label small mb-0">Raw reading when empty</label>
+                <input type="number" name="waterLevelRawEmpty" class="form-control form-control-sm" style="width:10rem" value="@Model.Zone.WaterLevelRawEmpty" />
+            </div>
+            <div>
+                <label class="form-label small mb-0">Raw reading when full</label>
+                <input type="number" name="waterLevelRawFull" class="form-control form-control-sm" style="width:10rem" value="@Model.Zone.WaterLevelRawFull" />
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">Save</button>
+        </form>
+    </div>
+</div>

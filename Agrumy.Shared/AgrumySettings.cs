@@ -30,6 +30,10 @@ namespace api
         public double BatteryLowThreshold { get; set; } = 20.0;
         public double BatteryLowHysteresis { get; set; } = 5.0;
 
+        // See api.Models.ServerConfig.TankRefillThreshold/TankRefillHysteresis - same dead-zone rule, applied to TankCalculator's fill percent instead of Battery.
+        public double TankRefillThreshold { get; set; } = 20.0;
+        public double TankRefillHysteresis { get; set; } = 5.0;
+
         // WaterPump-only safety-limit defaults (30min run/5min cooldown); only seeds new devices, never retroactively changes existing DeviceConfigController rows.
         public int WaterPumpMaxRunSeconds { get; set; } = 1800;
         public int WaterPumpCooldownSeconds { get; set; } = 300;
@@ -84,6 +88,8 @@ namespace api
             HysteresisLight = ParseDoubleOr(configuration, "ServerConfig:Hysteresis:Light", 20.0),
             BatteryLowThreshold = ParseDoubleOr(configuration, "ServerConfig:BatteryLowThreshold", 20.0),
             BatteryLowHysteresis = ParseDoubleOr(configuration, "ServerConfig:BatteryLowHysteresis", 5.0),
+            TankRefillThreshold = ParseDoubleOr(configuration, "ServerConfig:TankRefillThreshold", 20.0),
+            TankRefillHysteresis = ParseDoubleOr(configuration, "ServerConfig:TankRefillHysteresis", 5.0),
             WaterPumpMaxRunSeconds = ParseIntOr(configuration, "ServerConfig:WaterPumpMaxRunSeconds", 1800),
             WaterPumpCooldownSeconds = ParseIntOr(configuration, "ServerConfig:WaterPumpCooldownSeconds", 300),
             EventDedupeMinutes = ParseIntOr(configuration, "ServerConfig:EventDedupeMinutes", 10),

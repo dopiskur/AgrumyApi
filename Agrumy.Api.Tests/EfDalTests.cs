@@ -194,6 +194,55 @@ public class VpdCalculatorTests
     }
 }
 
+public class TankCalculatorTests
+{
+    [Theory]
+    [InlineData(null, 0, 100, 200.0)]
+    [InlineData(50.0, null, 100, 200.0)]
+    [InlineData(50.0, 0, null, 200.0)]
+    [InlineData(50.0, 0, 100, null)]
+    [InlineData(50.0, 50, 50, 200.0)] // rawEmpty == rawFull - undefined calibration, not a divide-by-zero crash
+    public void Compute_MissingCalibrationInput_ReturnsNullPair(double? raw, int? empty, int? full, double? capacity)
+    {
+        var (percent, liters) = api.Utils.TankCalculator.Compute(raw, empty, full, capacity);
+        Assert.Null(percent);
+        Assert.Null(liters);
+    }
+
+    [Fact]
+    public void Compute_Midpoint_Returns50PercentAndHalfCapacity()
+    {
+        var (percent, liters) = api.Utils.TankCalculator.Compute(50, 0, 100, 200.0);
+        Assert.Equal(50.0, percent);
+        Assert.Equal(100.0, liters);
+    }
+
+    [Fact]
+    public void Compute_BelowEmptyCalibration_ClampsToZero()
+    {
+        var (percent, liters) = api.Utils.TankCalculator.Compute(-10, 0, 100, 200.0);
+        Assert.Equal(0.0, percent);
+        Assert.Equal(0.0, liters);
+    }
+
+    [Fact]
+    public void Compute_AboveFullCalibration_ClampsTo100()
+    {
+        var (percent, liters) = api.Utils.TankCalculator.Compute(150, 0, 100, 200.0);
+        Assert.Equal(100.0, percent);
+        Assert.Equal(200.0, liters);
+    }
+
+    [Fact]
+    public void Compute_InvertedCalibration_StillInterpolatesCorrectly()
+    {
+        // Some raw sensors read HIGHER when the tank is more empty - rawEmpty > rawFull is a valid, deliberately supported calibration.
+        var (percent, liters) = api.Utils.TankCalculator.Compute(75, 100, 0, 200.0);
+        Assert.Equal(25.0, percent);
+        Assert.Equal(50.0, liters);
+    }
+}
+
 public class ClassifyExceptionTests
 {
     // ClassifyException is a pure function - never touches the DbContext, so a never-connected one and default settings are enough to construct it.

@@ -26,6 +26,13 @@ namespace api.Models
 
         // Per-zone opt-in, not a global switch; combined server-side with ServerConfig.WeatherRainPredicted into DeviceConfigController.SkipWaterPumpForRain.
         public bool SkipWaterPumpWhenRainPredicted { get; set; }
+
+        // Tank calibration (roadmap #234) - all three null means "no tank tracking for this zone", not a zero-capacity tank. TankFillPercent/TankVolumeLiters (api.Utils.TankCalculator) are derived from these plus the zone's latest WaterLevel, never stored.
+        public double? TankCapacityLiters { get; set; }
+        /// Raw sensorData.WaterLevel reading when the tank is empty - not necessarily 0, depends on the physical sensor.
+        public int? WaterLevelRawEmpty { get; set; }
+        /// Raw sensorData.WaterLevel reading when the tank is full.
+        public int? WaterLevelRawFull { get; set; }
     }
 
     /// Relay function a DeviceUnitZoneRule targets, same numeric convention as deviceTypeRelay seed rows; kept as a plain int on the wire (not this enum) so firmware can parse it as a number without JsonStringEnumConverter.
@@ -157,6 +164,9 @@ namespace api.Models
         public double? RainLevel { get; set; }
         public double? WaterLevel { get; set; }
         public double? Wind { get; set; }
+        /// Derived from WaterLevel + the zone's tank calibration (api.Utils.TankCalculator) - null for a Unit rollup (spans zones with potentially different/no calibration) or an uncalibrated zone.
+        public double? TankFillPercent { get; set; }
+        public double? TankVolumeLiters { get; set; }
     }
 
     /// Traffic-light health for a Unit/Zone cube; Red beats Orange beats Green, so one offline device reddens the whole cube.

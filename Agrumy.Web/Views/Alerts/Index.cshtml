@@ -63,6 +63,23 @@
                 <input asp-for="BatteryLowHysteresis" class="form-control" />
                 <span asp-validation-for="BatteryLowHysteresis" class="text-danger"></span>
             </div>
+
+            <p class="text-secondary">
+                Tank refill alert: a calibrated zone's tank fill percent (Device Unit &rarr; a
+                zone &rarr; Tank calibration) at or below this percentage triggers one email
+                per low-tank streak, same dead-zone clearing rule as the battery alert above.
+                A zone with no tank calibration set never triggers this.
+            </p>
+            <div class="mb-3">
+                <label asp-for="TankRefillThreshold" class="form-label"></label>
+                <input asp-for="TankRefillThreshold" class="form-control" />
+                <span asp-validation-for="TankRefillThreshold" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="TankRefillHysteresis" class="form-label"></label>
+                <input asp-for="TankRefillHysteresis" class="form-control" />
+                <span asp-validation-for="TankRefillHysteresis" class="text-danger"></span>
+            </div>
             <p class="text-secondary">
                 A device repeating the identical event (e.g. "NoInternet") within this many
                 minutes of its last one is ignored, not stored.

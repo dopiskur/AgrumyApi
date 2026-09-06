@@ -18,6 +18,9 @@ namespace api.Notifications
         // How often RuleNotificationEvaluator (#212) sweeps Notification-action rules; same cadence as
         // OfflineCheckIntervalMinutes - a rule-driven alert is meant to feel timely, not battery-drain-slow.
         public int RuleCheckIntervalMinutes { get; set; } = 5;
+
+        // How often TankRefillAlertEvaluator (#234) sweeps calibrated zones; same reasoning as BatteryCheckIntervalMinutes - a tank drains over hours/days, not seconds.
+        public int TankCheckIntervalMinutes { get; set; } = 30;
     }
 
     public sealed class EmailChannelOptions

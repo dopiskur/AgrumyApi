@@ -124,6 +124,9 @@ namespace api.Migration
                     WaterPumpMaxRunSeconds = z.WaterPumpMaxRunSeconds,
                     WaterPumpCooldownSeconds = z.WaterPumpCooldownSeconds,
                     SkipWaterPumpWhenRainPredicted = z.SkipWaterPumpWhenRainPredicted,
+                    TankCapacityLiters = z.TankCapacityLiters,
+                    WaterLevelRawEmpty = z.WaterLevelRawEmpty,
+                    WaterLevelRawFull = z.WaterLevelRawFull,
                 });
                 if (z.IDDeviceUnitZone is int oldId && created.IDDeviceUnitZone is int newId)
                 {

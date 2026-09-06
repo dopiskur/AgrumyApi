@@ -23,6 +23,12 @@ namespace api.Dal.Entities
 
         // See api.Models.DeviceUnitZone.SkipWaterPumpWhenRainPredicted.
         public bool SkipWaterPumpWhenRainPredicted { get; set; }
+
+        // See api.Models.DeviceUnitZone's own copy of these for the full explanation (roadmap #234).
+        public double? TankCapacityLiters { get; set; }
+        public int? WaterLevelRawEmpty { get; set; }
+        public int? WaterLevelRawFull { get; set; }
+        public DateTime? TankRefillNotifiedAt { get; set; }
     }
 
     /// See api.Models.DeviceUnitZoneRule - Conditions is a JSON array of RuleCondition, (de)serialized at the application layer, not a native JSON column type. Exactly one of DeviceUnitZoneID/DeviceUnitID is set for Zone/Unit scope, both null for Global (per-tenant) scope.

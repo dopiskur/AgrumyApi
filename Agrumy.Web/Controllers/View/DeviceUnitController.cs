@@ -238,6 +238,27 @@ namespace api.Controllers.View
             return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
         }
 
+        // Roadmap #234 - all three null together means "no tank tracking", the empty-string->null coercion below keeps a blank form submit from writing a zero-capacity/zero-calibration tank instead.
+        [Authorize(Roles = RoleNames.DeviceManagers)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> TankCalibrationUpdate(int idDeviceUnitZone, double? tankCapacityLiters, int? waterLevelRawEmpty, int? waterLevelRawFull)
+        {
+            DeviceUnitZone zone = await api.DeviceUnitZoneGetById(idDeviceUnitZone);
+            zone.TankCapacityLiters = tankCapacityLiters;
+            zone.WaterLevelRawEmpty = waterLevelRawEmpty;
+            zone.WaterLevelRawFull = waterLevelRawFull;
+            try
+            {
+                await api.DeviceUnitZoneUpdate(zone);
+            }
+            catch (ApiException ex)
+            {
+                TempData["Error"] = ex.Body;
+            }
+            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+        }
+
         // ---- Rules (Zone/Unit/Global scope, roadmap #212) ----------------------------
 
         [Authorize(Roles = RoleNames.DeviceManagers)]

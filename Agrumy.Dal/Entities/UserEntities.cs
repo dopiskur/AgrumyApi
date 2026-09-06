@@ -100,6 +100,8 @@ namespace api.Dal.Entities
 
         public double? BatteryLowThreshold { get; set; }
         public double? BatteryLowHysteresis { get; set; }
+        public double? TankRefillThreshold { get; set; }
+        public double? TankRefillHysteresis { get; set; }
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
         public int? EventDedupeMinutes { get; set; }

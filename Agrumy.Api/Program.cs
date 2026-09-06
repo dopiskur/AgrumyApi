@@ -126,6 +126,9 @@ builder.Services.AddHostedService<OfflineAlertBackgroundService>();
 builder.Services.AddScoped<LowBatteryAlertEvaluator>();
 builder.Services.AddHostedService<LowBatteryAlertBackgroundService>();
 
+builder.Services.AddScoped<TankRefillAlertEvaluator>();
+builder.Services.AddHostedService<TankRefillAlertBackgroundService>();
+
 // Roadmap #212: server-side evaluator for Notification-action rules - a Relay-action rule's fold runs on-device instead.
 builder.Services.AddScoped<RuleNotificationEvaluator>();
 builder.Services.AddHostedService<RuleNotificationBackgroundService>();

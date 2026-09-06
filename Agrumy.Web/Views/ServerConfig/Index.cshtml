@@ -23,6 +23,8 @@
             @* Alerts settings moved to their own page (#338) - same "ride along hidden" reasoning as the Firmware fields above. *@
             <input type="hidden" asp-for="BatteryLowThreshold" />
             <input type="hidden" asp-for="BatteryLowHysteresis" />
+            <input type="hidden" asp-for="TankRefillThreshold" />
+            <input type="hidden" asp-for="TankRefillHysteresis" />
             <input type="hidden" asp-for="EventDedupeMinutes" />
             <input type="hidden" asp-for="ProblemEventAlertsEnabled" />
             <input type="hidden" asp-for="ProblemEventExpiryHours" />

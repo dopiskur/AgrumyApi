@@ -18,6 +18,7 @@
         ("Rain", "bi-cloud-rain", averages.RainLevel, "", trend?.RainLevel),
         ("Water level", "bi-water", averages.WaterLevel, "", trend?.WaterLevel),
         ("Wind", "bi-wind", averages.Wind, "m/s", trend?.Wind),
+        ("Tank", "bi-droplet-fill", averages.TankFillPercent, "%", null),
     ];
     var present = rows.Where(r => r.Value != null).ToList();
 

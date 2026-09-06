@@ -2,6 +2,17 @@ using api.Models;
 
 namespace api.Dal.Interface
 {
+    /// The minimal shape TankRefillAlertEvaluator needs - WaterLevel is the zone's latest-per-device reading averaged (same shape as SensorAverages.WaterLevel), null when no device in the zone has reported one.
+    public sealed record TankRefillAlertCandidate(
+        int IDDeviceUnitZone,
+        int TenantID,
+        string? DeviceUnitZoneName,
+        double? WaterLevel,
+        int? WaterLevelRawEmpty,
+        int? WaterLevelRawFull,
+        double? TankCapacityLiters,
+        DateTime? TankRefillNotifiedAt);
+
     /// Unit/Zone facet of the data layer: CRUD, device assignment, and the hierarchical dashboard aggregation - split out from IDeviceRepository as its own sizeable domain.
     public interface IDeviceUnitRepository
     {
@@ -106,5 +117,12 @@ namespace api.Dal.Interface
         Task<bool> RuleNotificationWasTrueGetAsync(int ruleId, int idDeviceUnitZone);
 
         Task RuleNotificationWasTrueSetAsync(int ruleId, int idDeviceUnitZone, bool wasTrue, DateTime? lastFiredAtUtc);
+
+        // ---- Tank refill alert (roadmap #234) --------------------------
+
+        /// Every real, tank-calibrated zone (TankCapacityLiters + both raw calibration points set) across every tenant, with its latest averaged WaterLevel reading.
+        Task<IList<TankRefillAlertCandidate>> TankRefillAlertCandidatesGetAsync();
+
+        Task TankRefillNotifiedSetAsync(int idDeviceUnitZone, DateTime? notifiedAt);
     }
 }

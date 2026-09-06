@@ -29,6 +29,8 @@ namespace api.Dal
                 LightHysteresis = settings.HysteresisLight,
                 BatteryLowThreshold = settings.BatteryLowThreshold,
                 BatteryLowHysteresis = settings.BatteryLowHysteresis,
+                TankRefillThreshold = settings.TankRefillThreshold,
+                TankRefillHysteresis = settings.TankRefillHysteresis,
                 WaterPumpMaxRunSeconds = settings.WaterPumpMaxRunSeconds,
                 WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds,
                 EventDedupeMinutes = settings.EventDedupeMinutes,
@@ -68,6 +70,8 @@ namespace api.Dal
             row.LightHysteresis = config.LightHysteresis;
             row.BatteryLowThreshold = config.BatteryLowThreshold;
             row.BatteryLowHysteresis = config.BatteryLowHysteresis;
+            row.TankRefillThreshold = config.TankRefillThreshold;
+            row.TankRefillHysteresis = config.TankRefillHysteresis;
             row.WaterPumpMaxRunSeconds = config.WaterPumpMaxRunSeconds;
             row.WaterPumpCooldownSeconds = config.WaterPumpCooldownSeconds;
             row.EventDedupeMinutes = config.EventDedupeMinutes;
@@ -130,6 +134,8 @@ namespace api.Dal
             row.LightHysteresis = settings.HysteresisLight;
             row.BatteryLowThreshold = settings.BatteryLowThreshold;
             row.BatteryLowHysteresis = settings.BatteryLowHysteresis;
+            row.TankRefillThreshold = settings.TankRefillThreshold;
+            row.TankRefillHysteresis = settings.TankRefillHysteresis;
             row.WaterPumpMaxRunSeconds = settings.WaterPumpMaxRunSeconds;
             row.WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds;
             row.EventDedupeMinutes = settings.EventDedupeMinutes;
@@ -182,6 +188,8 @@ namespace api.Dal
             LightHysteresis = r.LightHysteresis,
             BatteryLowThreshold = r.BatteryLowThreshold,
             BatteryLowHysteresis = r.BatteryLowHysteresis,
+            TankRefillThreshold = r.TankRefillThreshold,
+            TankRefillHysteresis = r.TankRefillHysteresis,
             WaterPumpMaxRunSeconds = r.WaterPumpMaxRunSeconds,
             WaterPumpCooldownSeconds = r.WaterPumpCooldownSeconds,
             EventDedupeMinutes = r.EventDedupeMinutes,
