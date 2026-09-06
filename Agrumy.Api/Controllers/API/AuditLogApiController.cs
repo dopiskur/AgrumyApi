@@ -16,10 +16,10 @@ namespace api.Controllers.API
 
         [Authorize(Roles = RoleNames.Admins)]
         [HttpGet]
-        public async Task<ActionResult<IReadOnlyList<AuditLogEntry>>> AuditLogGet(int take = 200)
+        public async Task<ActionResult<IReadOnlyList<AuditLogEntry>>> AuditLogGet(int take = 200, string? actorEmail = null, string? action = null, string? targetType = null, DateTime? fromUtc = null, DateTime? toUtc = null)
         {
             int? tenantId = CallerIsGlobalAdmin ? null : CallerTenantId;
-            return Ok(await auditLog.AuditLogGetAsync(tenantId, Math.Clamp(take, 1, MaxTake)));
+            return Ok(await auditLog.AuditLogGetAsync(tenantId, Math.Clamp(take, 1, MaxTake), actorEmail, action, targetType, fromUtc, toUtc));
         }
     }
 }

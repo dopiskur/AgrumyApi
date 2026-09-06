@@ -65,4 +65,17 @@ public class AuditLogApiControllerTests
 
         _repo.Verify(r => r.AuditLogGetAsync(7, It.IsInRange(1, 500, Moq.Range.Inclusive)), Times.Once);
     }
+
+    [Fact]
+    public async Task AuditLogGet_PassesFiltersThrough()
+    {
+        var from = new DateTime(2026, 9, 1);
+        var to = new DateTime(2026, 9, 6);
+        _repo.Setup(r => r.AuditLogGetAsync(7, 200, "a@b.com", "User.Deleted", "User", from, to)).ReturnsAsync(new List<AuditLogEntry>());
+        var controller = NewController(tenantId: 7, RoleNames.TenantAdmin);
+
+        await controller.AuditLogGet(actorEmail: "a@b.com", action: "User.Deleted", targetType: "User", fromUtc: from, toUtc: to);
+
+        _repo.Verify(r => r.AuditLogGetAsync(7, 200, "a@b.com", "User.Deleted", "User", from, to), Times.Once);
+    }
 }

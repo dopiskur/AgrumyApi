@@ -398,6 +398,6 @@ namespace api.Dal.Interface
         // ---- Audit log --------------------------------------
 
         [Get("/api/AuditLog")]
-        Task<List<AuditLogEntry>> AuditLogGet(int take = 200);
+        Task<List<AuditLogEntry>> AuditLogGet(int take = 200, string? actorEmail = null, string? action = null, string? targetType = null, DateTime? fromUtc = null, DateTime? toUtc = null);
     }
 }
