@@ -401,8 +401,16 @@ install_baremetal() {
     api_url="https://${API_DOMAIN}"
   fi
 
-  read -rp "Reverse proxy - (n)ginx or (a)pache? [n]: " PROXY_CHOICE
-  PROXY_CHOICE="${PROXY_CHOICE:-n}"
+  if [ "$PRESET" = "custom" ]; then
+    read -rp "Reverse proxy - (n)ginx or (a)pache? [n]: " PROXY_CHOICE
+    PROXY_CHOICE="${PROXY_CHOICE:-n}"
+  elif [ "$PRESET" = "small" ]; then
+    PROXY_CHOICE="a"
+    log "Quick install (Small) - using Apache as the reverse proxy."
+  else
+    PROXY_CHOICE="n"
+    log "Quick install (Large) - using nginx as the reverse proxy."
+  fi
 
   read -rp "Service account to run Agrumy as [www-data]: " SERVICE_USER
   SERVICE_USER="${SERVICE_USER:-www-data}"
