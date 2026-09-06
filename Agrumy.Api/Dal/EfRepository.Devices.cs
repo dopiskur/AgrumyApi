@@ -198,7 +198,8 @@ namespace api.Dal
             db.Devices.Where(d => d.IDDevice == deviceID)
                 .ExecuteUpdateAsync(s => s.SetProperty(d => d.Reset, pending));
 
-        private static Device ToDto(DeviceRow d) => new()
+        /// internal, not private - EfGatewayRepository (#246 extraction) also maps DeviceRow to Device for GatewayDevicesGetAllAsync.
+        internal static Device ToDto(DeviceRow d) => new()
         {
             IDDevice = d.IDDevice,
             TenantID = d.TenantID,
