@@ -1750,16 +1750,19 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await _repo.DeviceAssignToZoneAsync(d1.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
         await _repo.DeviceAssignToZoneAsync(d2.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
 
-        // d1: an older then a newer reading - only the newer one (20.0) must count.
+        // d1: an older then a newer reading - only the newer one (20.0) must count. Both timestamps are relative to now (not a fixed past date) - #345's staleness cutoff would otherwise exclude them entirely.
+        DateTime now = DateTime.UtcNow;
+        string older = now.AddSeconds(-30).ToString("yyyy-MM-dd HH:mm:ss");
+        string newer = now.AddSeconds(-10).ToString("yyyy-MM-dd HH:mm:ss");
         await _repo.SensorDataPushAsync(new JsonArray(
-            new JsonObject { ["temperature"] = "10.0", ["dateCreated"] = "2026-08-01 00:00:00" }),
+            new JsonObject { ["temperature"] = "10.0", ["dateCreated"] = older }),
             d1.IDDevice!.Value, tenantId, unit.IDDeviceUnit, zone.IDDeviceUnitZone);
         await _repo.SensorDataPushAsync(new JsonArray(
-            new JsonObject { ["temperature"] = "20.0", ["dateCreated"] = "2026-08-02 00:00:00" }),
+            new JsonObject { ["temperature"] = "20.0", ["dateCreated"] = newer }),
             d1.IDDevice!.Value, tenantId, unit.IDDeviceUnit, zone.IDDeviceUnitZone);
         // d2: reports humidity only - never sent a temperature, must not drag the temperature average down.
         await _repo.SensorDataPushAsync(new JsonArray(
-            new JsonObject { ["humidity"] = "50.0", ["dateCreated"] = "2026-08-02 00:00:00" }),
+            new JsonObject { ["humidity"] = "50.0", ["dateCreated"] = newer }),
             d2.IDDevice!.Value, tenantId, unit.IDDeviceUnit, zone.IDDeviceUnitZone);
 
         var unitDashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);

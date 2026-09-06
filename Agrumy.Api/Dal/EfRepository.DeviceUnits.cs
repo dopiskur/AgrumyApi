@@ -566,6 +566,12 @@ namespace api.Dal
             return deviceLatestIds.Select(d =>
             {
                 SensorDataRow? s = d.LatestSensorDataId != null && latestById.TryGetValue(d.LatestSensorDataId.Value, out var row) ? row : null;
+                // Same window ComputeOnline uses to decide online/offline - a reading outside it is from a dead/unreachable sensor and must not silently count toward the zone/unit average or feed RuleNotificationEvaluator (which reads this same Averages value).
+                double maxReadingAgeSeconds = (d.SleepSeconds ?? 60) * DeviceFleetStatus.OfflineMissedPolls + DeviceFleetStatus.OfflineGraceSeconds;
+                if (s?.DateCreated is DateTime readingAt && (utcNow - readingAt).TotalSeconds > maxReadingAgeSeconds)
+                {
+                    s = null;
+                }
                 bool enabled = d.Enabled == true;
                 // A disabled device is expected to be silent - its offline-ness must not redden a zone/unit nobody expects it to report into.
                 bool online = !enabled || DeviceFleetStatus.ComputeOnline(d.LastSeenAt, d.SleepSeconds, utcNow);
