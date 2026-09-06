@@ -1,16 +1,16 @@
 @model api.ViewModels.ZoneViewModel
 @{
     var zone = Model.Dashboard;
-    ViewData["Title"] = zone.DeviceUnitZoneName;
+    ViewData["Title"] = zone.DeviceFarmUnitZoneName;
     Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
     bool hasController = zone.Devices.Any(d => d.DeviceControllerEnabled == true);
     var renameModel = new InlineRenameViewModel
     {
-        Action = nameof(api.Controllers.View.DeviceUnitController.ZoneRename),
-        IdFieldName = "idDeviceUnitZone",
-        IdValue = zone.IDDeviceUnitZone,
-        NameFieldName = "deviceUnitZoneName",
-        CurrentName = zone.DeviceUnitZoneName,
+        Action = nameof(api.Controllers.View.DeviceFarmUnitController.ZoneRename),
+        IdFieldName = "idDeviceFarmUnitZone",
+        IdValue = zone.IDDeviceFarmUnitZone,
+        NameFieldName = "deviceFarmUnitZoneName",
+        CurrentName = zone.DeviceFarmUnitZoneName,
         MaxLength = 120,
     };
 }
@@ -18,8 +18,8 @@
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a asp-action="Index">Units</a></li>
-        <li class="breadcrumb-item"><a asp-action="Zones" asp-route-idDeviceUnit="@zone.IDDeviceUnit">Zones</a></li>
-        <li class="breadcrumb-item active" aria-current="page">@zone.DeviceUnitZoneName</li>
+        <li class="breadcrumb-item"><a asp-action="Zones" asp-route-idDeviceFarmUnit="@zone.IDDeviceFarmUnit">Zones</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@zone.DeviceFarmUnitZoneName</li>
     </ol>
 </nav>
 
@@ -35,8 +35,8 @@
             <h3 class="card-title">Discovered devices</h3>
             <div class="float-end">
                 <form asp-action="ScanZone" method="post">
-                    <input type="hidden" name="UnitID" value="@zone.IDDeviceUnit" />
-                    <input type="hidden" name="ZoneID" value="@zone.IDDeviceUnitZone" />
+                    <input type="hidden" name="UnitID" value="@zone.IDDeviceFarmUnit" />
+                    <input type="hidden" name="ZoneID" value="@zone.IDDeviceFarmUnitZone" />
                     <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-broadcast"></i> Scan for new devices</button>
                 </form>
             </div>
@@ -59,7 +59,7 @@
     <div class="card-header">
         <h3 class="card-title">
             @* Status badge lives in _ZoneDetails.cshtml, not here - this header sits outside the polled #zoneDetails fragment and a badge here would go stale. *@
-            @zone.DeviceUnitZoneName
+            @zone.DeviceFarmUnitZoneName
             @if (hasAnyRole(RoleNames.DeviceManagers))
             {
                 <partial name="_InlineRename" model="renameModel" />
@@ -70,28 +70,28 @@
             <div class="float-end d-flex align-items-center gap-2">
                 @if (hasController)
                 {
-                    <partial name="_DeviceCommandButtons" model="new DeviceCommandButtonsViewModel { TargetType = CommandTargetType.Zone, TargetId = zone.IDDeviceUnitZone }" />
+                    <partial name="_DeviceCommandButtons" model="new DeviceCommandButtonsViewModel { TargetType = CommandTargetType.Zone, TargetId = zone.IDDeviceFarmUnitZone }" />
                 }
                 @if (!hasController)
                 {
-                    <a asp-action="AssignPicker" asp-route-idDeviceUnitZone="@zone.IDDeviceUnitZone" asp-route-controllerCapable="true" class="btn btn-sm btn-outline-primary">
+                    <a asp-action="AssignPicker" asp-route-idDeviceFarmUnitZone="@zone.IDDeviceFarmUnitZone" asp-route-controllerCapable="true" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-cpu"></i> Add Controller
                     </a>
                 }
-                <a asp-action="AssignPicker" asp-route-idDeviceUnitZone="@zone.IDDeviceUnitZone" asp-route-controllerCapable="false" class="btn btn-sm btn-outline-primary">
+                <a asp-action="AssignPicker" asp-route-idDeviceFarmUnitZone="@zone.IDDeviceFarmUnitZone" asp-route-controllerCapable="false" class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-broadcast"></i> Add Sensor
                 </a>
                 <details class="d-inline-block align-middle">
                     <summary class="btn btn-sm btn-outline-primary" style="cursor:pointer;"><i class="bi bi-plus-lg"></i> Add Zone</summary>
                     <form asp-action="ZoneAdd" method="post" class="d-flex gap-2 mt-2">
-                        <input type="hidden" name="idDeviceUnit" value="@zone.IDDeviceUnit" />
-                        <input type="text" name="deviceUnitZoneName" class="form-control form-control-sm" placeholder="New zone name" required maxlength="120" />
+                        <input type="hidden" name="idDeviceFarmUnit" value="@zone.IDDeviceFarmUnit" />
+                        <input type="text" name="deviceFarmUnitZoneName" class="form-control form-control-sm" placeholder="New zone name" required maxlength="120" />
                         <button type="submit" class="btn btn-sm btn-primary text-nowrap">Add</button>
                     </form>
                 </details>
                 <form asp-action="ZoneDelete" method="post" onsubmit="return confirm('Delete this zone? Its devices are unassigned, not deleted.');">
-                    <input type="hidden" name="idDeviceUnitZone" value="@zone.IDDeviceUnitZone" />
-                    <input type="hidden" name="idDeviceUnit" value="@zone.IDDeviceUnit" />
+                    <input type="hidden" name="idDeviceFarmUnitZone" value="@zone.IDDeviceFarmUnitZone" />
+                    <input type="hidden" name="idDeviceFarmUnit" value="@zone.IDDeviceFarmUnit" />
                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete zone"><i class="bi bi-trash"></i></button>
                 </form>
             </div>
@@ -127,8 +127,8 @@
                 </div>
                 <div class="modal-body">
                     <input type="hidden" name="DiscoveredApMac" id="registerApMac" />
-                    <input type="hidden" name="UnitID" value="@zone.IDDeviceUnit" />
-                    <input type="hidden" name="ZoneID" value="@zone.IDDeviceUnitZone" />
+                    <input type="hidden" name="UnitID" value="@zone.IDDeviceFarmUnit" />
+                    <input type="hidden" name="ZoneID" value="@zone.IDDeviceFarmUnitZone" />
                     <div class="mb-3">
                         <label class="form-label" for="registerDeviceName">Name (optional)</label>
                         <input type="text" name="DeviceName" id="registerDeviceName" class="form-control" maxlength="128" />
@@ -149,7 +149,7 @@
     <script nonce="@Context.CspNonce()">
         document.addEventListener('DOMContentLoaded', function () {
             startLiveRefresh({
-                url: '@Url.Action("ZoneDetails", new { idDeviceUnitZone = zone.IDDeviceUnitZone })',
+                url: '@Url.Action("ZoneDetails", new { idDeviceFarmUnitZone = zone.IDDeviceFarmUnitZone })',
                 applyHtml: function (html) {
                     document.getElementById('zoneDetails').innerHTML = html;
                 }

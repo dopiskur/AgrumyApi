@@ -95,10 +95,10 @@ namespace api.Migration
         private async Task<Dictionary<int, int>> ImportUnitsAsync(TenantExport export, int tenantId, TenantImportResult result)
         {
             var map = new Dictionary<int, int>();
-            foreach (DeviceUnit u in export.Units)
+            foreach (DeviceFarmUnit u in export.Units)
             {
-                DeviceUnit created = await repo.DeviceUnitAddAsync(new DeviceUnit { TenantID = tenantId, DeviceUnitName = u.DeviceUnitName });
-                if (u.IDDeviceUnit is int oldId && created.IDDeviceUnit is int newId)
+                DeviceFarmUnit created = await repo.DeviceFarmUnitAddAsync(new DeviceFarmUnit { TenantID = tenantId, DeviceFarmUnitName = u.DeviceFarmUnitName });
+                if (u.IDDeviceFarmUnit is int oldId && created.IDDeviceFarmUnit is int newId)
                 {
                     map[oldId] = newId;
                 }
@@ -107,20 +107,20 @@ namespace api.Migration
             return map;
         }
 
-        // IDDeviceUnit/IDDeviceUnitZone=0 are shared "unassigned"/"Disabled" sentinels, same meaning on every server - never remapped, just passed through.
+        // IDDeviceFarmUnit/IDDeviceFarmUnitZone=0 are shared "unassigned"/"Disabled" sentinels, same meaning on every server - never remapped, just passed through.
         private static int RemapOrSentinel(int oldId, Dictionary<int, int> map) =>
             oldId == 0 ? 0 : map.GetValueOrDefault(oldId, 0);
 
         private async Task<Dictionary<int, int>> ImportZonesAsync(TenantExport export, int tenantId, Dictionary<int, int> unitIdMap, TenantImportResult result)
         {
             var map = new Dictionary<int, int>();
-            foreach (DeviceUnitZone z in export.Zones)
+            foreach (DeviceFarmUnitZone z in export.Zones)
             {
-                DeviceUnitZone created = await repo.DeviceUnitZoneAddAsync(new DeviceUnitZone
+                DeviceFarmUnitZone created = await repo.DeviceFarmUnitZoneAddAsync(new DeviceFarmUnitZone
                 {
                     TenantID = tenantId,
-                    DeviceUnitID = RemapOrSentinel(z.DeviceUnitID, unitIdMap),
-                    DeviceUnitZoneName = z.DeviceUnitZoneName,
+                    DeviceFarmUnitID = RemapOrSentinel(z.DeviceFarmUnitID, unitIdMap),
+                    DeviceFarmUnitZoneName = z.DeviceFarmUnitZoneName,
                     WaterPumpMaxRunSeconds = z.WaterPumpMaxRunSeconds,
                     WaterPumpCooldownSeconds = z.WaterPumpCooldownSeconds,
                     SkipWaterPumpWhenRainPredicted = z.SkipWaterPumpWhenRainPredicted,
@@ -130,7 +130,7 @@ namespace api.Migration
                     HeatingMaxRunSeconds = z.HeatingMaxRunSeconds,
                     VentilationMaxRunSeconds = z.VentilationMaxRunSeconds,
                 });
-                if (z.IDDeviceUnitZone is int oldId && created.IDDeviceUnitZone is int newId)
+                if (z.IDDeviceFarmUnitZone is int oldId && created.IDDeviceFarmUnitZone is int newId)
                 {
                     map[oldId] = newId;
                 }
@@ -141,19 +141,19 @@ namespace api.Migration
 
         private async Task ImportZoneRulesAsync(TenantExport export, int tenantId, Dictionary<int, int> zoneIdMap, TenantImportResult result)
         {
-            // Export only ever captured Zone-scoped rules (TenantExportService predates Unit/Global scope) - r.DeviceUnitZoneID is
+            // Export only ever captured Zone-scoped rules (TenantExportService predates Unit/Global scope) - r.DeviceFarmUnitZoneID is
             // therefore always set here, never null.
-            foreach (DeviceUnitZoneRule r in export.ZoneRules.Where(r => r.DeviceUnitZoneID != null))
+            foreach (DeviceFarmUnitZoneRule r in export.ZoneRules.Where(r => r.DeviceFarmUnitZoneID != null))
             {
-                int newZoneId = RemapOrSentinel(r.DeviceUnitZoneID!.Value, zoneIdMap);
+                int newZoneId = RemapOrSentinel(r.DeviceFarmUnitZoneID!.Value, zoneIdMap);
                 if (newZoneId == 0)
                 {
                     continue; // the zone it belonged to failed to import - an orphaned rule is worse than a dropped one
                 }
-                await repo.RuleAddAsync(new DeviceUnitZoneRule
+                await repo.RuleAddAsync(new DeviceFarmUnitZoneRule
                 {
                     TenantID = tenantId,
-                    DeviceUnitZoneID = newZoneId,
+                    DeviceFarmUnitZoneID = newZoneId,
                     ActionType = r.ActionType,
                     RelayFunction = r.RelayFunction,
                     SensorMetric = r.SensorMetric,
@@ -183,8 +183,8 @@ namespace api.Migration
                 {
                     TenantID = tenantId,
                     DeviceRoleID = ed.Device.DeviceRoleID,
-                    DeviceUnitID = ed.Device.DeviceUnitID is int u ? RemapOrSentinel(u, unitIdMap) : null,
-                    DeviceUnitZoneID = ed.Device.DeviceUnitZoneID is int z ? RemapOrSentinel(z, zoneIdMap) : null,
+                    DeviceFarmUnitID = ed.Device.DeviceFarmUnitID is int u ? RemapOrSentinel(u, unitIdMap) : null,
+                    DeviceFarmUnitZoneID = ed.Device.DeviceFarmUnitZoneID is int z ? RemapOrSentinel(z, zoneIdMap) : null,
                     DeviceName = ed.Device.DeviceName,
                     MacAddress = ed.Device.MacAddress,
                     ApiId = ed.ApiId,
@@ -236,8 +236,8 @@ namespace api.Migration
                 {
                     TenantID = tenantId,
                     DeviceID = newDeviceId,
-                    DeviceUnitID = sd.DeviceUnitID is int u ? RemapOrSentinel(u, unitIdMap) : 0,
-                    DeviceUnitZoneID = sd.DeviceUnitZoneID is int z ? RemapOrSentinel(z, zoneIdMap) : 0,
+                    DeviceFarmUnitID = sd.DeviceFarmUnitID is int u ? RemapOrSentinel(u, unitIdMap) : 0,
+                    DeviceFarmUnitZoneID = sd.DeviceFarmUnitZoneID is int z ? RemapOrSentinel(z, zoneIdMap) : 0,
                     Battery = sd.Battery,
                     Temperature = sd.Temperature,
                     SoilTemperature = sd.SoilTemperature,

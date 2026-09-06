@@ -12,8 +12,8 @@ using Microsoft.Extensions.Options;
 namespace api.Controllers.API
 {
     /// Unit/Zone CRUD, device assignment, and hierarchical dashboard aggregation - ownership checks mirror DeviceApiController.EnsureOwnedDeviceAsync, same CallerReadsDevicesGlobally/CallerManagesDevicesGlobally rules as the rest of the Device domain.
-    [Route("/api/DeviceUnit")]
-    public class DeviceUnitApiController(IDeviceUnitRepository deviceUnitRepo, IDeviceRepository deviceRepo, IServerConfigRepository serverConfigRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, IOptions<AgrumySettings> settingsOptions, ManualActuateService manualActuate) : ApiControllerBase(userRepo, auditLogRepo, cache)
+    [Route("/api/DeviceFarmUnit")]
+    public class DeviceFarmUnitApiController(IDeviceFarmUnitRepository deviceFarmUnitRepo, IDeviceRepository deviceRepo, IServerConfigRepository serverConfigRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, IOptions<AgrumySettings> settingsOptions, ManualActuateService manualActuate) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         private readonly AgrumySettings settings = settingsOptions.Value;
 
@@ -27,53 +27,53 @@ namespace api.Controllers.API
 
         [Authorize]
         [HttpGet("All")]
-        public async Task<ActionResult<IList<DeviceUnit>>> DeviceUnitsGet() =>
-            Ok(await deviceUnitRepo.DeviceUnitsGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
+        public async Task<ActionResult<IList<DeviceFarmUnit>>> DeviceFarmUnitsGet() =>
+            Ok(await deviceFarmUnitRepo.DeviceFarmUnitsGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
 
         [Authorize]
         [HttpGet]
-        public async Task<ActionResult<DeviceUnit>> DeviceUnitGet(int? idDeviceUnit)
+        public async Task<ActionResult<DeviceFarmUnit>> DeviceFarmUnitGet(int? idDeviceFarmUnit)
         {
-            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceUnit, forWrite: false);
+            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceFarmUnit, forWrite: false);
             return error ?? Ok(unit);
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
-        public async Task<ActionResult<DeviceUnit>> DeviceUnitAdd([FromBody] DeviceUnit unit)
+        public async Task<ActionResult<DeviceFarmUnit>> DeviceFarmUnitAdd([FromBody] DeviceFarmUnit unit)
         {
             unit.TenantID = CallerTenantId; // payload cannot pick another tenant - same rule as every other Add
-            DeviceUnit added = await deviceUnitRepo.DeviceUnitAddAsync(unit);
-            await WriteAuditAsync("DeviceUnit.Created", added.TenantID, "DeviceUnit", added.IDDeviceUnit.ToString()!, added.DeviceUnitName);
+            DeviceFarmUnit added = await deviceFarmUnitRepo.DeviceFarmUnitAddAsync(unit);
+            await WriteAuditAsync("DeviceFarmUnit.Created", added.TenantID, "DeviceFarmUnit", added.IDDeviceFarmUnit.ToString()!, added.DeviceFarmUnitName);
             return Ok(added);
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPut]
-        public async Task<ActionResult<bool>> DeviceUnitUpdate([FromBody] DeviceUnit unit)
+        public async Task<ActionResult<bool>> DeviceFarmUnitUpdate([FromBody] DeviceFarmUnit unit)
         {
-            var (existing, error) = await EnsureOwnedUnitAsync(unit.IDDeviceUnit, forWrite: true);
+            var (existing, error) = await EnsureOwnedUnitAsync(unit.IDDeviceFarmUnit, forWrite: true);
             if (error != null)
             {
                 return error;
             }
             unit.TenantID = existing!.TenantID; // payload cannot move a unit to another tenant
-            await deviceUnitRepo.DeviceUnitUpdateAsync(unit);
-            await WriteAuditAsync("DeviceUnit.Updated", existing.TenantID, "DeviceUnit", existing.IDDeviceUnit.ToString()!, unit.DeviceUnitName);
+            await deviceFarmUnitRepo.DeviceFarmUnitUpdateAsync(unit);
+            await WriteAuditAsync("DeviceFarmUnit.Updated", existing.TenantID, "DeviceFarmUnit", existing.IDDeviceFarmUnit.ToString()!, unit.DeviceFarmUnitName);
             return true;
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpDelete]
-        public async Task<ActionResult<bool>> DeviceUnitDelete(int? idDeviceUnit)
+        public async Task<ActionResult<bool>> DeviceFarmUnitDelete(int? idDeviceFarmUnit)
         {
-            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceUnit, forWrite: true);
+            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceFarmUnit, forWrite: true);
             if (error != null)
             {
                 return error;
             }
-            await deviceUnitRepo.DeviceUnitDeleteAsync(unit!.IDDeviceUnit!.Value);
-            await WriteAuditAsync("DeviceUnit.Deleted", unit.TenantID, "DeviceUnit", idDeviceUnit.ToString()!, unit.DeviceUnitName);
+            await deviceFarmUnitRepo.DeviceFarmUnitDeleteAsync(unit!.IDDeviceFarmUnit!.Value);
+            await WriteAuditAsync("DeviceFarmUnit.Deleted", unit.TenantID, "DeviceFarmUnit", idDeviceFarmUnit.ToString()!, unit.DeviceFarmUnitName);
             return true;
         }
 
@@ -84,45 +84,45 @@ namespace api.Controllers.API
         /// Every Zone within one Unit - ownership is checked on the Unit, not per-zone, since a zone always belongs to exactly one unit.
         [Authorize]
         [HttpGet("Zone")]
-        public async Task<ActionResult<IList<DeviceUnitZone>>> DeviceUnitZonesGet(int? idDeviceUnit)
+        public async Task<ActionResult<IList<DeviceFarmUnitZone>>> DeviceFarmUnitZonesGet(int? idDeviceFarmUnit)
         {
-            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceUnit, forWrite: false);
+            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceFarmUnit, forWrite: false);
             if (error != null)
             {
                 return error;
             }
-            return Ok(await deviceUnitRepo.DeviceUnitZonesGetAsync(unit!.IDDeviceUnit!.Value));
+            return Ok(await deviceFarmUnitRepo.DeviceFarmUnitZonesGetAsync(unit!.IDDeviceFarmUnit!.Value));
         }
 
-        /// Single zone by id, so a caller that needs to patch one field can fetch-then-resubmit the whole object - DeviceUnitZoneUpdateAsync overwrites unconditionally, it does not merge.
+        /// Single zone by id, so a caller that needs to patch one field can fetch-then-resubmit the whole object - DeviceFarmUnitZoneUpdateAsync overwrites unconditionally, it does not merge.
         [Authorize]
         [HttpGet("ZoneById")]
-        public async Task<ActionResult<DeviceUnitZone>> DeviceUnitZoneGetById(int? idDeviceUnitZone)
+        public async Task<ActionResult<DeviceFarmUnitZone>> DeviceFarmUnitZoneGetById(int? idDeviceFarmUnitZone)
         {
-            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceUnitZone, forWrite: false);
+            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceFarmUnitZone, forWrite: false);
             return error ?? Ok(zone);
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost("Zone")]
-        public async Task<ActionResult<DeviceUnitZone>> DeviceUnitZoneAdd([FromBody] DeviceUnitZone zone)
+        public async Task<ActionResult<DeviceFarmUnitZone>> DeviceFarmUnitZoneAdd([FromBody] DeviceFarmUnitZone zone)
         {
-            var (unit, error) = await EnsureOwnedUnitAsync(zone.DeviceUnitID, forWrite: true);
+            var (unit, error) = await EnsureOwnedUnitAsync(zone.DeviceFarmUnitID, forWrite: true);
             if (error != null)
             {
                 return error;
             }
             zone.TenantID = unit!.TenantID; // the owning unit's tenant, not necessarily the caller's (a Global admin may add to another tenant's unit)
-            DeviceUnitZone added = await deviceUnitRepo.DeviceUnitZoneAddAsync(zone);
-            await WriteAuditAsync("DeviceUnitZone.Created", added.TenantID, "DeviceUnitZone", added.IDDeviceUnitZone.ToString()!, added.DeviceUnitZoneName);
+            DeviceFarmUnitZone added = await deviceFarmUnitRepo.DeviceFarmUnitZoneAddAsync(zone);
+            await WriteAuditAsync("DeviceFarmUnitZone.Created", added.TenantID, "DeviceFarmUnitZone", added.IDDeviceFarmUnitZone.ToString()!, added.DeviceFarmUnitZoneName);
             return Ok(added);
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPut("Zone")]
-        public async Task<ActionResult<bool>> DeviceUnitZoneUpdate([FromBody] DeviceUnitZone zone)
+        public async Task<ActionResult<bool>> DeviceFarmUnitZoneUpdate([FromBody] DeviceFarmUnitZone zone)
         {
-            var (existing, error) = await EnsureOwnedZoneAsync(zone.IDDeviceUnitZone, forWrite: true);
+            var (existing, error) = await EnsureOwnedZoneAsync(zone.IDDeviceFarmUnitZone, forWrite: true);
             if (error != null)
             {
                 return error;
@@ -147,23 +147,23 @@ namespace api.Controllers.API
             }
 
             zone.TenantID = existing!.TenantID; // payload cannot move a zone to another tenant
-            zone.DeviceUnitID = existing.DeviceUnitID; // ...or to another unit - rename only
-            await deviceUnitRepo.DeviceUnitZoneUpdateAsync(zone);
-            await WriteAuditAsync("DeviceUnitZone.Updated", existing.TenantID, "DeviceUnitZone", existing.IDDeviceUnitZone.ToString()!, zone.DeviceUnitZoneName);
+            zone.DeviceFarmUnitID = existing.DeviceFarmUnitID; // ...or to another unit - rename only
+            await deviceFarmUnitRepo.DeviceFarmUnitZoneUpdateAsync(zone);
+            await WriteAuditAsync("DeviceFarmUnitZone.Updated", existing.TenantID, "DeviceFarmUnitZone", existing.IDDeviceFarmUnitZone.ToString()!, zone.DeviceFarmUnitZoneName);
             return true;
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpDelete("Zone")]
-        public async Task<ActionResult<bool>> DeviceUnitZoneDelete(int? idDeviceUnitZone)
+        public async Task<ActionResult<bool>> DeviceFarmUnitZoneDelete(int? idDeviceFarmUnitZone)
         {
-            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceUnitZone, forWrite: true);
+            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceFarmUnitZone, forWrite: true);
             if (error != null)
             {
                 return error;
             }
-            await deviceUnitRepo.DeviceUnitZoneDeleteAsync(zone!.IDDeviceUnitZone!.Value);
-            await WriteAuditAsync("DeviceUnitZone.Deleted", zone.TenantID, "DeviceUnitZone", idDeviceUnitZone.ToString()!, zone.DeviceUnitZoneName);
+            await deviceFarmUnitRepo.DeviceFarmUnitZoneDeleteAsync(zone!.IDDeviceFarmUnitZone!.Value);
+            await WriteAuditAsync("DeviceFarmUnitZone.Deleted", zone.TenantID, "DeviceFarmUnitZone", idDeviceFarmUnitZone.ToString()!, zone.DeviceFarmUnitZoneName);
             return true;
         }
 
@@ -173,39 +173,39 @@ namespace api.Controllers.API
 
         [Authorize]
         [HttpGet("Zone/Rule")]
-        public async Task<ActionResult<IList<DeviceUnitZoneRule>>> DeviceUnitZoneRulesGet(int? idDeviceUnitZone)
+        public async Task<ActionResult<IList<DeviceFarmUnitZoneRule>>> DeviceFarmUnitZoneRulesGet(int? idDeviceFarmUnitZone)
         {
             if (CallerIsDataReaderOnly)
             {
                 return StatusCode(403, "Data Reader role cannot view zone rules.");
             }
-            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceUnitZone, forWrite: false);
+            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceFarmUnitZone, forWrite: false);
             if (error != null)
             {
                 return error;
             }
-            return Ok(await deviceUnitRepo.RulesGetForZoneAsync(zone!.IDDeviceUnitZone!.Value));
+            return Ok(await deviceFarmUnitRepo.RulesGetForZoneAsync(zone!.IDDeviceFarmUnitZone!.Value));
         }
 
         [Authorize]
         [HttpGet("Unit/Rule")]
-        public async Task<ActionResult<IList<DeviceUnitZoneRule>>> DeviceUnitRulesGet(int? idDeviceUnit)
+        public async Task<ActionResult<IList<DeviceFarmUnitZoneRule>>> DeviceFarmUnitRulesGet(int? idDeviceFarmUnit)
         {
             if (CallerIsDataReaderOnly)
             {
                 return StatusCode(403, "Data Reader role cannot view unit rules.");
             }
-            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceUnit, forWrite: false);
+            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceFarmUnit, forWrite: false);
             if (error != null)
             {
                 return error;
             }
-            return Ok(await deviceUnitRepo.RulesGetForUnitAsync(unit!.IDDeviceUnit!.Value));
+            return Ok(await deviceFarmUnitRepo.RulesGetForUnitAsync(unit!.IDDeviceFarmUnit!.Value));
         }
 
         [Authorize]
         [HttpGet("Global/Rule")]
-        public async Task<ActionResult<IList<DeviceUnitZoneRule>>> GlobalRulesGet()
+        public async Task<ActionResult<IList<DeviceFarmUnitZoneRule>>> GlobalRulesGet()
         {
             if (CallerIsDataReaderOnly)
             {
@@ -215,53 +215,53 @@ namespace api.Controllers.API
             {
                 return StatusCode(403, "Caller has no tenant.");
             }
-            return Ok(await deviceUnitRepo.RulesGetForTenantGlobalAsync(tenantId));
+            return Ok(await deviceFarmUnitRepo.RulesGetForTenantGlobalAsync(tenantId));
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost("Zone/Rule")]
-        public async Task<ActionResult<int>> DeviceUnitZoneRuleAdd([FromBody] DeviceUnitZoneRule rule)
+        public async Task<ActionResult<int>> DeviceFarmUnitZoneRuleAdd([FromBody] DeviceFarmUnitZoneRule rule)
         {
-            var (zone, error) = await EnsureOwnedZoneAsync(rule.DeviceUnitZoneID, forWrite: true);
+            var (zone, error) = await EnsureOwnedZoneAsync(rule.DeviceFarmUnitZoneID, forWrite: true);
             if (error != null)
             {
                 return error;
             }
-            rule.DeviceUnitID = null;
+            rule.DeviceFarmUnitID = null;
             rule.TenantID = zone!.TenantID ?? CallerTenantId ?? 0;
-            return await AddRuleAsync(rule, existingCount: (await deviceUnitRepo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value)).Count, scopeLabel: $"zone {rule.DeviceUnitZoneID}");
+            return await AddRuleAsync(rule, existingCount: (await deviceFarmUnitRepo.RulesGetForZoneAsync(zone.IDDeviceFarmUnitZone!.Value)).Count, scopeLabel: $"zone {rule.DeviceFarmUnitZoneID}");
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost("Unit/Rule")]
-        public async Task<ActionResult<int>> DeviceUnitRuleAdd([FromBody] DeviceUnitZoneRule rule)
+        public async Task<ActionResult<int>> DeviceFarmUnitRuleAdd([FromBody] DeviceFarmUnitZoneRule rule)
         {
-            var (unit, error) = await EnsureOwnedUnitAsync(rule.DeviceUnitID, forWrite: true);
+            var (unit, error) = await EnsureOwnedUnitAsync(rule.DeviceFarmUnitID, forWrite: true);
             if (error != null)
             {
                 return error;
             }
-            rule.DeviceUnitZoneID = null;
+            rule.DeviceFarmUnitZoneID = null;
             rule.TenantID = unit!.TenantID ?? CallerTenantId ?? 0;
-            return await AddRuleAsync(rule, existingCount: (await deviceUnitRepo.RulesGetForUnitAsync(unit.IDDeviceUnit!.Value)).Count, scopeLabel: $"unit {rule.DeviceUnitID}");
+            return await AddRuleAsync(rule, existingCount: (await deviceFarmUnitRepo.RulesGetForUnitAsync(unit.IDDeviceFarmUnit!.Value)).Count, scopeLabel: $"unit {rule.DeviceFarmUnitID}");
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost("Global/Rule")]
-        public async Task<ActionResult<int>> GlobalRuleAdd([FromBody] DeviceUnitZoneRule rule)
+        public async Task<ActionResult<int>> GlobalRuleAdd([FromBody] DeviceFarmUnitZoneRule rule)
         {
             if (CallerTenantId is not int tenantId)
             {
                 return StatusCode(403, "Caller has no tenant.");
             }
-            rule.DeviceUnitZoneID = null;
-            rule.DeviceUnitID = null;
+            rule.DeviceFarmUnitZoneID = null;
+            rule.DeviceFarmUnitID = null;
             rule.TenantID = tenantId;
-            return await AddRuleAsync(rule, existingCount: (await deviceUnitRepo.RulesGetForTenantGlobalAsync(tenantId)).Count, scopeLabel: $"tenant {tenantId} (global)");
+            return await AddRuleAsync(rule, existingCount: (await deviceFarmUnitRepo.RulesGetForTenantGlobalAsync(tenantId)).Count, scopeLabel: $"tenant {tenantId} (global)");
         }
 
         /// Shared validate+cap+persist body for all three scopes - the only difference between them is which EnsureOwned*/existing-count call the caller already made.
-        private async Task<ActionResult<int>> AddRuleAsync(DeviceUnitZoneRule rule, int existingCount, string scopeLabel)
+        private async Task<ActionResult<int>> AddRuleAsync(DeviceFarmUnitZoneRule rule, int existingCount, string scopeLabel)
         {
             if (await RuleShapeErrorAsync(rule) is string shapeError)
             {
@@ -273,27 +273,27 @@ namespace api.Controllers.API
             {
                 return BadRequest($"This scope already has {existingCount} rules, the configured maximum ({effectiveMax}). Remove one before adding another.");
             }
-            int idRule = await deviceUnitRepo.RuleAddAsync(rule);
-            await WriteAuditAsync("DeviceUnitZoneRule.Created", rule.TenantID, "DeviceUnitZoneRule", idRule.ToString(), $"{scopeLabel}, {rule.ActionType}/{rule.RelayFunction}{rule.SensorMetric}");
+            int idRule = await deviceFarmUnitRepo.RuleAddAsync(rule);
+            await WriteAuditAsync("DeviceFarmUnitZoneRule.Created", rule.TenantID, "DeviceFarmUnitZoneRule", idRule.ToString(), $"{scopeLabel}, {rule.ActionType}/{rule.RelayFunction}{rule.SensorMetric}");
             return Ok(idRule);
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpDelete("Zone/Rule")]
-        public Task<ActionResult<bool>> DeviceUnitZoneRuleDelete(int? idDeviceUnitZoneRule) => DeleteRuleAsync(idDeviceUnitZoneRule);
+        public Task<ActionResult<bool>> DeviceFarmUnitZoneRuleDelete(int? idDeviceFarmUnitZoneRule) => DeleteRuleAsync(idDeviceFarmUnitZoneRule);
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpDelete("Unit/Rule")]
-        public Task<ActionResult<bool>> DeviceUnitRuleDelete(int? idDeviceUnitZoneRule) => DeleteRuleAsync(idDeviceUnitZoneRule);
+        public Task<ActionResult<bool>> DeviceFarmUnitRuleDelete(int? idDeviceFarmUnitZoneRule) => DeleteRuleAsync(idDeviceFarmUnitZoneRule);
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpDelete("Global/Rule")]
-        public Task<ActionResult<bool>> GlobalRuleDelete(int? idDeviceUnitZoneRule) => DeleteRuleAsync(idDeviceUnitZoneRule);
+        public Task<ActionResult<bool>> GlobalRuleDelete(int? idDeviceFarmUnitZoneRule) => DeleteRuleAsync(idDeviceFarmUnitZoneRule);
 
         /// One shared delete body regardless of which scope route it came in through - ownership is resolved from the rule's OWN scope fields, not the route.
         private async Task<ActionResult<bool>> DeleteRuleAsync(int? idRule)
         {
-            DeviceUnitZoneRule? rule = await deviceUnitRepo.RuleGetByIdAsync(idRule);
+            DeviceFarmUnitZoneRule? rule = await deviceFarmUnitRepo.RuleGetByIdAsync(idRule);
             if (rule == null)
             {
                 return NotFound();
@@ -303,25 +303,25 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            var referencing = await deviceUnitRepo.RulesReferencingAsync(idRule!.Value, rule.TenantID);
+            var referencing = await deviceFarmUnitRepo.RulesReferencingAsync(idRule!.Value, rule.TenantID);
             if (referencing.Count > 0)
             {
-                string names = string.Join(", ", referencing.Select(r => $"#{r.IDDeviceUnitZoneRule}"));
+                string names = string.Join(", ", referencing.Select(r => $"#{r.IDDeviceFarmUnitZoneRule}"));
                 return Conflict($"Cannot delete: still referenced by another rule's \"another rule fired\" condition ({names}). Remove that condition first.");
             }
-            await deviceUnitRepo.RuleDeleteAsync(idRule.Value);
-            await WriteAuditAsync("DeviceUnitZoneRule.Deleted", rule.TenantID, "DeviceUnitZoneRule", idRule.ToString()!, $"{rule.ActionType}/{rule.RelayFunction}{rule.SensorMetric}");
+            await deviceFarmUnitRepo.RuleDeleteAsync(idRule.Value);
+            await WriteAuditAsync("DeviceFarmUnitZoneRule.Deleted", rule.TenantID, "DeviceFarmUnitZoneRule", idRule.ToString()!, $"{rule.ActionType}/{rule.RelayFunction}{rule.SensorMetric}");
             return true;
         }
 
         /// Resolves ownership from the rule's OWN scope (Zone/Unit/Global), not the caller's route - a rule can only ever have one of those three shapes.
-        private async Task<ActionResult?> EnsureOwnedRuleAsync(DeviceUnitZoneRule rule, bool forWrite)
+        private async Task<ActionResult?> EnsureOwnedRuleAsync(DeviceFarmUnitZoneRule rule, bool forWrite)
         {
-            if (rule.DeviceUnitZoneID is int idZone)
+            if (rule.DeviceFarmUnitZoneID is int idZone)
             {
                 return (await EnsureOwnedZoneAsync(idZone, forWrite)).Error;
             }
-            if (rule.DeviceUnitID is int idUnit)
+            if (rule.DeviceFarmUnitID is int idUnit)
             {
                 return (await EnsureOwnedUnitAsync(idUnit, forWrite)).Error;
             }
@@ -332,7 +332,7 @@ namespace api.Controllers.API
         }
 
         /// Shape+bound check for the whole rule: ActionType/RelayFunction/SensorMetric consistency, condition-list bounds, per-condition shape, and (DB-dependent, hence async) RuleTriggered's cross-reference validity.
-        private async Task<string?> RuleShapeErrorAsync(DeviceUnitZoneRule rule)
+        private async Task<string?> RuleShapeErrorAsync(DeviceFarmUnitZoneRule rule)
         {
             if (rule.ActionType == ActionType.Relay)
             {
@@ -383,7 +383,7 @@ namespace api.Controllers.API
                 if (condition.ConditionType == ConditionType.RuleTriggered)
                 {
                     var config = condition.ConditionConfig?.Deserialize<RuleTriggeredConditionConfig>(ConditionConfigJson.Options);
-                    DeviceUnitZoneRule? referenced = config == null ? null : await deviceUnitRepo.RuleGetByIdAsync(config.ReferencedRuleId);
+                    DeviceFarmUnitZoneRule? referenced = config == null ? null : await deviceFarmUnitRepo.RuleGetByIdAsync(config.ReferencedRuleId);
                     if (referenced == null || referenced.TenantID != rule.TenantID || referenced.ActionType != ActionType.Notification)
                     {
                         return $"Condition {i + 1}: referenced rule must exist, belong to the same tenant, and be a Notification-action rule.";
@@ -470,68 +470,68 @@ namespace api.Controllers.API
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost("Zone/ManualActuate")]
-        public async Task<ActionResult<IReadOnlyList<int>>> ZoneManualActuateStart(int idDeviceUnitZone, [FromBody] ManualActuateRequest request)
+        public async Task<ActionResult<IReadOnlyList<int>>> ZoneManualActuateStart(int idDeviceFarmUnitZone, [FromBody] ManualActuateRequest request)
         {
-            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceUnitZone, forWrite: true);
+            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceFarmUnitZone, forWrite: true);
             if (error != null)
             {
                 return error;
             }
-            ManualActuateResult result = await manualActuate.StartForZoneAsync(idDeviceUnitZone, request);
+            ManualActuateResult result = await manualActuate.StartForZoneAsync(idDeviceFarmUnitZone, request);
             if (result.Outcome == ManualActuateOutcome.Success)
             {
-                await WriteAuditAsync("DeviceUnitZone.ManualActuateStarted", zone!.TenantID, "DeviceUnitZone", idDeviceUnitZone.ToString(), $"{request.RelayFunction}/{request.Mode}");
+                await WriteAuditAsync("DeviceFarmUnitZone.ManualActuateStarted", zone!.TenantID, "DeviceFarmUnitZone", idDeviceFarmUnitZone.ToString(), $"{request.RelayFunction}/{request.Mode}");
             }
             return ManualActuateResponse(result);
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost("Unit/ManualActuate")]
-        public async Task<ActionResult<IReadOnlyList<int>>> UnitManualActuateStart(int idDeviceUnit, [FromBody] ManualActuateRequest request)
+        public async Task<ActionResult<IReadOnlyList<int>>> UnitManualActuateStart(int idDeviceFarmUnit, [FromBody] ManualActuateRequest request)
         {
-            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceUnit, forWrite: true);
+            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceFarmUnit, forWrite: true);
             if (error != null)
             {
                 return error;
             }
-            ManualActuateResult result = await manualActuate.StartForUnitAsync(idDeviceUnit, request);
+            ManualActuateResult result = await manualActuate.StartForUnitAsync(idDeviceFarmUnit, request);
             if (result.Outcome == ManualActuateOutcome.Success)
             {
-                await WriteAuditAsync("DeviceUnit.ManualActuateStarted", unit!.TenantID, "DeviceUnit", idDeviceUnit.ToString(), $"{request.RelayFunction}/{request.Mode}");
+                await WriteAuditAsync("DeviceFarmUnit.ManualActuateStarted", unit!.TenantID, "DeviceFarmUnit", idDeviceFarmUnit.ToString(), $"{request.RelayFunction}/{request.Mode}");
             }
             return ManualActuateResponse(result);
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost("Zone/ManualActuate/Stop")]
-        public async Task<ActionResult> ZoneManualActuateStop(int idDeviceUnitZone, RelayFunction relayFunction)
+        public async Task<ActionResult> ZoneManualActuateStop(int idDeviceFarmUnitZone, RelayFunction relayFunction)
         {
-            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceUnitZone, forWrite: true);
+            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceFarmUnitZone, forWrite: true);
             if (error != null)
             {
                 return error;
             }
-            await manualActuate.StopAsync(idDeviceUnitZone, relayFunction);
-            await WriteAuditAsync("DeviceUnitZone.ManualActuateStopped", zone!.TenantID, "DeviceUnitZone", idDeviceUnitZone.ToString(), relayFunction.ToString());
+            await manualActuate.StopAsync(idDeviceFarmUnitZone, relayFunction);
+            await WriteAuditAsync("DeviceFarmUnitZone.ManualActuateStopped", zone!.TenantID, "DeviceFarmUnitZone", idDeviceFarmUnitZone.ToString(), relayFunction.ToString());
             return Ok();
         }
 
         /// The zone's currently-active manual commands (not yet past ExpiresAtUtc) - what the Web UI polls to render "currently active, X remaining".
         [Authorize]
         [HttpGet("Zone/ManualActuate")]
-        public async Task<ActionResult<IList<DeviceManualOverride>>> ZoneManualActuateStatus(int idDeviceUnitZone)
+        public async Task<ActionResult<IList<DeviceManualOverride>>> ZoneManualActuateStatus(int idDeviceFarmUnitZone)
         {
-            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceUnitZone, forWrite: false);
+            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceFarmUnitZone, forWrite: false);
             if (error != null)
             {
                 return error;
             }
-            Device? controller = await deviceUnitRepo.DeviceUnitZoneGetControllerAsync(idDeviceUnitZone);
+            Device? controller = await deviceFarmUnitRepo.DeviceFarmUnitZoneGetControllerAsync(idDeviceFarmUnitZone);
             if (controller?.IDDevice is not int deviceId)
             {
                 return Ok(Array.Empty<DeviceManualOverride>());
             }
-            return Ok(await deviceUnitRepo.ManualOverridesActiveForDeviceAsync(deviceId));
+            return Ok(await deviceFarmUnitRepo.ManualOverridesActiveForDeviceAsync(deviceId));
         }
 
         private ActionResult<IReadOnlyList<int>> ManualActuateResponse(ManualActuateResult result) => result.Outcome switch
@@ -549,7 +549,7 @@ namespace api.Controllers.API
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpGet("Unassigned")]
         public async Task<ActionResult<IList<DeviceDto>>> DeviceUnassignedGet(bool controllerCapable) =>
-            Ok((await deviceUnitRepo.DeviceUnassignedGetAsync(CallerManagesDevicesGlobally ? null : CallerTenantId, controllerCapable))
+            Ok((await deviceFarmUnitRepo.DeviceUnassignedGetAsync(CallerManagesDevicesGlobally ? null : CallerTenantId, controllerCapable))
                 .Select(d => d.ToDto()).ToList());
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -563,7 +563,7 @@ namespace api.Controllers.API
                 return deviceError;
             }
 
-            var (zone, zoneError) = await EnsureOwnedZoneAsync(body.IDDeviceUnitZone, forWrite: true);
+            var (zone, zoneError) = await EnsureOwnedZoneAsync(body.IDDeviceFarmUnitZone, forWrite: true);
             if (zoneError != null)
             {
                 return zoneError;
@@ -576,13 +576,13 @@ namespace api.Controllers.API
             }
 
             // A zone has at most one controller (not required, but capped at one).
-            if (device!.DeviceControllerEnabled == true && await deviceUnitRepo.DeviceUnitZoneHasControllerAsync(body.IDDeviceUnitZone))
+            if (device!.DeviceControllerEnabled == true && await deviceFarmUnitRepo.DeviceFarmUnitZoneHasControllerAsync(body.IDDeviceFarmUnitZone))
             {
                 return Conflict("This zone already has a controller assigned.");
             }
 
-            await deviceUnitRepo.DeviceAssignToZoneAsync(body.IDDevice, body.IDDeviceUnitZone);
-            await WriteAuditAsync("Device.AssignedToZone", device.TenantID, "Device", body.IDDevice.ToString(), $"zone {body.IDDeviceUnitZone}");
+            await deviceFarmUnitRepo.DeviceAssignToZoneAsync(body.IDDevice, body.IDDeviceFarmUnitZone);
+            await WriteAuditAsync("Device.AssignedToZone", device.TenantID, "Device", body.IDDevice.ToString(), $"zone {body.IDDeviceFarmUnitZone}");
             return true;
         }
 
@@ -596,7 +596,7 @@ namespace api.Controllers.API
             {
                 return error;
             }
-            await deviceUnitRepo.DeviceUnassignFromZoneAsync(device!.IDDevice!.Value);
+            await deviceFarmUnitRepo.DeviceUnassignFromZoneAsync(device!.IDDevice!.Value);
             await WriteAuditAsync("Device.UnassignedFromZone", device.TenantID, "Device", idDevice.ToString()!, null);
             return true;
         }
@@ -608,43 +608,43 @@ namespace api.Controllers.API
         /// Top-level Unit cubes - read-only, open to any authenticated caller (same reasoning as DeviceApiController.DeviceFleetGet).
         [Authorize]
         [HttpGet("Dashboard")]
-        public async Task<ActionResult<IList<DeviceUnitDashboard>>> DeviceUnitDashboardGet() =>
-            Ok(await deviceUnitRepo.DeviceUnitDashboardGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
+        public async Task<ActionResult<IList<DeviceFarmUnitDashboard>>> DeviceFarmUnitDashboardGet() =>
+            Ok(await deviceFarmUnitRepo.DeviceFarmUnitDashboardGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId));
 
         [Authorize]
         [HttpGet("Dashboard/Zones")]
-        public async Task<ActionResult<IList<DeviceUnitZoneDashboard>>> DeviceUnitZoneDashboardListGet(int? idDeviceUnit)
+        public async Task<ActionResult<IList<DeviceFarmUnitZoneDashboard>>> DeviceFarmUnitZoneDashboardListGet(int? idDeviceFarmUnit)
         {
-            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceUnit, forWrite: false);
+            var (unit, error) = await EnsureOwnedUnitAsync(idDeviceFarmUnit, forWrite: false);
             if (error != null)
             {
                 return error;
             }
-            return Ok(await deviceUnitRepo.DeviceUnitZoneDashboardListGetAsync(unit!.IDDeviceUnit!.Value));
+            return Ok(await deviceFarmUnitRepo.DeviceFarmUnitZoneDashboardListGetAsync(unit!.IDDeviceFarmUnit!.Value));
         }
 
         [Authorize]
         [HttpGet("Dashboard/Zone")]
-        public async Task<ActionResult<DeviceUnitZoneDashboard>> DeviceUnitZoneDashboardGet(int? idDeviceUnitZone)
+        public async Task<ActionResult<DeviceFarmUnitZoneDashboard>> DeviceFarmUnitZoneDashboardGet(int? idDeviceFarmUnitZone)
         {
-            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceUnitZone, forWrite: false);
+            var (zone, error) = await EnsureOwnedZoneAsync(idDeviceFarmUnitZone, forWrite: false);
             if (error != null)
             {
                 return error;
             }
-            DeviceUnitZoneDashboard? dashboard = await deviceUnitRepo.DeviceUnitZoneDashboardGetAsync(zone!.IDDeviceUnitZone!.Value);
+            DeviceFarmUnitZoneDashboard? dashboard = await deviceFarmUnitRepo.DeviceFarmUnitZoneDashboardGetAsync(zone!.IDDeviceFarmUnitZone!.Value);
             return dashboard is null ? NotFound() : Ok(dashboard);
         }
 
         #endregion
 
-        /// Same shape as DeviceApiController.EnsureOwnedDeviceAsync, for DeviceUnit - see ApiControllerBase.EnsureOwnedDeviceEntityAsync for the shared 404/403 logic.
-        private Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int? idDeviceUnit, bool forWrite) =>
-            EnsureOwnedDeviceEntityAsync(() => deviceUnitRepo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite);
+        /// Same shape as DeviceApiController.EnsureOwnedDeviceAsync, for DeviceFarmUnit - see ApiControllerBase.EnsureOwnedDeviceEntityAsync for the shared 404/403 logic.
+        private Task<(DeviceFarmUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int? idDeviceFarmUnit, bool forWrite) =>
+            EnsureOwnedDeviceEntityAsync(() => deviceFarmUnitRepo.DeviceFarmUnitGetByIdAsync(idDeviceFarmUnit), u => u.TenantID, "Unit", forWrite);
 
-        /// Same shape as EnsureOwnedUnitAsync, for DeviceUnitZone.
-        private Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int? idDeviceUnitZone, bool forWrite) =>
-            EnsureOwnedDeviceEntityAsync(() => deviceUnitRepo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone), z => z.TenantID, "Zone", forWrite);
+        /// Same shape as EnsureOwnedUnitAsync, for DeviceFarmUnitZone.
+        private Task<(DeviceFarmUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int? idDeviceFarmUnitZone, bool forWrite) =>
+            EnsureOwnedDeviceEntityAsync(() => deviceFarmUnitRepo.DeviceFarmUnitZoneGetByIdAsync(idDeviceFarmUnitZone), z => z.TenantID, "Zone", forWrite);
 
         /// Same shape as EnsureOwnedUnitAsync, for Device.
         private Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(

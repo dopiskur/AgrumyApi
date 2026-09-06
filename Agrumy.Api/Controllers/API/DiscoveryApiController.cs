@@ -12,7 +12,7 @@ namespace api.Controllers.API
 {
     /// "Scan for new devices" - device-facing report intake, the admin scan trigger, the aggregated results list, and Register (PIN + WiFi credentials to the winning scanning device).
     [Route("/api/Discovery")]
-    public class DiscoveryApiController(IDiscoveryRepository discoveryRepo, IDeviceRepository deviceRepo, IDeviceUnitRepository deviceUnitRepo, ITenantRepository tenantRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, IServerConfigRepository serverConfigRepo, ICache cache, CommandQueueService commandQueue, IOptions<AgrumySettings> settings) : ApiControllerBase(userRepo, auditLogRepo, cache)
+    public class DiscoveryApiController(IDiscoveryRepository discoveryRepo, IDeviceRepository deviceRepo, IDeviceFarmUnitRepository deviceFarmUnitRepo, ITenantRepository tenantRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, IServerConfigRepository serverConfigRepo, ICache cache, CommandQueueService commandQueue, IOptions<AgrumySettings> settings) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         // Separate field, not the primary-constructor parameter directly - a parameter used both here and in the base(...) call trips CS9107 (ambiguous double-capture).
         private readonly IUserRepository users = userRepo;
@@ -266,11 +266,11 @@ namespace api.Controllers.API
             };
         }
 
-        private Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int idDeviceUnitZone, bool forWrite) =>
-            EnsureOwnedDeviceEntityAsync(() => deviceUnitRepo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone), z => z.TenantID, "Zone", forWrite);
+        private Task<(DeviceFarmUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int idDeviceFarmUnitZone, bool forWrite) =>
+            EnsureOwnedDeviceEntityAsync(() => deviceFarmUnitRepo.DeviceFarmUnitZoneGetByIdAsync(idDeviceFarmUnitZone), z => z.TenantID, "Zone", forWrite);
 
-        private Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int idDeviceUnit, bool forWrite) =>
-            EnsureOwnedDeviceEntityAsync(() => deviceUnitRepo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite);
+        private Task<(DeviceFarmUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int idDeviceFarmUnit, bool forWrite) =>
+            EnsureOwnedDeviceEntityAsync(() => deviceFarmUnitRepo.DeviceFarmUnitGetByIdAsync(idDeviceFarmUnit), u => u.TenantID, "Unit", forWrite);
 
         private Task<(TenantWifiConfig? Config, ActionResult? Error)> EnsureOwnedWifiConfigAsync(int idTenantWifiConfig) =>
             EnsureOwnedDeviceEntityAsync(() => tenantRepo.TenantWifiConfigGetByIdAsync(idTenantWifiConfig), c => (int?)c.TenantID, "WiFi network", forWrite: true);

@@ -18,7 +18,7 @@ namespace api.Models
         public double? BatteryLowThreshold { get; set; }
         public double? BatteryLowHysteresis { get; set; }
 
-        // TankRefillAlertEvaluator's threshold/hysteresis (percent of TankCalculator fill), global like Battery's - a physical tank's own capacity/calibration is per-zone (DeviceUnitZone), but "how empty is too empty" is one policy for the whole tenant.
+        // TankRefillAlertEvaluator's threshold/hysteresis (percent of TankCalculator fill), global like Battery's - a physical tank's own capacity/calibration is per-zone (DeviceFarmUnitZone), but "how empty is too empty" is one policy for the whole tenant.
         public double? TankRefillThreshold { get; set; }
         public double? TankRefillHysteresis { get; set; }
 

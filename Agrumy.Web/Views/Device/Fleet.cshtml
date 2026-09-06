@@ -81,13 +81,13 @@
                             <select class="form-select" id="assignUnitSelect">
                                 @foreach (var unit in Model.Units)
                                 {
-                                    <option value="@unit.IDDeviceUnit">@unit.DeviceUnitName</option>
+                                    <option value="@unit.IDDeviceFarmUnit">@unit.DeviceFarmUnitName</option>
                                 }
                             </select>
                         </div>
                         <div class="mb-3">
                             <label class="form-label" for="assignZoneSelect">Zone</label>
-                            <select class="form-select" name="idDeviceUnitZone" id="assignZoneSelect"></select>
+                            <select class="form-select" name="idDeviceFarmUnitZone" id="assignZoneSelect"></select>
                         </div>
                     }
                 </div>
@@ -135,7 +135,7 @@
                                 <option value="">-- none --</option>
                                 @foreach (var unit in Model.Units)
                                 {
-                                    <option value="@unit.IDDeviceUnit">@unit.DeviceUnitName</option>
+                                    <option value="@unit.IDDeviceFarmUnit">@unit.DeviceFarmUnitName</option>
                                 }
                             </select>
                         </div>
@@ -154,7 +154,7 @@
         </div>
     </div>
 </div>
-<script type="application/json" id="assignZonesData">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Zones.Select(z => new { id = z.IDDeviceUnitZone, unitId = z.DeviceUnitID, name = z.DeviceUnitZoneName })))</script>
+<script type="application/json" id="assignZonesData">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Zones.Select(z => new { id = z.IDDeviceFarmUnitZone, unitId = z.DeviceFarmUnitID, name = z.DeviceFarmUnitZoneName })))</script>
 
 @section Scripts {
     <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.min.js"></script>

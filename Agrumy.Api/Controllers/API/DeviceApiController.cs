@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 namespace api.Controllers.API
 {
     [Route("/api/Device")]
-    public class DeviceApiController(IDeviceRepository deviceRepo, IDeviceUnitRepository deviceUnitRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, CommandQueueService commandQueue, FirmwareCatalogService firmwareCatalog, DeviceConfigBuilder configBuilder, IOptions<AgrumySettings> settingsOptions) : ApiControllerBase(userRepo, auditLogRepo, cache)
+    public class DeviceApiController(IDeviceRepository deviceRepo, IDeviceFarmUnitRepository deviceFarmUnitRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, CommandQueueService commandQueue, FirmwareCatalogService firmwareCatalog, DeviceConfigBuilder configBuilder, IOptions<AgrumySettings> settingsOptions) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         private readonly AgrumySettings settings = settingsOptions.Value;
         // Separate field, not the primary-constructor parameter directly - a parameter used both here and in the base(...) call trips CS9107 (ambiguous double-capture).
@@ -173,7 +173,7 @@ namespace api.Controllers.API
             return true;
         }
 
-        /// Only relay-pin mapping is left on the per-device Controller row - thresholds, schedule and safety limits live on the device's assigned zone instead (DeviceUnitApiController's Zone/Rule endpoints).
+        /// Only relay-pin mapping is left on the per-device Controller row - thresholds, schedule and safety limits live on the device's assigned zone instead (DeviceFarmUnitApiController's Zone/Rule endpoints).
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPut("Controller")]
         public async Task<ActionResult<bool>> DeviceConfigControllerUpdate(DeviceUpdate? deviceUpdate)
@@ -418,7 +418,7 @@ namespace api.Controllers.API
 
                 if (provision?.ZoneID is int zoneId)
                 {
-                    await deviceUnitRepo.DeviceAssignToZoneAsync(device.IDDevice!.Value, zoneId);
+                    await deviceFarmUnitRepo.DeviceAssignToZoneAsync(device.IDDevice!.Value, zoneId);
                 }
             }
 

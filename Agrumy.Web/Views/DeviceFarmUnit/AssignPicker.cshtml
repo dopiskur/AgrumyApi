@@ -39,7 +39,7 @@
                             <td class="text-end">
                                 <form asp-action="Assign" method="post" class="d-inline">
                                     <input type="hidden" name="idDevice" value="@d.IDDevice" />
-                                    <input type="hidden" name="idDeviceUnitZone" value="@Model.IDDeviceUnitZone" />
+                                    <input type="hidden" name="idDeviceFarmUnitZone" value="@Model.IDDeviceFarmUnitZone" />
                                     <input type="hidden" name="controllerCapable" value="@Model.ControllerCapable" />
                                     <button type="submit" class="btn btn-sm btn-primary">Add</button>
                                 </form>
@@ -50,6 +50,6 @@
             </table>
         }
 
-        <a asp-action="Zone" asp-route-idDeviceUnitZone="@Model.IDDeviceUnitZone" class="btn btn-outline-secondary">Back</a>
+        <a asp-action="Zone" asp-route-idDeviceFarmUnitZone="@Model.IDDeviceFarmUnitZone" class="btn btn-outline-secondary">Back</a>
     </div>
 </div>

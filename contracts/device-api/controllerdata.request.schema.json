@@ -12,7 +12,7 @@
     "properties": {
       "relayFunction": {
         "type": "integer",
-        "description": "1=Ventilation, 2=Light, 3=Heating, 4=WaterPump (api.Models.RelayFunction) - same convention as deviceUnitZoneRule.relayFunction in config.response.schema.json."
+        "description": "1=Ventilation, 2=Light, 3=Heating, 4=WaterPump (api.Models.RelayFunction) - same convention as deviceFarmUnitZoneRule.relayFunction in config.response.schema.json."
       },
       "isOn": {
         "type": "boolean",

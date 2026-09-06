@@ -20,7 +20,7 @@ public class MqttCommandPublisherTests
 
     private readonly Mock<ICommandRepository> _commands = new(MockBehavior.Strict);
     private readonly Mock<IDeviceRepository> _devices = new(MockBehavior.Strict);
-    private readonly Mock<IDeviceUnitRepository> _units = new(MockBehavior.Strict);
+    private readonly Mock<IDeviceFarmUnitRepository> _units = new(MockBehavior.Strict);
     private readonly Mock<IMqttCommandPublisher> _mqtt = new(MockBehavior.Strict);
 
     private CommandQueueService NewService() => new(_commands.Object, _devices.Object, _units.Object, _mqtt.Object);

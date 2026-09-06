@@ -9,29 +9,29 @@ using Microsoft.AspNetCore.Mvc;
 namespace api.Controllers.View
 {
     [Authorize]
-    public class DeviceUnitController(IApi api) : Controller
+    public class DeviceFarmUnitController(IApi api) : Controller
     {
-        public async Task<ActionResult> Index() => View(await api.DeviceUnitDashboardGet());
+        public async Task<ActionResult> Index() => View(await api.DeviceFarmUnitDashboardGet());
 
-        public async Task<ActionResult> IndexCubes() => PartialView("_UnitCubes", await api.DeviceUnitDashboardGet());
+        public async Task<ActionResult> IndexCubes() => PartialView("_UnitCubes", await api.DeviceFarmUnitDashboardGet());
 
-        public async Task<ActionResult> Zones(int idDeviceUnit)
+        public async Task<ActionResult> Zones(int idDeviceFarmUnit)
         {
-            IList<DeviceUnitZoneDashboard> zones = await api.DeviceUnitZoneDashboardListGet(idDeviceUnit);
+            IList<DeviceFarmUnitZoneDashboard> zones = await api.DeviceFarmUnitZoneDashboardListGet(idDeviceFarmUnit);
             if (zones.Count == 1)
             {
-                return RedirectToAction(nameof(Zone), new { idDeviceUnitZone = zones[0].IDDeviceUnitZone });
+                return RedirectToAction(nameof(Zone), new { idDeviceFarmUnitZone = zones[0].IDDeviceFarmUnitZone });
             }
 
             string? timeZone = User.GetTimeZone();
             return View(new UnitZonesViewModel
             {
-                Unit = await api.DeviceUnitGet(idDeviceUnit),
+                Unit = await api.DeviceFarmUnitGet(idDeviceFarmUnit),
                 Zones = zones,
                 DisplayTimeZone = string.IsNullOrWhiteSpace(timeZone) ? "UTC" : timeZone,
                 // Last 24h, hourly buckets - same window _ZoneDetails' sparkline trend already uses.
-                SensorDataJson = await api.SensorDataUnitAverageGet(idDeviceUnit, 24, 1),
-                DiscoveredDevices = await api.DiscoveryResultsGet(idDeviceUnit, null),
+                SensorDataJson = await api.SensorDataUnitAverageGet(idDeviceFarmUnit, 24, 1),
+                DiscoveredDevices = await api.DiscoveryResultsGet(idDeviceFarmUnit, null),
                 WifiConfigs = await api.DiscoveryWifiConfigsGet(),
             });
         }
@@ -50,13 +50,13 @@ namespace api.Controllers.View
             {
                 TempData["Error"] = ex.Body;
             }
-            return RedirectToAction(nameof(Zones), new { idDeviceUnit = request.UnitID });
+            return RedirectToAction(nameof(Zones), new { idDeviceFarmUnit = request.UnitID });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> RegisterDiscoveredDeviceUnit(DiscoveryRegisterRequest request)
+        public async Task<ActionResult> RegisterDiscoveredDeviceFarmUnit(DiscoveryRegisterRequest request)
         {
             try
             {
@@ -69,30 +69,30 @@ namespace api.Controllers.View
             {
                 TempData["Error"] = ex.Body;
             }
-            return RedirectToAction(nameof(Zones), new { idDeviceUnit = request.UnitID });
+            return RedirectToAction(nameof(Zones), new { idDeviceFarmUnit = request.UnitID });
         }
 
-        public async Task<ActionResult> ZonesCubes(int idDeviceUnit) =>
-            PartialView("_ZoneCubes", await api.DeviceUnitZoneDashboardListGet(idDeviceUnit));
+        public async Task<ActionResult> ZonesCubes(int idDeviceFarmUnit) =>
+            PartialView("_ZoneCubes", await api.DeviceFarmUnitZoneDashboardListGet(idDeviceFarmUnit));
 
-        public async Task<ActionResult> Zone(int idDeviceUnitZone)
+        public async Task<ActionResult> Zone(int idDeviceFarmUnitZone)
         {
-            ZoneViewModel model = await BuildZoneViewAsync(idDeviceUnitZone);
+            ZoneViewModel model = await BuildZoneViewAsync(idDeviceFarmUnitZone);
             // Last 24h hourly buckets, only fetched here (not in the 10s-polled ZoneDetails fragment) - the chart lives outside that fragment.
-            model.SensorDataJson = await api.SensorDataZoneAverageGet(idDeviceUnitZone, 24, 1);
+            model.SensorDataJson = await api.SensorDataZoneAverageGet(idDeviceFarmUnitZone, 24, 1);
             return View(model);
         }
 
-        public async Task<ActionResult> ZoneDetails(int idDeviceUnitZone) =>
-            PartialView("_ZoneDetails", await BuildZoneViewAsync(idDeviceUnitZone));
+        public async Task<ActionResult> ZoneDetails(int idDeviceFarmUnitZone) =>
+            PartialView("_ZoneDetails", await BuildZoneViewAsync(idDeviceFarmUnitZone));
 
-        private async Task<ZoneViewModel> BuildZoneViewAsync(int idDeviceUnitZone)
+        private async Task<ZoneViewModel> BuildZoneViewAsync(int idDeviceFarmUnitZone)
         {
-            DeviceUnitZoneDashboard dashboard = await api.DeviceUnitZoneDashboardGet(idDeviceUnitZone);
+            DeviceFarmUnitZoneDashboard dashboard = await api.DeviceFarmUnitZoneDashboardGet(idDeviceFarmUnitZone);
 
             // LastSeenAt is stored/served in UTC; convert here for display only.
             IList<DeviceFleetStatus> fleet = (await api.DeviceFleetGet())
-                .Where(f => f.DeviceUnitZoneID == idDeviceUnitZone)
+                .Where(f => f.DeviceFarmUnitZoneID == idDeviceFarmUnitZone)
                 .ToList();
             string? timeZone = User.GetTimeZone();
             foreach (var d in fleet)
@@ -104,14 +104,14 @@ namespace api.Controllers.View
             }
 
             bool hasController = dashboard.Devices.Any(d => d.DeviceControllerEnabled == true);
-            DeviceUnitZone? zone = null;
-            IList<DeviceUnitZoneRule> rules = [];
+            DeviceFarmUnitZone? zone = null;
+            IList<DeviceFarmUnitZoneRule> rules = [];
             IList<DeviceManualOverride> manualOverrides = [];
             if (hasController)
             {
-                zone = await api.DeviceUnitZoneGetById(idDeviceUnitZone);
-                rules = await api.DeviceUnitZoneRulesGet(idDeviceUnitZone);
-                manualOverrides = await api.DeviceUnitZoneManualActuateStatus(idDeviceUnitZone);
+                zone = await api.DeviceFarmUnitZoneGetById(idDeviceFarmUnitZone);
+                rules = await api.DeviceFarmUnitZoneRulesGet(idDeviceFarmUnitZone);
+                manualOverrides = await api.DeviceFarmUnitZoneManualActuateStatus(idDeviceFarmUnitZone);
             }
 
             return new ZoneViewModel
@@ -122,7 +122,7 @@ namespace api.Controllers.View
                 Zone = zone,
                 Rules = rules,
                 ManualOverrides = manualOverrides,
-                DiscoveredDevices = await api.DiscoveryResultsGet(null, idDeviceUnitZone),
+                DiscoveredDevices = await api.DiscoveryResultsGet(null, idDeviceFarmUnitZone),
                 WifiConfigs = await api.DiscoveryWifiConfigsGet(),
             };
         }
@@ -141,7 +141,7 @@ namespace api.Controllers.View
             {
                 TempData["Error"] = ex.Body;
             }
-            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone = request.ZoneID });
+            return RedirectToAction(nameof(Zone), new { idDeviceFarmUnitZone = request.ZoneID });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -160,130 +160,130 @@ namespace api.Controllers.View
             {
                 TempData["Error"] = ex.Body;
             }
-            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone = request.ZoneID });
+            return RedirectToAction(nameof(Zone), new { idDeviceFarmUnitZone = request.ZoneID });
         }
 
         // Roadmap #219. durationMinutes is the admin-facing unit (matches the quick-preset buttons); converted to seconds only for the wire request. TargetMetric/TargetThreshold/TargetHysteresis are ignored server-side for Duration mode and vice versa (api.Commands.ManualActuateService), so posting all six fields regardless of the selected mode is harmless.
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> ZoneManualActuateStart(int idDeviceUnitZone, RelayFunction relayFunction, ManualOverrideMode mode,
+        public async Task<ActionResult> ZoneManualActuateStart(int idDeviceFarmUnitZone, RelayFunction relayFunction, ManualOverrideMode mode,
             int? durationMinutes, SensorMetric? targetMetric, double? targetThreshold, double? targetHysteresis)
         {
             var request = new ManualActuateRequest(relayFunction, mode, durationMinutes is int m ? m * 60 : null, targetMetric, targetThreshold, targetHysteresis);
             try
             {
-                await api.DeviceUnitZoneManualActuateStart(idDeviceUnitZone, request);
+                await api.DeviceFarmUnitZoneManualActuateStart(idDeviceFarmUnitZone, request);
                 TempData["Message"] = $"{relayFunction} manually started.";
             }
             catch (ApiException ex)
             {
                 TempData["Error"] = ex.Body;
             }
-            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+            return RedirectToAction(nameof(Zone), new { idDeviceFarmUnitZone });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> ZoneManualActuateStop(int idDeviceUnitZone, RelayFunction relayFunction)
+        public async Task<ActionResult> ZoneManualActuateStop(int idDeviceFarmUnitZone, RelayFunction relayFunction)
         {
             try
             {
-                await api.DeviceUnitZoneManualActuateStop(idDeviceUnitZone, relayFunction);
+                await api.DeviceFarmUnitZoneManualActuateStop(idDeviceFarmUnitZone, relayFunction);
             }
             catch (ApiException ex)
             {
                 TempData["Error"] = ex.Body;
             }
-            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+            return RedirectToAction(nameof(Zone), new { idDeviceFarmUnitZone });
         }
 
         /// Unit-level fan-out - same request shape as the Zone-level trigger above, applied to every zone's controller under this unit.
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> UnitManualActuateStart(int idDeviceUnit, RelayFunction relayFunction, ManualOverrideMode mode,
+        public async Task<ActionResult> UnitManualActuateStart(int idDeviceFarmUnit, RelayFunction relayFunction, ManualOverrideMode mode,
             int? durationMinutes, SensorMetric? targetMetric, double? targetThreshold, double? targetHysteresis)
         {
             var request = new ManualActuateRequest(relayFunction, mode, durationMinutes is int m ? m * 60 : null, targetMetric, targetThreshold, targetHysteresis);
             try
             {
-                IReadOnlyList<int> affected = await api.DeviceUnitManualActuateStart(idDeviceUnit, request);
+                IReadOnlyList<int> affected = await api.DeviceFarmUnitManualActuateStart(idDeviceFarmUnit, request);
                 TempData["Message"] = $"{relayFunction} manually started across {affected.Count} zone(s).";
             }
             catch (ApiException ex)
             {
                 TempData["Error"] = ex.Body;
             }
-            return RedirectToAction(nameof(Zones), new { idDeviceUnit });
+            return RedirectToAction(nameof(Zones), new { idDeviceFarmUnit });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> UnitAdd(string deviceUnitName)
+        public async Task<ActionResult> UnitAdd(string deviceFarmUnitName)
         {
-            DeviceUnit unit = await api.DeviceUnitAdd(new DeviceUnit { DeviceUnitName = deviceUnitName });
-            DeviceUnitZone zone = await api.DeviceUnitZoneAdd(new DeviceUnitZone { DeviceUnitID = unit.IDDeviceUnit!.Value, DeviceUnitZoneName = "Default" });
-            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone = zone.IDDeviceUnitZone });
+            DeviceFarmUnit unit = await api.DeviceFarmUnitAdd(new DeviceFarmUnit { DeviceFarmUnitName = deviceFarmUnitName });
+            DeviceFarmUnitZone zone = await api.DeviceFarmUnitZoneAdd(new DeviceFarmUnitZone { DeviceFarmUnitID = unit.IDDeviceFarmUnit!.Value, DeviceFarmUnitZoneName = "Default" });
+            return RedirectToAction(nameof(Zone), new { idDeviceFarmUnitZone = zone.IDDeviceFarmUnitZone });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> UnitDelete(int idDeviceUnit)
+        public async Task<ActionResult> UnitDelete(int idDeviceFarmUnit)
         {
-            await api.DeviceUnitDelete(idDeviceUnit);
+            await api.DeviceFarmUnitDelete(idDeviceFarmUnit);
             return RedirectToAction(nameof(Index));
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> UnitRename(int idDeviceUnit, string deviceUnitName)
+        public async Task<ActionResult> UnitRename(int idDeviceFarmUnit, string deviceFarmUnitName)
         {
-            await api.DeviceUnitUpdate(new DeviceUnit { IDDeviceUnit = idDeviceUnit, DeviceUnitName = deviceUnitName });
-            return RedirectToAction(nameof(Zones), new { idDeviceUnit });
+            await api.DeviceFarmUnitUpdate(new DeviceFarmUnit { IDDeviceFarmUnit = idDeviceFarmUnit, DeviceFarmUnitName = deviceFarmUnitName });
+            return RedirectToAction(nameof(Zones), new { idDeviceFarmUnit });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> ZoneAdd(int idDeviceUnit, string deviceUnitZoneName)
+        public async Task<ActionResult> ZoneAdd(int idDeviceFarmUnit, string deviceFarmUnitZoneName)
         {
-            await api.DeviceUnitZoneAdd(new DeviceUnitZone { DeviceUnitID = idDeviceUnit, DeviceUnitZoneName = deviceUnitZoneName });
-            return RedirectToAction(nameof(Zones), new { idDeviceUnit });
+            await api.DeviceFarmUnitZoneAdd(new DeviceFarmUnitZone { DeviceFarmUnitID = idDeviceFarmUnit, DeviceFarmUnitZoneName = deviceFarmUnitZoneName });
+            return RedirectToAction(nameof(Zones), new { idDeviceFarmUnit });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> ZoneDelete(int idDeviceUnitZone, int idDeviceUnit)
+        public async Task<ActionResult> ZoneDelete(int idDeviceFarmUnitZone, int idDeviceFarmUnit)
         {
-            await api.DeviceUnitZoneDelete(idDeviceUnitZone);
-            return RedirectToAction(nameof(Zones), new { idDeviceUnit });
+            await api.DeviceFarmUnitZoneDelete(idDeviceFarmUnitZone);
+            return RedirectToAction(nameof(Zones), new { idDeviceFarmUnit });
         }
 
         // Fetch-then-patch: the update call overwrites every field unconditionally, so posting just the name would blank the other fields.
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> ZoneRename(int idDeviceUnitZone, string deviceUnitZoneName)
+        public async Task<ActionResult> ZoneRename(int idDeviceFarmUnitZone, string deviceFarmUnitZoneName)
         {
-            DeviceUnitZone zone = await api.DeviceUnitZoneGetById(idDeviceUnitZone);
-            zone.DeviceUnitZoneName = deviceUnitZoneName;
-            await api.DeviceUnitZoneUpdate(zone);
-            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+            DeviceFarmUnitZone zone = await api.DeviceFarmUnitZoneGetById(idDeviceFarmUnitZone);
+            zone.DeviceFarmUnitZoneName = deviceFarmUnitZoneName;
+            await api.DeviceFarmUnitZoneUpdate(zone);
+            return RedirectToAction(nameof(Zone), new { idDeviceFarmUnitZone });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> SafetyLimitsUpdate(int idDeviceUnitZone, int? waterPumpMaxRunSeconds, int? waterPumpCooldownSeconds, bool skipWaterPumpWhenRainPredicted,
+        public async Task<ActionResult> SafetyLimitsUpdate(int idDeviceFarmUnitZone, int? waterPumpMaxRunSeconds, int? waterPumpCooldownSeconds, bool skipWaterPumpWhenRainPredicted,
             int? heatingMaxRunSeconds, int? ventilationMaxRunSeconds)
         {
-            DeviceUnitZone zone = await api.DeviceUnitZoneGetById(idDeviceUnitZone);
+            DeviceFarmUnitZone zone = await api.DeviceFarmUnitZoneGetById(idDeviceFarmUnitZone);
             zone.WaterPumpMaxRunSeconds = waterPumpMaxRunSeconds;
             zone.WaterPumpCooldownSeconds = waterPumpCooldownSeconds;
             zone.SkipWaterPumpWhenRainPredicted = skipWaterPumpWhenRainPredicted;
@@ -291,34 +291,34 @@ namespace api.Controllers.View
             zone.VentilationMaxRunSeconds = ventilationMaxRunSeconds;
             try
             {
-                await api.DeviceUnitZoneUpdate(zone);
+                await api.DeviceFarmUnitZoneUpdate(zone);
             }
             catch (ApiException ex)
             {
                 TempData["Error"] = ex.Body;
             }
-            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+            return RedirectToAction(nameof(Zone), new { idDeviceFarmUnitZone });
         }
 
         // Roadmap #234 - all three null together means "no tank tracking", the empty-string->null coercion below keeps a blank form submit from writing a zero-capacity/zero-calibration tank instead.
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> TankCalibrationUpdate(int idDeviceUnitZone, double? tankCapacityLiters, int? waterLevelRawEmpty, int? waterLevelRawFull)
+        public async Task<ActionResult> TankCalibrationUpdate(int idDeviceFarmUnitZone, double? tankCapacityLiters, int? waterLevelRawEmpty, int? waterLevelRawFull)
         {
-            DeviceUnitZone zone = await api.DeviceUnitZoneGetById(idDeviceUnitZone);
+            DeviceFarmUnitZone zone = await api.DeviceFarmUnitZoneGetById(idDeviceFarmUnitZone);
             zone.TankCapacityLiters = tankCapacityLiters;
             zone.WaterLevelRawEmpty = waterLevelRawEmpty;
             zone.WaterLevelRawFull = waterLevelRawFull;
             try
             {
-                await api.DeviceUnitZoneUpdate(zone);
+                await api.DeviceFarmUnitZoneUpdate(zone);
             }
             catch (ApiException ex)
             {
                 TempData["Error"] = ex.Body;
             }
-            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+            return RedirectToAction(nameof(Zone), new { idDeviceFarmUnitZone });
         }
 
         // ---- Rules (Zone/Unit/Global scope, roadmap #212) ----------------------------
@@ -326,46 +326,46 @@ namespace api.Controllers.View
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> RuleAdd(int idDeviceUnitZone, RuleFormInput input)
+        public async Task<ActionResult> RuleAdd(int idDeviceFarmUnitZone, RuleFormInput input)
         {
-            await AddRuleAsync(BuildRule(input, idDeviceUnitZone, null), r => api.DeviceUnitZoneRuleAdd(r));
-            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+            await AddRuleAsync(BuildRule(input, idDeviceFarmUnitZone, null), r => api.DeviceFarmUnitZoneRuleAdd(r));
+            return RedirectToAction(nameof(Zone), new { idDeviceFarmUnitZone });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> RuleDelete(int idDeviceUnitZoneRule, int idDeviceUnitZone)
+        public async Task<ActionResult> RuleDelete(int idDeviceFarmUnitZoneRule, int idDeviceFarmUnitZone)
         {
-            await DeleteRuleAsync(idDeviceUnitZoneRule, r => api.DeviceUnitZoneRuleDelete(r));
-            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+            await DeleteRuleAsync(idDeviceFarmUnitZoneRule, r => api.DeviceFarmUnitZoneRuleDelete(r));
+            return RedirectToAction(nameof(Zone), new { idDeviceFarmUnitZone });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
-        public async Task<ActionResult> UnitRules(int idDeviceUnit) => View(new RuleEditorViewModel
+        public async Task<ActionResult> UnitRules(int idDeviceFarmUnit) => View(new RuleEditorViewModel
         {
             Scope = RuleScope.Unit,
-            ScopeId = idDeviceUnit,
-            Rules = await api.DeviceUnitRulesGet(idDeviceUnit),
+            ScopeId = idDeviceFarmUnit,
+            Rules = await api.DeviceFarmUnitRulesGet(idDeviceFarmUnit),
             RedirectActionName = nameof(UnitRules),
         });
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> UnitRuleAdd(int idDeviceUnit, RuleFormInput input)
+        public async Task<ActionResult> UnitRuleAdd(int idDeviceFarmUnit, RuleFormInput input)
         {
-            await AddRuleAsync(BuildRule(input, null, idDeviceUnit), r => api.DeviceUnitRuleAdd(r));
-            return RedirectToAction(nameof(UnitRules), new { idDeviceUnit });
+            await AddRuleAsync(BuildRule(input, null, idDeviceFarmUnit), r => api.DeviceFarmUnitRuleAdd(r));
+            return RedirectToAction(nameof(UnitRules), new { idDeviceFarmUnit });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> UnitRuleDelete(int idDeviceUnitZoneRule, int idDeviceUnit)
+        public async Task<ActionResult> UnitRuleDelete(int idDeviceFarmUnitZoneRule, int idDeviceFarmUnit)
         {
-            await DeleteRuleAsync(idDeviceUnitZoneRule, r => api.DeviceUnitRuleDelete(r));
-            return RedirectToAction(nameof(UnitRules), new { idDeviceUnit });
+            await DeleteRuleAsync(idDeviceFarmUnitZoneRule, r => api.DeviceFarmUnitRuleDelete(r));
+            return RedirectToAction(nameof(UnitRules), new { idDeviceFarmUnit });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
@@ -388,13 +388,13 @@ namespace api.Controllers.View
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> GlobalRuleDelete(int idDeviceUnitZoneRule)
+        public async Task<ActionResult> GlobalRuleDelete(int idDeviceFarmUnitZoneRule)
         {
-            await DeleteRuleAsync(idDeviceUnitZoneRule, r => api.GlobalRuleDelete(r));
+            await DeleteRuleAsync(idDeviceFarmUnitZoneRule, r => api.GlobalRuleDelete(r));
             return RedirectToAction(nameof(GlobalRules));
         }
 
-        private async Task AddRuleAsync(DeviceUnitZoneRule rule, Func<DeviceUnitZoneRule, Task<int>> add)
+        private async Task AddRuleAsync(DeviceFarmUnitZoneRule rule, Func<DeviceFarmUnitZoneRule, Task<int>> add)
         {
             try
             {
@@ -418,8 +418,8 @@ namespace api.Controllers.View
             }
         }
 
-        /// Builds a DeviceUnitZoneRule from the form input - exactly one of idDeviceUnitZone/idDeviceUnit is non-null for Zone/Unit scope, both null for Global.
-        private static DeviceUnitZoneRule BuildRule(RuleFormInput input, int? idDeviceUnitZone, int? idDeviceUnit)
+        /// Builds a DeviceFarmUnitZoneRule from the form input - exactly one of idDeviceFarmUnitZone/idDeviceFarmUnit is non-null for Zone/Unit scope, both null for Global.
+        private static DeviceFarmUnitZoneRule BuildRule(RuleFormInput input, int? idDeviceFarmUnitZone, int? idDeviceFarmUnit)
         {
             var conditions = new List<RuleCondition>();
             foreach (RuleConditionInput slot in input.Conditions)
@@ -429,10 +429,10 @@ namespace api.Controllers.View
                     conditions.Add(c);
                 }
             }
-            return new DeviceUnitZoneRule
+            return new DeviceFarmUnitZoneRule
             {
-                DeviceUnitZoneID = idDeviceUnitZone,
-                DeviceUnitID = idDeviceUnit,
+                DeviceFarmUnitZoneID = idDeviceFarmUnitZone,
+                DeviceFarmUnitID = idDeviceFarmUnit,
                 ActionType = input.ActionType,
                 RelayFunction = input.ActionType == ActionType.Relay ? input.RelayFunction : null,
                 SensorMetric = input.ActionType == ActionType.Notification ? input.SensorMetric : null,
@@ -463,10 +463,10 @@ namespace api.Controllers.View
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
-        public async Task<ActionResult> AssignPicker(int idDeviceUnitZone, bool controllerCapable) =>
+        public async Task<ActionResult> AssignPicker(int idDeviceFarmUnitZone, bool controllerCapable) =>
             View(new AssignPickerViewModel
             {
-                IDDeviceUnitZone = idDeviceUnitZone,
+                IDDeviceFarmUnitZone = idDeviceFarmUnitZone,
                 ControllerCapable = controllerCapable,
                 Devices = await api.DeviceUnassignedGet(controllerCapable),
             });
@@ -474,33 +474,33 @@ namespace api.Controllers.View
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Assign(int idDevice, int idDeviceUnitZone, bool controllerCapable)
+        public async Task<ActionResult> Assign(int idDevice, int idDeviceFarmUnitZone, bool controllerCapable)
         {
             try
             {
-                await api.DeviceAssign(new DeviceZoneAssignment { IDDevice = idDevice, IDDeviceUnitZone = idDeviceUnitZone });
+                await api.DeviceAssign(new DeviceZoneAssignment { IDDevice = idDevice, IDDeviceFarmUnitZone = idDeviceFarmUnitZone });
             }
             catch (ApiException ex)
             {
                 ModelState.AddModelError(string.Empty, ex.Body);
                 return View(nameof(AssignPicker), new AssignPickerViewModel
                 {
-                    IDDeviceUnitZone = idDeviceUnitZone,
+                    IDDeviceFarmUnitZone = idDeviceFarmUnitZone,
                     ControllerCapable = controllerCapable,
                     Devices = await api.DeviceUnassignedGet(controllerCapable),
                 });
             }
 
-            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+            return RedirectToAction(nameof(Zone), new { idDeviceFarmUnitZone });
         }
 
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Remove(int idDevice, int idDeviceUnitZone)
+        public async Task<ActionResult> Remove(int idDevice, int idDeviceFarmUnitZone)
         {
             await api.DeviceUnassign(idDevice);
-            return RedirectToAction(nameof(Zone), new { idDeviceUnitZone });
+            return RedirectToAction(nameof(Zone), new { idDeviceFarmUnitZone });
         }
 
         // returnUrl comes from window.location client-side (_ZoneStatusBadge) since Request.Path server-side would be the AJAX poll endpoint, not the visible page; falls back to Index if missing/unsafe.

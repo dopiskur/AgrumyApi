@@ -12,9 +12,9 @@ namespace api.BackgroundWorkers
     /// rule's OR-across-rules/AND-OR-within-a-rule fold happens on-device, this is the server-side
     /// equivalent for the action type firmware has no way to perform itself.
     public sealed class RuleNotificationEvaluator(
-        ITenantRepository tenantRepo, IDeviceUnitRepository unitRepo, IUserRepository userRepo, INotificationDispatcher dispatcher)
+        ITenantRepository tenantRepo, IDeviceFarmUnitRepository unitRepo, IUserRepository userRepo, INotificationDispatcher dispatcher)
     {
-        private sealed record EvalItem(DeviceUnitZoneRule Rule, int ZoneId, int TenantId, bool WasTrue, double? MetricReading, int UtcOffsetSeconds);
+        private sealed record EvalItem(DeviceFarmUnitZoneRule Rule, int ZoneId, int TenantId, bool WasTrue, double? MetricReading, int UtcOffsetSeconds);
 
         public async Task RunOnceAsync(CancellationToken ct = default)
         {
@@ -26,7 +26,7 @@ namespace api.BackgroundWorkers
                     continue;
                 }
 
-                IList<DeviceUnitZoneRule> notificationRules = await unitRepo.RulesGetNotificationRulesForTenantAsync(tenantId);
+                IList<DeviceFarmUnitZoneRule> notificationRules = await unitRepo.RulesGetNotificationRulesForTenantAsync(tenantId);
                 if (notificationRules.Count == 0)
                 {
                     continue;
@@ -36,38 +36,38 @@ namespace api.BackgroundWorkers
             }
         }
 
-        private async Task EvaluateTenantAsync(Tenant tenant, int tenantId, IList<DeviceUnitZoneRule> notificationRules, CancellationToken ct)
+        private async Task EvaluateTenantAsync(Tenant tenant, int tenantId, IList<DeviceFarmUnitZoneRule> notificationRules, CancellationToken ct)
         {
             int utcOffsetSeconds = TimeZoneHelper.GetUtcOffsetSeconds(DateTime.UtcNow, tenant.ScheduleTimeZone);
             DateTime utcNow = DateTime.UtcNow;
 
             var items = new List<EvalItem>();
-            foreach (DeviceUnit unit in await unitRepo.DeviceUnitsGetAsync(tenantId))
+            foreach (DeviceFarmUnit unit in await unitRepo.DeviceFarmUnitsGetAsync(tenantId))
             {
-                if (unit.IDDeviceUnit is not int unitId)
+                if (unit.IDDeviceFarmUnit is not int unitId)
                 {
                     continue;
                 }
-                var unitScoped = notificationRules.Where(r => r.DeviceUnitID == unitId).ToList();
-                var globalScoped = notificationRules.Where(r => r.DeviceUnitID == null && r.DeviceUnitZoneID == null).ToList();
+                var unitScoped = notificationRules.Where(r => r.DeviceFarmUnitID == unitId).ToList();
+                var globalScoped = notificationRules.Where(r => r.DeviceFarmUnitID == null && r.DeviceFarmUnitZoneID == null).ToList();
 
-                foreach (DeviceUnitZone zone in await unitRepo.DeviceUnitZonesGetAsync(unitId))
+                foreach (DeviceFarmUnitZone zone in await unitRepo.DeviceFarmUnitZonesGetAsync(unitId))
                 {
-                    if (zone.IDDeviceUnitZone is not int zoneId)
+                    if (zone.IDDeviceFarmUnitZone is not int zoneId)
                     {
                         continue;
                     }
-                    var zoneScoped = notificationRules.Where(r => r.DeviceUnitZoneID == zoneId).ToList();
-                    IList<DeviceUnitZoneRule> effective = RuleHierarchyResolver.ResolveNotificationRules(zoneScoped, unitScoped, globalScoped);
+                    var zoneScoped = notificationRules.Where(r => r.DeviceFarmUnitZoneID == zoneId).ToList();
+                    IList<DeviceFarmUnitZoneRule> effective = RuleHierarchyResolver.ResolveNotificationRules(zoneScoped, unitScoped, globalScoped);
                     if (effective.Count == 0)
                     {
                         continue;
                     }
 
-                    DeviceUnitZoneDashboard? dashboard = await unitRepo.DeviceUnitZoneDashboardGetAsync(zoneId);
-                    foreach (DeviceUnitZoneRule rule in effective)
+                    DeviceFarmUnitZoneDashboard? dashboard = await unitRepo.DeviceFarmUnitZoneDashboardGetAsync(zoneId);
+                    foreach (DeviceFarmUnitZoneRule rule in effective)
                     {
-                        if (rule.IDDeviceUnitZoneRule is not int ruleId)
+                        if (rule.IDDeviceFarmUnitZoneRule is not int ruleId)
                         {
                             continue;
                         }
@@ -100,7 +100,7 @@ namespace api.BackgroundWorkers
                     results[item] = result;
                     if (result)
                     {
-                        firedThisTick.Add(item.Rule.IDDeviceUnitZoneRule!.Value);
+                        firedThisTick.Add(item.Rule.IDDeviceFarmUnitZoneRule!.Value);
                     }
                 }
                 if (firedThisTick.Count == before)
@@ -117,7 +117,7 @@ namespace api.BackgroundWorkers
 
         private async Task FinalizeAsync(EvalItem item, bool result, CancellationToken ct)
         {
-            int ruleId = item.Rule.IDDeviceUnitZoneRule!.Value;
+            int ruleId = item.Rule.IDDeviceFarmUnitZoneRule!.Value;
             if (result == item.WasTrue)
             {
                 return; // no transition - dedup, nothing to persist or notify

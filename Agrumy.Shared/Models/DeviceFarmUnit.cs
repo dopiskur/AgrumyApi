@@ -2,23 +2,23 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Models
 {
-    /// A physical/logical space (e.g. a greenhouse) containing DeviceUnitZones; TenantID null only means the shared IDDeviceUnit=0 "Default" sentinel every unzoned device points at.
-    public class DeviceUnit
+    /// A physical/logical space (e.g. a greenhouse) containing DeviceFarmUnitZones; TenantID null only means the shared IDDeviceFarmUnit=0 "Default" sentinel every unzoned device points at.
+    public class DeviceFarmUnit
     {
         [HiddenInput(DisplayValue = true)]
-        public int? IDDeviceUnit { get; set; }
+        public int? IDDeviceFarmUnit { get; set; }
         public int? TenantID { get; set; }
-        public string? DeviceUnitName { get; set; }
+        public string? DeviceFarmUnitName { get; set; }
     }
 
-    /// A growing zone within one DeviceUnit - "one zone = one controller" at most, may be sensor-only; TenantID is denormalized from DeviceUnit so a zone query needs no join to check ownership.
-    public class DeviceUnitZone
+    /// A growing zone within one DeviceFarmUnit - "one zone = one controller" at most, may be sensor-only; TenantID is denormalized from DeviceFarmUnit so a zone query needs no join to check ownership.
+    public class DeviceFarmUnitZone
     {
         [HiddenInput(DisplayValue = true)]
-        public int? IDDeviceUnitZone { get; set; }
+        public int? IDDeviceFarmUnitZone { get; set; }
         public int? TenantID { get; set; }
-        public int DeviceUnitID { get; set; }
-        public string? DeviceUnitZoneName { get; set; }
+        public int DeviceFarmUnitID { get; set; }
+        public string? DeviceFarmUnitZoneName { get; set; }
 
         // WaterPump-only hard safety ceiling, not a Rule - applied by the device after a rule already decided WaterPump should run; seeded from AgrumySettings on creation.
         public int? WaterPumpMaxRunSeconds { get; set; }
@@ -39,7 +39,7 @@ namespace api.Models
         public int? VentilationMaxRunSeconds { get; set; }
     }
 
-    /// Relay function a DeviceUnitZoneRule targets, same numeric convention as deviceTypeRelay seed rows; kept as a plain int on the wire (not this enum) so firmware can parse it as a number without JsonStringEnumConverter.
+    /// Relay function a DeviceFarmUnitZoneRule targets, same numeric convention as deviceTypeRelay seed rows; kept as a plain int on the wire (not this enum) so firmware can parse it as a number without JsonStringEnumConverter.
     public enum RelayFunction
     {
         Ventilation = 1,
@@ -64,7 +64,7 @@ namespace api.Models
         public DateTime? DateChanged { get; set; }
     }
 
-    /// Which measured quantity a Notification-action Threshold condition reads - mirrors SensorAverages' fields (a DeviceUnitZoneRule.RelayFunction implies its metric/direction instead, so Relay-action rules never set this).
+    /// Which measured quantity a Notification-action Threshold condition reads - mirrors SensorAverages' fields (a DeviceFarmUnitZoneRule.RelayFunction implies its metric/direction instead, so Relay-action rules never set this).
     public enum SensorMetric
     {
         Temperature = 1,
@@ -114,17 +114,17 @@ namespace api.Models
         public static readonly System.Text.Json.JsonSerializerOptions Options = new(System.Text.Json.JsonSerializerDefaults.Web);
     }
 
-    /// One entry in a DeviceUnitZoneRule's flat, left-to-right condition list - Operator is the operator BEFORE this condition, null for the first entry, required otherwise.
+    /// One entry in a DeviceFarmUnitZoneRule's flat, left-to-right condition list - Operator is the operator BEFORE this condition, null for the first entry, required otherwise.
     public record RuleCondition(ConditionType ConditionType, System.Text.Json.Nodes.JsonNode? ConditionConfig, LogicalOperator? Operator);
 
-    /// One automation rule at exactly one scope - DeviceUnitZoneID set means Zone scope, DeviceUnitID set means Unit scope, both null means Global (per-tenant: every unit/zone the tenant owns). Several rules at the SAME scope for the same RelayFunction/SensorMetric still OR together; within one rule, Conditions fold left-to-right by their own Operator. A more specific scope's rules for a function/metric fully replace (not merge with) a less specific scope's, resolved server-side (api.Devices.RuleHierarchyResolver) before a Relay rule ever reaches firmware.
-    public class DeviceUnitZoneRule
+    /// One automation rule at exactly one scope - DeviceFarmUnitZoneID set means Zone scope, DeviceFarmUnitID set means Unit scope, both null means Global (per-tenant: every unit/zone the tenant owns). Several rules at the SAME scope for the same RelayFunction/SensorMetric still OR together; within one rule, Conditions fold left-to-right by their own Operator. A more specific scope's rules for a function/metric fully replace (not merge with) a less specific scope's, resolved server-side (api.Devices.RuleHierarchyResolver) before a Relay rule ever reaches firmware.
+    public class DeviceFarmUnitZoneRule
     {
         [HiddenInput(DisplayValue = true)]
-        public int? IDDeviceUnitZoneRule { get; set; }
+        public int? IDDeviceFarmUnitZoneRule { get; set; }
         public int TenantID { get; set; }
-        public int? DeviceUnitID { get; set; }
-        public int? DeviceUnitZoneID { get; set; }
+        public int? DeviceFarmUnitID { get; set; }
+        public int? DeviceFarmUnitZoneID { get; set; }
         public ActionType ActionType { get; set; } = ActionType.Relay;
         /// Required when ActionType is Relay, null when Notification.
         public RelayFunction? RelayFunction { get; set; }
@@ -213,10 +213,10 @@ namespace api.Models
     }
 
     /// One Unit cube on the top-level dashboard - name plus a roll-up over every sensor in every zone of this unit.
-    public class DeviceUnitDashboard
+    public class DeviceFarmUnitDashboard
     {
-        public int IDDeviceUnit { get; set; }
-        public string? DeviceUnitName { get; set; }
+        public int IDDeviceFarmUnit { get; set; }
+        public string? DeviceFarmUnitName { get; set; }
         public int ZoneCount { get; set; }
         public int DeviceCount { get; set; }
         public SensorAverages Averages { get; set; } = new();
@@ -225,12 +225,12 @@ namespace api.Models
         public IList<UnitZoneProblemAlert> ProblemAlerts { get; set; } = new List<UnitZoneProblemAlert>();
     }
 
-    /// One Zone cube inside a Unit's drill-down, same shape as DeviceUnitDashboard narrowed to this zone; Devices is populated only by the single-zone detail view, left empty on the zone-list view.
-    public class DeviceUnitZoneDashboard
+    /// One Zone cube inside a Unit's drill-down, same shape as DeviceFarmUnitDashboard narrowed to this zone; Devices is populated only by the single-zone detail view, left empty on the zone-list view.
+    public class DeviceFarmUnitZoneDashboard
     {
-        public int IDDeviceUnitZone { get; set; }
-        public int IDDeviceUnit { get; set; }
-        public string? DeviceUnitZoneName { get; set; }
+        public int IDDeviceFarmUnitZone { get; set; }
+        public int IDDeviceFarmUnit { get; set; }
+        public string? DeviceFarmUnitZoneName { get; set; }
         public int DeviceCount { get; set; }
         public SensorAverages Averages { get; set; } = new();
         public IList<Device> Devices { get; set; } = new List<Device>();
@@ -239,10 +239,10 @@ namespace api.Models
         public IList<UnitZoneProblemAlert> ProblemAlerts { get; set; } = new List<UnitZoneProblemAlert>();
     }
 
-    /// Body of the Add Controller/Add Sensor action - assigns an unassigned device to a zone; the zone's own DeviceUnitID resolves the Unit, so no separate unit id is needed.
+    /// Body of the Add Controller/Add Sensor action - assigns an unassigned device to a zone; the zone's own DeviceFarmUnitID resolves the Unit, so no separate unit id is needed.
     public class DeviceZoneAssignment
     {
         public int IDDevice { get; set; }
-        public int IDDeviceUnitZone { get; set; }
+        public int IDDeviceFarmUnitZone { get; set; }
     }
 }

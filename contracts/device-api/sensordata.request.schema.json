@@ -9,15 +9,15 @@
     "type": "object",
     "additionalProperties": false,
     "required": [
-      "deviceID", "tenantID", "deviceUnitID", "deviceUnitZoneID",
+      "deviceID", "tenantID", "deviceFarmUnitID", "deviceFarmUnitZoneID",
       "temperature", "soilTemperature", "humidity", "battery", "moisture", "light",
       "co2", "tvoc", "barometer", "liquidPH", "rainLevel", "waterLevel", "wind", "dateCreated"
     ],
     "properties": {
       "deviceID": { "type": ["integer", "null"] },
       "tenantID": { "type": ["integer", "null"] },
-      "deviceUnitID": { "type": ["integer", "null"] },
-      "deviceUnitZoneID": { "type": ["integer", "null"] },
+      "deviceFarmUnitID": { "type": ["integer", "null"] },
+      "deviceFarmUnitZoneID": { "type": ["integer", "null"] },
       "temperature": { "type": ["number", "string", "null"] },
       "soilTemperature": {
         "type": ["number", "string", "null"],

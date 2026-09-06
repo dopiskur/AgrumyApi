@@ -7,9 +7,9 @@ namespace Agrumy.Api.Tests;
 /// Server-side Notification-action rule evaluation (roadmap #212) - mirrors AgrumyFirmware's RelayLogic.cpp semantics for the same condition types.
 public class RuleConditionEvaluatorTests
 {
-    private static DeviceUnitZoneRule Rule(params RuleCondition[] conditions) => new()
+    private static DeviceFarmUnitZoneRule Rule(params RuleCondition[] conditions) => new()
     {
-        IDDeviceUnitZoneRule = 1,
+        IDDeviceFarmUnitZoneRule = 1,
         TenantID = 1,
         ActionType = ActionType.Notification,
         SensorMetric = SensorMetric.Temperature,

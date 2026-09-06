@@ -8,7 +8,7 @@
     var notificationRules = Model.Rules.Where(r => r.ActionType == api.Models.ActionType.Notification).ToList();
     var rulesByFunction = relayRules.GroupBy(r => r.RelayFunction!.Value).ToDictionary(g => g.Key, g => g.ToList());
     // Not ToDictionary: SensorMetric? (a valid, meaningful key here - null groups pure reminder rules) can't be a Dictionary<TKey> key at all.
-    List<api.Models.DeviceUnitZoneRule> RulesForMetric(api.Models.SensorMetric? metric) => notificationRules.Where(r => r.SensorMetric == metric).ToList();
+    List<api.Models.DeviceFarmUnitZoneRule> RulesForMetric(api.Models.SensorMetric? metric) => notificationRules.Where(r => r.SensorMetric == metric).ToList();
 
     (api.Models.RelayFunction Value, string Label)[] functions =
     [
@@ -90,7 +90,7 @@
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0">
                                 <span>@Html.Raw(string.Join(" ", rule.Conditions.Select(SummarizeCondition)))</span>
                                 <form asp-action="@Model.DeleteActionName" method="post" onsubmit="return confirm('Remove this rule?');">
-                                    <input type="hidden" name="idDeviceUnitZoneRule" value="@rule.IDDeviceUnitZoneRule" />
+                                    <input type="hidden" name="idDeviceFarmUnitZoneRule" value="@rule.IDDeviceFarmUnitZoneRule" />
                                     @if (!string.IsNullOrEmpty(Model.ScopeHiddenFieldName))
                                     {
                                         <input type="hidden" name="@Model.ScopeHiddenFieldName" value="@Model.ScopeId" />
@@ -152,7 +152,7 @@
                                 @Html.Raw(string.Join(" ", rule.Conditions.Select(SummarizeCondition)))
                             </span>
                             <form asp-action="@Model.DeleteActionName" method="post" onsubmit="return confirm('Remove this rule?');">
-                                <input type="hidden" name="idDeviceUnitZoneRule" value="@rule.IDDeviceUnitZoneRule" />
+                                <input type="hidden" name="idDeviceFarmUnitZoneRule" value="@rule.IDDeviceFarmUnitZoneRule" />
                                 @if (!string.IsNullOrEmpty(Model.ScopeHiddenFieldName))
                                 {
                                     <input type="hidden" name="@Model.ScopeHiddenFieldName" value="@Model.ScopeId" />
@@ -177,7 +177,7 @@
                         <li class="list-group-item d-flex justify-content-between align-items-center px-0">
                             <span><strong>@rule.NotificationSubject</strong> - @Html.Raw(string.Join(" ", rule.Conditions.Select(SummarizeCondition)))</span>
                             <form asp-action="@Model.DeleteActionName" method="post" onsubmit="return confirm('Remove this rule?');">
-                                <input type="hidden" name="idDeviceUnitZoneRule" value="@rule.IDDeviceUnitZoneRule" />
+                                <input type="hidden" name="idDeviceFarmUnitZoneRule" value="@rule.IDDeviceFarmUnitZoneRule" />
                                 @if (!string.IsNullOrEmpty(Model.ScopeHiddenFieldName))
                                 {
                                     <input type="hidden" name="@Model.ScopeHiddenFieldName" value="@Model.ScopeId" />

@@ -156,96 +156,96 @@ namespace api.Dal.Interface
 
         // ---- Unit/Zone -----------------------------------
 
-        [Get("/api/DeviceUnit/All")]
-        Task<IList<DeviceUnit>> DeviceUnitsGet();
+        [Get("/api/DeviceFarmUnit/All")]
+        Task<IList<DeviceFarmUnit>> DeviceFarmUnitsGet();
 
-        [Get("/api/DeviceUnit")]
-        Task<DeviceUnit> DeviceUnitGet(int? idDeviceUnit);
+        [Get("/api/DeviceFarmUnit")]
+        Task<DeviceFarmUnit> DeviceFarmUnitGet(int? idDeviceFarmUnit);
 
-        [Post("/api/DeviceUnit")]
-        Task<DeviceUnit> DeviceUnitAdd([Body] DeviceUnit unit);
+        [Post("/api/DeviceFarmUnit")]
+        Task<DeviceFarmUnit> DeviceFarmUnitAdd([Body] DeviceFarmUnit unit);
 
-        [Put("/api/DeviceUnit")]
-        Task DeviceUnitUpdate([Body] DeviceUnit unit);
+        [Put("/api/DeviceFarmUnit")]
+        Task DeviceFarmUnitUpdate([Body] DeviceFarmUnit unit);
 
-        [Delete("/api/DeviceUnit")]
-        Task DeviceUnitDelete(int? idDeviceUnit);
+        [Delete("/api/DeviceFarmUnit")]
+        Task DeviceFarmUnitDelete(int? idDeviceFarmUnit);
 
-        [Get("/api/DeviceUnit/Zone")]
-        Task<IList<DeviceUnitZone>> DeviceUnitZonesGet(int? idDeviceUnit);
+        [Get("/api/DeviceFarmUnit/Zone")]
+        Task<IList<DeviceFarmUnitZone>> DeviceFarmUnitZonesGet(int? idDeviceFarmUnit);
 
-        [Post("/api/DeviceUnit/Zone")]
-        Task<DeviceUnitZone> DeviceUnitZoneAdd([Body] DeviceUnitZone zone);
+        [Post("/api/DeviceFarmUnit/Zone")]
+        Task<DeviceFarmUnitZone> DeviceFarmUnitZoneAdd([Body] DeviceFarmUnitZone zone);
 
-        [Put("/api/DeviceUnit/Zone")]
-        Task DeviceUnitZoneUpdate([Body] DeviceUnitZone zone);
+        [Put("/api/DeviceFarmUnit/Zone")]
+        Task DeviceFarmUnitZoneUpdate([Body] DeviceFarmUnitZone zone);
 
-        [Delete("/api/DeviceUnit/Zone")]
-        Task DeviceUnitZoneDelete(int? idDeviceUnitZone);
+        [Delete("/api/DeviceFarmUnit/Zone")]
+        Task DeviceFarmUnitZoneDelete(int? idDeviceFarmUnitZone);
 
-        [Get("/api/DeviceUnit/ZoneById")]
-        Task<DeviceUnitZone> DeviceUnitZoneGetById(int? idDeviceUnitZone);
+        [Get("/api/DeviceFarmUnit/ZoneById")]
+        Task<DeviceFarmUnitZone> DeviceFarmUnitZoneGetById(int? idDeviceFarmUnitZone);
 
         // ---- Rules (Zone/Unit/Global scope, roadmap #212) ------
 
-        [Get("/api/DeviceUnit/Zone/Rule")]
-        Task<IList<DeviceUnitZoneRule>> DeviceUnitZoneRulesGet(int? idDeviceUnitZone);
+        [Get("/api/DeviceFarmUnit/Zone/Rule")]
+        Task<IList<DeviceFarmUnitZoneRule>> DeviceFarmUnitZoneRulesGet(int? idDeviceFarmUnitZone);
 
-        [Post("/api/DeviceUnit/Zone/Rule")]
-        Task<int> DeviceUnitZoneRuleAdd([Body] DeviceUnitZoneRule rule);
+        [Post("/api/DeviceFarmUnit/Zone/Rule")]
+        Task<int> DeviceFarmUnitZoneRuleAdd([Body] DeviceFarmUnitZoneRule rule);
 
-        [Delete("/api/DeviceUnit/Zone/Rule")]
-        Task DeviceUnitZoneRuleDelete(int? idDeviceUnitZoneRule);
+        [Delete("/api/DeviceFarmUnit/Zone/Rule")]
+        Task DeviceFarmUnitZoneRuleDelete(int? idDeviceFarmUnitZoneRule);
 
-        [Get("/api/DeviceUnit/Unit/Rule")]
-        Task<IList<DeviceUnitZoneRule>> DeviceUnitRulesGet(int? idDeviceUnit);
+        [Get("/api/DeviceFarmUnit/Unit/Rule")]
+        Task<IList<DeviceFarmUnitZoneRule>> DeviceFarmUnitRulesGet(int? idDeviceFarmUnit);
 
-        [Post("/api/DeviceUnit/Unit/Rule")]
-        Task<int> DeviceUnitRuleAdd([Body] DeviceUnitZoneRule rule);
+        [Post("/api/DeviceFarmUnit/Unit/Rule")]
+        Task<int> DeviceFarmUnitRuleAdd([Body] DeviceFarmUnitZoneRule rule);
 
-        [Delete("/api/DeviceUnit/Unit/Rule")]
-        Task DeviceUnitRuleDelete(int? idDeviceUnitZoneRule);
+        [Delete("/api/DeviceFarmUnit/Unit/Rule")]
+        Task DeviceFarmUnitRuleDelete(int? idDeviceFarmUnitZoneRule);
 
-        [Get("/api/DeviceUnit/Global/Rule")]
-        Task<IList<DeviceUnitZoneRule>> GlobalRulesGet();
+        [Get("/api/DeviceFarmUnit/Global/Rule")]
+        Task<IList<DeviceFarmUnitZoneRule>> GlobalRulesGet();
 
-        [Post("/api/DeviceUnit/Global/Rule")]
-        Task<int> GlobalRuleAdd([Body] DeviceUnitZoneRule rule);
+        [Post("/api/DeviceFarmUnit/Global/Rule")]
+        Task<int> GlobalRuleAdd([Body] DeviceFarmUnitZoneRule rule);
 
-        [Delete("/api/DeviceUnit/Global/Rule")]
-        Task GlobalRuleDelete(int? idDeviceUnitZoneRule);
+        [Delete("/api/DeviceFarmUnit/Global/Rule")]
+        Task GlobalRuleDelete(int? idDeviceFarmUnitZoneRule);
 
-        [Get("/api/DeviceUnit/Unassigned")]
+        [Get("/api/DeviceFarmUnit/Unassigned")]
         Task<IList<DeviceDto>> DeviceUnassignedGet(bool controllerCapable);
 
-        [Post("/api/DeviceUnit/Assign")]
+        [Post("/api/DeviceFarmUnit/Assign")]
         Task DeviceAssign([Body] DeviceZoneAssignment body);
 
-        [Post("/api/DeviceUnit/Unassign")]
+        [Post("/api/DeviceFarmUnit/Unassign")]
         Task DeviceUnassign(int? idDevice);
 
-        [Get("/api/DeviceUnit/Dashboard")]
-        Task<IList<DeviceUnitDashboard>> DeviceUnitDashboardGet();
+        [Get("/api/DeviceFarmUnit/Dashboard")]
+        Task<IList<DeviceFarmUnitDashboard>> DeviceFarmUnitDashboardGet();
 
-        [Get("/api/DeviceUnit/Dashboard/Zones")]
-        Task<IList<DeviceUnitZoneDashboard>> DeviceUnitZoneDashboardListGet(int? idDeviceUnit);
+        [Get("/api/DeviceFarmUnit/Dashboard/Zones")]
+        Task<IList<DeviceFarmUnitZoneDashboard>> DeviceFarmUnitZoneDashboardListGet(int? idDeviceFarmUnit);
 
-        [Get("/api/DeviceUnit/Dashboard/Zone")]
-        Task<DeviceUnitZoneDashboard> DeviceUnitZoneDashboardGet(int? idDeviceUnitZone);
+        [Get("/api/DeviceFarmUnit/Dashboard/Zone")]
+        Task<DeviceFarmUnitZoneDashboard> DeviceFarmUnitZoneDashboardGet(int? idDeviceFarmUnitZone);
 
         // ---- Manual actuate (roadmap #219) ---------------------
 
-        [Post("/api/DeviceUnit/Zone/ManualActuate")]
-        Task<IReadOnlyList<int>> DeviceUnitZoneManualActuateStart(int idDeviceUnitZone, [Body] ManualActuateRequest request);
+        [Post("/api/DeviceFarmUnit/Zone/ManualActuate")]
+        Task<IReadOnlyList<int>> DeviceFarmUnitZoneManualActuateStart(int idDeviceFarmUnitZone, [Body] ManualActuateRequest request);
 
-        [Post("/api/DeviceUnit/Unit/ManualActuate")]
-        Task<IReadOnlyList<int>> DeviceUnitManualActuateStart(int idDeviceUnit, [Body] ManualActuateRequest request);
+        [Post("/api/DeviceFarmUnit/Unit/ManualActuate")]
+        Task<IReadOnlyList<int>> DeviceFarmUnitManualActuateStart(int idDeviceFarmUnit, [Body] ManualActuateRequest request);
 
-        [Post("/api/DeviceUnit/Zone/ManualActuate/Stop")]
-        Task DeviceUnitZoneManualActuateStop(int idDeviceUnitZone, RelayFunction relayFunction);
+        [Post("/api/DeviceFarmUnit/Zone/ManualActuate/Stop")]
+        Task DeviceFarmUnitZoneManualActuateStop(int idDeviceFarmUnitZone, RelayFunction relayFunction);
 
-        [Get("/api/DeviceUnit/Zone/ManualActuate")]
-        Task<IList<DeviceManualOverride>> DeviceUnitZoneManualActuateStatus(int idDeviceUnitZone);
+        [Get("/api/DeviceFarmUnit/Zone/ManualActuate")]
+        Task<IList<DeviceManualOverride>> DeviceFarmUnitZoneManualActuateStatus(int idDeviceFarmUnitZone);
 
         // ---- Device commands ---------------------------------
 
@@ -325,10 +325,10 @@ namespace api.Dal.Interface
 
         /// Same JSON shape as SensorDataGet, time-bucket averaged across every device in the zone/unit.
         [Get("/api/SensorData/ZoneAverage")]
-        Task<string> SensorDataZoneAverageGet(int deviceUnitZoneID, int? timeRange, int? timeMDMY);
+        Task<string> SensorDataZoneAverageGet(int deviceFarmUnitZoneID, int? timeRange, int? timeMDMY);
 
         [Get("/api/SensorData/UnitAverage")]
-        Task<string> SensorDataUnitAverageGet(int deviceUnitID, int? timeRange, int? timeMDMY);
+        Task<string> SensorDataUnitAverageGet(int deviceFarmUnitID, int? timeRange, int? timeMDMY);
 
         [Get("/api/SensorData/Report")]
         Task<IEnumerable<SensorDataReport>> SensorDataReportGet(int? idDevice, int? iDSensorDataReport, int? getData);

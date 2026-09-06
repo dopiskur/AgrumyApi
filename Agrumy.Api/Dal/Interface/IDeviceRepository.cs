@@ -85,7 +85,7 @@ namespace api.Dal.Interface
         /// Same shape as one DeviceFleetGetAsync row, scoped to a single device - null if deviceID doesn't exist or (when tenantID is set) belongs to another tenant.
         Task<DeviceFleetStatus?> DeviceFleetStatusGetAsync(int deviceID, int? tenantID);
 
-        /// Drops the cached DeviceFleetGetAsync snapshot (own-tenant and global) - called by IDeviceUnitRepository after any write that changes a device's fleet row (e.g. zone assignment).
+        /// Drops the cached DeviceFleetGetAsync snapshot (own-tenant and global) - called by IDeviceFarmUnitRepository after any write that changes a device's fleet row (e.g. zone assignment).
         Task InvalidateFleetCacheAsync(int? tenantID);
 
         // Device events

@@ -8,10 +8,10 @@ namespace api.Devices
     public static class SimulatedRelayEvaluator
     {
         /// wasOn is the relay's own last-known state (for Threshold's dead-zone latch, same rule as RuleConditionEvaluator's wasRuleTrue) - several rules for the same function OR together, unchanged from AgrumyFirmware's OR-across-rules semantics.
-        public static bool Evaluate(RelayFunction function, IList<DeviceUnitZoneRule> rules, bool wasOn, SimulatedReading reading, DateTime utcNow, int utcOffsetSeconds)
+        public static bool Evaluate(RelayFunction function, IList<DeviceFarmUnitZoneRule> rules, bool wasOn, SimulatedReading reading, DateTime utcNow, int utcOffsetSeconds)
         {
             bool any = false;
-            foreach (DeviceUnitZoneRule rule in rules)
+            foreach (DeviceFarmUnitZoneRule rule in rules)
             {
                 if (rule.ActionType != ActionType.Relay || rule.RelayFunction != function || rule.Conditions.Count == 0)
                 {
@@ -22,7 +22,7 @@ namespace api.Devices
             return any;
         }
 
-        private static bool EvaluateRule(RelayFunction function, DeviceUnitZoneRule rule, bool wasOn, SimulatedReading reading, DateTime utcNow, int utcOffsetSeconds)
+        private static bool EvaluateRule(RelayFunction function, DeviceFarmUnitZoneRule rule, bool wasOn, SimulatedReading reading, DateTime utcNow, int utcOffsetSeconds)
         {
             bool result = EvaluateCondition(function, rule.Conditions[0], wasOn, reading, utcNow, utcOffsetSeconds);
             for (int i = 1; i < rule.Conditions.Count; i++)

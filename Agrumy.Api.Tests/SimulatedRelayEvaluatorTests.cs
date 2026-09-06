@@ -8,9 +8,9 @@ namespace Agrumy.Api.Tests;
 /// Relay evaluation for a simulated device against the SAME rule shape a real device receives over /api/Device/Config.
 public class SimulatedRelayEvaluatorTests
 {
-    private static DeviceUnitZoneRule Rule(RelayFunction function, params RuleCondition[] conditions) => new()
+    private static DeviceFarmUnitZoneRule Rule(RelayFunction function, params RuleCondition[] conditions) => new()
     {
-        IDDeviceUnitZoneRule = 1,
+        IDDeviceFarmUnitZoneRule = 1,
         TenantID = 1,
         ActionType = ActionType.Relay,
         RelayFunction = function,
@@ -31,7 +31,7 @@ public class SimulatedRelayEvaluatorTests
     [Fact]
     public void Ventilation_TurnsOnAboveHumidityThreshold()
     {
-        var rules = new List<DeviceUnitZoneRule> { Rule(RelayFunction.Ventilation, Threshold(60, 2)) };
+        var rules = new List<DeviceFarmUnitZoneRule> { Rule(RelayFunction.Ventilation, Threshold(60, 2)) };
         bool on = SimulatedRelayEvaluator.Evaluate(RelayFunction.Ventilation, rules, wasOn: false, Reading(humidity: 65), DateTime.UtcNow, 0);
         Assert.True(on);
     }
@@ -40,7 +40,7 @@ public class SimulatedRelayEvaluatorTests
     public void Heating_TurnsOnBelowTemperatureThreshold()
     {
         // Heating's direction is inverted relative to Ventilation - matches AgrumyFirmware's ActuatorController::evaluateCondition table.
-        var rules = new List<DeviceUnitZoneRule> { Rule(RelayFunction.Heating, Threshold(18, 1)) };
+        var rules = new List<DeviceFarmUnitZoneRule> { Rule(RelayFunction.Heating, Threshold(18, 1)) };
         bool on = SimulatedRelayEvaluator.Evaluate(RelayFunction.Heating, rules, wasOn: false, Reading(temperature: 15), DateTime.UtcNow, 0);
         Assert.True(on);
     }
@@ -48,7 +48,7 @@ public class SimulatedRelayEvaluatorTests
     [Fact]
     public void Heating_AboveThreshold_StaysOff()
     {
-        var rules = new List<DeviceUnitZoneRule> { Rule(RelayFunction.Heating, Threshold(18, 1)) };
+        var rules = new List<DeviceFarmUnitZoneRule> { Rule(RelayFunction.Heating, Threshold(18, 1)) };
         bool on = SimulatedRelayEvaluator.Evaluate(RelayFunction.Heating, rules, wasOn: false, Reading(temperature: 22), DateTime.UtcNow, 0);
         Assert.False(on);
     }
@@ -56,7 +56,7 @@ public class SimulatedRelayEvaluatorTests
     [Fact]
     public void SeveralRulesForSameFunction_OrTogether()
     {
-        var rules = new List<DeviceUnitZoneRule>
+        var rules = new List<DeviceFarmUnitZoneRule>
         {
             Rule(RelayFunction.Light, Threshold(1000, 50)), // below 1000 -> on; reading is 5000, so this alone is off
             Rule(RelayFunction.WaterPump, Threshold(30, 2)), // different function - must not affect Light's result
@@ -68,7 +68,7 @@ public class SimulatedRelayEvaluatorTests
     [Fact]
     public void UnrelatedFunction_WithNoMatchingRule_IsFalse()
     {
-        var rules = new List<DeviceUnitZoneRule> { Rule(RelayFunction.Heating, Threshold(18, 1)) };
+        var rules = new List<DeviceFarmUnitZoneRule> { Rule(RelayFunction.Heating, Threshold(18, 1)) };
         bool on = SimulatedRelayEvaluator.Evaluate(RelayFunction.WaterPump, rules, wasOn: true, Reading(waterLevel: 10), DateTime.UtcNow, 0);
         Assert.False(on);
     }

@@ -18,9 +18,9 @@ namespace api.Dal
         public DbSet<ServerConfigRow> ServerConfigs => Set<ServerConfigRow>();
 
         public DbSet<DeviceRow> Devices => Set<DeviceRow>();
-        public DbSet<DeviceUnitRow> DeviceUnits => Set<DeviceUnitRow>();
-        public DbSet<DeviceUnitZoneRow> DeviceUnitZones => Set<DeviceUnitZoneRow>();
-        public DbSet<DeviceUnitZoneRuleRow> DeviceUnitZoneRules => Set<DeviceUnitZoneRuleRow>();
+        public DbSet<DeviceFarmUnitRow> DeviceFarmUnits => Set<DeviceFarmUnitRow>();
+        public DbSet<DeviceFarmUnitZoneRow> DeviceFarmUnitZones => Set<DeviceFarmUnitZoneRow>();
+        public DbSet<DeviceFarmUnitZoneRuleRow> DeviceFarmUnitZoneRules => Set<DeviceFarmUnitZoneRuleRow>();
         public DbSet<RuleNotificationStateRow> RuleNotificationStates => Set<RuleNotificationStateRow>();
         public DbSet<DeviceRoleRow> DeviceRoles => Set<DeviceRoleRow>();
         public DbSet<DeviceTypeServiceRow> DeviceTypeServices => Set<DeviceTypeServiceRow>();
@@ -142,36 +142,36 @@ namespace api.Dal
                 e.Property(x => x.FirmwareCustomRepositoryUrl).HasMaxLength(500);
             });
 
-            modelBuilder.Entity<DeviceUnitRow>(e =>
+            modelBuilder.Entity<DeviceFarmUnitRow>(e =>
             {
-                e.ToTable("deviceUnit");
-                e.HasKey(x => x.IDDeviceUnit);
-                e.Property(x => x.IDDeviceUnit).ValueGeneratedNever();
-                e.Property(x => x.DeviceUnitName).HasMaxLength(100);
+                e.ToTable("deviceFarmUnit");
+                e.HasKey(x => x.IDDeviceFarmUnit);
+                e.Property(x => x.IDDeviceFarmUnit).ValueGeneratedNever();
+                e.Property(x => x.DeviceFarmUnitName).HasMaxLength(100);
             });
 
             // Real containment FK (Zone -> Unit) - see db/migrations/2026-09-02-deviceunit-zone-containment.sql.
-            modelBuilder.Entity<DeviceUnitZoneRow>(e =>
+            modelBuilder.Entity<DeviceFarmUnitZoneRow>(e =>
             {
-                e.ToTable("deviceUnitZone");
-                e.HasKey(x => x.IDDeviceUnitZone);
-                e.Property(x => x.IDDeviceUnitZone).ValueGeneratedNever();
-                e.Property(x => x.DeviceUnitZoneName).HasMaxLength(120);
-                e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
+                e.ToTable("deviceFarmUnitZone");
+                e.HasKey(x => x.IDDeviceFarmUnitZone);
+                e.Property(x => x.IDDeviceFarmUnitZone).ValueGeneratedNever();
+                e.Property(x => x.DeviceFarmUnitZoneName).HasMaxLength(120);
+                e.HasOne<DeviceFarmUnitRow>().WithMany().HasForeignKey(x => x.DeviceFarmUnitID).OnDelete(DeleteBehavior.NoAction);
             });
 
-            // Several rows may share (scope, RelayFunction/SensorMetric); OR semantics across them, and Zone>Unit>Global precedence, are resolved in EfRepository/RuleHierarchyResolver, not here. Exactly one of DeviceUnitZoneID/DeviceUnitID is set (Global scope: both null) - enforced in DeviceUnitApiController, not the DB.
-            modelBuilder.Entity<DeviceUnitZoneRuleRow>(e =>
+            // Several rows may share (scope, RelayFunction/SensorMetric); OR semantics across them, and Zone>Unit>Global precedence, are resolved in EfRepository/RuleHierarchyResolver, not here. Exactly one of DeviceFarmUnitZoneID/DeviceFarmUnitID is set (Global scope: both null) - enforced in DeviceFarmUnitApiController, not the DB.
+            modelBuilder.Entity<DeviceFarmUnitZoneRuleRow>(e =>
             {
-                e.ToTable("deviceUnitZoneRule");
-                e.HasKey(x => x.IDDeviceUnitZoneRule);
-                e.Property(x => x.IDDeviceUnitZoneRule).ValueGeneratedOnAdd();
+                e.ToTable("deviceFarmUnitZoneRule");
+                e.HasKey(x => x.IDDeviceFarmUnitZoneRule);
+                e.Property(x => x.IDDeviceFarmUnitZoneRule).ValueGeneratedOnAdd();
                 e.Property(x => x.Conditions).IsRequired();
-                e.HasOne<DeviceUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceUnitZoneID).OnDelete(DeleteBehavior.NoAction).IsRequired(false);
-                e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction).IsRequired(false);
-                e.HasIndex(x => x.DeviceUnitZoneID).HasDatabaseName("ix_deviceUnitZoneRule_zone");
-                e.HasIndex(x => x.DeviceUnitID).HasDatabaseName("ix_deviceUnitZoneRule_unit");
-                e.HasIndex(x => x.TenantID).HasDatabaseName("ix_deviceUnitZoneRule_tenant");
+                e.HasOne<DeviceFarmUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceFarmUnitZoneID).OnDelete(DeleteBehavior.NoAction).IsRequired(false);
+                e.HasOne<DeviceFarmUnitRow>().WithMany().HasForeignKey(x => x.DeviceFarmUnitID).OnDelete(DeleteBehavior.NoAction).IsRequired(false);
+                e.HasIndex(x => x.DeviceFarmUnitZoneID).HasDatabaseName("ix_deviceFarmUnitZoneRule_zone");
+                e.HasIndex(x => x.DeviceFarmUnitID).HasDatabaseName("ix_deviceFarmUnitZoneRule_unit");
+                e.HasIndex(x => x.TenantID).HasDatabaseName("ix_deviceFarmUnitZoneRule_tenant");
             });
 
             modelBuilder.Entity<RuleNotificationStateRow>(e =>
@@ -179,9 +179,9 @@ namespace api.Dal
                 e.ToTable("ruleNotificationState");
                 e.HasKey(x => x.IDRuleNotificationState);
                 e.Property(x => x.IDRuleNotificationState).ValueGeneratedOnAdd();
-                e.HasOne<DeviceUnitZoneRuleRow>().WithMany().HasForeignKey(x => x.RuleID).OnDelete(DeleteBehavior.NoAction);
-                e.HasOne<DeviceUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceUnitZoneID).OnDelete(DeleteBehavior.NoAction);
-                e.HasIndex(x => new { x.RuleID, x.DeviceUnitZoneID }).IsUnique().HasDatabaseName("ux_ruleNotificationState_rule_zone");
+                e.HasOne<DeviceFarmUnitZoneRuleRow>().WithMany().HasForeignKey(x => x.RuleID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceFarmUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceFarmUnitZoneID).OnDelete(DeleteBehavior.NoAction);
+                e.HasIndex(x => new { x.RuleID, x.DeviceFarmUnitZoneID }).IsUnique().HasDatabaseName("ux_ruleNotificationState_rule_zone");
             });
 
             modelBuilder.Entity<DeviceRoleRow>(e =>
@@ -288,7 +288,7 @@ namespace api.Dal
                 e.HasIndex(x => x.ApiId).IsUnique().HasDatabaseName("ApiID_UNIQUE");
                 e.HasIndex(x => new { x.MacAddress, x.TenantID }).IsUnique().HasDatabaseName("MacAddress_TenantID_UNIQUE"); // Composite, not a bare MacAddress unique - a device can be legitimately resold across tenants.
                 e.HasIndex(x => x.TenantID).HasDatabaseName("ix_device_tenant"); // TenantID is the second column of the unique index above, so it can't be used as a prefix for a plain WHERE TenantID = x.
-                // Legacy device FKs (fk_device_*). DeviceUnitZoneID has no FK on device.
+                // Legacy device FKs (fk_device_*). DeviceFarmUnitZoneID has no FK on device.
                 e.HasOne<DeviceConfigControllerRow>().WithMany().HasForeignKey(x => x.DeviceConfigControllerID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceConfigSensorRow>().WithMany().HasForeignKey(x => x.DeviceConfigSensorID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<DeviceRoleRow>().WithMany().HasForeignKey(x => x.DeviceRoleID).OnDelete(DeleteBehavior.NoAction);
@@ -296,7 +296,7 @@ namespace api.Dal
                 // Admin-chosen from the SAME catalog as deviceDiagnostic.DeviceTypeID (no auto-registration needed here - the Web dropdown only ever offers existing catalog entries).
                 e.HasOne<DeviceTypeRow>().WithMany().HasForeignKey(x => x.ManualDeviceTypeID).OnDelete(DeleteBehavior.NoAction);
                 e.HasOne<TenantRow>().WithMany().HasForeignKey(x => x.TenantID).OnDelete(DeleteBehavior.NoAction);
-                e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceFarmUnitRow>().WithMany().HasForeignKey(x => x.DeviceFarmUnitID).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<GatewayDeviceMappingRow>(e =>
@@ -392,12 +392,12 @@ namespace api.Dal
                 // Legacy Battery/Moisture/WaterLevel are tinyint(1); the DTO exposes them as int, so a fresh DB uses int (old tinyint(1) columns still read fine).
                 e.HasIndex(x => new { x.DeviceID, x.TenantID, x.DateCreated })
                  .HasDatabaseName("ix_sensorData_device_tenant_date");
-                e.HasIndex(x => new { x.DeviceUnitZoneID, x.DateCreated })
-                 .HasDatabaseName("ix_sensorData_deviceUnitZone_date"); // The 24h trend sparkline query filters directly by zone, not by device.
+                e.HasIndex(x => new { x.DeviceFarmUnitZoneID, x.DateCreated })
+                 .HasDatabaseName("ix_sensorData_deviceFarmUnitZone_date"); // The 24h trend sparkline query filters directly by zone, not by device.
                 // Legacy fk_sensorData_* (no FK on sensorData.TenantID).
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
-                e.HasOne<DeviceUnitRow>().WithMany().HasForeignKey(x => x.DeviceUnitID).OnDelete(DeleteBehavior.NoAction);
-                e.HasOne<DeviceUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceUnitZoneID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceFarmUnitRow>().WithMany().HasForeignKey(x => x.DeviceFarmUnitID).OnDelete(DeleteBehavior.NoAction);
+                e.HasOne<DeviceFarmUnitZoneRow>().WithMany().HasForeignKey(x => x.DeviceFarmUnitZoneID).OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<ControllerDataRow>(e =>

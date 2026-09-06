@@ -19,18 +19,18 @@ public class RefitContentSerializerTests
     }
 
     [Fact]
-    public void DeviceUnitZoneRule_RelayFunctionAndConditionType_SerializeAsNumbers()
+    public void DeviceFarmUnitZoneRule_RelayFunctionAndConditionType_SerializeAsNumbers()
     {
-        var rule = new DeviceUnitZoneRule
+        var rule = new DeviceFarmUnitZoneRule
         {
-            DeviceUnitZoneID = 5,
+            DeviceFarmUnitZoneID = 5,
             RelayFunction = RelayFunction.Ventilation,
             Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(10, 2), ConditionConfigJson.Options), null)],
         };
 
         string wire = SerializeAsWebWould(rule);
 
-        var parsed = JsonSerializer.Deserialize<DeviceUnitZoneRule>(wire, Mvc);
+        var parsed = JsonSerializer.Deserialize<DeviceFarmUnitZoneRule>(wire, Mvc);
         Assert.NotNull(parsed);
         Assert.Equal(RelayFunction.Ventilation, parsed!.RelayFunction);
         Assert.Equal(ConditionType.Threshold, parsed.Conditions[0].ConditionType);

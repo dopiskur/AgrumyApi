@@ -37,9 +37,9 @@ namespace api.Models
         public string? SourceTenantName { get; set; }
 
         public IList<TenantExportUser> Users { get; set; } = [];
-        public IList<DeviceUnit> Units { get; set; } = [];
-        public IList<DeviceUnitZone> Zones { get; set; } = [];
-        public IList<DeviceUnitZoneRule> ZoneRules { get; set; } = [];
+        public IList<DeviceFarmUnit> Units { get; set; } = [];
+        public IList<DeviceFarmUnitZone> Zones { get; set; } = [];
+        public IList<DeviceFarmUnitZoneRule> ZoneRules { get; set; } = [];
         public IList<TenantExportDevice> Devices { get; set; } = [];
 
         public bool IncludesSensorData { get; set; }

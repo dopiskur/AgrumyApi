@@ -5,8 +5,8 @@ namespace api.ViewModels
     public class FleetViewModel
     {
         public IList<DeviceFleetStatus> Devices { get; set; } = new List<DeviceFleetStatus>();
-        public IList<DeviceUnit> Units { get; set; } = new List<DeviceUnit>();
-        public IList<DeviceUnitZone> Zones { get; set; } = new List<DeviceUnitZone>();
+        public IList<DeviceFarmUnit> Units { get; set; } = new List<DeviceFarmUnit>();
+        public IList<DeviceFarmUnitZone> Zones { get; set; } = new List<DeviceFarmUnitZone>();
         public IList<DiscoveryResult> DiscoveredDevices { get; set; } = new List<DiscoveryResult>();
         public IList<TenantWifiConfig> WifiConfigs { get; set; } = new List<TenantWifiConfig>();
         public IList<DeviceType> DeviceTypes { get; set; } = new List<DeviceType>();

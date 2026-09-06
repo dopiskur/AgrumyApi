@@ -4,7 +4,7 @@ namespace api.ViewModels
 {
     public class AssignPickerViewModel
     {
-        public int IDDeviceUnitZone { get; set; }
+        public int IDDeviceFarmUnitZone { get; set; }
         public bool ControllerCapable { get; set; }
         public IList<DeviceDto> Devices { get; set; } = new List<DeviceDto>();
     }

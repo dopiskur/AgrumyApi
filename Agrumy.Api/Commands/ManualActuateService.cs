@@ -15,7 +15,7 @@ namespace api.Commands
     public sealed record ManualActuateResult(ManualActuateOutcome Outcome, IReadOnlyList<int> AffectedDeviceIds, string? Message = null);
 
     /// Roadmap #219 - target resolution/fan-out (a Zone's one controller, or every controller across a Unit's zones), validation, and the ExpiresAtUtc safety-cap math; no background worker, DeviceConfigBuilder reads the resulting rows lazily on each device's next poll.
-    public sealed class ManualActuateService(IDeviceUnitRepository unitRepo)
+    public sealed class ManualActuateService(IDeviceFarmUnitRepository unitRepo)
     {
         /// Heating->Temperature only, Ventilation->Temperature or Humidity, WaterPump->Moisture (soil moisture - see AgrumyFirmware's sensor_analog_moist) only - roadmap #219's explicit per-function allowed subset.
         private static readonly Dictionary<RelayFunction, SensorMetric[]> AllowedTargetMetrics = new()
@@ -25,7 +25,7 @@ namespace api.Commands
             [RelayFunction.WaterPump] = [SensorMetric.Moisture],
         };
 
-        private static int? MaxRunSecondsForFunction(DeviceUnitZone zone, RelayFunction function) => function switch
+        private static int? MaxRunSecondsForFunction(DeviceFarmUnitZone zone, RelayFunction function) => function switch
         {
             RelayFunction.Heating => zone.HeatingMaxRunSeconds,
             RelayFunction.Ventilation => zone.VentilationMaxRunSeconds,
@@ -33,37 +33,37 @@ namespace api.Commands
             _ => null,
         };
 
-        public async Task<ManualActuateResult> StartForZoneAsync(int idDeviceUnitZone, ManualActuateRequest request)
+        public async Task<ManualActuateResult> StartForZoneAsync(int idDeviceFarmUnitZone, ManualActuateRequest request)
         {
-            Device? controller = await unitRepo.DeviceUnitZoneGetControllerAsync(idDeviceUnitZone);
+            Device? controller = await unitRepo.DeviceFarmUnitZoneGetControllerAsync(idDeviceFarmUnitZone);
             if (controller?.IDDevice is not int deviceId)
             {
-                return new ManualActuateResult(ManualActuateOutcome.TargetNotFound, [], $"Zone {idDeviceUnitZone} has no controller assigned.");
+                return new ManualActuateResult(ManualActuateOutcome.TargetNotFound, [], $"Zone {idDeviceFarmUnitZone} has no controller assigned.");
             }
-            DeviceUnitZone? zone = await unitRepo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone);
+            DeviceFarmUnitZone? zone = await unitRepo.DeviceFarmUnitZoneGetByIdAsync(idDeviceFarmUnitZone);
             if (zone == null)
             {
-                return new ManualActuateResult(ManualActuateOutcome.TargetNotFound, [], $"Zone {idDeviceUnitZone} not found.");
+                return new ManualActuateResult(ManualActuateOutcome.TargetNotFound, [], $"Zone {idDeviceFarmUnitZone} not found.");
             }
             return await StartForTargetsAsync([(deviceId, zone)], request);
         }
 
         /// Fans out to every zone under the unit that has a controller - a zone with no controller is simply skipped, not an error (same "absent zones are fine" reasoning as CommandQueueService's Unit fan-out for ScanForDevices).
-        public async Task<ManualActuateResult> StartForUnitAsync(int idDeviceUnit, ManualActuateRequest request)
+        public async Task<ManualActuateResult> StartForUnitAsync(int idDeviceFarmUnit, ManualActuateRequest request)
         {
-            IList<Device> controllers = await unitRepo.DeviceUnitGetControllersAsync(idDeviceUnit);
+            IList<Device> controllers = await unitRepo.DeviceFarmUnitGetControllersAsync(idDeviceFarmUnit);
             if (controllers.Count == 0)
             {
-                return new ManualActuateResult(ManualActuateOutcome.TargetNotFound, [], $"Unit {idDeviceUnit} has no controllers across any of its zones.");
+                return new ManualActuateResult(ManualActuateOutcome.TargetNotFound, [], $"Unit {idDeviceFarmUnit} has no controllers across any of its zones.");
             }
-            var targets = new List<(int DeviceId, DeviceUnitZone Zone)>();
+            var targets = new List<(int DeviceId, DeviceFarmUnitZone Zone)>();
             foreach (Device controller in controllers)
             {
-                if (controller.IDDevice is not int deviceId || controller.DeviceUnitZoneID is not int idZone)
+                if (controller.IDDevice is not int deviceId || controller.DeviceFarmUnitZoneID is not int idZone)
                 {
                     continue;
                 }
-                DeviceUnitZone? zone = await unitRepo.DeviceUnitZoneGetByIdAsync(idZone);
+                DeviceFarmUnitZone? zone = await unitRepo.DeviceFarmUnitZoneGetByIdAsync(idZone);
                 if (zone != null)
                 {
                     targets.Add((deviceId, zone));
@@ -71,22 +71,22 @@ namespace api.Commands
             }
             if (targets.Count == 0)
             {
-                return new ManualActuateResult(ManualActuateOutcome.TargetNotFound, [], $"Unit {idDeviceUnit} has no controllers across any of its zones.");
+                return new ManualActuateResult(ManualActuateOutcome.TargetNotFound, [], $"Unit {idDeviceFarmUnit} has no controllers across any of its zones.");
             }
             return await StartForTargetsAsync(targets, request);
         }
 
-        public async Task StopAsync(int idDeviceUnitZone, RelayFunction relayFunction)
+        public async Task StopAsync(int idDeviceFarmUnitZone, RelayFunction relayFunction)
         {
-            Device? controller = await unitRepo.DeviceUnitZoneGetControllerAsync(idDeviceUnitZone);
+            Device? controller = await unitRepo.DeviceFarmUnitZoneGetControllerAsync(idDeviceFarmUnitZone);
             if (controller?.IDDevice is int deviceId)
             {
                 await unitRepo.ManualOverrideStopAsync(deviceId, relayFunction);
-                await unitRepo.DeviceUnitZoneConfigVersionBumpAsync(idDeviceUnitZone);
+                await unitRepo.DeviceFarmUnitZoneConfigVersionBumpAsync(idDeviceFarmUnitZone);
             }
         }
 
-        private async Task<ManualActuateResult> StartForTargetsAsync(List<(int DeviceId, DeviceUnitZone Zone)> targets, ManualActuateRequest request)
+        private async Task<ManualActuateResult> StartForTargetsAsync(List<(int DeviceId, DeviceFarmUnitZone Zone)> targets, ManualActuateRequest request)
         {
             if (!AllowedTargetMetrics.TryGetValue(request.RelayFunction, out SensorMetric[]? allowedMetrics))
             {
@@ -138,7 +138,7 @@ namespace api.Commands
                     TargetHysteresis = request.Mode == ManualOverrideMode.Target ? request.TargetHysteresis : null,
                 });
                 affected.Add(deviceId);
-                if (zone.IDDeviceUnitZone is int idZone)
+                if (zone.IDDeviceFarmUnitZone is int idZone)
                 {
                     zonesToBump.Add(idZone);
                 }
@@ -152,7 +152,7 @@ namespace api.Commands
 
             foreach (int idZone in zonesToBump)
             {
-                await unitRepo.DeviceUnitZoneConfigVersionBumpAsync(idZone);
+                await unitRepo.DeviceFarmUnitZoneConfigVersionBumpAsync(idZone);
             }
 
             return new ManualActuateResult(ManualActuateOutcome.Success, affected,

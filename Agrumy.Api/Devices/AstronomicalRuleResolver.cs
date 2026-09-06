@@ -7,17 +7,17 @@ namespace api.Devices
     /// Compiles every Astronomical condition inside a rule's Conditions list into an effective Schedule condition for today's local date so the firmware only ever has to understand ConditionType.Schedule; a rule with a condition that can't be resolved today (no location set, polar day/night, or a zero/negative window) is dropped entirely rather than sent with a broken link in its AND/OR chain, leaving the function's other rules intact.
     public static class AstronomicalRuleResolver
     {
-        public static IList<DeviceUnitZoneRule> Resolve(IList<DeviceUnitZoneRule> rules, ServerConfig serverConfig, DateOnly localDate, int utcOffsetSeconds)
+        public static IList<DeviceFarmUnitZoneRule> Resolve(IList<DeviceFarmUnitZoneRule> rules, ServerConfig serverConfig, DateOnly localDate, int utcOffsetSeconds)
         {
-            var result = new List<DeviceUnitZoneRule>(rules.Count);
-            foreach (DeviceUnitZoneRule rule in rules)
+            var result = new List<DeviceFarmUnitZoneRule>(rules.Count);
+            foreach (DeviceFarmUnitZoneRule rule in rules)
             {
                 if (!rule.Conditions.Any(c => c.ConditionType == ConditionType.Astronomical))
                 {
                     result.Add(rule);
                     continue;
                 }
-                if (ResolveOne(rule, serverConfig, localDate, utcOffsetSeconds) is DeviceUnitZoneRule resolved)
+                if (ResolveOne(rule, serverConfig, localDate, utcOffsetSeconds) is DeviceFarmUnitZoneRule resolved)
                 {
                     result.Add(resolved);
                 }
@@ -25,7 +25,7 @@ namespace api.Devices
             return result;
         }
 
-        private static DeviceUnitZoneRule? ResolveOne(DeviceUnitZoneRule rule, ServerConfig serverConfig, DateOnly localDate, int utcOffsetSeconds)
+        private static DeviceFarmUnitZoneRule? ResolveOne(DeviceFarmUnitZoneRule rule, ServerConfig serverConfig, DateOnly localDate, int utcOffsetSeconds)
         {
             var resolvedConditions = new List<RuleCondition>(rule.Conditions.Count);
             foreach (RuleCondition condition in rule.Conditions)
@@ -42,12 +42,12 @@ namespace api.Devices
                 resolvedConditions.Add(resolvedCondition);
             }
 
-            return new DeviceUnitZoneRule
+            return new DeviceFarmUnitZoneRule
             {
-                IDDeviceUnitZoneRule = rule.IDDeviceUnitZoneRule,
+                IDDeviceFarmUnitZoneRule = rule.IDDeviceFarmUnitZoneRule,
                 TenantID = rule.TenantID,
-                DeviceUnitID = rule.DeviceUnitID,
-                DeviceUnitZoneID = rule.DeviceUnitZoneID,
+                DeviceFarmUnitID = rule.DeviceFarmUnitID,
+                DeviceFarmUnitZoneID = rule.DeviceFarmUnitZoneID,
                 ActionType = rule.ActionType,
                 RelayFunction = rule.RelayFunction,
                 SensorMetric = rule.SensorMetric,

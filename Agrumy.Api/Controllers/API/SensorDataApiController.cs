@@ -57,7 +57,7 @@ namespace api.Controllers.API
             }
 
             await sensorDataRepo.SensorDataPushAsync(jsonArray, device.IDDevice!.Value, device.TenantID,
-                device.DeviceUnitID, device.DeviceUnitZoneID);
+                device.DeviceFarmUnitID, device.DeviceFarmUnitZoneID);
 
             return Ok(device.ConfigVersion);
         }
@@ -89,24 +89,24 @@ namespace api.Controllers.API
 
         [HttpGet("ZoneAverage")]
         [Authorize]
-        public async Task<ActionResult<string>> ZoneAverageGet(int deviceUnitZoneID, int? timeRange = 60, int? timeMDMY = 0)
+        public async Task<ActionResult<string>> ZoneAverageGet(int deviceFarmUnitZoneID, int? timeRange = 60, int? timeMDMY = 0)
         {
             if (timeRange is int range && !IsWithinMaxTimeRange(timeMDMY, range))
             {
                 return BadRequest($"timeRange {range} exceeds the maximum allowed for this unit.");
             }
-            return Ok(await sensorDataRepo.SensorDataZoneAverageGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, deviceUnitZoneID, timeRange, timeMDMY));
+            return Ok(await sensorDataRepo.SensorDataZoneAverageGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, deviceFarmUnitZoneID, timeRange, timeMDMY));
         }
 
         [HttpGet("UnitAverage")]
         [Authorize]
-        public async Task<ActionResult<string>> UnitAverageGet(int deviceUnitID, int? timeRange = 60, int? timeMDMY = 0)
+        public async Task<ActionResult<string>> UnitAverageGet(int deviceFarmUnitID, int? timeRange = 60, int? timeMDMY = 0)
         {
             if (timeRange is int range && !IsWithinMaxTimeRange(timeMDMY, range))
             {
                 return BadRequest($"timeRange {range} exceeds the maximum allowed for this unit.");
             }
-            return Ok(await sensorDataRepo.SensorDataUnitAverageGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, deviceUnitID, timeRange, timeMDMY));
+            return Ok(await sensorDataRepo.SensorDataUnitAverageGetAsync(CallerReadsDevicesGlobally ? null : CallerTenantId, deviceFarmUnitID, timeRange, timeMDMY));
         }
     }
 }

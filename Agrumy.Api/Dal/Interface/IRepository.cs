@@ -8,7 +8,7 @@ namespace api.Dal.Interface
         ITenantRepository,
         IRefreshTokenRepository,
         IDeviceRepository,
-        IDeviceUnitRepository,
+        IDeviceFarmUnitRepository,
         ICommandRepository,
         IFirmwareRepository,
         ISensorDataRepository,

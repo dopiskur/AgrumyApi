@@ -1,47 +1,47 @@
 namespace api.Dal.Entities
 {
-    /// TenantID null means the shared global sentinel row (IDDeviceUnit=0 "Default", see EfRepository.SeedDeviceUnitSentinelsAsync), not a real per-tenant Unit.
-    public class DeviceUnitRow
+    /// TenantID null means the shared global sentinel row (IDDeviceFarmUnit=0 "Default", see EfRepository.SeedDeviceFarmUnitSentinelsAsync), not a real per-tenant Unit.
+    public class DeviceFarmUnitRow
     {
-        public int IDDeviceUnit { get; set; }
+        public int IDDeviceFarmUnit { get; set; }
         public int? TenantID { get; set; }
-        public string? DeviceUnitName { get; set; }
+        public string? DeviceFarmUnitName { get; set; }
         public bool? ZoneEnabled { get; set; }
     }
 
-    /// DeviceUnitID is the real "Unit contains many Zones" FK (see db/migrations/2026-09-02-deviceunit-zone-containment.sql) - TenantID null means the shared global sentinel row (IDDeviceUnitZone=0 "Disabled"), same convention as DeviceUnitRow.
-    public class DeviceUnitZoneRow
+    /// DeviceFarmUnitID is the real "Unit contains many Zones" FK (see db/migrations/2026-09-02-deviceunit-zone-containment.sql) - TenantID null means the shared global sentinel row (IDDeviceFarmUnitZone=0 "Disabled"), same convention as DeviceFarmUnitRow.
+    public class DeviceFarmUnitZoneRow
     {
-        public int IDDeviceUnitZone { get; set; }
+        public int IDDeviceFarmUnitZone { get; set; }
         public int? TenantID { get; set; }
-        public int DeviceUnitID { get; set; }
-        public string? DeviceUnitZoneName { get; set; }
+        public int DeviceFarmUnitID { get; set; }
+        public string? DeviceFarmUnitZoneName { get; set; }
 
-        // See api.Models.DeviceUnitZone's own copy of these for the full explanation.
+        // See api.Models.DeviceFarmUnitZone's own copy of these for the full explanation.
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
 
-        // See api.Models.DeviceUnitZone.SkipWaterPumpWhenRainPredicted.
+        // See api.Models.DeviceFarmUnitZone.SkipWaterPumpWhenRainPredicted.
         public bool SkipWaterPumpWhenRainPredicted { get; set; }
 
-        // See api.Models.DeviceUnitZone's own copy of these for the full explanation (roadmap #234).
+        // See api.Models.DeviceFarmUnitZone's own copy of these for the full explanation (roadmap #234).
         public double? TankCapacityLiters { get; set; }
         public int? WaterLevelRawEmpty { get; set; }
         public int? WaterLevelRawFull { get; set; }
         public DateTime? TankRefillNotifiedAt { get; set; }
 
-        // See api.Models.DeviceUnitZone's own copy of these for the full explanation (roadmap #219).
+        // See api.Models.DeviceFarmUnitZone's own copy of these for the full explanation (roadmap #219).
         public int? HeatingMaxRunSeconds { get; set; }
         public int? VentilationMaxRunSeconds { get; set; }
     }
 
-    /// See api.Models.DeviceUnitZoneRule - Conditions is a JSON array of RuleCondition, (de)serialized at the application layer, not a native JSON column type. Exactly one of DeviceUnitZoneID/DeviceUnitID is set for Zone/Unit scope, both null for Global (per-tenant) scope.
-    public class DeviceUnitZoneRuleRow
+    /// See api.Models.DeviceFarmUnitZoneRule - Conditions is a JSON array of RuleCondition, (de)serialized at the application layer, not a native JSON column type. Exactly one of DeviceFarmUnitZoneID/DeviceFarmUnitID is set for Zone/Unit scope, both null for Global (per-tenant) scope.
+    public class DeviceFarmUnitZoneRuleRow
     {
-        public int IDDeviceUnitZoneRule { get; set; }
+        public int IDDeviceFarmUnitZoneRule { get; set; }
         public int TenantID { get; set; }
-        public int? DeviceUnitID { get; set; }
-        public int? DeviceUnitZoneID { get; set; }
+        public int? DeviceFarmUnitID { get; set; }
+        public int? DeviceFarmUnitZoneID { get; set; }
         public int ActionType { get; set; }
         public int? RelayFunction { get; set; }
         public int? SensorMetric { get; set; }
@@ -55,7 +55,7 @@ namespace api.Dal.Entities
     {
         public int IDRuleNotificationState { get; set; }
         public int RuleID { get; set; }
-        public int DeviceUnitZoneID { get; set; }
+        public int DeviceFarmUnitZoneID { get; set; }
         public bool WasTrue { get; set; }
         public DateTime? LastFiredAtUtc { get; set; }
     }
@@ -213,8 +213,8 @@ namespace api.Dal.Entities
         public int IDDevice { get; set; }
         public int TenantID { get; set; } // Non-nullable, matching the DB column (NOT NULL DEFAULT 0).
         public int? DeviceRoleID { get; set; }
-        public int? DeviceUnitID { get; set; }
-        public int? DeviceUnitZoneID { get; set; }
+        public int? DeviceFarmUnitID { get; set; }
+        public int? DeviceFarmUnitZoneID { get; set; }
         public int? DeviceConfigSensorID { get; set; }
         public int? DeviceConfigControllerID { get; set; }
         public int? DeviceTypeServiceID { get; set; }

@@ -20,10 +20,10 @@ namespace api.ViewModels
         public int? ReferencedRuleId { get; set; }
     }
 
-    /// Bound from DeviceUnitController's RuleAdd/UnitRuleAdd/GlobalRuleAdd forms - Conditions[0]..[MaxConditionsPerRule-1] (indexed list binding), matching the API's HardMaxConditionsPerRule.
+    /// Bound from DeviceFarmUnitController's RuleAdd/UnitRuleAdd/GlobalRuleAdd forms - Conditions[0]..[MaxConditionsPerRule-1] (indexed list binding), matching the API's HardMaxConditionsPerRule.
     public class RuleFormInput
     {
-        /// Mirrors DeviceUnitApiController's private HardMaxConditionsPerRule (=8, itself mirroring AgrumyFirmware's MAX_CONDITIONS_PER_RULE) - no shared constant between the two projects today.
+        /// Mirrors DeviceFarmUnitApiController's private HardMaxConditionsPerRule (=8, itself mirroring AgrumyFirmware's MAX_CONDITIONS_PER_RULE) - no shared constant between the two projects today.
         public const int MaxConditionsPerRule = 8;
 
         public ActionType ActionType { get; set; } = api.Models.ActionType.Relay;

@@ -79,8 +79,8 @@ public class ContractTests
         ConfigVersion = 66,
         TenantID = 0,
         deviceID = 1000038,
-        DeviceUnitID = 0,
-        DeviceUnitZoneID = 0,
+        DeviceFarmUnitID = 0,
+        DeviceFarmUnitZoneID = 0,
         DeviceTypeServiceID = 1,
         ApiId = "4527ae5d-0cd7-4dbd-9ada-6994450ed887",
         ApiKey = "1967b2e9-e5bf-432a-bccb-8c96cb2b5821",
@@ -143,23 +143,23 @@ public class ContractTests
     [InlineData("register.response.schema.json")]
     public void DeviceConfig_WithZoneRules_MatchesResponseSchema(string schema)
     {
-        // Exercises all three deviceUnitZoneRule/conditionConfig definitions, not just the "always empty rules array" default every other test here sends.
+        // Exercises all three deviceFarmUnitZoneRule/conditionConfig definitions, not just the "always empty rules array" default every other test here sends.
         var cfg = FullConfig();
         cfg.DeviceConfigController!.Rules =
         [
-            new DeviceUnitZoneRule
+            new DeviceFarmUnitZoneRule
             {
-                IDDeviceUnitZoneRule = 1, RelayFunction = RelayFunction.WaterPump,
+                IDDeviceFarmUnitZoneRule = 1, RelayFunction = RelayFunction.WaterPump,
                 Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(10, 5), ConditionConfigJson.Options), null)],
             },
-            new DeviceUnitZoneRule
+            new DeviceFarmUnitZoneRule
             {
-                IDDeviceUnitZoneRule = 2, RelayFunction = RelayFunction.Heating,
+                IDDeviceFarmUnitZoneRule = 2, RelayFunction = RelayFunction.Heating,
                 Conditions = [new RuleCondition(ConditionType.Interval, JsonSerializer.SerializeToNode(new IntervalConditionConfig(3600, 300), ConditionConfigJson.Options), null)],
             },
-            new DeviceUnitZoneRule
+            new DeviceFarmUnitZoneRule
             {
-                IDDeviceUnitZoneRule = 3, RelayFunction = RelayFunction.Light,
+                IDDeviceFarmUnitZoneRule = 3, RelayFunction = RelayFunction.Light,
                 // Two-condition AND group - Mon-Fri 06:00-06:30 AND a threshold, exercising the #212 conditions array (not just the single-condition case).
                 Conditions =
                 [
@@ -243,7 +243,7 @@ public class ContractTests
             """
             [
               {
-                "deviceID": 1000038, "tenantID": 0, "deviceUnitID": 0, "deviceUnitZoneID": 0,
+                "deviceID": 1000038, "tenantID": 0, "deviceFarmUnitID": 0, "deviceFarmUnitZoneID": 0,
                 "temperature": "26.13", "soilTemperature": null, "humidity": "47.5", "battery": null,
                 "moisture": null, "light": "2", "co2": "408", "tvoc": null, "barometer": "100727.82",
                 "liquidPH": null, "rainLevel": null, "waterLevel": null, "wind": null,
@@ -263,7 +263,7 @@ public class ContractTests
             """
             [
               {
-                "deviceID": 1000038, "tenantID": 0, "deviceUnitID": 0, "deviceUnitZoneID": 0,
+                "deviceID": 1000038, "tenantID": 0, "deviceFarmUnitID": 0, "deviceFarmUnitZoneID": 0,
                 "temperature": 26.13, "soilTemperature": null, "humidity": 47.5, "battery": null,
                 "moisture": null, "light": 2, "co2": 408, "tvoc": null, "barometer": 100727.82,
                 "liquidPH": null, "rainLevel": null, "waterLevel": null, "wind": null,

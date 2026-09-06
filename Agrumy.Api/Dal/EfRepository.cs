@@ -9,7 +9,7 @@ using Npgsql;
 namespace api.Dal
 {
     /// EF Core implementation of IRepository, split into partial files mirroring its facets (EfRepository.Users.cs, EfRepository.Devices.cs, ...) - this file holds connection plumbing and the ISystemRepository members.
-    internal partial class EfRepository(AgrumyDbContext db, ILogger<EfRepository> logger, IAuditLogRepository auditLogRepository, IRefreshTokenRepository refreshTokenRepository, IControllerDataRepository controllerDataRepository, IDiscoveryRepository discoveryRepository, ITenantRepository tenantRepository, IGatewayRepository gatewayRepository, IServerConfigRepository serverConfigRepository, ICommandRepository commandRepository, IFirmwareRepository firmwareRepository, IUserRepository userRepository, IDeviceRepository deviceRepository, ISimulationRepository simulationRepository, IDeviceUnitRepository deviceUnitRepository, ISensorDataRepository sensorDataRepository) : IRepository
+    internal partial class EfRepository(AgrumyDbContext db, ILogger<EfRepository> logger, IAuditLogRepository auditLogRepository, IRefreshTokenRepository refreshTokenRepository, IControllerDataRepository controllerDataRepository, IDiscoveryRepository discoveryRepository, ITenantRepository tenantRepository, IGatewayRepository gatewayRepository, IServerConfigRepository serverConfigRepository, ICommandRepository commandRepository, IFirmwareRepository firmwareRepository, IUserRepository userRepository, IDeviceRepository deviceRepository, ISimulationRepository simulationRepository, IDeviceFarmUnitRepository deviceFarmUnitRepository, ISensorDataRepository sensorDataRepository) : IRepository
     {
 
         // ---- Startup / health -----------------------------------------------------------
@@ -36,7 +36,7 @@ namespace api.Dal
 
             await SeedDeviceTypeLookupsAsync(db);
             await SeedEventTypeLookupAsync(db);
-            await SeedDeviceUnitSentinelsAsync(db);
+            await SeedDeviceFarmUnitSentinelsAsync(db);
             await SeedDefaultTenantAsync(db);
             string? bootstrapSecret = await SeedBootstrapAdminAsync(db);
             if (bootstrapSecret != null)
@@ -90,17 +90,17 @@ namespace api.Dal
             await serverConfigRepository.ApplyRetentionPolicyAsync((await serverConfigRepository.ServerConfigGetAsync(1)).SensorDataRetentionDays);
         }
 
-        /// Seeds the IDDeviceUnit=0/IDDeviceUnitZone=0 sentinel pair, also reserving ID 0 so DeviceUnitAddAsync/DeviceUnitZoneAddAsync's MAX+1 never assigns it to a real Unit/Zone.
-        private static async Task SeedDeviceUnitSentinelsAsync(AgrumyDbContext db)
+        /// Seeds the IDDeviceFarmUnit=0/IDDeviceFarmUnitZone=0 sentinel pair, also reserving ID 0 so DeviceFarmUnitAddAsync/DeviceFarmUnitZoneAddAsync's MAX+1 never assigns it to a real Unit/Zone.
+        private static async Task SeedDeviceFarmUnitSentinelsAsync(AgrumyDbContext db)
         {
-            if (!await db.DeviceUnits.AnyAsync())
+            if (!await db.DeviceFarmUnits.AnyAsync())
             {
-                db.DeviceUnits.Add(new DeviceUnitRow { IDDeviceUnit = 0, TenantID = null, DeviceUnitName = "Default" });
+                db.DeviceFarmUnits.Add(new DeviceFarmUnitRow { IDDeviceFarmUnit = 0, TenantID = null, DeviceFarmUnitName = "Default" });
                 await db.SaveChangesAsync();
             }
-            if (!await db.DeviceUnitZones.AnyAsync())
+            if (!await db.DeviceFarmUnitZones.AnyAsync())
             {
-                db.DeviceUnitZones.Add(new DeviceUnitZoneRow { IDDeviceUnitZone = 0, TenantID = null, DeviceUnitID = 0, DeviceUnitZoneName = "Disabled" });
+                db.DeviceFarmUnitZones.Add(new DeviceFarmUnitZoneRow { IDDeviceFarmUnitZone = 0, TenantID = null, DeviceFarmUnitID = 0, DeviceFarmUnitZoneName = "Disabled" });
                 await db.SaveChangesAsync();
             }
         }

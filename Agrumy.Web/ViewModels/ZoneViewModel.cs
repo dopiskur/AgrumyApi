@@ -4,7 +4,7 @@ namespace api.ViewModels
 {
     public class ZoneViewModel
     {
-        public required DeviceUnitZoneDashboard Dashboard { get; init; }
+        public required DeviceFarmUnitZoneDashboard Dashboard { get; init; }
         public IList<DeviceFleetStatus> Fleet { get; init; } = [];
         public string DisplayTimeZone { get; init; } = "UTC";
 
@@ -12,8 +12,8 @@ namespace api.ViewModels
         public string? SensorDataJson { get; set; }
 
         // Null/empty when the zone has no controller-capable device assigned; the automation section is not shown at all in that case.
-        public DeviceUnitZone? Zone { get; init; }
-        public IList<DeviceUnitZoneRule> Rules { get; init; } = [];
+        public DeviceFarmUnitZone? Zone { get; init; }
+        public IList<DeviceFarmUnitZoneRule> Rules { get; init; } = [];
 
         /// Roadmap #219 - currently-active manual commands (not yet past ExpiresAtUtc), same "no controller, no section" condition as Zone/Rules above.
         public IList<DeviceManualOverride> ManualOverrides { get; init; } = [];

@@ -2,7 +2,7 @@ using api.Models;
 
 namespace api.Dal
 {
-    /// IDeviceRepository core CRUD members - forwarded to the standalone EfDeviceRepository (roadmap #246) so IRepository's broad consumers keep working unchanged. ToDto(DeviceRow) moved to EfDeviceRepository.ToDto - EfRepository.DeviceUnits.cs (not yet extracted) now calls that directly.
+    /// IDeviceRepository core CRUD members - forwarded to the standalone EfDeviceRepository (roadmap #246) so IRepository's broad consumers keep working unchanged. ToDto(DeviceRow) moved to EfDeviceRepository.ToDto - EfRepository.DeviceFarmUnits.cs (not yet extracted) now calls that directly.
     internal partial class EfRepository
     {
         public Task<Device> DeviceAddAsync(Device device) => deviceRepository.DeviceAddAsync(device);

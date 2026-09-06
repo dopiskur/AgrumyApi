@@ -3,12 +3,12 @@
     var ruleEditorModel = new api.ViewModels.RuleEditorViewModel
     {
         Scope = api.ViewModels.RuleScope.Zone,
-        ScopeId = Model.Zone!.IDDeviceUnitZone,
+        ScopeId = Model.Zone!.IDDeviceFarmUnitZone,
         Rules = Model.Rules,
         RedirectActionName = "Zone",
     };
 
-    int idZone = Model.Zone!.IDDeviceUnitZone!.Value;
+    int idZone = Model.Zone!.IDDeviceFarmUnitZone!.Value;
     DeviceManualOverride? ActiveFor(RelayFunction f) => Model.ManualOverrides.FirstOrDefault(o => o.RelayFunction == f);
 
     var heatingModel = new ManualActuateFunctionViewModel
@@ -54,7 +54,7 @@
             function should run, independent of what decided it. 0/blank disables it.
         </p>
         <form asp-action="SafetyLimitsUpdate" method="post" class="d-flex flex-wrap align-items-end gap-2">
-            <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
+            <input type="hidden" name="idDeviceFarmUnitZone" value="@Model.Zone!.IDDeviceFarmUnitZone" />
             <div>
                 <label class="form-label small mb-0">WaterPump max run seconds</label>
                 <input type="number" min="0" name="waterPumpMaxRunSeconds" class="form-control form-control-sm" style="width:10rem" value="@Model.Zone.WaterPumpMaxRunSeconds" />
@@ -100,7 +100,7 @@
             for this zone.
         </p>
         <form asp-action="TankCalibrationUpdate" method="post" class="d-flex flex-wrap align-items-end gap-2">
-            <input type="hidden" name="idDeviceUnitZone" value="@Model.Zone!.IDDeviceUnitZone" />
+            <input type="hidden" name="idDeviceFarmUnitZone" value="@Model.Zone!.IDDeviceFarmUnitZone" />
             <div>
                 <label class="form-label small mb-0">Tank capacity (liters)</label>
                 <input type="number" min="0" step="any" name="tankCapacityLiters" class="form-control form-control-sm" style="width:10rem" value="@Model.Zone.TankCapacityLiters" />

@@ -6,13 +6,13 @@ namespace api.Dal.Interface
     /// Telemetry facet of the data layer.
     public interface ISensorDataRepository
     {
-        /// Persists a telemetry batch - deviceID/tenantID/deviceUnitID/deviceUnitZoneID come from the authenticated identity and are applied to every row; matching keys inside the JSON itself are ignored.
-        Task SensorDataPushAsync(JsonArray jsonArray, int deviceID, int tenantID, int? deviceUnitID, int? deviceUnitZoneID);
+        /// Persists a telemetry batch - deviceID/tenantID/deviceFarmUnitID/deviceFarmUnitZoneID come from the authenticated identity and are applied to every row; matching keys inside the JSON itself are ignored.
+        Task SensorDataPushAsync(JsonArray jsonArray, int deviceID, int tenantID, int? deviceFarmUnitID, int? deviceFarmUnitZoneID);
         Task<string> SensorDataGetAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY, int? buildReport);
 
         /// Same JSON shape as SensorDataGetAsync, but time-bucket averaged across every device in the zone/unit instead of one device's own raw readings.
-        Task<string> SensorDataZoneAverageGetAsync(int? tenantID, int deviceUnitZoneID, int? timeRange, int? timeMDMY);
-        Task<string> SensorDataUnitAverageGetAsync(int? tenantID, int deviceUnitID, int? timeRange, int? timeMDMY);
+        Task<string> SensorDataZoneAverageGetAsync(int? tenantID, int deviceFarmUnitZoneID, int? timeRange, int? timeMDMY);
+        Task<string> SensorDataUnitAverageGetAsync(int? tenantID, int deviceFarmUnitID, int? timeRange, int? timeMDMY);
 
         Task<IList<SensorDataReport>> SensorDataReportGetAsync(int? tenantID, int? getData, int? deviceID, int? sensorDataReportID);
         Task SensorDataDeleteAsync(int? tenantID, int? deviceID, int? timeRange, int? timeMDMY);

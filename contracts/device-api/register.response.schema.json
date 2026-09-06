@@ -9,8 +9,8 @@
     "configVersion",
     "tenantID",
     "deviceID",
-    "deviceUnitID",
-    "deviceUnitZoneID",
+    "deviceFarmUnitID",
+    "deviceFarmUnitZoneID",
     "deviceTypeServiceID",
     "apiId",
     "apiKey",
@@ -59,13 +59,13 @@
       ],
       "description": "Lowercase 'd' - the C# property is literally 'deviceID', so camelCase serialization leaves it unchanged. Firmware reads config[\"deviceID\"]."
     },
-    "deviceUnitID": {
+    "deviceFarmUnitID": {
       "type": [
         "integer",
         "null"
       ]
     },
-    "deviceUnitZoneID": {
+    "deviceFarmUnitZoneID": {
       "type": [
         "integer",
         "null"
@@ -410,7 +410,7 @@
         "rules": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/deviceUnitZoneRule"
+            "$ref": "#/definitions/deviceFarmUnitZoneRule"
           },
           "description": "Roadmap #21. Every automation rule for the zone this device is assigned to - empty when unassigned. Several rules may target the SAME relayFunction: OR semantics, any rule that evaluates on wins (AgrumyFirmware's ActuatorController::evaluateRule/initController)."
         },
@@ -419,7 +419,7 @@
             "integer",
             "null"
           ],
-          "description": "Roadmap #21/#36. Hard ceiling (seconds) on continuous WaterPump run time, enforced device-side AFTER any rule decides the pump should run - AgrumyFirmware's ActuatorController::applyWaterPumpSafetyLimits. Copied from the assigned zone (api.Models.DeviceUnitZone), not this row. 0/null disables it."
+          "description": "Roadmap #21/#36. Hard ceiling (seconds) on continuous WaterPump run time, enforced device-side AFTER any rule decides the pump should run - AgrumyFirmware's ActuatorController::applyWaterPumpSafetyLimits. Copied from the assigned zone (api.Models.DeviceFarmUnitZone), not this row. 0/null disables it."
         },
         "waterPumpCooldownSeconds": {
           "type": [
@@ -518,15 +518,15 @@
         }
       }
     },
-    "deviceUnitZoneRule": {
+    "deviceFarmUnitZoneRule": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Roadmap #21/#212. camelCase serialization of api.Models.DeviceUnitZoneRule - the SAME class the DB/admin-API CRUD side uses (not split into a firmware-only DTO), so every property below is always present on the wire even though a rule reaching a device is always already resolved to Zone scope and filtered to Relay action (api.Devices.RuleHierarchyResolver) - tenantID/deviceUnitID/actionType/sensorMetric/notificationSubject/notificationBody are consequently fixed/null shapes here, never meaningfully read by firmware.",
+      "description": "Roadmap #21/#212. camelCase serialization of api.Models.DeviceFarmUnitZoneRule - the SAME class the DB/admin-API CRUD side uses (not split into a firmware-only DTO), so every property below is always present on the wire even though a rule reaching a device is always already resolved to Zone scope and filtered to Relay action (api.Devices.RuleHierarchyResolver) - tenantID/deviceFarmUnitID/actionType/sensorMetric/notificationSubject/notificationBody are consequently fixed/null shapes here, never meaningfully read by firmware.",
       "required": [
-        "idDeviceUnitZoneRule",
+        "idDeviceFarmUnitZoneRule",
         "tenantID",
-        "deviceUnitID",
-        "deviceUnitZoneID",
+        "deviceFarmUnitID",
+        "deviceFarmUnitZoneID",
         "actionType",
         "relayFunction",
         "sensorMetric",
@@ -535,7 +535,7 @@
         "notificationBody"
       ],
       "properties": {
-        "idDeviceUnitZoneRule": {
+        "idDeviceFarmUnitZoneRule": {
           "type": [
             "integer",
             "null"
@@ -545,7 +545,7 @@
           "type": "integer",
           "description": "Admin-API/DB concern only - firmware has no notion of tenant."
         },
-        "deviceUnitID": {
+        "deviceFarmUnitID": {
           "type": [
             "integer",
             "null"
@@ -590,19 +590,19 @@
           ],
           "description": "Notification-action only - always null here."
         },
-        "deviceUnitZoneID": {
+        "deviceFarmUnitZoneID": {
           "type": [
             "integer",
             "null"
           ],
-          "description": "Which zone this rule belongs to - redundant with the top-level deviceConfig.deviceUnitZoneID (the device already knows its own zone). Never actually null on a rule that reached a device (a rule only reaches firmware after RuleHierarchyResolver has already pinned it to this specific zone), the type stays nullable here only because it mirrors the same always-present-class as the Unit/Global-scope rows the admin-API CRUD side also serializes with this definition."
+          "description": "Which zone this rule belongs to - redundant with the top-level deviceConfig.deviceFarmUnitZoneID (the device already knows its own zone). Never actually null on a rule that reached a device (a rule only reaches firmware after RuleHierarchyResolver has already pinned it to this specific zone), the type stays nullable here only because it mirrors the same always-present-class as the Unit/Global-scope rows the admin-API CRUD side also serializes with this definition."
         }
       }
     },
     "ruleCondition": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Roadmap #212. camelCase serialization of api.Models.RuleCondition - one entry in a deviceUnitZoneRule's conditions array.",
+      "description": "Roadmap #212. camelCase serialization of api.Models.RuleCondition - one entry in a deviceFarmUnitZoneRule's conditions array.",
       "required": [
         "conditionType",
         "conditionConfig",
@@ -650,7 +650,7 @@
         },
         "hysteresis": {
           "type": "number",
-          "description": "Dead-zone margin - must not be negative (enforced server-side, DeviceUnitApiController.RuleConditionConfigError)."
+          "description": "Dead-zone margin - must not be negative (enforced server-side, DeviceFarmUnitApiController.RuleConditionConfigError)."
         }
       }
     },
@@ -692,7 +692,7 @@
         },
         "duration": {
           "type": "integer",
-          "description": "Seconds. start+duration must not exceed 86400 (no crossing local midnight in v1) - enforced server-side, DeviceUnitApiController.RuleConditionConfigError."
+          "description": "Seconds. start+duration must not exceed 86400 (no crossing local midnight in v1) - enforced server-side, DeviceFarmUnitApiController.RuleConditionConfigError."
         }
       }
     },

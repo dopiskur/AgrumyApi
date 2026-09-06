@@ -11,7 +11,7 @@ namespace api.Dal
     /// ISensorDataRepository, extracted out of the EfRepository god class (roadmap #246) - a pure leaf, no dependency on any other facet. Includes the JSON value coercion helpers the telemetry push uses (firmware sends measurements as strings or null).
     internal sealed class EfSensorDataRepository(AgrumyDbContext db) : ISensorDataRepository
     {
-        public async Task SensorDataPushAsync(JsonArray jsonArray, int deviceID, int tenantID, int? deviceUnitID, int? deviceUnitZoneID)
+        public async Task SensorDataPushAsync(JsonArray jsonArray, int deviceID, int tenantID, int? deviceFarmUnitID, int? deviceFarmUnitZoneID)
         {
             var rows = new List<SensorDataRow>();
             foreach (var node in jsonArray)
@@ -27,8 +27,8 @@ namespace api.Dal
                     // Identity is server-authoritative - the matching keys in the JSON payload are deliberately ignored.
                     DeviceID = deviceID,
                     TenantID = tenantID,
-                    DeviceUnitID = deviceUnitID,
-                    DeviceUnitZoneID = deviceUnitZoneID,
+                    DeviceFarmUnitID = deviceFarmUnitID,
+                    DeviceFarmUnitZoneID = deviceFarmUnitZoneID,
                     Battery = ReadInt(o, "battery"),
                     Temperature = ReadDouble(o, "temperature"),
                     SoilTemperature = ReadDouble(o, "soilTemperature"),
@@ -115,11 +115,11 @@ namespace api.Dal
             return json;
         }
 
-        public Task<string> SensorDataZoneAverageGetAsync(int? tenantID, int deviceUnitZoneID, int? timeRange, int? timeMDMY) =>
-            AveragedSensorJsonAsync(tenantID, q => q.Where(r => r.DeviceUnitZoneID == deviceUnitZoneID), timeRange, timeMDMY);
+        public Task<string> SensorDataZoneAverageGetAsync(int? tenantID, int deviceFarmUnitZoneID, int? timeRange, int? timeMDMY) =>
+            AveragedSensorJsonAsync(tenantID, q => q.Where(r => r.DeviceFarmUnitZoneID == deviceFarmUnitZoneID), timeRange, timeMDMY);
 
-        public Task<string> SensorDataUnitAverageGetAsync(int? tenantID, int deviceUnitID, int? timeRange, int? timeMDMY) =>
-            AveragedSensorJsonAsync(tenantID, q => q.Where(r => r.DeviceUnitID == deviceUnitID), timeRange, timeMDMY);
+        public Task<string> SensorDataUnitAverageGetAsync(int? tenantID, int deviceFarmUnitID, int? timeRange, int? timeMDMY) =>
+            AveragedSensorJsonAsync(tenantID, q => q.Where(r => r.DeviceFarmUnitID == deviceFarmUnitID), timeRange, timeMDMY);
 
         /// Shared by the zone/unit averaged-chart endpoints - same time-cutoff/bucket logic as SensorDataGetAsync, scoped by the caller's predicate instead of a single device, shaped by BuildAveraged instead of Build.
         private async Task<string> AveragedSensorJsonAsync(int? tenantID, Func<IQueryable<SensorDataRow>, IQueryable<SensorDataRow>> scope, int? timeRange, int? timeMDMY)
@@ -292,7 +292,7 @@ namespace api.Dal
         private static DateTime BucketStart(DateTime timestamp) =>
             new(timestamp.Ticks - (timestamp.Ticks % OptimizeBucketSize.Ticks), DateTimeKind.Utc);
 
-        /// One replacement row for a 5-minute bucket: TenantID/DeviceUnitID/DeviceUnitZoneID come from the most recent raw row, every sensor column is the average-without-outliers of that bucket's values.
+        /// One replacement row for a 5-minute bucket: TenantID/DeviceFarmUnitID/DeviceFarmUnitZoneID come from the most recent raw row, every sensor column is the average-without-outliers of that bucket's values.
         private static SensorDataRow BuildOptimizedRow(int deviceId, DateTime bucketStart, List<SensorDataRow> rows)
         {
             SensorDataRow mostRecent = rows[^1]; // rows arrive pre-sorted by DateCreated ascending
@@ -300,8 +300,8 @@ namespace api.Dal
             {
                 TenantID = mostRecent.TenantID,
                 DeviceID = deviceId,
-                DeviceUnitID = mostRecent.DeviceUnitID,
-                DeviceUnitZoneID = mostRecent.DeviceUnitZoneID,
+                DeviceFarmUnitID = mostRecent.DeviceFarmUnitID,
+                DeviceFarmUnitZoneID = mostRecent.DeviceFarmUnitZoneID,
                 Battery = TrimmedMeanInt(rows.Select(r => r.Battery)),
                 Temperature = TrimmedMean(rows.Select(r => r.Temperature)),
                 SoilTemperature = TrimmedMean(rows.Select(r => r.SoilTemperature)),
@@ -393,8 +393,8 @@ namespace api.Dal
             {
                 TenantID = s.TenantID,
                 DeviceID = s.DeviceID,
-                DeviceUnitID = s.DeviceUnitID,
-                DeviceUnitZoneID = s.DeviceUnitZoneID,
+                DeviceFarmUnitID = s.DeviceFarmUnitID,
+                DeviceFarmUnitZoneID = s.DeviceFarmUnitZoneID,
                 Battery = s.Battery,
                 Temperature = s.Temperature,
                 SoilTemperature = s.SoilTemperature,
@@ -418,8 +418,8 @@ namespace api.Dal
             {
                 TenantID = r.TenantID ?? 0,
                 DeviceID = r.DeviceID ?? 0,
-                DeviceUnitID = r.DeviceUnitID,
-                DeviceUnitZoneID = r.DeviceUnitZoneID,
+                DeviceFarmUnitID = r.DeviceFarmUnitID,
+                DeviceFarmUnitZoneID = r.DeviceFarmUnitZoneID,
                 Battery = r.Battery,
                 Temperature = r.Temperature,
                 SoilTemperature = r.SoilTemperature,

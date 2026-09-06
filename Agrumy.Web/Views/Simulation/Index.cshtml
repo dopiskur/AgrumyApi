@@ -24,7 +24,7 @@
         {
             <tr>
                 <td><a asp-controller="Device" asp-action="Details" asp-route-idDevice="@device.IDDevice">@device.DeviceName</a></td>
-                <td>@(device.DeviceUnitZoneID is int ? "Assigned" : "Not assigned")</td>
+                <td>@(device.DeviceFarmUnitZoneID is int ? "Assigned" : "Not assigned")</td>
                 <td>
                     <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Delete this virtual device? Its sensor history goes with it.');">
                         <input type="hidden" name="idDevice" value="@device.IDDevice" />

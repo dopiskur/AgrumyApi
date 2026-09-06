@@ -26,11 +26,11 @@ namespace api.Dal
             IQueryable<DeviceRow> scanners = db.Devices.AsNoTracking();
             if (zoneId is int zid)
             {
-                scanners = scanners.Where(d => d.DeviceUnitZoneID == zid);
+                scanners = scanners.Where(d => d.DeviceFarmUnitZoneID == zid);
             }
             else if (unitId is int uid)
             {
-                scanners = scanners.Where(d => d.DeviceUnitID == uid);
+                scanners = scanners.Where(d => d.DeviceFarmUnitID == uid);
             }
             else if (tenantId != null)
             {

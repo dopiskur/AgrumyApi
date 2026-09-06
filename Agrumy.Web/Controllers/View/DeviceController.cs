@@ -13,11 +13,11 @@ namespace api.Controllers.View
     {
         public async Task<ActionResult> Fleet()
         {
-            IList<DeviceUnit> units = await api.DeviceUnitsGet();
-            var zones = new List<DeviceUnitZone>();
+            IList<DeviceFarmUnit> units = await api.DeviceFarmUnitsGet();
+            var zones = new List<DeviceFarmUnitZone>();
             foreach (var unit in units)
             {
-                zones.AddRange(await api.DeviceUnitZonesGet(unit.IDDeviceUnit));
+                zones.AddRange(await api.DeviceFarmUnitZonesGet(unit.IDDeviceFarmUnit));
             }
 
             return View(new FleetViewModel
@@ -36,11 +36,11 @@ namespace api.Controllers.View
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> AssignToZone(int idDevice, int idDeviceUnitZone)
+        public async Task<ActionResult> AssignToZone(int idDevice, int idDeviceFarmUnitZone)
         {
             try
             {
-                await api.DeviceAssign(new DeviceZoneAssignment { IDDevice = idDevice, IDDeviceUnitZone = idDeviceUnitZone });
+                await api.DeviceAssign(new DeviceZoneAssignment { IDDevice = idDevice, IDDeviceFarmUnitZone = idDeviceFarmUnitZone });
             }
             catch (ApiException ex)
             {

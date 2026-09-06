@@ -7,7 +7,7 @@ namespace api.BackgroundWorkers
 {
     /// A calibrated zone's fill percent (api.Utils.TankCalculator) crossing ServerConfig.TankRefillThreshold fires one alert per low-tank streak, dead-zone-latched against TankRefillHysteresis - same shape as LowBatteryAlertEvaluator, scoped to zones instead of devices.
     public sealed class TankRefillAlertEvaluator(
-        IDeviceUnitRepository deviceUnitRepo, IUserRepository userRepo, IServerConfigRepository serverConfigRepo, INotificationDispatcher dispatcher)
+        IDeviceFarmUnitRepository deviceFarmUnitRepo, IUserRepository userRepo, IServerConfigRepository serverConfigRepo, INotificationDispatcher dispatcher)
     {
         public async Task RunOnceAsync(CancellationToken ct = default)
         {
@@ -17,7 +17,7 @@ namespace api.BackgroundWorkers
             double hysteresis = Math.Max(0.0, serverConfig.TankRefillHysteresis ?? 5.0);
             double clearAt = threshold + hysteresis;
 
-            var candidates = await deviceUnitRepo.TankRefillAlertCandidatesGetAsync();
+            var candidates = await deviceFarmUnitRepo.TankRefillAlertCandidatesGetAsync();
 
             foreach (var z in candidates)
             {
@@ -38,7 +38,7 @@ namespace api.BackgroundWorkers
                     // Only clear once the reading is fully back OUT of the dead zone (>= clearAt), not merely "not low" (> threshold), or it could spuriously re-fire next tick.
                     if (recovered && z.TankRefillNotifiedAt is not null)
                     {
-                        await deviceUnitRepo.TankRefillNotifiedSetAsync(z.IDDeviceUnitZone, null);
+                        await deviceFarmUnitRepo.TankRefillNotifiedSetAsync(z.IDDeviceFarmUnitZone, null);
                     }
                     continue;
                 }
@@ -48,7 +48,7 @@ namespace api.BackgroundWorkers
                     continue; // already alerted for this ongoing low-tank streak - dedup
                 }
 
-                string zoneLabel = string.IsNullOrWhiteSpace(z.DeviceUnitZoneName) ? $"Zone {z.IDDeviceUnitZone}" : z.DeviceUnitZoneName;
+                string zoneLabel = string.IsNullOrWhiteSpace(z.DeviceFarmUnitZoneName) ? $"Zone {z.IDDeviceFarmUnitZone}" : z.DeviceFarmUnitZoneName;
 
                 var admins = await userRepo.TenantAdminsGetAsync(z.TenantID);
                 foreach (var admin in admins)
@@ -65,7 +65,7 @@ namespace api.BackgroundWorkers
                     await dispatcher.DispatchAsync(notification, ct);
                 }
 
-                await deviceUnitRepo.TankRefillNotifiedSetAsync(z.IDDeviceUnitZone, DateTime.UtcNow);
+                await deviceFarmUnitRepo.TankRefillNotifiedSetAsync(z.IDDeviceFarmUnitZone, DateTime.UtcNow);
             }
         }
     }

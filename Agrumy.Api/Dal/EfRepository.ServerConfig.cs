@@ -3,7 +3,7 @@ using api.Models;
 
 namespace api.Dal
 {
-    /// IServerConfigRepository members - forwarded to the standalone EfServerConfigRepository (roadmap #246) so IRepository's broad consumers keep working unchanged. Defaults preserved on idServerConfig since some internal callers (Devices.cs, DeviceUnits.cs, Devices.Diagnostics.cs) rely on them.
+    /// IServerConfigRepository members - forwarded to the standalone EfServerConfigRepository (roadmap #246) so IRepository's broad consumers keep working unchanged. Defaults preserved on idServerConfig since some internal callers (Devices.cs, DeviceFarmUnits.cs, Devices.Diagnostics.cs) rely on them.
     internal partial class EfRepository
     {
         public Task<ServerConfig> ServerConfigGetAsync(int idServerConfig = 1) => serverConfigRepository.ServerConfigGetAsync(idServerConfig);

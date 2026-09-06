@@ -1,4 +1,4 @@
-@model IList<api.Models.DeviceUnitZoneDashboard>
+@model IList<api.Models.DeviceFarmUnitZoneDashboard>
 @if (Model.Count == 0)
 {
     <div class="col-12">
@@ -8,10 +8,10 @@
 @foreach (var z in Model)
 {
     <div class="col-md-4 col-sm-6 mb-3">
-        <a asp-action="Zone" asp-route-idDeviceUnitZone="@z.IDDeviceUnitZone" class="text-decoration-none text-reset">
+        <a asp-action="Zone" asp-route-idDeviceFarmUnitZone="@z.IDDeviceFarmUnitZone" class="text-decoration-none text-reset">
             <div class="small-box text-bg-info h-100">
                 <div class="inner">
-                    <h3 class="fs-4">@z.DeviceUnitZoneName <partial name="_ZoneStatusBadge" model="(z.Status, z.ProblemAlerts)" /></h3>
+                    <h3 class="fs-4">@z.DeviceFarmUnitZoneName <partial name="_ZoneStatusBadge" model="(z.Status, z.ProblemAlerts)" /></h3>
                     <p class="mb-2">@z.DeviceCount device@(z.DeviceCount == 1 ? "" : "s")</p>
                     <partial name="_SensorAverages" model="new SensorSummaryViewModel { Averages = z.Averages, Trend = z.Trend }" />
                 </div>

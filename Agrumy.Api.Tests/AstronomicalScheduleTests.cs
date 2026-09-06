@@ -50,10 +50,10 @@ public class AstronomicalScheduleTests
     [Fact]
     public void Resolve_NoLocationConfigured_DropsRule()
     {
-        var rules = new List<DeviceUnitZoneRule> { AstroRule(daysOfWeek: 127, sunriseOffset: 0, sunsetOffset: 0) };
+        var rules = new List<DeviceFarmUnitZoneRule> { AstroRule(daysOfWeek: 127, sunriseOffset: 0, sunsetOffset: 0) };
         var serverConfig = new ServerConfig();
 
-        IList<DeviceUnitZoneRule> resolved = AstronomicalRuleResolver.Resolve(rules, serverConfig, new DateOnly(2026, 6, 21), utcOffsetSeconds: 0);
+        IList<DeviceFarmUnitZoneRule> resolved = AstronomicalRuleResolver.Resolve(rules, serverConfig, new DateOnly(2026, 6, 21), utcOffsetSeconds: 0);
 
         Assert.Empty(resolved);
     }
@@ -61,12 +61,12 @@ public class AstronomicalScheduleTests
     [Fact]
     public void Resolve_WithLocation_CompilesToScheduleWindowSpanningSunriseToSunset()
     {
-        var rules = new List<DeviceUnitZoneRule> { AstroRule(daysOfWeek: 127, sunriseOffset: -30, sunsetOffset: 60) };
+        var rules = new List<DeviceFarmUnitZoneRule> { AstroRule(daysOfWeek: 127, sunriseOffset: -30, sunsetOffset: 60) };
         var serverConfig = new ServerConfig { WeatherLocationLat = 45.8, WeatherLocationLon = 16.0 };
 
-        IList<DeviceUnitZoneRule> resolved = AstronomicalRuleResolver.Resolve(rules, serverConfig, new DateOnly(2026, 6, 21), utcOffsetSeconds: 7200);
+        IList<DeviceFarmUnitZoneRule> resolved = AstronomicalRuleResolver.Resolve(rules, serverConfig, new DateOnly(2026, 6, 21), utcOffsetSeconds: 7200);
 
-        DeviceUnitZoneRule rule = Assert.Single(resolved);
+        DeviceFarmUnitZoneRule rule = Assert.Single(resolved);
         RuleCondition condition = Assert.Single(rule.Conditions);
         Assert.Equal(ConditionType.Schedule, condition.ConditionType);
         var schedule = condition.ConditionConfig!.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options)!;
@@ -81,10 +81,10 @@ public class AstronomicalScheduleTests
     public void Resolve_OffsetsCollapseWindowToZero_DropsRule()
     {
         // Sunrise offset pushed past the sunset offset on the same day leaves nothing "on".
-        var rules = new List<DeviceUnitZoneRule> { AstroRule(daysOfWeek: 127, sunriseOffset: 700, sunsetOffset: -700) };
+        var rules = new List<DeviceFarmUnitZoneRule> { AstroRule(daysOfWeek: 127, sunriseOffset: 700, sunsetOffset: -700) };
         var serverConfig = new ServerConfig { WeatherLocationLat = 45.8, WeatherLocationLon = 16.0 };
 
-        IList<DeviceUnitZoneRule> resolved = AstronomicalRuleResolver.Resolve(rules, serverConfig, new DateOnly(2026, 6, 21), utcOffsetSeconds: 7200);
+        IList<DeviceFarmUnitZoneRule> resolved = AstronomicalRuleResolver.Resolve(rules, serverConfig, new DateOnly(2026, 6, 21), utcOffsetSeconds: 7200);
 
         Assert.Empty(resolved);
     }
@@ -92,21 +92,21 @@ public class AstronomicalScheduleTests
     [Fact]
     public void Resolve_NonAstronomicalRule_PassesThroughUnchanged()
     {
-        var scheduleRule = new DeviceUnitZoneRule
+        var scheduleRule = new DeviceFarmUnitZoneRule
         {
-            DeviceUnitZoneID = 1,
+            DeviceFarmUnitZoneID = 1,
             RelayFunction = RelayFunction.Light,
             Conditions = [new RuleCondition(ConditionType.Schedule, JsonSerializer.SerializeToNode(new ScheduleConditionConfig(127, 0, 3600), ConditionConfigJson.Options), null)],
         };
 
-        IList<DeviceUnitZoneRule> resolved = AstronomicalRuleResolver.Resolve([scheduleRule], new ServerConfig(), new DateOnly(2026, 6, 21), 0);
+        IList<DeviceFarmUnitZoneRule> resolved = AstronomicalRuleResolver.Resolve([scheduleRule], new ServerConfig(), new DateOnly(2026, 6, 21), 0);
 
         Assert.Same(scheduleRule, Assert.Single(resolved));
     }
 
-    private static DeviceUnitZoneRule AstroRule(int daysOfWeek, int sunriseOffset, int sunsetOffset) => new()
+    private static DeviceFarmUnitZoneRule AstroRule(int daysOfWeek, int sunriseOffset, int sunsetOffset) => new()
     {
-        DeviceUnitZoneID = 1,
+        DeviceFarmUnitZoneID = 1,
         RelayFunction = RelayFunction.Light,
         Conditions = [new RuleCondition(ConditionType.Astronomical, JsonSerializer.SerializeToNode(new AstronomicalConditionConfig(daysOfWeek, sunriseOffset, sunsetOffset), ConditionConfigJson.Options), null)],
     };

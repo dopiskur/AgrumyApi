@@ -38,8 +38,8 @@ namespace api.Dal
             {
                 TenantID = device.TenantID,
                 DeviceRoleID = device.DeviceRoleID,
-                DeviceUnitID = device.DeviceUnitID,
-                DeviceUnitZoneID = device.DeviceUnitZoneID,
+                DeviceFarmUnitID = device.DeviceFarmUnitID,
+                DeviceFarmUnitZoneID = device.DeviceFarmUnitZoneID,
                 DeviceName = device.DeviceName,
                 MacAddress = device.MacAddress,
                 ManualDeviceTypeID = device.ManualDeviceTypeID,
@@ -174,7 +174,7 @@ namespace api.Dal
                 return;
             }
 
-            // Does not set MacAddress, config-id columns, DeviceUnitID/DeviceUnitZoneID (written exclusively by DeviceAssignToZoneAsync/DeviceUnassignFromZoneAsync to stay consistent), or ApiId/ApiKey (omitting them would wipe a device's real credential).
+            // Does not set MacAddress, config-id columns, DeviceFarmUnitID/DeviceFarmUnitZoneID (written exclusively by DeviceAssignToZoneAsync/DeviceUnassignFromZoneAsync to stay consistent), or ApiId/ApiKey (omitting them would wipe a device's real credential).
             row.TenantID = device.TenantID;
             row.DeviceRoleID = device.DeviceRoleID;
             row.DeviceTypeServiceID = device.DeviceTypeServiceID;
@@ -203,14 +203,14 @@ namespace api.Dal
             db.Devices.Where(d => d.IDDevice == deviceID)
                 .ExecuteUpdateAsync(s => s.SetProperty(d => d.Reset, pending));
 
-        /// internal, not private - EfGatewayRepository and EfRepository.DeviceUnits.cs (not yet extracted) also map DeviceRow to Device.
+        /// internal, not private - EfGatewayRepository and EfRepository.DeviceFarmUnits.cs (not yet extracted) also map DeviceRow to Device.
         internal static Device ToDto(DeviceRow d) => new()
         {
             IDDevice = d.IDDevice,
             TenantID = d.TenantID,
             DeviceRoleID = d.DeviceRoleID,
-            DeviceUnitID = d.DeviceUnitID,
-            DeviceUnitZoneID = d.DeviceUnitZoneID,
+            DeviceFarmUnitID = d.DeviceFarmUnitID,
+            DeviceFarmUnitZoneID = d.DeviceFarmUnitZoneID,
             DeviceConfigSensorID = d.DeviceConfigSensorID,
             DeviceConfigControllerID = d.DeviceConfigControllerID,
             DeviceTypeServiceID = d.DeviceTypeServiceID,
@@ -372,7 +372,7 @@ namespace api.Dal
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigController == ownConfigControllerId);
             if (row != null)
             {
-                // Only the relay-pin mapping lives here now - threshold/hysteresis/interval/schedule config moved to the device's assigned DeviceUnitZone, edited from the Zone page instead.
+                // Only the relay-pin mapping lives here now - threshold/hysteresis/interval/schedule config moved to the device's assigned DeviceFarmUnitZone, edited from the Zone page instead.
                 row.RelayEnabled = cfg.RelayEnabled;
 
                 // Wholesale replace: delete every existing slot row for this controller, then insert one row per ASSIGNED slot (RelayFunction 0/Disabled is omitted, not stored) - simpler and less error-prone than diffing against the posted set.
@@ -552,7 +552,7 @@ namespace api.Dal
 
             List<DeviceFleetStatus> result = (await BuildFleetStatusesAsync(devices))
                 // Fleet page default view: unassigned devices surfaced first, newest device first within each group.
-                .OrderBy(d => d.DeviceUnitID == null ? 0 : 1)
+                .OrderBy(d => d.DeviceFarmUnitID == null ? 0 : 1)
                 .ThenByDescending(d => d.IDDevice)
                 .ToList();
 
@@ -560,7 +560,7 @@ namespace api.Dal
             return result;
         }
 
-        /// A write that changes a device's fleet row (e.g. zone assignment) must drop both its own-tenant and the GlobalAdmin's cached snapshot, or the next Fleet read can still serve the pre-write result for up to FleetCacheTtl. Public (not private) since EfRepository.DeviceUnits.cs (not yet extracted) also calls it after assign/unassign.
+        /// A write that changes a device's fleet row (e.g. zone assignment) must drop both its own-tenant and the GlobalAdmin's cached snapshot, or the next Fleet read can still serve the pre-write result for up to FleetCacheTtl. Public (not private) since EfRepository.DeviceFarmUnits.cs (not yet extracted) also calls it after assign/unassign.
         public Task InvalidateFleetCacheAsync(int? tenantID) => Task.WhenAll(
             cache.RemoveAsync("fleet:global"),
             tenantID != null ? cache.RemoveAsync($"fleet:{tenantID}") : Task.CompletedTask);
@@ -600,10 +600,10 @@ namespace api.Dal
                 .ToDictionaryAsync(k => k.IDDeviceType);
 
             // Units/Zones are a small admin-managed set - same in-memory-lookup reasoning as kitCapability above.
-            Dictionary<int, string?> unitNames = await db.DeviceUnits.AsNoTracking()
-                .ToDictionaryAsync(u => u.IDDeviceUnit, u => u.DeviceUnitName);
-            Dictionary<int, string?> zoneNames = await db.DeviceUnitZones.AsNoTracking()
-                .ToDictionaryAsync(z => z.IDDeviceUnitZone, z => z.DeviceUnitZoneName);
+            Dictionary<int, string?> unitNames = await db.DeviceFarmUnits.AsNoTracking()
+                .ToDictionaryAsync(u => u.IDDeviceFarmUnit, u => u.DeviceFarmUnitName);
+            Dictionary<int, string?> zoneNames = await db.DeviceFarmUnitZones.AsNoTracking()
+                .ToDictionaryAsync(z => z.IDDeviceFarmUnitZone, z => z.DeviceFarmUnitZoneName);
 
             // One bulk read of every relay state for devices in this result set, grouped in memory - same reasoning as kitCapability above (a handful of rows per device, not worth a per-device round trip).
             var deviceIds = rows.Select(r => r.Device.IDDevice).ToList();
@@ -651,10 +651,10 @@ namespace api.Dal
                     FirmwareTargetVersion = r.Device.FirmwareTargetVersion,
                     Battery = r.Battery,
                     Online = DeviceFleetStatus.ComputeOnline(r.Diag?.LastSeenAt, r.Device.SleepSeconds, utcNow),
-                    DeviceUnitID = r.Device.DeviceUnitID,
-                    DeviceUnitZoneID = r.Device.DeviceUnitZoneID,
-                    DeviceUnitName = r.Device.DeviceUnitID is int uid ? unitNames.GetValueOrDefault(uid) : null,
-                    DeviceUnitZoneName = r.Device.DeviceUnitZoneID is int zid ? zoneNames.GetValueOrDefault(zid) : null,
+                    DeviceFarmUnitID = r.Device.DeviceFarmUnitID,
+                    DeviceFarmUnitZoneID = r.Device.DeviceFarmUnitZoneID,
+                    DeviceFarmUnitName = r.Device.DeviceFarmUnitID is int uid ? unitNames.GetValueOrDefault(uid) : null,
+                    DeviceFarmUnitZoneName = r.Device.DeviceFarmUnitZoneID is int zid ? zoneNames.GetValueOrDefault(zid) : null,
                     RelayStates = relayStates.GetValueOrDefault(r.Device.IDDevice),
                 };
             }).ToList();

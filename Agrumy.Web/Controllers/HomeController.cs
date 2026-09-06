@@ -8,7 +8,7 @@ namespace api.Controllers
     public class HomeController : Controller
     {
         [Authorize]
-        public IActionResult Index() => RedirectToAction("Index", "DeviceUnit");
+        public IActionResult Index() => RedirectToAction("Index", "DeviceFarmUnit");
 
         [AllowAnonymous]
         public IActionResult Privacy() => View();

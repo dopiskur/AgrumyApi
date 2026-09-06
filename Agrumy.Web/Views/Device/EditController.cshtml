@@ -25,7 +25,7 @@
         <p class="text-secondary small">
             Automation rules (thresholds, intervals, schedules, WaterPump safety limits) now live on
             this device's assigned zone - see the
-            <a asp-controller="DeviceUnit" asp-action="Zone" asp-route-idDeviceUnitZone="@Model.Device?.DeviceUnitZoneID">Zone page</a>.
+            <a asp-controller="DeviceFarmUnit" asp-action="Zone" asp-route-idDeviceFarmUnitZone="@Model.Device?.DeviceFarmUnitZoneID">Zone page</a>.
         </p>
         <form asp-action="EditController">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>

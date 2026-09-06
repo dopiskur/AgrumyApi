@@ -8,14 +8,14 @@ using Microsoft.Extensions.Options;
 
 namespace api.Dal
 {
-    /// IDeviceUnitRepository, extracted out of the EfRepository god class (roadmap #246) - Unit/Zone CRUD, device assignment, and the hierarchical dashboard aggregation. Needs IServerConfigRepository (dashboard's ProblemEvent settings) and IDeviceRepository (fleet-cache invalidation after assign/unassign, plus its ToDto mapper) - both already-extracted facets, so no circular dependency.
-    internal sealed class EfDeviceUnitRepository(AgrumyDbContext db, IOptions<AgrumySettings> settingsOptions, IServerConfigRepository serverConfigRepository, IDeviceRepository deviceRepository) : IDeviceUnitRepository
+    /// IDeviceFarmUnitRepository, extracted out of the EfRepository god class (roadmap #246) - Unit/Zone CRUD, device assignment, and the hierarchical dashboard aggregation. Needs IServerConfigRepository (dashboard's ProblemEvent settings) and IDeviceRepository (fleet-cache invalidation after assign/unassign, plus its ToDto mapper) - both already-extracted facets, so no circular dependency.
+    internal sealed class EfDeviceFarmUnitRepository(AgrumyDbContext db, IOptions<AgrumySettings> settingsOptions, IServerConfigRepository serverConfigRepository, IDeviceRepository deviceRepository) : IDeviceFarmUnitRepository
     {
         private readonly AgrumySettings settings = settingsOptions.Value;
 
         /// A record, not the SensorData DTO - carries only what dashboard aggregation needs.
         private sealed record UnitZoneDeviceSnapshot(
-            int? DeviceUnitID, int? DeviceUnitZoneID, bool Enabled, bool Online, bool HasRecentProblemEvent,
+            int? DeviceFarmUnitID, int? DeviceFarmUnitZoneID, bool Enabled, bool Online, bool HasRecentProblemEvent,
             double? Temperature, double? SoilTemperature, double? Humidity, int? Moisture, int? Light,
             int? Co2, int? Tvoc, double? Barometer, double? LiquidPH, int? RainLevel, int? WaterLevel, double? Wind)
         {
@@ -35,31 +35,31 @@ namespace api.Dal
 
         // ---- Unit CRUD -------------------------------------------------
 
-        public async Task<IList<DeviceUnit>> DeviceUnitsGetAsync(int? tenantID)
+        public async Task<IList<DeviceFarmUnit>> DeviceFarmUnitsGetAsync(int? tenantID)
         {
-            IQueryable<DeviceUnitRow> q = db.DeviceUnits.AsNoTracking().Where(u => u.IDDeviceUnit != 0);
+            IQueryable<DeviceFarmUnitRow> q = db.DeviceFarmUnits.AsNoTracking().Where(u => u.IDDeviceFarmUnit != 0);
             if (tenantID != null)
             {
                 q = q.Where(u => u.TenantID == tenantID);
             }
-            var rows = await q.OrderBy(u => u.DeviceUnitName).ToListAsync();
+            var rows = await q.OrderBy(u => u.DeviceFarmUnitName).ToListAsync();
             return rows.Select(ToDtoUnit).ToList();
         }
 
-        public async Task<DeviceUnit?> DeviceUnitGetByIdAsync(int? idDeviceUnit)
+        public async Task<DeviceFarmUnit?> DeviceFarmUnitGetByIdAsync(int? idDeviceFarmUnit)
         {
-            var row = await db.DeviceUnits.AsNoTracking().FirstOrDefaultAsync(u => u.IDDeviceUnit == idDeviceUnit);
+            var row = await db.DeviceFarmUnits.AsNoTracking().FirstOrDefaultAsync(u => u.IDDeviceFarmUnit == idDeviceFarmUnit);
             return row == null ? null : ToDtoUnit(row);
         }
 
-        public async Task<DeviceUnit> DeviceUnitAddAsync(DeviceUnit unit)
+        public async Task<DeviceFarmUnit> DeviceFarmUnitAddAsync(DeviceFarmUnit unit)
         {
-            // IDDeviceUnit is ValueGeneratedNever - MySQL's default sql_mode treats an explicit 0 on an AUTO_INCREMENT column as "generate a new value", which would collide with the reserved IDDeviceUnit=0 sentinel (Math.Max(...,1) below keeps 0 free).
+            // IDDeviceFarmUnit is ValueGeneratedNever - MySQL's default sql_mode treats an explicit 0 on an AUTO_INCREMENT column as "generate a new value", which would collide with the reserved IDDeviceFarmUnit=0 sentinel (Math.Max(...,1) below keeps 0 free).
             for (int attempt = 0; ; attempt++)
             {
-                int nextId = Math.Max((await db.DeviceUnits.AsNoTracking().Select(u => (int?)u.IDDeviceUnit).MaxAsync() ?? 0) + 1, 1);
-                var row = new DeviceUnitRow { IDDeviceUnit = nextId, TenantID = unit.TenantID, DeviceUnitName = unit.DeviceUnitName };
-                db.DeviceUnits.Add(row);
+                int nextId = Math.Max((await db.DeviceFarmUnits.AsNoTracking().Select(u => (int?)u.IDDeviceFarmUnit).MaxAsync() ?? 0) + 1, 1);
+                var row = new DeviceFarmUnitRow { IDDeviceFarmUnit = nextId, TenantID = unit.TenantID, DeviceFarmUnitName = unit.DeviceFarmUnitName };
+                db.DeviceFarmUnits.Add(row);
                 try
                 {
                     await db.SaveChangesAsync();
@@ -73,68 +73,68 @@ namespace api.Dal
             }
         }
 
-        public async Task DeviceUnitUpdateAsync(DeviceUnit unit)
+        public async Task DeviceFarmUnitUpdateAsync(DeviceFarmUnit unit)
         {
-            var row = await db.DeviceUnits.FirstOrDefaultAsync(u => u.IDDeviceUnit == unit.IDDeviceUnit);
+            var row = await db.DeviceFarmUnits.FirstOrDefaultAsync(u => u.IDDeviceFarmUnit == unit.IDDeviceFarmUnit);
             if (row == null)
             {
                 return;
             }
             // TenantID intentionally not overwritten - same "payload cannot move to another tenant" rule as DeviceUpdateAsync.
-            row.DeviceUnitName = unit.DeviceUnitName;
+            row.DeviceFarmUnitName = unit.DeviceFarmUnitName;
             await db.SaveChangesAsync();
         }
 
-        public async Task DeviceUnitDeleteAsync(int idDeviceUnit)
+        public async Task DeviceFarmUnitDeleteAsync(int idDeviceFarmUnit)
         {
-            var zoneIds = await db.DeviceUnitZones.AsNoTracking()
-                .Where(z => z.DeviceUnitID == idDeviceUnit)
-                .Select(z => z.IDDeviceUnitZone)
+            var zoneIds = await db.DeviceFarmUnitZones.AsNoTracking()
+                .Where(z => z.DeviceFarmUnitID == idDeviceFarmUnit)
+                .Select(z => z.IDDeviceFarmUnitZone)
                 .ToListAsync();
 
             foreach (int zoneId in zoneIds)
             {
-                await DeviceUnitZoneDeleteAsync(zoneId);
+                await DeviceFarmUnitZoneDeleteAsync(zoneId);
             }
 
-            // Unit-scope rules (DeviceUnitZoneID == null) live directly on the unit, not any of its zones - the zone loop above never touches them, so they'd otherwise survive as orphans after the unit is gone.
-            var unitRuleIds = await db.DeviceUnitZoneRules.AsNoTracking()
-                .Where(r => r.DeviceUnitID == idDeviceUnit && r.DeviceUnitZoneID == null).Select(r => r.IDDeviceUnitZoneRule).ToListAsync();
+            // Unit-scope rules (DeviceFarmUnitZoneID == null) live directly on the unit, not any of its zones - the zone loop above never touches them, so they'd otherwise survive as orphans after the unit is gone.
+            var unitRuleIds = await db.DeviceFarmUnitZoneRules.AsNoTracking()
+                .Where(r => r.DeviceFarmUnitID == idDeviceFarmUnit && r.DeviceFarmUnitZoneID == null).Select(r => r.IDDeviceFarmUnitZoneRule).ToListAsync();
             await db.RuleNotificationStates.Where(s => unitRuleIds.Contains(s.RuleID)).ExecuteDeleteAsync();
-            await db.DeviceUnitZoneRules.Where(r => r.DeviceUnitID == idDeviceUnit && r.DeviceUnitZoneID == null).ExecuteDeleteAsync();
+            await db.DeviceFarmUnitZoneRules.Where(r => r.DeviceFarmUnitID == idDeviceFarmUnit && r.DeviceFarmUnitZoneID == null).ExecuteDeleteAsync();
 
-            await db.DeviceUnits.Where(u => u.IDDeviceUnit == idDeviceUnit).ExecuteDeleteAsync();
+            await db.DeviceFarmUnits.Where(u => u.IDDeviceFarmUnit == idDeviceFarmUnit).ExecuteDeleteAsync();
         }
 
         // ---- Zone CRUD ------------------------------------------------
 
-        public async Task<IList<DeviceUnitZone>> DeviceUnitZonesGetAsync(int idDeviceUnit)
+        public async Task<IList<DeviceFarmUnitZone>> DeviceFarmUnitZonesGetAsync(int idDeviceFarmUnit)
         {
-            var rows = await db.DeviceUnitZones.AsNoTracking()
-                .Where(z => z.DeviceUnitID == idDeviceUnit && z.IDDeviceUnitZone != 0)
-                .OrderBy(z => z.DeviceUnitZoneName)
+            var rows = await db.DeviceFarmUnitZones.AsNoTracking()
+                .Where(z => z.DeviceFarmUnitID == idDeviceFarmUnit && z.IDDeviceFarmUnitZone != 0)
+                .OrderBy(z => z.DeviceFarmUnitZoneName)
                 .ToListAsync();
             return rows.Select(ToDtoZone).ToList();
         }
 
-        public async Task<DeviceUnitZone?> DeviceUnitZoneGetByIdAsync(int? idDeviceUnitZone)
+        public async Task<DeviceFarmUnitZone?> DeviceFarmUnitZoneGetByIdAsync(int? idDeviceFarmUnitZone)
         {
-            var row = await db.DeviceUnitZones.AsNoTracking().FirstOrDefaultAsync(z => z.IDDeviceUnitZone == idDeviceUnitZone);
+            var row = await db.DeviceFarmUnitZones.AsNoTracking().FirstOrDefaultAsync(z => z.IDDeviceFarmUnitZone == idDeviceFarmUnitZone);
             return row == null ? null : ToDtoZone(row);
         }
 
-        public async Task<DeviceUnitZone> DeviceUnitZoneAddAsync(DeviceUnitZone zone)
+        public async Task<DeviceFarmUnitZone> DeviceFarmUnitZoneAddAsync(DeviceFarmUnitZone zone)
         {
-            // Same manual max+1 reasoning, and same collision-retry, as DeviceUnitAddAsync.
+            // Same manual max+1 reasoning, and same collision-retry, as DeviceFarmUnitAddAsync.
             for (int attempt = 0; ; attempt++)
             {
-                int nextId = Math.Max((await db.DeviceUnitZones.AsNoTracking().Select(z => (int?)z.IDDeviceUnitZone).MaxAsync() ?? 0) + 1, 1);
-                var row = new DeviceUnitZoneRow
+                int nextId = Math.Max((await db.DeviceFarmUnitZones.AsNoTracking().Select(z => (int?)z.IDDeviceFarmUnitZone).MaxAsync() ?? 0) + 1, 1);
+                var row = new DeviceFarmUnitZoneRow
                 {
-                    IDDeviceUnitZone = nextId,
+                    IDDeviceFarmUnitZone = nextId,
                     TenantID = zone.TenantID,
-                    DeviceUnitID = zone.DeviceUnitID,
-                    DeviceUnitZoneName = zone.DeviceUnitZoneName,
+                    DeviceFarmUnitID = zone.DeviceFarmUnitID,
+                    DeviceFarmUnitZoneName = zone.DeviceFarmUnitZoneName,
                     WaterPumpMaxRunSeconds = settings.WaterPumpMaxRunSeconds,
                     WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds,
                     // No server-wide default makes sense for a specific tank's own calibration - unlike WaterPumpMaxRunSeconds above, always taken from the caller (null/unset is the correct "no tank tracking yet" state).
@@ -145,7 +145,7 @@ namespace api.Dal
                     HeatingMaxRunSeconds = zone.HeatingMaxRunSeconds,
                     VentilationMaxRunSeconds = zone.VentilationMaxRunSeconds,
                 };
-                db.DeviceUnitZones.Add(row);
+                db.DeviceFarmUnitZones.Add(row);
                 try
                 {
                     await db.SaveChangesAsync();
@@ -158,15 +158,15 @@ namespace api.Dal
             }
         }
 
-        public async Task DeviceUnitZoneUpdateAsync(DeviceUnitZone zone)
+        public async Task DeviceFarmUnitZoneUpdateAsync(DeviceFarmUnitZone zone)
         {
-            var row = await db.DeviceUnitZones.FirstOrDefaultAsync(z => z.IDDeviceUnitZone == zone.IDDeviceUnitZone);
+            var row = await db.DeviceFarmUnitZones.FirstOrDefaultAsync(z => z.IDDeviceFarmUnitZone == zone.IDDeviceFarmUnitZone);
             if (row == null)
             {
                 return;
             }
-            // TenantID/DeviceUnitID intentionally not overwritten - renaming a zone must not silently move it to another unit or tenant.
-            row.DeviceUnitZoneName = zone.DeviceUnitZoneName;
+            // TenantID/DeviceFarmUnitID intentionally not overwritten - renaming a zone must not silently move it to another unit or tenant.
+            row.DeviceFarmUnitZoneName = zone.DeviceFarmUnitZoneName;
             row.WaterPumpMaxRunSeconds = zone.WaterPumpMaxRunSeconds;
             row.WaterPumpCooldownSeconds = zone.WaterPumpCooldownSeconds;
             row.SkipWaterPumpWhenRainPredicted = zone.SkipWaterPumpWhenRainPredicted;
@@ -176,20 +176,20 @@ namespace api.Dal
             row.HeatingMaxRunSeconds = zone.HeatingMaxRunSeconds;
             row.VentilationMaxRunSeconds = zone.VentilationMaxRunSeconds;
             await db.SaveChangesAsync();
-            await DeviceUnitZoneConfigVersionBumpAsync(idDeviceUnitZone: row.IDDeviceUnitZone);
+            await DeviceFarmUnitZoneConfigVersionBumpAsync(idDeviceFarmUnitZone: row.IDDeviceFarmUnitZone);
         }
 
         /// Bumps ConfigVersion for every device in the zone (bulk update, not fetch-then-loop) so the next poll picks up a zone-level rule/safety-limit change.
-        public async Task DeviceUnitZoneConfigVersionBumpAsync(int idDeviceUnitZone)
+        public async Task DeviceFarmUnitZoneConfigVersionBumpAsync(int idDeviceFarmUnitZone)
         {
-            await db.Devices.Where(d => d.DeviceUnitZoneID == idDeviceUnitZone)
+            await db.Devices.Where(d => d.DeviceFarmUnitZoneID == idDeviceFarmUnitZone)
                 .ExecuteUpdateAsync(s => s.SetProperty(d => d.ConfigVersion, d => (d.ConfigVersion ?? 0) + 1));
         }
 
-        public async Task DeviceUnitZoneDeleteAsync(int idDeviceUnitZone)
+        public async Task DeviceFarmUnitZoneDeleteAsync(int idDeviceFarmUnitZone)
         {
             var deviceIds = await db.Devices.AsNoTracking()
-                .Where(d => d.DeviceUnitZoneID == idDeviceUnitZone)
+                .Where(d => d.DeviceFarmUnitZoneID == idDeviceFarmUnitZone)
                 .Select(d => d.IDDevice)
                 .ToListAsync();
 
@@ -198,66 +198,66 @@ namespace api.Dal
                 await DeviceUnassignFromZoneAsync(deviceId);
             }
 
-            // App-level cleanup, not a DB-level CASCADE - see AgrumyDbContext's DeviceUnitZoneRuleRow config, DeleteBehavior.NoAction. Zone-cascade deletion does not run the RulesReferencingAsync guard RuleDeleteAsync uses - a whole-zone delete already unassigns its devices unconditionally, same "cascade wins" precedent.
-            var ruleIds = await db.DeviceUnitZoneRules.AsNoTracking()
-                .Where(r => r.DeviceUnitZoneID == idDeviceUnitZone).Select(r => r.IDDeviceUnitZoneRule).ToListAsync();
-            await db.RuleNotificationStates.Where(s => ruleIds.Contains(s.RuleID) || s.DeviceUnitZoneID == idDeviceUnitZone).ExecuteDeleteAsync();
-            await db.DeviceUnitZoneRules.Where(r => r.DeviceUnitZoneID == idDeviceUnitZone).ExecuteDeleteAsync();
+            // App-level cleanup, not a DB-level CASCADE - see AgrumyDbContext's DeviceFarmUnitZoneRuleRow config, DeleteBehavior.NoAction. Zone-cascade deletion does not run the RulesReferencingAsync guard RuleDeleteAsync uses - a whole-zone delete already unassigns its devices unconditionally, same "cascade wins" precedent.
+            var ruleIds = await db.DeviceFarmUnitZoneRules.AsNoTracking()
+                .Where(r => r.DeviceFarmUnitZoneID == idDeviceFarmUnitZone).Select(r => r.IDDeviceFarmUnitZoneRule).ToListAsync();
+            await db.RuleNotificationStates.Where(s => ruleIds.Contains(s.RuleID) || s.DeviceFarmUnitZoneID == idDeviceFarmUnitZone).ExecuteDeleteAsync();
+            await db.DeviceFarmUnitZoneRules.Where(r => r.DeviceFarmUnitZoneID == idDeviceFarmUnitZone).ExecuteDeleteAsync();
 
-            await db.DeviceUnitZones.Where(z => z.IDDeviceUnitZone == idDeviceUnitZone).ExecuteDeleteAsync();
+            await db.DeviceFarmUnitZones.Where(z => z.IDDeviceFarmUnitZone == idDeviceFarmUnitZone).ExecuteDeleteAsync();
         }
 
         // ---- Rules (Zone/Unit/Global scope) --------------------------------------
 
-        public async Task<IList<DeviceUnitZoneRule>> RulesGetForZoneAsync(int idDeviceUnitZone)
+        public async Task<IList<DeviceFarmUnitZoneRule>> RulesGetForZoneAsync(int idDeviceFarmUnitZone)
         {
-            var rows = await db.DeviceUnitZoneRules.AsNoTracking()
-                .Where(r => r.DeviceUnitZoneID == idDeviceUnitZone)
-                .OrderBy(r => r.RelayFunction).ThenBy(r => r.SensorMetric).ThenBy(r => r.IDDeviceUnitZoneRule)
+            var rows = await db.DeviceFarmUnitZoneRules.AsNoTracking()
+                .Where(r => r.DeviceFarmUnitZoneID == idDeviceFarmUnitZone)
+                .OrderBy(r => r.RelayFunction).ThenBy(r => r.SensorMetric).ThenBy(r => r.IDDeviceFarmUnitZoneRule)
                 .ToListAsync();
             return rows.Select(ToDtoRule).ToList();
         }
 
-        public async Task<IList<DeviceUnitZoneRule>> RulesGetForUnitAsync(int idDeviceUnit)
+        public async Task<IList<DeviceFarmUnitZoneRule>> RulesGetForUnitAsync(int idDeviceFarmUnit)
         {
-            var rows = await db.DeviceUnitZoneRules.AsNoTracking()
-                .Where(r => r.DeviceUnitID == idDeviceUnit)
-                .OrderBy(r => r.RelayFunction).ThenBy(r => r.SensorMetric).ThenBy(r => r.IDDeviceUnitZoneRule)
+            var rows = await db.DeviceFarmUnitZoneRules.AsNoTracking()
+                .Where(r => r.DeviceFarmUnitID == idDeviceFarmUnit)
+                .OrderBy(r => r.RelayFunction).ThenBy(r => r.SensorMetric).ThenBy(r => r.IDDeviceFarmUnitZoneRule)
                 .ToListAsync();
             return rows.Select(ToDtoRule).ToList();
         }
 
-        public async Task<IList<DeviceUnitZoneRule>> RulesGetForTenantGlobalAsync(int tenantId)
+        public async Task<IList<DeviceFarmUnitZoneRule>> RulesGetForTenantGlobalAsync(int tenantId)
         {
-            var rows = await db.DeviceUnitZoneRules.AsNoTracking()
-                .Where(r => r.TenantID == tenantId && r.DeviceUnitID == null && r.DeviceUnitZoneID == null)
-                .OrderBy(r => r.RelayFunction).ThenBy(r => r.SensorMetric).ThenBy(r => r.IDDeviceUnitZoneRule)
+            var rows = await db.DeviceFarmUnitZoneRules.AsNoTracking()
+                .Where(r => r.TenantID == tenantId && r.DeviceFarmUnitID == null && r.DeviceFarmUnitZoneID == null)
+                .OrderBy(r => r.RelayFunction).ThenBy(r => r.SensorMetric).ThenBy(r => r.IDDeviceFarmUnitZoneRule)
                 .ToListAsync();
             return rows.Select(ToDtoRule).ToList();
         }
 
         /// Every Notification-action rule for the tenant across all three scopes - RuleNotificationEvaluator resolves Zone>Unit>Global itself per zone, so this deliberately returns the flat, unresolved set.
-        public async Task<IList<DeviceUnitZoneRule>> RulesGetNotificationRulesForTenantAsync(int tenantId)
+        public async Task<IList<DeviceFarmUnitZoneRule>> RulesGetNotificationRulesForTenantAsync(int tenantId)
         {
-            var rows = await db.DeviceUnitZoneRules.AsNoTracking()
+            var rows = await db.DeviceFarmUnitZoneRules.AsNoTracking()
                 .Where(r => r.TenantID == tenantId && r.ActionType == (int)ActionType.Notification)
                 .ToListAsync();
             return rows.Select(ToDtoRule).ToList();
         }
 
-        public async Task<DeviceUnitZoneRule?> RuleGetByIdAsync(int? idRule)
+        public async Task<DeviceFarmUnitZoneRule?> RuleGetByIdAsync(int? idRule)
         {
-            var row = await db.DeviceUnitZoneRules.AsNoTracking().FirstOrDefaultAsync(r => r.IDDeviceUnitZoneRule == idRule);
+            var row = await db.DeviceFarmUnitZoneRules.AsNoTracking().FirstOrDefaultAsync(r => r.IDDeviceFarmUnitZoneRule == idRule);
             return row == null ? null : ToDtoRule(row);
         }
 
-        public async Task<int> RuleAddAsync(DeviceUnitZoneRule rule)
+        public async Task<int> RuleAddAsync(DeviceFarmUnitZoneRule rule)
         {
-            var row = new DeviceUnitZoneRuleRow
+            var row = new DeviceFarmUnitZoneRuleRow
             {
                 TenantID = rule.TenantID,
-                DeviceUnitID = rule.DeviceUnitID,
-                DeviceUnitZoneID = rule.DeviceUnitZoneID,
+                DeviceFarmUnitID = rule.DeviceFarmUnitID,
+                DeviceFarmUnitZoneID = rule.DeviceFarmUnitZoneID,
                 ActionType = (int)rule.ActionType,
                 RelayFunction = (int?)rule.RelayFunction,
                 SensorMetric = (int?)rule.SensorMetric,
@@ -265,15 +265,15 @@ namespace api.Dal
                 NotificationSubject = rule.NotificationSubject,
                 NotificationBody = rule.NotificationBody,
             };
-            db.DeviceUnitZoneRules.Add(row);
+            db.DeviceFarmUnitZoneRules.Add(row);
             await db.SaveChangesAsync();
-            if (rule.DeviceUnitZoneID is int idZone)
+            if (rule.DeviceFarmUnitZoneID is int idZone)
             {
-                await DeviceUnitZoneConfigVersionBumpAsync(idZone);
+                await DeviceFarmUnitZoneConfigVersionBumpAsync(idZone);
             }
-            else if (rule.DeviceUnitID is int idUnit)
+            else if (rule.DeviceFarmUnitID is int idUnit)
             {
-                await db.Devices.Where(d => d.DeviceUnitID == idUnit)
+                await db.Devices.Where(d => d.DeviceFarmUnitID == idUnit)
                     .ExecuteUpdateAsync(s => s.SetProperty(d => d.ConfigVersion, d => (d.ConfigVersion ?? 0) + 1));
             }
             else
@@ -281,19 +281,19 @@ namespace api.Dal
                 await db.Devices.Where(d => d.TenantID == rule.TenantID)
                     .ExecuteUpdateAsync(s => s.SetProperty(d => d.ConfigVersion, d => (d.ConfigVersion ?? 0) + 1));
             }
-            return row.IDDeviceUnitZoneRule;
+            return row.IDDeviceFarmUnitZoneRule;
         }
 
         /// Every RuleTriggered condition anywhere in the tenant's rules that references ruleId - callers use this to block deleting a still-referenced rule, and RuleNotificationEvaluator uses it to find dependents of a just-fired rule.
-        public async Task<IList<DeviceUnitZoneRule>> RulesReferencingAsync(int ruleId, int tenantId)
+        public async Task<IList<DeviceFarmUnitZoneRule>> RulesReferencingAsync(int ruleId, int tenantId)
         {
-            var candidates = await db.DeviceUnitZoneRules.AsNoTracking()
+            var candidates = await db.DeviceFarmUnitZoneRules.AsNoTracking()
                 .Where(r => r.TenantID == tenantId && r.ActionType == (int)ActionType.Notification)
                 .ToListAsync();
-            var result = new List<DeviceUnitZoneRule>();
+            var result = new List<DeviceFarmUnitZoneRule>();
             foreach (var row in candidates)
             {
-                DeviceUnitZoneRule dto = ToDtoRule(row);
+                DeviceFarmUnitZoneRule dto = ToDtoRule(row);
                 bool references = dto.Conditions.Any(c =>
                     c.ConditionType == ConditionType.RuleTriggered &&
                     c.ConditionConfig?.Deserialize<RuleTriggeredConditionConfig>(ConditionConfigJson.Options)?.ReferencedRuleId == ruleId);
@@ -307,20 +307,20 @@ namespace api.Dal
 
         public async Task RuleDeleteAsync(int idRule)
         {
-            var row = await db.DeviceUnitZoneRules.AsNoTracking()
-                .FirstOrDefaultAsync(r => r.IDDeviceUnitZoneRule == idRule);
+            var row = await db.DeviceFarmUnitZoneRules.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.IDDeviceFarmUnitZoneRule == idRule);
             if (row == null) { return; }
 
             await db.RuleNotificationStates.Where(s => s.RuleID == idRule).ExecuteDeleteAsync();
-            await db.DeviceUnitZoneRules.Where(r => r.IDDeviceUnitZoneRule == idRule).ExecuteDeleteAsync();
+            await db.DeviceFarmUnitZoneRules.Where(r => r.IDDeviceFarmUnitZoneRule == idRule).ExecuteDeleteAsync();
 
-            if (row.DeviceUnitZoneID is int idZone)
+            if (row.DeviceFarmUnitZoneID is int idZone)
             {
-                await DeviceUnitZoneConfigVersionBumpAsync(idZone);
+                await DeviceFarmUnitZoneConfigVersionBumpAsync(idZone);
             }
-            else if (row.DeviceUnitID is int idUnit)
+            else if (row.DeviceFarmUnitID is int idUnit)
             {
-                await db.Devices.Where(d => d.DeviceUnitID == idUnit)
+                await db.Devices.Where(d => d.DeviceFarmUnitID == idUnit)
                     .ExecuteUpdateAsync(s => s.SetProperty(d => d.ConfigVersion, d => (d.ConfigVersion ?? 0) + 1));
             }
             else
@@ -331,17 +331,17 @@ namespace api.Dal
         }
 
         /// False (not just missing) for a (rule, zone) pair with no row yet - a rule that has never fired for this zone has never been "true".
-        public async Task<bool> RuleNotificationWasTrueGetAsync(int ruleId, int idDeviceUnitZone) =>
+        public async Task<bool> RuleNotificationWasTrueGetAsync(int ruleId, int idDeviceFarmUnitZone) =>
             await db.RuleNotificationStates.AsNoTracking()
-                .Where(s => s.RuleID == ruleId && s.DeviceUnitZoneID == idDeviceUnitZone)
+                .Where(s => s.RuleID == ruleId && s.DeviceFarmUnitZoneID == idDeviceFarmUnitZone)
                 .Select(s => (bool?)s.WasTrue).FirstOrDefaultAsync() ?? false;
 
-        public async Task RuleNotificationWasTrueSetAsync(int ruleId, int idDeviceUnitZone, bool wasTrue, DateTime? lastFiredAtUtc)
+        public async Task RuleNotificationWasTrueSetAsync(int ruleId, int idDeviceFarmUnitZone, bool wasTrue, DateTime? lastFiredAtUtc)
         {
-            var row = await db.RuleNotificationStates.FirstOrDefaultAsync(s => s.RuleID == ruleId && s.DeviceUnitZoneID == idDeviceUnitZone);
+            var row = await db.RuleNotificationStates.FirstOrDefaultAsync(s => s.RuleID == ruleId && s.DeviceFarmUnitZoneID == idDeviceFarmUnitZone);
             if (row == null)
             {
-                row = new RuleNotificationStateRow { RuleID = ruleId, DeviceUnitZoneID = idDeviceUnitZone };
+                row = new RuleNotificationStateRow { RuleID = ruleId, DeviceFarmUnitZoneID = idDeviceFarmUnitZone };
                 db.RuleNotificationStates.Add(row);
             }
             row.WasTrue = wasTrue;
@@ -352,12 +352,12 @@ namespace api.Dal
             await db.SaveChangesAsync();
         }
 
-        private static DeviceUnitZoneRule ToDtoRule(DeviceUnitZoneRuleRow r) => new()
+        private static DeviceFarmUnitZoneRule ToDtoRule(DeviceFarmUnitZoneRuleRow r) => new()
         {
-            IDDeviceUnitZoneRule = r.IDDeviceUnitZoneRule,
+            IDDeviceFarmUnitZoneRule = r.IDDeviceFarmUnitZoneRule,
             TenantID = r.TenantID,
-            DeviceUnitID = r.DeviceUnitID,
-            DeviceUnitZoneID = r.DeviceUnitZoneID,
+            DeviceFarmUnitID = r.DeviceFarmUnitID,
+            DeviceFarmUnitZoneID = r.DeviceFarmUnitZoneID,
             ActionType = (ActionType)r.ActionType,
             RelayFunction = (RelayFunction?)r.RelayFunction,
             SensorMetric = (SensorMetric?)r.SensorMetric,
@@ -366,39 +366,39 @@ namespace api.Dal
             NotificationBody = r.NotificationBody,
         };
 
-        public async Task<bool> DeviceUnitZoneHasControllerAsync(int idDeviceUnitZone)
+        public async Task<bool> DeviceFarmUnitZoneHasControllerAsync(int idDeviceFarmUnitZone)
         {
             return await db.Devices.AsNoTracking()
-                .AnyAsync(d => d.DeviceUnitZoneID == idDeviceUnitZone && d.DeviceControllerEnabled == true);
+                .AnyAsync(d => d.DeviceFarmUnitZoneID == idDeviceFarmUnitZone && d.DeviceControllerEnabled == true);
         }
 
-        public async Task<Device?> DeviceUnitZoneGetControllerAsync(int idDeviceUnitZone)
+        public async Task<Device?> DeviceFarmUnitZoneGetControllerAsync(int idDeviceFarmUnitZone)
         {
             var row = await db.Devices.AsNoTracking()
-                .FirstOrDefaultAsync(d => d.DeviceUnitZoneID == idDeviceUnitZone && d.DeviceControllerEnabled == true);
+                .FirstOrDefaultAsync(d => d.DeviceFarmUnitZoneID == idDeviceFarmUnitZone && d.DeviceControllerEnabled == true);
             return row == null ? null : EfDeviceRepository.ToDto(row);
         }
 
-        public async Task<IList<Device>> DeviceUnitGetControllersAsync(int idDeviceUnit)
+        public async Task<IList<Device>> DeviceFarmUnitGetControllersAsync(int idDeviceFarmUnit)
         {
             var rows = await db.Devices.AsNoTracking()
-                .Where(d => d.DeviceUnitID == idDeviceUnit && d.DeviceControllerEnabled == true)
+                .Where(d => d.DeviceFarmUnitID == idDeviceFarmUnit && d.DeviceControllerEnabled == true)
                 .ToListAsync();
             return rows.Select(EfDeviceRepository.ToDto).ToList();
         }
 
-        public async Task<IList<Device>> DeviceUnitZoneGetSensorsAsync(int idDeviceUnitZone)
+        public async Task<IList<Device>> DeviceFarmUnitZoneGetSensorsAsync(int idDeviceFarmUnitZone)
         {
             var rows = await db.Devices.AsNoTracking()
-                .Where(d => d.DeviceUnitZoneID == idDeviceUnitZone && d.DeviceSensorEnabled == true && d.DeviceControllerEnabled != true)
+                .Where(d => d.DeviceFarmUnitZoneID == idDeviceFarmUnitZone && d.DeviceSensorEnabled == true && d.DeviceControllerEnabled != true)
                 .ToListAsync();
             return rows.Select(EfDeviceRepository.ToDto).ToList();
         }
 
-        public async Task<IList<Device>> DeviceUnitGetSensorsAsync(int idDeviceUnit)
+        public async Task<IList<Device>> DeviceFarmUnitGetSensorsAsync(int idDeviceFarmUnit)
         {
             var rows = await db.Devices.AsNoTracking()
-                .Where(d => d.DeviceUnitID == idDeviceUnit && d.DeviceSensorEnabled == true && d.DeviceControllerEnabled != true)
+                .Where(d => d.DeviceFarmUnitID == idDeviceFarmUnit && d.DeviceSensorEnabled == true && d.DeviceControllerEnabled != true)
                 .ToListAsync();
             return rows.Select(EfDeviceRepository.ToDto).ToList();
         }
@@ -408,7 +408,7 @@ namespace api.Dal
         public async Task<IList<Device>> DeviceUnassignedGetAsync(int? tenantID, bool controllerCapable)
         {
             IQueryable<DeviceRow> q = db.Devices.AsNoTracking()
-                .Where(d => d.DeviceUnitZoneID == null);
+                .Where(d => d.DeviceFarmUnitZoneID == null);
             if (tenantID != null)
             {
                 q = q.Where(d => d.TenantID == tenantID);
@@ -421,17 +421,17 @@ namespace api.Dal
             return rows.Select(EfDeviceRepository.ToDto).ToList();
         }
 
-        public async Task DeviceAssignToZoneAsync(int idDevice, int idDeviceUnitZone)
+        public async Task DeviceAssignToZoneAsync(int idDevice, int idDeviceFarmUnitZone)
         {
-            var zone = await db.DeviceUnitZones.AsNoTracking().FirstOrDefaultAsync(z => z.IDDeviceUnitZone == idDeviceUnitZone);
+            var zone = await db.DeviceFarmUnitZones.AsNoTracking().FirstOrDefaultAsync(z => z.IDDeviceFarmUnitZone == idDeviceFarmUnitZone);
             var device = await db.Devices.FirstOrDefaultAsync(d => d.IDDevice == idDevice);
             if (zone == null || device == null)
             {
                 return;
             }
 
-            device.DeviceUnitID = zone.DeviceUnitID;
-            device.DeviceUnitZoneID = zone.IDDeviceUnitZone;
+            device.DeviceFarmUnitID = zone.DeviceFarmUnitID;
+            device.DeviceFarmUnitZoneID = zone.IDDeviceFarmUnitZone;
             // Bumped (unlike Unassign below) - the device learns its new assignment on its next poll.
             device.ConfigVersion = (device.ConfigVersion ?? 0) + 1;
             await db.SaveChangesAsync();
@@ -445,16 +445,16 @@ namespace api.Dal
             // No ConfigVersion bump - the device is not notified, it just stops counting toward any zone's aggregation.
             await db.Devices.Where(d => d.IDDevice == idDevice)
                 .ExecuteUpdateAsync(s => s
-                    .SetProperty(d => d.DeviceUnitID, (int?)null)
-                    .SetProperty(d => d.DeviceUnitZoneID, (int?)null));
+                    .SetProperty(d => d.DeviceFarmUnitID, (int?)null)
+                    .SetProperty(d => d.DeviceFarmUnitZoneID, (int?)null));
             await deviceRepository.InvalidateFleetCacheAsync(tenantID);
         }
 
         // ---- Dashboard aggregation -------------------------------------
 
-        public async Task<IList<DeviceUnitDashboard>> DeviceUnitDashboardGetAsync(int? tenantID)
+        public async Task<IList<DeviceFarmUnitDashboard>> DeviceFarmUnitDashboardGetAsync(int? tenantID)
         {
-            IQueryable<DeviceUnitRow> units = db.DeviceUnits.AsNoTracking().Where(u => u.IDDeviceUnit != 0);
+            IQueryable<DeviceFarmUnitRow> units = db.DeviceFarmUnits.AsNoTracking().Where(u => u.IDDeviceFarmUnit != 0);
             if (tenantID != null)
             {
                 units = units.Where(u => u.TenantID == tenantID);
@@ -462,7 +462,7 @@ namespace api.Dal
             var unitRows = await units.ToListAsync();
 
             IQueryable<DeviceRow> scopedDevices = db.Devices.AsNoTracking()
-                .Where(d => d.DeviceUnitID != null);
+                .Where(d => d.DeviceFarmUnitID != null);
             if (tenantID != null)
             {
                 scopedDevices = scopedDevices.Where(d => d.TenantID == tenantID);
@@ -471,94 +471,94 @@ namespace api.Dal
             var snapshots = await GetDeviceSnapshotsAsync(scopedDevices, expiryHours, alertsEnabled);
             var alerts = await GetProblemAlertsAsync(scopedDevices, expiryHours, alertsEnabled);
 
-            var zonesByUnit = (await db.DeviceUnitZones.AsNoTracking()
-                .Where(z => z.IDDeviceUnitZone != 0)
-                .Select(z => new { z.DeviceUnitID, z.IDDeviceUnitZone })
+            var zonesByUnit = (await db.DeviceFarmUnitZones.AsNoTracking()
+                .Where(z => z.IDDeviceFarmUnitZone != 0)
+                .Select(z => new { z.DeviceFarmUnitID, z.IDDeviceFarmUnitZone })
                 .ToListAsync())
-                .GroupBy(z => z.DeviceUnitID)
-                .ToDictionary(g => g.Key, g => g.Select(z => z.IDDeviceUnitZone).ToList());
+                .GroupBy(z => z.DeviceFarmUnitID)
+                .ToDictionary(g => g.Key, g => g.Select(z => z.IDDeviceFarmUnitZone).ToList());
 
             // One SensorData query for every unit's zones combined, not one query per unit in the loop below - a fleet with 20+ units otherwise pulls its whole 24h trend window once per unit.
-            var zoneIdsByUnit = unitRows.ToDictionary(u => u.IDDeviceUnit, u => zonesByUnit.GetValueOrDefault(u.IDDeviceUnit) ?? []);
+            var zoneIdsByUnit = unitRows.ToDictionary(u => u.IDDeviceFarmUnit, u => zonesByUnit.GetValueOrDefault(u.IDDeviceFarmUnit) ?? []);
             var trendsByUnit = await BuildTrendsByZoneGroupAsync(zoneIdsByUnit);
 
-            var result = new List<DeviceUnitDashboard>();
+            var result = new List<DeviceFarmUnitDashboard>();
             foreach (var u in unitRows)
             {
-                var scoped = snapshots.Where(s => s.DeviceUnitID == u.IDDeviceUnit).ToList();
-                var zoneIds = zonesByUnit.GetValueOrDefault(u.IDDeviceUnit) ?? [];
-                result.Add(new DeviceUnitDashboard
+                var scoped = snapshots.Where(s => s.DeviceFarmUnitID == u.IDDeviceFarmUnit).ToList();
+                var zoneIds = zonesByUnit.GetValueOrDefault(u.IDDeviceFarmUnit) ?? [];
+                result.Add(new DeviceFarmUnitDashboard
                 {
-                    IDDeviceUnit = u.IDDeviceUnit,
-                    DeviceUnitName = u.DeviceUnitName,
+                    IDDeviceFarmUnit = u.IDDeviceFarmUnit,
+                    DeviceFarmUnitName = u.DeviceFarmUnitName,
                     ZoneCount = zoneIds.Count,
                     DeviceCount = scoped.Count,
                     Averages = Average(scoped),
                     Status = ComputeStatus(scoped),
-                    Trend = trendsByUnit[u.IDDeviceUnit],
-                    ProblemAlerts = alerts.Where(a => a.DeviceUnitID == u.IDDeviceUnit).Select(ToDtoAlert).ToList(),
+                    Trend = trendsByUnit[u.IDDeviceFarmUnit],
+                    ProblemAlerts = alerts.Where(a => a.DeviceFarmUnitID == u.IDDeviceFarmUnit).Select(ToDtoAlert).ToList(),
                 });
             }
             return result;
         }
 
-        public async Task<IList<DeviceUnitZoneDashboard>> DeviceUnitZoneDashboardListGetAsync(int idDeviceUnit)
+        public async Task<IList<DeviceFarmUnitZoneDashboard>> DeviceFarmUnitZoneDashboardListGetAsync(int idDeviceFarmUnit)
         {
-            var zoneRows = await db.DeviceUnitZones.AsNoTracking()
-                .Where(z => z.DeviceUnitID == idDeviceUnit && z.IDDeviceUnitZone != 0)
+            var zoneRows = await db.DeviceFarmUnitZones.AsNoTracking()
+                .Where(z => z.DeviceFarmUnitID == idDeviceFarmUnit && z.IDDeviceFarmUnitZone != 0)
                 .ToListAsync();
 
-            IQueryable<DeviceRow> scopedDevices = db.Devices.AsNoTracking().Where(d => d.DeviceUnitID == idDeviceUnit);
+            IQueryable<DeviceRow> scopedDevices = db.Devices.AsNoTracking().Where(d => d.DeviceFarmUnitID == idDeviceFarmUnit);
             (int expiryHours, bool alertsEnabled) = await ProblemEventSettingsAsync();
             var snapshots = await GetDeviceSnapshotsAsync(scopedDevices, expiryHours, alertsEnabled);
             var alerts = await GetProblemAlertsAsync(scopedDevices, expiryHours, alertsEnabled);
 
-            // Same batching as DeviceUnitDashboardGetAsync - one query for every zone's trend instead of one per zone in the loop below.
-            var trendsByZone = await BuildTrendsByZoneGroupAsync(zoneRows.ToDictionary(z => z.IDDeviceUnitZone, z => (List<int>)[z.IDDeviceUnitZone]));
+            // Same batching as DeviceFarmUnitDashboardGetAsync - one query for every zone's trend instead of one per zone in the loop below.
+            var trendsByZone = await BuildTrendsByZoneGroupAsync(zoneRows.ToDictionary(z => z.IDDeviceFarmUnitZone, z => (List<int>)[z.IDDeviceFarmUnitZone]));
 
-            var result = new List<DeviceUnitZoneDashboard>();
+            var result = new List<DeviceFarmUnitZoneDashboard>();
             foreach (var z in zoneRows)
             {
-                var scoped = snapshots.Where(s => s.DeviceUnitZoneID == z.IDDeviceUnitZone).ToList();
-                result.Add(new DeviceUnitZoneDashboard
+                var scoped = snapshots.Where(s => s.DeviceFarmUnitZoneID == z.IDDeviceFarmUnitZone).ToList();
+                result.Add(new DeviceFarmUnitZoneDashboard
                 {
-                    IDDeviceUnitZone = z.IDDeviceUnitZone,
-                    IDDeviceUnit = z.DeviceUnitID,
-                    DeviceUnitZoneName = z.DeviceUnitZoneName,
+                    IDDeviceFarmUnitZone = z.IDDeviceFarmUnitZone,
+                    IDDeviceFarmUnit = z.DeviceFarmUnitID,
+                    DeviceFarmUnitZoneName = z.DeviceFarmUnitZoneName,
                     DeviceCount = scoped.Count,
                     Averages = Average(scoped, z),
                     Status = ComputeStatus(scoped),
-                    Trend = trendsByZone[z.IDDeviceUnitZone],
-                    ProblemAlerts = alerts.Where(a => a.DeviceUnitZoneID == z.IDDeviceUnitZone).Select(ToDtoAlert).ToList(),
+                    Trend = trendsByZone[z.IDDeviceFarmUnitZone],
+                    ProblemAlerts = alerts.Where(a => a.DeviceFarmUnitZoneID == z.IDDeviceFarmUnitZone).Select(ToDtoAlert).ToList(),
                 });
             }
             return result;
         }
 
-        public async Task<DeviceUnitZoneDashboard?> DeviceUnitZoneDashboardGetAsync(int idDeviceUnitZone)
+        public async Task<DeviceFarmUnitZoneDashboard?> DeviceFarmUnitZoneDashboardGetAsync(int idDeviceFarmUnitZone)
         {
-            var zone = await db.DeviceUnitZones.AsNoTracking().FirstOrDefaultAsync(z => z.IDDeviceUnitZone == idDeviceUnitZone);
+            var zone = await db.DeviceFarmUnitZones.AsNoTracking().FirstOrDefaultAsync(z => z.IDDeviceFarmUnitZone == idDeviceFarmUnitZone);
             if (zone == null)
             {
                 return null;
             }
 
-            var deviceRows = await db.Devices.AsNoTracking().Where(d => d.DeviceUnitZoneID == idDeviceUnitZone).ToListAsync();
-            IQueryable<DeviceRow> scopedDevices = db.Devices.AsNoTracking().Where(d => d.DeviceUnitZoneID == idDeviceUnitZone);
+            var deviceRows = await db.Devices.AsNoTracking().Where(d => d.DeviceFarmUnitZoneID == idDeviceFarmUnitZone).ToListAsync();
+            IQueryable<DeviceRow> scopedDevices = db.Devices.AsNoTracking().Where(d => d.DeviceFarmUnitZoneID == idDeviceFarmUnitZone);
             (int expiryHours, bool alertsEnabled) = await ProblemEventSettingsAsync();
             var snapshots = await GetDeviceSnapshotsAsync(scopedDevices, expiryHours, alertsEnabled);
             var alerts = await GetProblemAlertsAsync(scopedDevices, expiryHours, alertsEnabled);
 
-            return new DeviceUnitZoneDashboard
+            return new DeviceFarmUnitZoneDashboard
             {
-                IDDeviceUnitZone = zone.IDDeviceUnitZone,
-                IDDeviceUnit = zone.DeviceUnitID,
-                DeviceUnitZoneName = zone.DeviceUnitZoneName,
+                IDDeviceFarmUnitZone = zone.IDDeviceFarmUnitZone,
+                IDDeviceFarmUnit = zone.DeviceFarmUnitID,
+                DeviceFarmUnitZoneName = zone.DeviceFarmUnitZoneName,
                 DeviceCount = deviceRows.Count,
                 Averages = Average(snapshots, zone),
                 Devices = deviceRows.Select(EfDeviceRepository.ToDto).ToList(),
                 Status = ComputeStatus(snapshots),
-                Trend = await BuildTrendAsync([idDeviceUnitZone]),
+                Trend = await BuildTrendAsync([idDeviceFarmUnitZone]),
                 ProblemAlerts = alerts.Select(ToDtoAlert).ToList(),
             };
         }
@@ -580,8 +580,8 @@ namespace api.Dal
             var deviceLatestIds = await devices
                 .Select(d => new
                 {
-                    d.DeviceUnitID,
-                    d.DeviceUnitZoneID,
+                    d.DeviceFarmUnitID,
+                    d.DeviceFarmUnitZoneID,
                     d.Enabled,
                     d.SleepSeconds,
                     LastSeenAt = db.DeviceDiagnostics.AsNoTracking()
@@ -618,14 +618,14 @@ namespace api.Dal
                 // A disabled device is expected to be silent - its offline-ness must not redden a zone/unit nobody expects it to report into.
                 bool online = !enabled || DeviceFleetStatus.ComputeOnline(d.LastSeenAt, d.SleepSeconds, utcNow);
                 return new UnitZoneDeviceSnapshot(
-                    d.DeviceUnitID, d.DeviceUnitZoneID, enabled, online, d.HasRecentProblemEvent,
+                    d.DeviceFarmUnitID, d.DeviceFarmUnitZoneID, enabled, online, d.HasRecentProblemEvent,
                     s?.Temperature, s?.SoilTemperature, s?.Humidity, s?.Moisture, s?.Light,
                     s?.Co2, s?.Tvoc, s?.Barometer, s?.LiquidPH, s?.RainLevel, s?.WaterLevel, s?.Wind);
             }).ToList();
         }
 
         /// Carries JOIN projection fields - lets the alert list group by unit/zone without a second round trip to look either up from DeviceID.
-        private sealed record UnitZoneProblemAlertRow(int? DeviceUnitID, int? DeviceUnitZoneID, int IDEventDevice, int DeviceID, string? DeviceName, int EventID, DateTime? Date, string? Message);
+        private sealed record UnitZoneProblemAlertRow(int? DeviceFarmUnitID, int? DeviceFarmUnitZoneID, int IDEventDevice, int DeviceID, string? DeviceName, int EventID, DateTime? Date, string? Message);
 
         /// Every un-acknowledged problem event still inside the expiry window - same predicate as GetDeviceSnapshotsAsync's HasRecentProblemEvent, but returns the actual rows so the dashboard can show what triggered Orange.
         private async Task<List<UnitZoneProblemAlertRow>> GetProblemAlertsAsync(IQueryable<DeviceRow> devices, int problemEventExpiryHours, bool problemEventAlertsEnabled)
@@ -641,10 +641,10 @@ namespace api.Dal
                 .Join(
                     db.EventDevices.AsNoTracking().Where(e => e.AcknowledgedAt == null && e.Date >= cutoff && ProblemEventTypeIds.Contains(e.EventID)),
                     d => d.IDDevice, e => e.DeviceID,
-                    (d, e) => new { d.DeviceUnitID, d.DeviceUnitZoneID, e.IDEventDevice, d.IDDevice, d.DeviceName, e.EventID, e.Date, e.Message })
+                    (d, e) => new { d.DeviceFarmUnitID, d.DeviceFarmUnitZoneID, e.IDEventDevice, d.IDDevice, d.DeviceName, e.EventID, e.Date, e.Message })
                 .OrderByDescending(a => a.Date)
                 .ToListAsync();
-            return rows.Select(a => new UnitZoneProblemAlertRow(a.DeviceUnitID, a.DeviceUnitZoneID, a.IDEventDevice, a.IDDevice, a.DeviceName, a.EventID, a.Date, a.Message)).ToList();
+            return rows.Select(a => new UnitZoneProblemAlertRow(a.DeviceFarmUnitID, a.DeviceFarmUnitZoneID, a.IDEventDevice, a.IDDevice, a.DeviceName, a.EventID, a.Date, a.Message)).ToList();
         }
 
         private static UnitZoneProblemAlert ToDtoAlert(UnitZoneProblemAlertRow a) => new()
@@ -671,7 +671,7 @@ namespace api.Dal
             return ZoneStatus.Green;
         }
 
-        /// Last-24h hourly average per sensor type across the given zones - filters sensorData directly by DeviceUnitZoneID (ix_sensorData_deviceUnitZone_date) since a trend needs every reading, not just the latest.
+        /// Last-24h hourly average per sensor type across the given zones - filters sensorData directly by DeviceFarmUnitZoneID (ix_sensorData_deviceFarmUnitZone_date) since a trend needs every reading, not just the latest.
         private async Task<SensorTrend> BuildTrendAsync(List<int> zoneIds)
         {
             var trend = new SensorTrend();
@@ -684,7 +684,7 @@ namespace api.Dal
             DateTime cutoff = utcNow.AddHours(-SensorTrend.HourBuckets);
 
             var rows = await db.SensorData.AsNoTracking()
-                .Where(s => s.DeviceUnitZoneID != null && zoneIds.Contains(s.DeviceUnitZoneID.Value) && s.DateCreated >= cutoff)
+                .Where(s => s.DeviceFarmUnitZoneID != null && zoneIds.Contains(s.DeviceFarmUnitZoneID.Value) && s.DateCreated >= cutoff)
                 .Select(s => new
                 {
                     s.DateCreated, s.Temperature, s.SoilTemperature, s.Humidity, s.Moisture, s.Light,
@@ -718,7 +718,7 @@ namespace api.Dal
             return trend;
         }
 
-        /// Same 24h hourly-bucket trend as BuildTrendAsync, but for many keys (units, or zones) in one SensorData query instead of one query per key - each zone belongs to exactly one key, so results just get routed by DeviceUnitZoneID after the single fetch.
+        /// Same 24h hourly-bucket trend as BuildTrendAsync, but for many keys (units, or zones) in one SensorData query instead of one query per key - each zone belongs to exactly one key, so results just get routed by DeviceFarmUnitZoneID after the single fetch.
         private async Task<Dictionary<TKey, SensorTrend>> BuildTrendsByZoneGroupAsync<TKey>(Dictionary<TKey, List<int>> zoneIdsByKey) where TKey : notnull
         {
             var result = zoneIdsByKey.Keys.ToDictionary(k => k, _ => new SensorTrend());
@@ -740,17 +740,17 @@ namespace api.Dal
             var zoneIdList = keyByZoneId.Keys.ToList();
 
             var rows = await db.SensorData.AsNoTracking()
-                .Where(s => s.DeviceUnitZoneID != null && zoneIdList.Contains(s.DeviceUnitZoneID.Value) && s.DateCreated >= cutoff)
+                .Where(s => s.DeviceFarmUnitZoneID != null && zoneIdList.Contains(s.DeviceFarmUnitZoneID.Value) && s.DateCreated >= cutoff)
                 .Select(s => new
                 {
-                    s.DeviceUnitZoneID, s.DateCreated, s.Temperature, s.SoilTemperature, s.Humidity, s.Moisture, s.Light,
+                    s.DeviceFarmUnitZoneID, s.DateCreated, s.Temperature, s.SoilTemperature, s.Humidity, s.Moisture, s.Light,
                     s.Co2, s.Tvoc, s.Barometer, s.LiquidPH, s.RainLevel, s.WaterLevel, s.Wind,
                 })
                 .ToListAsync();
 
             var byKeyAndBucket = rows
                 .Where(r => r.DateCreated != null)
-                .Select(r => (Key: keyByZoneId[r.DeviceUnitZoneID!.Value], Bucket: HourBucketIndex(r.DateCreated!.Value, utcNow), Row: r))
+                .Select(r => (Key: keyByZoneId[r.DeviceFarmUnitZoneID!.Value], Bucket: HourBucketIndex(r.DateCreated!.Value, utcNow), Row: r))
                 .Where(x => x.Bucket >= 0 && x.Bucket < SensorTrend.HourBuckets)
                 .GroupBy(x => (x.Key, x.Bucket));
 
@@ -780,7 +780,7 @@ namespace api.Dal
             SensorTrend.HourBuckets - 1 - (int)Math.Floor((utcNow - dateCreated).TotalHours);
 
         /// Per-sensor-type average across snapshots - LINQ's nullable Average() already ignores nulls and returns null (not an exception) for an all-null source, exactly "no device reported this type". zone is only passed at Zone granularity - a Unit rollup passes null since it may span zones with different (or no) tank calibration, and TankFillPercent/VolumeLiters stay null there.
-        private static SensorAverages Average(IReadOnlyCollection<UnitZoneDeviceSnapshot> snapshots, DeviceUnitZoneRow? zone = null)
+        private static SensorAverages Average(IReadOnlyCollection<UnitZoneDeviceSnapshot> snapshots, DeviceFarmUnitZoneRow? zone = null)
         {
             double? waterLevel = snapshots.Select(s => s.WaterLevel).Average();
             // Fill fraction is linear, so averaging raw WaterLevel first and calibrating once is equivalent to calibrating per device then averaging.
@@ -812,8 +812,8 @@ namespace api.Dal
 
         public async Task<IList<TankRefillAlertCandidate>> TankRefillAlertCandidatesGetAsync()
         {
-            var zones = await db.DeviceUnitZones.AsNoTracking()
-                .Where(z => z.IDDeviceUnitZone != 0 && z.TenantID != null
+            var zones = await db.DeviceFarmUnitZones.AsNoTracking()
+                .Where(z => z.IDDeviceFarmUnitZone != 0 && z.TenantID != null
                     && z.TankCapacityLiters != null && z.WaterLevelRawEmpty != null && z.WaterLevelRawFull != null)
                 .ToListAsync();
 
@@ -822,7 +822,7 @@ namespace api.Dal
             {
                 // Latest reading per device in the zone (portable scalar subquery, same shape as LowBatteryAlertCandidatesGetAsync's Battery column), averaged client-side.
                 var latestPerDevice = await db.Devices.AsNoTracking()
-                    .Where(d => d.DeviceUnitZoneID == z.IDDeviceUnitZone)
+                    .Where(d => d.DeviceFarmUnitZoneID == z.IDDeviceFarmUnitZone)
                     .Select(d => db.SensorData.AsNoTracking()
                         .Where(s => s.DeviceID == d.IDDevice)
                         .OrderByDescending(s => s.DateCreated)
@@ -832,15 +832,15 @@ namespace api.Dal
                 double? waterLevel = latestPerDevice.Select(w => (double?)w).Average();
 
                 result.Add(new TankRefillAlertCandidate(
-                    z.IDDeviceUnitZone, z.TenantID!.Value, z.DeviceUnitZoneName,
+                    z.IDDeviceFarmUnitZone, z.TenantID!.Value, z.DeviceFarmUnitZoneName,
                     waterLevel, z.WaterLevelRawEmpty, z.WaterLevelRawFull, z.TankCapacityLiters, z.TankRefillNotifiedAt));
             }
             return result;
         }
 
-        public async Task TankRefillNotifiedSetAsync(int idDeviceUnitZone, DateTime? notifiedAt)
+        public async Task TankRefillNotifiedSetAsync(int idDeviceFarmUnitZone, DateTime? notifiedAt)
         {
-            await db.DeviceUnitZones.Where(z => z.IDDeviceUnitZone == idDeviceUnitZone)
+            await db.DeviceFarmUnitZones.Where(z => z.IDDeviceFarmUnitZone == idDeviceFarmUnitZone)
                 .ExecuteUpdateAsync(s => s.SetProperty(z => z.TankRefillNotifiedAt, notifiedAt));
         }
 
@@ -895,19 +895,19 @@ namespace api.Dal
             TargetHysteresis = o.TargetHysteresis,
         };
 
-        private static DeviceUnit ToDtoUnit(DeviceUnitRow u) => new()
+        private static DeviceFarmUnit ToDtoUnit(DeviceFarmUnitRow u) => new()
         {
-            IDDeviceUnit = u.IDDeviceUnit,
+            IDDeviceFarmUnit = u.IDDeviceFarmUnit,
             TenantID = u.TenantID,
-            DeviceUnitName = u.DeviceUnitName,
+            DeviceFarmUnitName = u.DeviceFarmUnitName,
         };
 
-        private static DeviceUnitZone ToDtoZone(DeviceUnitZoneRow z) => new()
+        private static DeviceFarmUnitZone ToDtoZone(DeviceFarmUnitZoneRow z) => new()
         {
-            IDDeviceUnitZone = z.IDDeviceUnitZone,
+            IDDeviceFarmUnitZone = z.IDDeviceFarmUnitZone,
             TenantID = z.TenantID,
-            DeviceUnitID = z.DeviceUnitID,
-            DeviceUnitZoneName = z.DeviceUnitZoneName,
+            DeviceFarmUnitID = z.DeviceFarmUnitID,
+            DeviceFarmUnitZoneName = z.DeviceFarmUnitZoneName,
             WaterPumpMaxRunSeconds = z.WaterPumpMaxRunSeconds,
             WaterPumpCooldownSeconds = z.WaterPumpCooldownSeconds,
             SkipWaterPumpWhenRainPredicted = z.SkipWaterPumpWhenRainPredicted,

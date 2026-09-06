@@ -10,7 +10,7 @@ public class CommandQueueServiceTests
 {
     private readonly Mock<ICommandRepository> _commands = new(MockBehavior.Strict);
     private readonly Mock<IDeviceRepository> _devices = new(MockBehavior.Strict);
-    private readonly Mock<IDeviceUnitRepository> _units = new(MockBehavior.Strict);
+    private readonly Mock<IDeviceFarmUnitRepository> _units = new(MockBehavior.Strict);
 
     private CommandQueueService NewService() => new(_commands.Object, _devices.Object, _units.Object, new NoOpMqttCommandPublisher());
 
@@ -32,7 +32,7 @@ public class CommandQueueServiceTests
     public async Task Zone_With_No_Controller_Returns_TargetNotFound()
     {
         // A zone has at most one controller - null means genuinely none, not "not looked up yet".
-        _units.Setup(u => u.DeviceUnitZoneGetControllerAsync(10)).ReturnsAsync((Device?)null);
+        _units.Setup(u => u.DeviceFarmUnitZoneGetControllerAsync(10)).ReturnsAsync((Device?)null);
 
         var result = await NewService().IssueCommandAsync(CommandTargetType.Zone, 10, CommandActionType.Reboot);
 
@@ -43,7 +43,7 @@ public class CommandQueueServiceTests
     public async Task Zone_Target_Resolves_To_Its_Single_Controller()
     {
         DateTime before = DateTime.UtcNow;
-        _units.Setup(u => u.DeviceUnitZoneGetControllerAsync(10)).ReturnsAsync(ControllerDevice(500));
+        _units.Setup(u => u.DeviceFarmUnitZoneGetControllerAsync(10)).ReturnsAsync(ControllerDevice(500));
         _commands.Setup(c => c.HasActiveCommandAsync(500, CommandActionType.Reboot, It.IsAny<DateTime>())).ReturnsAsync(false);
         _commands.Setup(c => c.AddCommandAsync(500, CommandActionType.Reboot, It.IsAny<DateTime>(), It.IsAny<DateTime>())).ReturnsAsync(1);
 
@@ -58,7 +58,7 @@ public class CommandQueueServiceTests
     [Fact]
     public async Task Unit_With_No_Controllers_Across_Any_Zone_Returns_TargetNotFound()
     {
-        _units.Setup(u => u.DeviceUnitGetControllersAsync(7)).ReturnsAsync(new List<Device>());
+        _units.Setup(u => u.DeviceFarmUnitGetControllersAsync(7)).ReturnsAsync(new List<Device>());
 
         var result = await NewService().IssueCommandAsync(CommandTargetType.Unit, 7, CommandActionType.ForceOTA);
 
@@ -68,7 +68,7 @@ public class CommandQueueServiceTests
     [Fact]
     public async Task Unit_Target_FansOut_To_Every_Controller_Across_All_Its_Zones()
     {
-        _units.Setup(u => u.DeviceUnitGetControllersAsync(7)).ReturnsAsync(new List<Device> { ControllerDevice(500), ControllerDevice(501) });
+        _units.Setup(u => u.DeviceFarmUnitGetControllersAsync(7)).ReturnsAsync(new List<Device> { ControllerDevice(500), ControllerDevice(501) });
         _commands.Setup(c => c.HasActiveCommandAsync(500, CommandActionType.ForceOTA, It.IsAny<DateTime>())).ReturnsAsync(false);
         _commands.Setup(c => c.HasActiveCommandAsync(501, CommandActionType.ForceOTA, It.IsAny<DateTime>())).ReturnsAsync(false);
         _commands.Setup(c => c.AddCommandAsync(500, CommandActionType.ForceOTA, It.IsAny<DateTime>(), It.IsAny<DateTime>())).ReturnsAsync(1);
@@ -112,7 +112,7 @@ public class CommandQueueServiceTests
     public async Task Unit_FanOut_One_Zone_Already_Pending_Is_Skipped_Not_The_Whole_Batch()
     {
         // A Unit with three controllers, one already holding an active command of this ActionType: that one is skipped, the other two still get created, outcome is still Success (not AllDuplicates).
-        _units.Setup(u => u.DeviceUnitGetControllersAsync(7))
+        _units.Setup(u => u.DeviceFarmUnitGetControllersAsync(7))
             .ReturnsAsync(new List<Device> { ControllerDevice(500), ControllerDevice(501), ControllerDevice(502) });
         _commands.Setup(c => c.HasActiveCommandAsync(500, CommandActionType.Reboot, It.IsAny<DateTime>())).ReturnsAsync(true);
         _commands.Setup(c => c.HasActiveCommandAsync(501, CommandActionType.Reboot, It.IsAny<DateTime>())).ReturnsAsync(false);
@@ -130,7 +130,7 @@ public class CommandQueueServiceTests
     [Fact]
     public async Task Unit_FanOut_Every_Controller_Already_Pending_Returns_AllDuplicates()
     {
-        _units.Setup(u => u.DeviceUnitGetControllersAsync(7)).ReturnsAsync(new List<Device> { ControllerDevice(500), ControllerDevice(501) });
+        _units.Setup(u => u.DeviceFarmUnitGetControllersAsync(7)).ReturnsAsync(new List<Device> { ControllerDevice(500), ControllerDevice(501) });
         _commands.Setup(c => c.HasActiveCommandAsync(500, CommandActionType.Reboot, It.IsAny<DateTime>())).ReturnsAsync(true);
         _commands.Setup(c => c.HasActiveCommandAsync(501, CommandActionType.Reboot, It.IsAny<DateTime>())).ReturnsAsync(true);
 

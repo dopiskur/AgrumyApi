@@ -13,7 +13,7 @@ namespace api.Controllers.View
     [Authorize(Roles = RoleNames.GlobalAdminOrReader)]
     public class TenantController(IApi api) : Controller
     {
-        // Human-readable, same convention as DeviceUnitZoneRule.ConditionConfig - an admin may open this JSON to sanity-check it before importing elsewhere.
+        // Human-readable, same convention as DeviceFarmUnitZoneRule.ConditionConfig - an admin may open this JSON to sanity-check it before importing elsewhere.
         private static readonly JsonSerializerOptions ExportJsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
         public async Task<ActionResult> Index() => View(await api.TenantsGet());

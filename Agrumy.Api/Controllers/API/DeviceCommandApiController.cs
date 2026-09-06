@@ -11,7 +11,7 @@ namespace api.Controllers.API
 {
     /// Issues a device command, resolved/fanned-out server-side by CommandQueueService - ownership checks reuse ApiControllerBase.EnsureOwnedDeviceEntityAsync, always as a write since issuing a command is never a read-only action.
     [Route("/api/DeviceCommand")]
-    public class DeviceCommandApiController(ICommandRepository commandRepo, IDeviceRepository deviceRepo, IDeviceUnitRepository deviceUnitRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, CommandQueueService commandQueue) : ApiControllerBase(userRepo, auditLogRepo, cache)
+    public class DeviceCommandApiController(ICommandRepository commandRepo, IDeviceRepository deviceRepo, IDeviceFarmUnitRepository deviceFarmUnitRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, CommandQueueService commandQueue) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         [Authorize(Roles = RoleNames.DeviceManagers)]
         [HttpPost]
@@ -100,10 +100,10 @@ namespace api.Controllers.API
         private Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(int idDevice) =>
             EnsureOwnedDeviceEntityAsync(() => deviceRepo.DeviceGetByIdAsync(idDevice), d => d.TenantID, "Device", forWrite: true);
 
-        private Task<(DeviceUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int idDeviceUnitZone) =>
-            EnsureOwnedDeviceEntityAsync(() => deviceUnitRepo.DeviceUnitZoneGetByIdAsync(idDeviceUnitZone), z => z.TenantID, "Zone", forWrite: true);
+        private Task<(DeviceFarmUnitZone? Zone, ActionResult? Error)> EnsureOwnedZoneAsync(int idDeviceFarmUnitZone) =>
+            EnsureOwnedDeviceEntityAsync(() => deviceFarmUnitRepo.DeviceFarmUnitZoneGetByIdAsync(idDeviceFarmUnitZone), z => z.TenantID, "Zone", forWrite: true);
 
-        private Task<(DeviceUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int idDeviceUnit) =>
-            EnsureOwnedDeviceEntityAsync(() => deviceUnitRepo.DeviceUnitGetByIdAsync(idDeviceUnit), u => u.TenantID, "Unit", forWrite: true);
+        private Task<(DeviceFarmUnit? Unit, ActionResult? Error)> EnsureOwnedUnitAsync(int idDeviceFarmUnit) =>
+            EnsureOwnedDeviceEntityAsync(() => deviceFarmUnitRepo.DeviceFarmUnitGetByIdAsync(idDeviceFarmUnit), u => u.TenantID, "Unit", forWrite: true);
     }
 }

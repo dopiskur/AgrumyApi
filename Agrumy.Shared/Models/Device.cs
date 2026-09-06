@@ -18,9 +18,9 @@ namespace api.Models
         public int? DeviceRoleID { get; set; } = 0;
         // No default (unlike DeviceRoleID above) - null means genuinely unassigned, not a 0-as-sentinel value.
         [HiddenInput(DisplayValue = true)]
-        public int? DeviceUnitID { get; set; }
+        public int? DeviceFarmUnitID { get; set; }
         [HiddenInput(DisplayValue = true)]
-        public int? DeviceUnitZoneID { get; set; }
+        public int? DeviceFarmUnitZoneID { get; set; }
         [HiddenInput(DisplayValue = true)]
         public int? DeviceConfigSensorID { get; set; }
         [HiddenInput(DisplayValue = true)]
@@ -85,9 +85,9 @@ namespace api.Models
         public int? IDDevice { get; set; }
         public int TenantID { get; set; } = 0;
         public int? DeviceRoleID { get; set; } = 0;
-        // No default (unlike DeviceRoleID above) - null means genuinely unassigned, see Device.DeviceUnitID.
-        public int? DeviceUnitID { get; set; }
-        public int? DeviceUnitZoneID { get; set; }
+        // No default (unlike DeviceRoleID above) - null means genuinely unassigned, see Device.DeviceFarmUnitID.
+        public int? DeviceFarmUnitID { get; set; }
+        public int? DeviceFarmUnitZoneID { get; set; }
         public int? DeviceConfigSensorID { get; set; }
         public int? DeviceConfigControllerID { get; set; }
         public int? DeviceTypeServiceID { get; set; } = 0;
@@ -144,8 +144,8 @@ namespace api.Models
             IDDevice = d.IDDevice,
             TenantID = d.TenantID,
             DeviceRoleID = d.DeviceRoleID,
-            DeviceUnitID = d.DeviceUnitID,
-            DeviceUnitZoneID = d.DeviceUnitZoneID,
+            DeviceFarmUnitID = d.DeviceFarmUnitID,
+            DeviceFarmUnitZoneID = d.DeviceFarmUnitZoneID,
             DeviceConfigSensorID = d.DeviceConfigSensorID,
             DeviceConfigControllerID = d.DeviceConfigControllerID,
             DeviceTypeServiceID = d.DeviceTypeServiceID,
@@ -181,8 +181,8 @@ namespace api.Models
             IDDevice = dto.IDDevice,
             TenantID = dto.TenantID,
             DeviceRoleID = dto.DeviceRoleID,
-            DeviceUnitID = dto.DeviceUnitID,
-            DeviceUnitZoneID = dto.DeviceUnitZoneID,
+            DeviceFarmUnitID = dto.DeviceFarmUnitID,
+            DeviceFarmUnitZoneID = dto.DeviceFarmUnitZoneID,
             DeviceConfigSensorID = dto.DeviceConfigSensorID,
             DeviceConfigControllerID = dto.DeviceConfigControllerID,
             DeviceTypeServiceID = dto.DeviceTypeServiceID,
@@ -271,8 +271,8 @@ namespace api.Models
         public int? ConfigVersion { get; set; }
         public int? TenantID { get; set; }
         public int? deviceID { get; set; }
-        public int? DeviceUnitID { get; set; }
-        public int? DeviceUnitZoneID { get; set; }
+        public int? DeviceFarmUnitID { get; set; }
+        public int? DeviceFarmUnitZoneID { get; set; }
         public int? DeviceTypeServiceID { get; set; }
 
         public string? ApiId { get; set; }
@@ -356,11 +356,11 @@ namespace api.Models
         public string? Kit { get; set; }
         // True when the device has real relay hardware - admin set DeviceRole to Sensor+Controller, or Kit maps to a deviceTypeKit board with relays; drives the Web UI's Controller tab.
         public bool ControllerCapable { get; set; }
-        // Lets the Web layer filter one shared DeviceFleetGet() response down to a single zone's devices (DeviceUnitController.ZoneDetails) instead of a second endpoint.
-        public int? DeviceUnitID { get; set; }
-        public int? DeviceUnitZoneID { get; set; }
-        public string? DeviceUnitName { get; set; }
-        public string? DeviceUnitZoneName { get; set; }
+        // Lets the Web layer filter one shared DeviceFleetGet() response down to a single zone's devices (DeviceFarmUnitController.ZoneDetails) instead of a second endpoint.
+        public int? DeviceFarmUnitID { get; set; }
+        public int? DeviceFarmUnitZoneID { get; set; }
+        public string? DeviceFarmUnitName { get; set; }
+        public string? DeviceFarmUnitZoneName { get; set; }
         /// Only the relay functions this device has ever reported a state for - empty for a sensor-only device or one whose firmware predates ControllerData.
         public IList<ControllerDataStatus>? RelayStates { get; set; }
 
@@ -493,7 +493,7 @@ namespace api.Models
         public double? TargetHysteresis { get; set; }
     }
 
-    /// POST /api/DeviceUnit/Zone/ManualActuate and .../Unit/ManualActuate's request body - api.Commands.ManualActuateService validates/caps it into a DeviceManualOverride. DurationSeconds is Duration-mode only (the admin's requested length, before the zone's MaxRunSeconds caps it); TargetMetric/TargetThreshold/TargetHysteresis are Target-mode only.
+    /// POST /api/DeviceFarmUnit/Zone/ManualActuate and .../Unit/ManualActuate's request body - api.Commands.ManualActuateService validates/caps it into a DeviceManualOverride. DurationSeconds is Duration-mode only (the admin's requested length, before the zone's MaxRunSeconds caps it); TargetMetric/TargetThreshold/TargetHysteresis are Target-mode only.
     public sealed record ManualActuateRequest(RelayFunction RelayFunction, ManualOverrideMode Mode, int? DurationSeconds,
         SensorMetric? TargetMetric, double? TargetThreshold, double? TargetHysteresis);
 
@@ -509,16 +509,16 @@ namespace api.Models
         public double? TargetHysteresis { get; set; }
     }
 
-    /// What's left of the per-device model after thresholds/schedule/safety-limits moved to the zone (DeviceUnitZone/DeviceUnitZoneRule) - just the relay-pin mapping; Rules/WaterPump* below are populated from the assigned zone by BuildDeviceConfigAsync, not from this row.
+    /// What's left of the per-device model after thresholds/schedule/safety-limits moved to the zone (DeviceFarmUnitZone/DeviceFarmUnitZoneRule) - just the relay-pin mapping; Rules/WaterPump* below are populated from the assigned zone by BuildDeviceConfigAsync, not from this row.
     public class DeviceConfigController()
     {
         [HiddenInput(DisplayValue = true)]
         public int? IDDeviceConfigController { get; set; }
 
         // The assigned zone's rules for whichever RelayFunction(s) Relays wires up; empty (all off) when the device has no zone.
-        public IList<DeviceUnitZoneRule> Rules { get; set; } = [];
+        public IList<DeviceFarmUnitZoneRule> Rules { get; set; } = [];
 
-        // Copied from the assigned zone's own fields - see DeviceUnitZone's remarks for why these are not Rules.
+        // Copied from the assigned zone's own fields - see DeviceFarmUnitZone's remarks for why these are not Rules.
         public int? WaterPumpMaxRunSeconds { get; set; }
         public int? WaterPumpCooldownSeconds { get; set; }
 

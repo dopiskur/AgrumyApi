@@ -8,7 +8,7 @@ namespace api.Migration
     /// Builds the full portable snapshot of one tenant - see api.Models.TenantExport for exactly what is/isn't included and why; read-only, composed from existing IRepository reads.
     public class TenantExportService(IRepository repo)
     {
-        // Human-readable (WriteIndented) - same convention as DeviceUnitZoneRule.ConditionConfig - an admin may open this JSON to sanity-check it before importing elsewhere.
+        // Human-readable (WriteIndented) - same convention as DeviceFarmUnitZoneRule.ConditionConfig - an admin may open this JSON to sanity-check it before importing elsewhere.
         private static readonly JsonSerializerOptions ExportJsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
         /// Packages ExportAsync's snapshot into a ZIP (single export.json entry) - same repackaging #124 already applies to the firmware catalog, so a tenant export behaves like every other admin download/upload pair instead of being the one plain-JSON exception.
@@ -51,20 +51,20 @@ namespace api.Migration
                 });
             }
 
-            IList<DeviceUnit> units = await repo.DeviceUnitsGetAsync(tenantId);
-            var zones = new List<DeviceUnitZone>();
-            var rules = new List<DeviceUnitZoneRule>();
-            foreach (DeviceUnit unit in units)
+            IList<DeviceFarmUnit> units = await repo.DeviceFarmUnitsGetAsync(tenantId);
+            var zones = new List<DeviceFarmUnitZone>();
+            var rules = new List<DeviceFarmUnitZoneRule>();
+            foreach (DeviceFarmUnit unit in units)
             {
-                if (unit.IDDeviceUnit is not int idUnit)
+                if (unit.IDDeviceFarmUnit is not int idUnit)
                 {
                     continue;
                 }
-                IList<DeviceUnitZone> unitZones = await repo.DeviceUnitZonesGetAsync(idUnit);
+                IList<DeviceFarmUnitZone> unitZones = await repo.DeviceFarmUnitZonesGetAsync(idUnit);
                 zones.AddRange(unitZones);
-                foreach (DeviceUnitZone zone in unitZones)
+                foreach (DeviceFarmUnitZone zone in unitZones)
                 {
-                    if (zone.IDDeviceUnitZone is int idZone)
+                    if (zone.IDDeviceFarmUnitZone is int idZone)
                     {
                         rules.AddRange(await repo.RulesGetForZoneAsync(idZone));
                     }

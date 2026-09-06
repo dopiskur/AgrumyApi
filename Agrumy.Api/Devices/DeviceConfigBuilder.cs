@@ -37,8 +37,8 @@ namespace api.Devices
                 ConfigVersion = device.ConfigVersion,
                 TenantID = device.TenantID,
                 deviceID = device.IDDevice,
-                DeviceUnitID = device.DeviceUnitID,
-                DeviceUnitZoneID = device.DeviceUnitZoneID,
+                DeviceFarmUnitID = device.DeviceFarmUnitID,
+                DeviceFarmUnitZoneID = device.DeviceFarmUnitZoneID,
                 ApiId = device.ApiId,
                 ApiKey = device.ApiKey,
                 ServicePoint = device.ServicePoint,
@@ -86,15 +86,15 @@ namespace api.Devices
             {
                 // Relay-pin mapping comes from the device row, but Rules/safety limits come from its zone, merged into the same DeviceConfigController; no zone means an empty Rules list so every relay stays off.
                 DeviceConfigController? controller = await repo.DeviceConfigControllerGetAsync(device.DeviceConfigControllerID);
-                if (controller != null && device.DeviceUnitZoneID is int idZone)
+                if (controller != null && device.DeviceFarmUnitZoneID is int idZone)
                 {
-                    IList<DeviceUnitZoneRule> zoneRules = await repo.RulesGetForZoneAsync(idZone);
-                    IList<DeviceUnitZoneRule> unitRules = device.DeviceUnitID is int idUnit ? await repo.RulesGetForUnitAsync(idUnit) : [];
-                    IList<DeviceUnitZoneRule> globalRules = await repo.RulesGetForTenantGlobalAsync(device.TenantID);
-                    IList<DeviceUnitZoneRule> rules = RuleHierarchyResolver.ResolveRelayRules(zoneRules, unitRules, globalRules);
+                    IList<DeviceFarmUnitZoneRule> zoneRules = await repo.RulesGetForZoneAsync(idZone);
+                    IList<DeviceFarmUnitZoneRule> unitRules = device.DeviceFarmUnitID is int idUnit ? await repo.RulesGetForUnitAsync(idUnit) : [];
+                    IList<DeviceFarmUnitZoneRule> globalRules = await repo.RulesGetForTenantGlobalAsync(device.TenantID);
+                    IList<DeviceFarmUnitZoneRule> rules = RuleHierarchyResolver.ResolveRelayRules(zoneRules, unitRules, globalRules);
                     DateOnly localDate = DateOnly.FromDateTime(DateTime.UtcNow.AddSeconds(utcOffsetSeconds));
                     controller.Rules = AstronomicalRuleResolver.Resolve(rules, serverConfig, localDate, utcOffsetSeconds);
-                    DeviceUnitZone? zone = await repo.DeviceUnitZoneGetByIdAsync(idZone);
+                    DeviceFarmUnitZone? zone = await repo.DeviceFarmUnitZoneGetByIdAsync(idZone);
                     controller.WaterPumpMaxRunSeconds = zone?.WaterPumpMaxRunSeconds;
                     controller.WaterPumpCooldownSeconds = zone?.WaterPumpCooldownSeconds;
                     // Computed here as a single AND-NOT gate, not sent as two separate flags - see DeviceConfigController.SkipWaterPumpForRain's remarks.

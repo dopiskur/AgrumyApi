@@ -138,7 +138,7 @@ namespace api.Controllers.API
                 ?? throw new JsonException("SensorData payload must be a JSON array.");
 
             await sensorDataRepo.SensorDataPushAsync(jsonArray, device.IDDevice!.Value, device.TenantID,
-                device.DeviceUnitID, device.DeviceUnitZoneID);
+                device.DeviceFarmUnitID, device.DeviceFarmUnitZoneID);
 
             return new GatewayBatchEntryResult { Success = true, StatusCode = 200 };
         }

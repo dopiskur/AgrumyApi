@@ -15,7 +15,7 @@ namespace api.Commands
     public sealed record IssueCommandResult(IssueCommandOutcome Outcome, IReadOnlyList<int> CreatedCommandIds, string? Message = null);
 
     /// Dedup, target resolution/fan-out, FIFO pending-command lookup, and ack/execute state transitions; no background worker - expiry is lazy, applied the moment a stale Pending row is next looked at.
-    public sealed class CommandQueueService(ICommandRepository commandRepo, IDeviceRepository deviceRepo, IDeviceUnitRepository unitRepo, IMqttCommandPublisher mqttPublisher)
+    public sealed class CommandQueueService(ICommandRepository commandRepo, IDeviceRepository deviceRepo, IDeviceFarmUnitRepository unitRepo, IMqttCommandPublisher mqttPublisher)
     {
         private static readonly TimeSpan DefaultExpiry = TimeSpan.FromMinutes(30);
 
@@ -33,12 +33,12 @@ namespace api.Commands
                     break;
                 case CommandTargetType.Zone:
                     // A zone has at most one controller - null means it genuinely has none, which must surface as an error, not a silent zero-created no-op.
-                    Device? controller = await unitRepo.DeviceUnitZoneGetControllerAsync(targetId);
+                    Device? controller = await unitRepo.DeviceFarmUnitZoneGetControllerAsync(targetId);
                     targets = controller == null ? [] : [controller];
                     notFoundMessage = $"Zone {targetId} has no controller assigned.";
                     break;
                 case CommandTargetType.Unit:
-                    targets = await unitRepo.DeviceUnitGetControllersAsync(targetId);
+                    targets = await unitRepo.DeviceFarmUnitGetControllersAsync(targetId);
                     notFoundMessage = $"Unit {targetId} has no controllers across any of its zones.";
                     break;
                 default:
@@ -60,12 +60,12 @@ namespace api.Commands
             string notFoundMessage;
             if (zoneId is int zid)
             {
-                targets = await unitRepo.DeviceUnitZoneGetSensorsAsync(zid);
+                targets = await unitRepo.DeviceFarmUnitZoneGetSensorsAsync(zid);
                 notFoundMessage = $"Zone {zid} has no sensor-only devices.";
             }
             else if (unitId is int uid)
             {
-                targets = await unitRepo.DeviceUnitGetSensorsAsync(uid);
+                targets = await unitRepo.DeviceFarmUnitGetSensorsAsync(uid);
                 notFoundMessage = $"Unit {uid} has no sensor-only devices across any of its zones.";
             }
             else

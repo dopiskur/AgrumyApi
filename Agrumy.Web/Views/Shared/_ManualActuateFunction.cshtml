@@ -3,7 +3,7 @@
 @{
     string fid = $"manualActuate_{Model.RelayFunction}_{Model.ScopeId}";
     string startAction = Model.IsUnitLevel ? "UnitManualActuateStart" : "ZoneManualActuateStart";
-    string scopeFieldName = Model.IsUnitLevel ? "idDeviceUnit" : "idDeviceUnitZone";
+    string scopeFieldName = Model.IsUnitLevel ? "idDeviceFarmUnit" : "idDeviceFarmUnitZone";
     // Target mode is always offered at Unit level - individual zones lacking MaxRunSeconds are skipped server-side, not gated here (a Unit can span zones with different or no configured cap).
     bool targetModeAvailable = Model.IsUnitLevel || Model.MaxRunSeconds is > 0;
 }
@@ -23,7 +23,7 @@
             </span>
         </div>
         <form asp-action="ZoneManualActuateStop" method="post">
-            <input type="hidden" name="idDeviceUnitZone" value="@Model.ScopeId" />
+            <input type="hidden" name="idDeviceFarmUnitZone" value="@Model.ScopeId" />
             <input type="hidden" name="relayFunction" value="@((int)Model.RelayFunction)" />
             <button type="submit" class="btn btn-sm btn-outline-danger">Stop</button>
         </form>

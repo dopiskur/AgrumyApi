@@ -13,7 +13,7 @@ namespace api.Devices
         /// EVERY Threshold condition's dead-zone latch input, since there is no per-condition state to store.
         /// This is an approximation for a rule with more than one Threshold condition (each shares the whole
         /// rule's latch rather than having its own), traded for not needing a per-condition state table.
-        public static bool EvaluateRule(DeviceUnitZoneRule rule, bool wasRuleTrue, double? metricReading,
+        public static bool EvaluateRule(DeviceFarmUnitZoneRule rule, bool wasRuleTrue, double? metricReading,
             DateTime utcNow, int utcOffsetSeconds, Func<int, bool> referencedRuleFiredThisTick)
         {
             if (rule.Conditions.Count == 0)

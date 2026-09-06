@@ -1,21 +1,21 @@
 @model api.ViewModels.UnitZonesViewModel
 @{
-    ViewData["Title"] = Model.Unit.DeviceUnitName;
+    ViewData["Title"] = Model.Unit.DeviceFarmUnitName;
     Func<string, bool> hasAnyRole = csv => csv.Split(',').Any(User.IsInRole);
     var renameModel = new InlineRenameViewModel
     {
-        Action = nameof(api.Controllers.View.DeviceUnitController.UnitRename),
-        IdFieldName = "idDeviceUnit",
-        IdValue = Model.Unit.IDDeviceUnit!.Value,
-        NameFieldName = "deviceUnitName",
-        CurrentName = Model.Unit.DeviceUnitName,
+        Action = nameof(api.Controllers.View.DeviceFarmUnitController.UnitRename),
+        IdFieldName = "idDeviceFarmUnit",
+        IdValue = Model.Unit.IDDeviceFarmUnit!.Value,
+        NameFieldName = "deviceFarmUnitName",
+        CurrentName = Model.Unit.DeviceFarmUnitName,
     };
 }
 
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a asp-action="Index">Units</a></li>
-        <li class="breadcrumb-item active" aria-current="page">@Model.Unit.DeviceUnitName</li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.Unit.DeviceFarmUnitName</li>
     </ol>
 </nav>
 
@@ -29,7 +29,7 @@
 }
 
 @{
-    int idUnit = Model.Unit.IDDeviceUnit!.Value;
+    int idUnit = Model.Unit.IDDeviceFarmUnit!.Value;
     var unitHeatingModel = new ManualActuateFunctionViewModel
     {
         ScopeId = idUnit, IsUnitLevel = true, RelayFunction = RelayFunction.Heating, Label = "Heating",
@@ -72,7 +72,7 @@
             <h3 class="card-title">Discovered devices</h3>
             <div class="float-end">
                 <form asp-action="ScanUnit" method="post">
-                    <input type="hidden" name="UnitID" value="@Model.Unit.IDDeviceUnit" />
+                    <input type="hidden" name="UnitID" value="@Model.Unit.IDDeviceFarmUnit" />
                     <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-broadcast"></i> Scan for new devices</button>
                 </form>
             </div>
@@ -86,7 +86,7 @@
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">
-            @Model.Unit.DeviceUnitName - Zones
+            @Model.Unit.DeviceFarmUnitName - Zones
             @if (hasAnyRole(RoleNames.DeviceManagers))
             {
                 <partial name="_InlineRename" model="renameModel" />
@@ -95,17 +95,17 @@
         @if (hasAnyRole(RoleNames.DeviceManagers))
         {
             <div class="float-end d-flex align-items-center gap-3">
-                <partial name="_DeviceCommandButtons" model="new DeviceCommandButtonsViewModel { TargetType = CommandTargetType.Unit, TargetId = Model.Unit.IDDeviceUnit!.Value }" />
-                <a asp-action="UnitRules" asp-route-idDeviceUnit="@Model.Unit.IDDeviceUnit" class="btn btn-sm btn-outline-primary text-nowrap">
+                <partial name="_DeviceCommandButtons" model="new DeviceCommandButtonsViewModel { TargetType = CommandTargetType.Unit, TargetId = Model.Unit.IDDeviceFarmUnit!.Value }" />
+                <a asp-action="UnitRules" asp-route-idDeviceFarmUnit="@Model.Unit.IDDeviceFarmUnit" class="btn btn-sm btn-outline-primary text-nowrap">
                     <i class="bi bi-diagram-3"></i> Unit rules
                 </a>
                 <form asp-action="ZoneAdd" method="post" class="d-flex gap-2">
-                    <input type="hidden" name="idDeviceUnit" value="@Model.Unit.IDDeviceUnit" />
-                    <input type="text" name="deviceUnitZoneName" class="form-control form-control-sm" placeholder="New zone name" required maxlength="120" />
+                    <input type="hidden" name="idDeviceFarmUnit" value="@Model.Unit.IDDeviceFarmUnit" />
+                    <input type="text" name="deviceFarmUnitZoneName" class="form-control form-control-sm" placeholder="New zone name" required maxlength="120" />
                     <button type="submit" class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-plus-lg"></i> Add Zone</button>
                 </form>
                 <form asp-action="UnitDelete" method="post" onsubmit="return confirm('Delete this unit and every zone in it? Devices are unassigned, not deleted.');">
-                    <input type="hidden" name="idDeviceUnit" value="@Model.Unit.IDDeviceUnit" />
+                    <input type="hidden" name="idDeviceFarmUnit" value="@Model.Unit.IDDeviceFarmUnit" />
                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete unit"><i class="bi bi-trash"></i></button>
                 </form>
             </div>
@@ -130,14 +130,14 @@
 <div class="modal fade" id="registerDeviceModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form asp-action="RegisterDiscoveredDeviceUnit" method="post">
+            <form asp-action="RegisterDiscoveredDeviceFarmUnit" method="post">
                 <div class="modal-header">
                     <h5 class="modal-title">Register discovered device</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" name="DiscoveredApMac" id="registerApMac" />
-                    <input type="hidden" name="UnitID" value="@Model.Unit.IDDeviceUnit" />
+                    <input type="hidden" name="UnitID" value="@Model.Unit.IDDeviceFarmUnit" />
                     <div class="mb-3">
                         <label class="form-label" for="registerDeviceName">Name (optional)</label>
                         <input type="text" name="DeviceName" id="registerDeviceName" class="form-control" maxlength="128" />
@@ -147,7 +147,7 @@
                         <select class="form-select" name="ZoneID" id="registerZoneSelect">
                             @foreach (var zone in Model.Zones)
                             {
-                                <option value="@zone.IDDeviceUnitZone">@zone.DeviceUnitZoneName</option>
+                                <option value="@zone.IDDeviceFarmUnitZone">@zone.DeviceFarmUnitZoneName</option>
                             }
                         </select>
                     </div>
@@ -167,7 +167,7 @@
     <script nonce="@Context.CspNonce()">
         document.addEventListener('DOMContentLoaded', function () {
             startLiveRefresh({
-                url: '@Url.Action("ZonesCubes", new { idDeviceUnit = Model.Unit.IDDeviceUnit })',
+                url: '@Url.Action("ZonesCubes", new { idDeviceFarmUnit = Model.Unit.IDDeviceFarmUnit })',
                 applyHtml: function (html) {
                     document.getElementById('zoneCubes').innerHTML = html;
                 }

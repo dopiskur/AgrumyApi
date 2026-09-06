@@ -14,10 +14,10 @@ namespace api.ViewModels
     {
         public required RuleScope Scope { get; init; }
 
-        /// IDDeviceUnitZone for Zone scope, IDDeviceUnit for Unit scope, null for Global (implied by the caller's tenant).
+        /// IDDeviceFarmUnitZone for Zone scope, IDDeviceFarmUnit for Unit scope, null for Global (implied by the caller's tenant).
         public int? ScopeId { get; init; }
 
-        public IList<DeviceUnitZoneRule> Rules { get; init; } = [];
+        public IList<DeviceFarmUnitZoneRule> Rules { get; init; } = [];
 
         public string AddActionName => Scope switch
         {
@@ -36,8 +36,8 @@ namespace api.ViewModels
         /// "" for Global, where there's no scope id to carry - RuleAdd's own scope check (server-side) resolves it from the caller's tenant instead.
         public string ScopeHiddenFieldName => Scope switch
         {
-            RuleScope.Zone => "idDeviceUnitZone",
-            RuleScope.Unit => "idDeviceUnit",
+            RuleScope.Zone => "idDeviceFarmUnitZone",
+            RuleScope.Unit => "idDeviceFarmUnit",
             _ => "",
         };
 

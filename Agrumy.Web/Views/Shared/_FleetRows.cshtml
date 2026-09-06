@@ -29,16 +29,16 @@
         @if (!zoneScoped)
         {
             <td>
-                @if (item.DeviceUnitID is null)
+                @if (item.DeviceFarmUnitID is null)
                 {
                     <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignZoneModal" data-device-id="@item.IDDevice">Assign</button>
                 }
                 else
                 {
-                    @item.DeviceUnitName
+                    @item.DeviceFarmUnitName
                 }
             </td>
-            <td>@(item.DeviceUnitZoneName ?? "-")</td>
+            <td>@(item.DeviceFarmUnitZoneName ?? "-")</td>
         }
         <td>
             @if (item.Online)
@@ -100,10 +100,10 @@
                 <a asp-controller="Device" asp-action="Events" asp-route-idDevice="@item.IDDevice" class="btn btn-outline-secondary" title="Events" aria-label="Events"><i class="bi bi-clock-history"></i></a>
                 @if (zoneScoped && hasAnyRole(RoleNames.DeviceManagers))
                 {
-                    <form asp-controller="DeviceUnit" asp-action="Remove" method="post" class="d-inline"
+                    <form asp-controller="DeviceFarmUnit" asp-action="Remove" method="post" class="d-inline"
                           onsubmit="return confirm('Remove this device from the zone? It stays registered and keeps reporting - it just stops counting toward this zone.');">
                         <input type="hidden" name="idDevice" value="@item.IDDevice" />
-                        <input type="hidden" name="idDeviceUnitZone" value="@item.DeviceUnitZoneID" />
+                        <input type="hidden" name="idDeviceFarmUnitZone" value="@item.DeviceFarmUnitZoneID" />
                         <button type="submit" class="btn btn-outline-danger" title="Remove from zone" aria-label="Remove from zone"><i class="bi bi-x-lg"></i></button>
                     </form>
                 }

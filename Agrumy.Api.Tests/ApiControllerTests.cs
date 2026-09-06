@@ -56,7 +56,7 @@ public class ApiControllerTests
 
     private void AssertNoJobWasQueued() =>
         Assert.False(_jobQueue.Reader.TryRead(out _), "Expected no background job to have been enqueued.");
-    private DeviceUnitApiController NewDeviceUnitController() => new(_repo.Object, _repo.Object, _repo.Object, _repo.Object, _repo.Object, _cache.Object, TestSettings, new api.Commands.ManualActuateService(_repo.Object));
+    private DeviceFarmUnitApiController NewDeviceFarmUnitController() => new(_repo.Object, _repo.Object, _repo.Object, _repo.Object, _repo.Object, _cache.Object, TestSettings, new api.Commands.ManualActuateService(_repo.Object));
     private TenantApiController NewTenantController() => new(_repo.Object, _repo.Object, _repo.Object, _cache.Object,
         new api.Migration.TenantExportService(_repo.Object), new api.Migration.TenantImportService(_repo.Object));
 
@@ -200,14 +200,14 @@ public class ApiControllerTests
     }
 
     [Fact]
-    public async Task DeviceUnitZoneRulesGet_TenantDataReaderOnly_Returns403_NeverLooksUpZone()
+    public async Task DeviceFarmUnitZoneRulesGet_TenantDataReaderOnly_Returns403_NeverLooksUpZone()
     {
-        var controller = NewDeviceUnitController();
+        var controller = NewDeviceFarmUnitController();
         SetCallerRoles(controller, 1, "user", RoleNames.TenantDataReader);
-        var result = await controller.DeviceUnitZoneRulesGet(5);
+        var result = await controller.DeviceFarmUnitZoneRulesGet(5);
 
         Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
-        // Strict mock: an un-set-up DeviceUnitZoneGetByIdAsync call would throw, proving it never runs.
+        // Strict mock: an un-set-up DeviceFarmUnitZoneGetByIdAsync call would throw, proving it never runs.
     }
 
     [Fact]
@@ -215,27 +215,27 @@ public class ApiControllerTests
     {
         // GlobalAdmin legitimately crosses tenants for the device AND the zone's own ownership checks, but the device and zone still belong to different tenants from each other.
         _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 1 });
-        _repo.Setup(r => r.DeviceUnitZoneGetByIdAsync(5)).ReturnsAsync(new DeviceUnitZone { IDDeviceUnitZone = 5, TenantID = 2 });
+        _repo.Setup(r => r.DeviceFarmUnitZoneGetByIdAsync(5)).ReturnsAsync(new DeviceFarmUnitZone { IDDeviceFarmUnitZone = 5, TenantID = 2 });
 
-        var controller = NewDeviceUnitController();
+        var controller = NewDeviceFarmUnitController();
         SetCallerRoles(controller, 0, "admin", RoleNames.GlobalAdmin);
-        var result = await controller.DeviceAssign(new DeviceZoneAssignment { IDDevice = 8, IDDeviceUnitZone = 5 });
+        var result = await controller.DeviceAssign(new DeviceZoneAssignment { IDDevice = 8, IDDeviceFarmUnitZone = 5 });
 
         Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
-        // Strict mock: an un-set-up DeviceUnitZoneHasControllerAsync/DeviceAssignToZoneAsync call would throw, proving the assignment never happened.
+        // Strict mock: an un-set-up DeviceFarmUnitZoneHasControllerAsync/DeviceAssignToZoneAsync call would throw, proving the assignment never happened.
     }
 
     [Fact]
     public async Task DeviceAssign_SameTenantDeviceAndZone_Succeeds()
     {
         _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 1, DeviceControllerEnabled = false });
-        _repo.Setup(r => r.DeviceUnitZoneGetByIdAsync(5)).ReturnsAsync(new DeviceUnitZone { IDDeviceUnitZone = 5, TenantID = 1 });
+        _repo.Setup(r => r.DeviceFarmUnitZoneGetByIdAsync(5)).ReturnsAsync(new DeviceFarmUnitZone { IDDeviceFarmUnitZone = 5, TenantID = 1 });
         _repo.Setup(r => r.DeviceAssignToZoneAsync(8, 5)).Returns(Task.CompletedTask);
         _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
 
-        var controller = NewDeviceUnitController();
+        var controller = NewDeviceFarmUnitController();
         SetCallerRoles(controller, 1, "user", RoleNames.TenantDevice);
-        var result = await controller.DeviceAssign(new DeviceZoneAssignment { IDDevice = 8, IDDeviceUnitZone = 5 });
+        var result = await controller.DeviceAssign(new DeviceZoneAssignment { IDDevice = 8, IDDeviceFarmUnitZone = 5 });
 
         Assert.True(result.Value);
         _repo.Verify(r => r.DeviceAssignToZoneAsync(8, 5), Times.Once);
@@ -2584,7 +2584,7 @@ public class ApiControllerTests
     {
         _repo.Setup(r => r.TenantGetByIdAsync(idTenant)).ReturnsAsync(new Tenant { IDTenant = idTenant, TenantName = "Acme" });
         _repo.Setup(r => r.UsersGetAsync(idTenant)).ReturnsAsync(new List<User>());
-        _repo.Setup(r => r.DeviceUnitsGetAsync(idTenant)).ReturnsAsync(new List<DeviceUnit>());
+        _repo.Setup(r => r.DeviceFarmUnitsGetAsync(idTenant)).ReturnsAsync(new List<DeviceFarmUnit>());
         _repo.Setup(r => r.DevicesGetAsync(idTenant)).ReturnsAsync(new List<Device>());
     }
 

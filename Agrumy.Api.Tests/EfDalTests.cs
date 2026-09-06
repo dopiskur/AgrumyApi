@@ -261,7 +261,7 @@ public class ClassifyExceptionTests
         new Mock<IUserRepository>().Object,
         new Mock<IDeviceRepository>().Object,
         new Mock<ISimulationRepository>().Object,
-        new Mock<IDeviceUnitRepository>().Object,
+        new Mock<IDeviceFarmUnitRepository>().Object,
         new Mock<ISensorDataRepository>().Object);
 
     [Fact]

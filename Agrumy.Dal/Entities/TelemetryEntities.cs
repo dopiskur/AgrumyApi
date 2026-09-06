@@ -5,8 +5,8 @@ namespace api.Dal.Entities
         public int IDSensorData { get; set; }
         public int TenantID { get; set; }
         public int DeviceID { get; set; }
-        public int? DeviceUnitID { get; set; }
-        public int? DeviceUnitZoneID { get; set; }
+        public int? DeviceFarmUnitID { get; set; }
+        public int? DeviceFarmUnitZoneID { get; set; }
         public int? Battery { get; set; }
         public double? Temperature { get; set; }
         public double? SoilTemperature { get; set; }

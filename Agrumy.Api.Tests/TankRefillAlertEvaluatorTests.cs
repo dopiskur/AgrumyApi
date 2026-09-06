@@ -9,12 +9,12 @@ namespace Agrumy.Api.Tests;
 /// Exercises TankRefillAlertEvaluator directly - no database, repositories/dispatcher are mocked. Fill percent math itself is covered by TankCalculatorTests.
 public class TankRefillAlertEvaluatorTests
 {
-    private readonly Mock<IDeviceUnitRepository> _deviceUnits = new(MockBehavior.Strict);
+    private readonly Mock<IDeviceFarmUnitRepository> _deviceFarmUnits = new(MockBehavior.Strict);
     private readonly Mock<IUserRepository> _users = new(MockBehavior.Strict);
     private readonly Mock<IServerConfigRepository> _serverConfig = new(MockBehavior.Strict);
     private readonly Mock<INotificationDispatcher> _dispatcher = new(MockBehavior.Strict);
 
-    private TankRefillAlertEvaluator NewEvaluator() => new(_deviceUnits.Object, _users.Object, _serverConfig.Object, _dispatcher.Object);
+    private TankRefillAlertEvaluator NewEvaluator() => new(_deviceFarmUnits.Object, _users.Object, _serverConfig.Object, _dispatcher.Object);
 
     // rawEmpty=0, rawFull=100 -> waterLevel IS the fill percent, keeps test math trivial.
     private static TankRefillAlertCandidate Candidate(
@@ -24,7 +24,7 @@ public class TankRefillAlertEvaluatorTests
         new(id, tenantId, name, waterLevel, rawEmpty, rawFull, capacityLiters, tankRefillNotifiedAt);
 
     private void SetupCandidates(params TankRefillAlertCandidate[] candidates) =>
-        _deviceUnits.Setup(d => d.TankRefillAlertCandidatesGetAsync()).ReturnsAsync(candidates);
+        _deviceFarmUnits.Setup(d => d.TankRefillAlertCandidatesGetAsync()).ReturnsAsync(candidates);
 
     // Threshold=20, hysteresis=5 (defaults) unless a test overrides it - alert at <=20%, clear at >=25%.
 
@@ -78,11 +78,11 @@ public class TankRefillAlertEvaluatorTests
     {
         SetupServerConfig();
         SetupCandidates(Candidate(waterLevel: 25, tankRefillNotifiedAt: DateTime.UtcNow.AddHours(-1)));
-        _deviceUnits.Setup(d => d.TankRefillNotifiedSetAsync(1, null)).Returns(Task.CompletedTask);
+        _deviceFarmUnits.Setup(d => d.TankRefillNotifiedSetAsync(1, null)).Returns(Task.CompletedTask);
 
         await NewEvaluator().RunOnceAsync();
 
-        _deviceUnits.Verify(d => d.TankRefillNotifiedSetAsync(1, null), Times.Once);
+        _deviceFarmUnits.Verify(d => d.TankRefillNotifiedSetAsync(1, null), Times.Once);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public class TankRefillAlertEvaluatorTests
               });
         _dispatcher.Setup(n => n.DispatchAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()))
                    .ReturnsAsync(new List<ChannelOutcome>());
-        _deviceUnits.Setup(d => d.TankRefillNotifiedSetAsync(1, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+        _deviceFarmUnits.Setup(d => d.TankRefillNotifiedSetAsync(1, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
 
         await NewEvaluator().RunOnceAsync();
 
@@ -111,7 +111,7 @@ public class TankRefillAlertEvaluatorTests
             It.Is<Notification>(x => x.Recipient.Email == "admin2@example.com"),
             It.IsAny<CancellationToken>()), Times.Once);
         _dispatcher.Verify(n => n.DispatchAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
-        _deviceUnits.Verify(d => d.TankRefillNotifiedSetAsync(1, It.IsAny<DateTime>()), Times.Once);
+        _deviceFarmUnits.Verify(d => d.TankRefillNotifiedSetAsync(1, It.IsAny<DateTime>()), Times.Once);
     }
 
     [Fact]
@@ -132,10 +132,10 @@ public class TankRefillAlertEvaluatorTests
         SetupCandidates(Candidate(tenantId: 7, waterLevel: 20, tankRefillNotifiedAt: null));
 
         _users.Setup(u => u.TenantAdminsGetAsync(7)).ReturnsAsync(new List<User>());
-        _deviceUnits.Setup(d => d.TankRefillNotifiedSetAsync(1, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
+        _deviceFarmUnits.Setup(d => d.TankRefillNotifiedSetAsync(1, It.IsAny<DateTime>())).Returns(Task.CompletedTask);
 
         await NewEvaluator().RunOnceAsync();
 
-        _deviceUnits.Verify(d => d.TankRefillNotifiedSetAsync(1, It.IsAny<DateTime>()), Times.Once);
+        _deviceFarmUnits.Verify(d => d.TankRefillNotifiedSetAsync(1, It.IsAny<DateTime>()), Times.Once);
     }
 }

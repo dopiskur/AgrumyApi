@@ -44,18 +44,18 @@
 
             <div class="mb-3">
                 <label class="form-label">Unit / Zone</label>
-                @if (device.DeviceUnitZoneID is int zoneId)
+                @if (device.DeviceFarmUnitZoneID is int zoneId)
                 {
                     <p class="form-control-plaintext">
                         Assigned - manage from the
-                        <a asp-controller="DeviceUnit" asp-action="Zone" asp-route-idDeviceUnitZone="@zoneId">zone dashboard</a>.
+                        <a asp-controller="DeviceFarmUnit" asp-action="Zone" asp-route-idDeviceFarmUnitZone="@zoneId">zone dashboard</a>.
                     </p>
                 }
                 else
                 {
                     <p class="form-control-plaintext">
                         Not assigned - assign it from the
-                        <a asp-controller="DeviceUnit" asp-action="Index">Dashboard</a>.
+                        <a asp-controller="DeviceFarmUnit" asp-action="Index">Dashboard</a>.
                     </p>
                 }
             </div>

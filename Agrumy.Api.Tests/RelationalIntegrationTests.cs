@@ -43,12 +43,12 @@ public sealed class RelationalIntegrationFixture
         int deviceRole = db.DeviceRoles.Where(t => t.DeviceRoleName == "greenhouse")
                            .Select(t => (int?)t.IDDeviceRole).FirstOrDefault() ?? SeedDeviceRole(db);
 
-        // deviceUnitZone.DeviceUnitID has a real FK to deviceUnit - the sentinel Zone row below (DeviceUnitID=0) needs the sentinel Unit row to already exist.
-        if (!db.DeviceUnits.Any())
-            db.DeviceUnits.Add(new DeviceUnitRow { IDDeviceUnit = 0, TenantID = null, DeviceUnitName = "Default" });
+        // deviceFarmUnitZone.DeviceFarmUnitID has a real FK to deviceFarmUnit - the sentinel Zone row below (DeviceFarmUnitID=0) needs the sentinel Unit row to already exist.
+        if (!db.DeviceFarmUnits.Any())
+            db.DeviceFarmUnits.Add(new DeviceFarmUnitRow { IDDeviceFarmUnit = 0, TenantID = null, DeviceFarmUnitName = "Default" });
         db.SaveChanges();
-        if (!db.DeviceUnitZones.Any())
-            db.DeviceUnitZones.Add(new DeviceUnitZoneRow { IDDeviceUnitZone = 0, TenantID = null, DeviceUnitID = 0, DeviceUnitZoneName = "Disabled" });
+        if (!db.DeviceFarmUnitZones.Any())
+            db.DeviceFarmUnitZones.Add(new DeviceFarmUnitZoneRow { IDDeviceFarmUnitZone = 0, TenantID = null, DeviceFarmUnitID = 0, DeviceFarmUnitZoneName = "Disabled" });
 
         if (!db.EventTypes.Any())
             db.EventTypes.AddRange(Enum.GetValues<DeviceEventType>().Select(t => new EventTypeRow { IDEventType = (int)t, EventTypeName = t.ToString() }));
@@ -129,7 +129,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             new EfCommandRepository(db), new EfFirmwareRepository(db),
             new EfUserRepository(db, tenantRepository, refreshTokenRepository), deviceRepository,
             new EfSimulationRepository(db, deviceRepository),
-            new EfDeviceUnitRepository(db, settingsOptions, serverConfigRepository, deviceRepository),
+            new EfDeviceFarmUnitRepository(db, settingsOptions, serverConfigRepository, deviceRepository),
             new EfSensorDataRepository(db));
     }
 
@@ -323,7 +323,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var tables = await db.Database.SqlQueryRaw<string>(sql).ToListAsync();
 
         foreach (var name in new[] { "tenant", "user", "userGroup", "userRole", "userRoleScope",
-            "device", "deviceUnit", "deviceUnitZone", "deviceType", "deviceTypeService",
+            "device", "deviceFarmUnit", "deviceFarmUnitZone", "deviceType", "deviceTypeService",
             "deviceTypeRelay", "deviceTypeSensor", "deviceConfigSensor", "deviceConfigController",
             "deviceFirmware", "deviceDiagnostic", "sensorData", "sensorDataReport", "eventDevice",
             "eventService", "serverConfig" })
@@ -1073,7 +1073,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitZone_WaterPumpSafetyLimits_SeededOnCreate_ThenOverridable(DbProviderKind provider)
+    public async Task DeviceFarmUnitZone_WaterPumpSafetyLimits_SeededOnCreate_ThenOverridable(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
@@ -1084,15 +1084,15 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
         zone.WaterPumpMaxRunSeconds = 900;
         zone.WaterPumpCooldownSeconds = 120;
-        await _repo.DeviceUnitZoneUpdateAsync(zone);
+        await _repo.DeviceFarmUnitZoneUpdateAsync(zone);
 
-        var overridden = await _repo.DeviceUnitZoneGetByIdAsync(zone.IDDeviceUnitZone);
+        var overridden = await _repo.DeviceFarmUnitZoneGetByIdAsync(zone.IDDeviceFarmUnitZone);
         Assert.Equal(900, overridden!.WaterPumpMaxRunSeconds);
         Assert.Equal(120, overridden.WaterPumpCooldownSeconds);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitZone_SkipWaterPumpWhenRainPredicted_DefaultsFalse_ThenOverridable(DbProviderKind provider)
+    public async Task DeviceFarmUnitZone_SkipWaterPumpWhenRainPredicted_DefaultsFalse_ThenOverridable(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
@@ -1101,66 +1101,66 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.False(zone.SkipWaterPumpWhenRainPredicted);
 
         zone.SkipWaterPumpWhenRainPredicted = true;
-        await _repo.DeviceUnitZoneUpdateAsync(zone);
+        await _repo.DeviceFarmUnitZoneUpdateAsync(zone);
 
-        var updated = await _repo.DeviceUnitZoneGetByIdAsync(zone.IDDeviceUnitZone);
+        var updated = await _repo.DeviceFarmUnitZoneGetByIdAsync(zone.IDDeviceFarmUnitZone);
         Assert.True(updated!.SkipWaterPumpWhenRainPredicted);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitZoneRule_AddAndDelete_AreIndependent_NotWholeListReplace(DbProviderKind provider)
+    public async Task DeviceFarmUnitZoneRule_AddAndDelete_AreIndependent_NotWholeListReplace(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (_, zone) = await MakeUnitAndZone(tenantId);
 
-        int rule1 = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        int rule1 = await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
         {
             TenantID = tenantId,
-            DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
+            DeviceFarmUnitZoneID = zone.IDDeviceFarmUnitZone!.Value,
             RelayFunction = RelayFunction.Ventilation,
             Conditions = [new RuleCondition(ConditionType.Schedule, JsonSerializer.SerializeToNode(new ScheduleConditionConfig(0b0111110, 21600, 1800), ConditionConfigJson.Options), null)],
         });
-        int rule2 = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        int rule2 = await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
         {
             TenantID = tenantId,
-            DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
+            DeviceFarmUnitZoneID = zone.IDDeviceFarmUnitZone!.Value,
             RelayFunction = RelayFunction.Ventilation,
             Conditions = [new RuleCondition(ConditionType.Schedule, JsonSerializer.SerializeToNode(new ScheduleConditionConfig(0b0111110, 50400, 900), ConditionConfigJson.Options), null)],
         });
-        Assert.Equal(2, (await _repo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value)).Count);
+        Assert.Equal(2, (await _repo.RulesGetForZoneAsync(zone.IDDeviceFarmUnitZone!.Value)).Count);
 
         await _repo.RuleDeleteAsync(rule1);
 
-        var remaining = Assert.Single(await _repo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value));
-        Assert.Equal(rule2, remaining.IDDeviceUnitZoneRule);
+        var remaining = Assert.Single(await _repo.RulesGetForZoneAsync(zone.IDDeviceFarmUnitZone!.Value));
+        Assert.Equal(rule2, remaining.IDDeviceFarmUnitZoneRule);
         var config = remaining.Conditions[0].ConditionConfig.Deserialize<ScheduleConditionConfig>(ConditionConfigJson.Options);
         Assert.Equal(50400, config!.Start);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitZoneRule_MultipleRulesSameFunction_BothPersist(DbProviderKind provider)
+    public async Task DeviceFarmUnitZoneRule_MultipleRulesSameFunction_BothPersist(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (_, zone) = await MakeUnitAndZone(tenantId);
 
-        await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
         {
             TenantID = tenantId,
-            DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
+            DeviceFarmUnitZoneID = zone.IDDeviceFarmUnitZone!.Value,
             RelayFunction = RelayFunction.WaterPump,
             Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(10, 5), ConditionConfigJson.Options), null)],
         });
-        await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
         {
             TenantID = tenantId,
-            DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
+            DeviceFarmUnitZoneID = zone.IDDeviceFarmUnitZone!.Value,
             RelayFunction = RelayFunction.WaterPump,
             Conditions = [new RuleCondition(ConditionType.Interval, JsonSerializer.SerializeToNode(new IntervalConditionConfig(3600, 300), ConditionConfigJson.Options), null)],
         });
 
-        var rules = await _repo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value);
+        var rules = await _repo.RulesGetForZoneAsync(zone.IDDeviceFarmUnitZone!.Value);
         Assert.Equal(2, rules.Count);
         Assert.All(rules, r => Assert.Equal(RelayFunction.WaterPump, r.RelayFunction));
         Assert.Contains(rules, r => r.Conditions[0].ConditionType == ConditionType.Threshold);
@@ -1168,47 +1168,47 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitZoneRule_AssignedDevice_ReadsZonesRulesAndSafetyLimits(DbProviderKind provider)
+    public async Task DeviceFarmUnitZoneRule_AssignedDevice_ReadsZonesRulesAndSafetyLimits(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (_, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
-        await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
+        await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
         {
             TenantID = tenantId,
-            DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
+            DeviceFarmUnitZoneID = zone.IDDeviceFarmUnitZone!.Value,
             RelayFunction = RelayFunction.Light,
             Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(200, 20), ConditionConfigJson.Options), null)],
         });
 
-        var rules = await _repo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value);
+        var rules = await _repo.RulesGetForZoneAsync(zone.IDDeviceFarmUnitZone!.Value);
         var rule = Assert.Single(rules);
         Assert.Equal(RelayFunction.Light, rule.RelayFunction);
 
-        var zoneAfter = await _repo.DeviceUnitZoneGetByIdAsync(zone.IDDeviceUnitZone);
+        var zoneAfter = await _repo.DeviceFarmUnitZoneGetByIdAsync(zone.IDDeviceFarmUnitZone);
         Assert.Equal(zone.WaterPumpMaxRunSeconds, zoneAfter!.WaterPumpMaxRunSeconds);
 
         var deviceAfter = await _repo.DeviceGetByIdAsync(d.IDDevice);
-        Assert.Equal(zone.IDDeviceUnitZone, deviceAfter!.DeviceUnitZoneID);
+        Assert.Equal(zone.IDDeviceFarmUnitZone, deviceAfter!.DeviceFarmUnitZoneID);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitZoneDelete_AlsoDeletesItsRules(DbProviderKind provider)
+    public async Task DeviceFarmUnitZoneDelete_AlsoDeletesItsRules(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (_, zone) = await MakeUnitAndZone(tenantId);
-        int ruleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        int ruleId = await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
         {
             TenantID = tenantId,
-            DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value,
+            DeviceFarmUnitZoneID = zone.IDDeviceFarmUnitZone!.Value,
             RelayFunction = RelayFunction.Heating,
             Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(18, 1), ConditionConfigJson.Options), null)],
         });
 
-        await _repo.DeviceUnitZoneDeleteAsync(zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceFarmUnitZoneDeleteAsync(zone.IDDeviceFarmUnitZone!.Value);
 
         Assert.Null(await _repo.RuleGetByIdAsync(ruleId));
     }
@@ -1220,25 +1220,25 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
 
-        int zoneRuleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        int zoneRuleId = await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
         {
-            TenantID = tenantId, DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value, RelayFunction = RelayFunction.Light,
+            TenantID = tenantId, DeviceFarmUnitZoneID = zone.IDDeviceFarmUnitZone!.Value, RelayFunction = RelayFunction.Light,
             Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(1, 1), ConditionConfigJson.Options), null)],
         });
-        int unitRuleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        int unitRuleId = await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
         {
-            TenantID = tenantId, DeviceUnitID = unit.IDDeviceUnit!.Value, RelayFunction = RelayFunction.Heating,
+            TenantID = tenantId, DeviceFarmUnitID = unit.IDDeviceFarmUnit!.Value, RelayFunction = RelayFunction.Heating,
             Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(1, 1), ConditionConfigJson.Options), null)],
         });
-        int globalRuleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        int globalRuleId = await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
         {
             TenantID = tenantId, RelayFunction = RelayFunction.WaterPump,
             Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(1, 1), ConditionConfigJson.Options), null)],
         });
 
-        Assert.Equal(zoneRuleId, Assert.Single(await _repo.RulesGetForZoneAsync(zone.IDDeviceUnitZone!.Value)).IDDeviceUnitZoneRule);
-        Assert.Equal(unitRuleId, Assert.Single(await _repo.RulesGetForUnitAsync(unit.IDDeviceUnit!.Value)).IDDeviceUnitZoneRule);
-        Assert.Equal(globalRuleId, Assert.Single(await _repo.RulesGetForTenantGlobalAsync(tenantId)).IDDeviceUnitZoneRule);
+        Assert.Equal(zoneRuleId, Assert.Single(await _repo.RulesGetForZoneAsync(zone.IDDeviceFarmUnitZone!.Value)).IDDeviceFarmUnitZoneRule);
+        Assert.Equal(unitRuleId, Assert.Single(await _repo.RulesGetForUnitAsync(unit.IDDeviceFarmUnit!.Value)).IDDeviceFarmUnitZoneRule);
+        Assert.Equal(globalRuleId, Assert.Single(await _repo.RulesGetForTenantGlobalAsync(tenantId)).IDDeviceFarmUnitZoneRule);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -1248,9 +1248,9 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (tenantId, _, _) = await MakeUser(t);
         var (_, zone) = await MakeUnitAndZone(tenantId);
 
-        int ruleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        int ruleId = await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
         {
-            TenantID = tenantId, DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value, RelayFunction = RelayFunction.Ventilation,
+            TenantID = tenantId, DeviceFarmUnitZoneID = zone.IDDeviceFarmUnitZone!.Value, RelayFunction = RelayFunction.Ventilation,
             Conditions =
             [
                 new RuleCondition(ConditionType.Schedule, JsonSerializer.SerializeToNode(new ScheduleConditionConfig(127, 0, 3600), ConditionConfigJson.Options), null),
@@ -1259,7 +1259,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             ],
         });
 
-        DeviceUnitZoneRule? loaded = await _repo.RuleGetByIdAsync(ruleId);
+        DeviceFarmUnitZoneRule? loaded = await _repo.RuleGetByIdAsync(ruleId);
         Assert.NotNull(loaded);
         Assert.Equal(3, loaded!.Conditions.Count);
         Assert.Null(loaded.Conditions[0].Operator);
@@ -1276,24 +1276,24 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zoneA) = await MakeUnitAndZone(tenantId);
-        var zoneB = await _repo.DeviceUnitZoneAddAsync(new DeviceUnitZone { TenantID = tenantId, DeviceUnitID = unit.IDDeviceUnit!.Value, DeviceUnitZoneName = "Zone B" });
+        var zoneB = await _repo.DeviceFarmUnitZoneAddAsync(new DeviceFarmUnitZone { TenantID = tenantId, DeviceFarmUnitID = unit.IDDeviceFarmUnit!.Value, DeviceFarmUnitZoneName = "Zone B" });
 
-        int referencedRuleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        int referencedRuleId = await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
         {
-            TenantID = tenantId, DeviceUnitZoneID = zoneA.IDDeviceUnitZone!.Value, ActionType = ActionType.Notification, SensorMetric = SensorMetric.Temperature,
+            TenantID = tenantId, DeviceFarmUnitZoneID = zoneA.IDDeviceFarmUnitZone!.Value, ActionType = ActionType.Notification, SensorMetric = SensorMetric.Temperature,
             Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(30, 1), ConditionConfigJson.Options), null)],
             NotificationSubject = "hot",
         });
-        int referencingRuleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        int referencingRuleId = await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
         {
             // Cross-zone reference (zoneB's rule references zoneA's rule) - explicitly allowed by #212's design.
-            TenantID = tenantId, DeviceUnitZoneID = zoneB.IDDeviceUnitZone!.Value, ActionType = ActionType.Notification, SensorMetric = null,
+            TenantID = tenantId, DeviceFarmUnitZoneID = zoneB.IDDeviceFarmUnitZone!.Value, ActionType = ActionType.Notification, SensorMetric = null,
             Conditions = [new RuleCondition(ConditionType.RuleTriggered, JsonSerializer.SerializeToNode(new RuleTriggeredConditionConfig(referencedRuleId), ConditionConfigJson.Options), null)],
             NotificationSubject = "chained",
         });
 
         var referencing = await _repo.RulesReferencingAsync(referencedRuleId, tenantId);
-        Assert.Equal(referencingRuleId, Assert.Single(referencing).IDDeviceUnitZoneRule);
+        Assert.Equal(referencingRuleId, Assert.Single(referencing).IDDeviceFarmUnitZoneRule);
 
         // Not referenced by anything - empty, not an error.
         Assert.Empty(await _repo.RulesReferencingAsync(referencingRuleId, tenantId));
@@ -1305,20 +1305,20 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (_, zone) = await MakeUnitAndZone(tenantId);
-        int ruleId = await _repo.RuleAddAsync(new DeviceUnitZoneRule
+        int ruleId = await _repo.RuleAddAsync(new DeviceFarmUnitZoneRule
         {
-            TenantID = tenantId, DeviceUnitZoneID = zone.IDDeviceUnitZone!.Value, ActionType = ActionType.Notification, SensorMetric = SensorMetric.Humidity,
+            TenantID = tenantId, DeviceFarmUnitZoneID = zone.IDDeviceFarmUnitZone!.Value, ActionType = ActionType.Notification, SensorMetric = SensorMetric.Humidity,
             Conditions = [new RuleCondition(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(80, 2), ConditionConfigJson.Options), null)],
             NotificationSubject = "humid",
         });
 
-        Assert.False(await _repo.RuleNotificationWasTrueGetAsync(ruleId, zone.IDDeviceUnitZone!.Value));
+        Assert.False(await _repo.RuleNotificationWasTrueGetAsync(ruleId, zone.IDDeviceFarmUnitZone!.Value));
 
-        await _repo.RuleNotificationWasTrueSetAsync(ruleId, zone.IDDeviceUnitZone!.Value, true, DateTime.UtcNow);
-        Assert.True(await _repo.RuleNotificationWasTrueGetAsync(ruleId, zone.IDDeviceUnitZone!.Value));
+        await _repo.RuleNotificationWasTrueSetAsync(ruleId, zone.IDDeviceFarmUnitZone!.Value, true, DateTime.UtcNow);
+        Assert.True(await _repo.RuleNotificationWasTrueGetAsync(ruleId, zone.IDDeviceFarmUnitZone!.Value));
 
-        await _repo.RuleNotificationWasTrueSetAsync(ruleId, zone.IDDeviceUnitZone!.Value, false, null);
-        Assert.False(await _repo.RuleNotificationWasTrueGetAsync(ruleId, zone.IDDeviceUnitZone!.Value));
+        await _repo.RuleNotificationWasTrueSetAsync(ruleId, zone.IDDeviceFarmUnitZone!.Value, false, null);
+        Assert.False(await _repo.RuleNotificationWasTrueGetAsync(ruleId, zone.IDDeviceFarmUnitZone!.Value));
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -1611,13 +1611,13 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var payload = new JsonArray(
             new JsonObject
             {
-                ["deviceID"] = d.IDDevice, ["tenantID"] = tenantId, ["deviceUnitID"] = 0, ["deviceUnitZoneID"] = 0,
+                ["deviceID"] = d.IDDevice, ["tenantID"] = tenantId, ["deviceFarmUnitID"] = 0, ["deviceFarmUnitZoneID"] = 0,
                 ["temperature"] = "26.13", ["humidity"] = "47.5", ["co2"] = "408", ["battery"] = null,
                 ["dateCreated"] = "2026-08-29 09:50:00",
             },
             new JsonObject
             {
-                ["deviceID"] = d.IDDevice, ["tenantID"] = tenantId, ["deviceUnitID"] = 0, ["deviceUnitZoneID"] = 0,
+                ["deviceID"] = d.IDDevice, ["tenantID"] = tenantId, ["deviceFarmUnitID"] = 0, ["deviceFarmUnitZoneID"] = 0,
                 ["temperature"] = "27.0", ["co2"] = "410",
             });
 
@@ -1645,8 +1645,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             {
                 ["deviceID"] = d.IDDevice!.Value + 999_999,
                 ["tenantID"] = tenantId + 999_999,
-                ["deviceUnitID"] = 7,
-                ["deviceUnitZoneID"] = 9,
+                ["deviceFarmUnitID"] = 7,
+                ["deviceFarmUnitZoneID"] = 9,
                 ["temperature"] = "21.5",
             });
 
@@ -1655,48 +1655,48 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await using var db = _fx.NewContext(t);
         var row = await db.SensorData.SingleAsync(r => r.DeviceID == d.IDDevice!.Value);
         Assert.Equal(tenantId, row.TenantID);
-        Assert.Equal(0, row.DeviceUnitID);
-        Assert.Equal(0, row.DeviceUnitZoneID);
+        Assert.Equal(0, row.DeviceFarmUnitID);
+        Assert.Equal(0, row.DeviceFarmUnitZoneID);
         Assert.Equal(21.5, row.Temperature);
         Assert.False(await db.SensorData.AnyAsync(r => r.DeviceID == d.IDDevice!.Value + 999_999));
         Assert.False(await db.SensorData.AnyAsync(r => r.TenantID == tenantId + 999_999));
     }
 
-    private async Task<(DeviceUnit Unit, DeviceUnitZone Zone)> MakeUnitAndZone(int? tenantId)
+    private async Task<(DeviceFarmUnit Unit, DeviceFarmUnitZone Zone)> MakeUnitAndZone(int? tenantId)
     {
-        var unit = await _repo.DeviceUnitAddAsync(new DeviceUnit { TenantID = tenantId, DeviceUnitName = "Unit_" + U() });
-        var zone = await _repo.DeviceUnitZoneAddAsync(new DeviceUnitZone
+        var unit = await _repo.DeviceFarmUnitAddAsync(new DeviceFarmUnit { TenantID = tenantId, DeviceFarmUnitName = "Unit_" + U() });
+        var zone = await _repo.DeviceFarmUnitZoneAddAsync(new DeviceFarmUnitZone
         {
             TenantID = tenantId,
-            DeviceUnitID = unit.IDDeviceUnit!.Value,
-            DeviceUnitZoneName = "Zone_" + U(),
+            DeviceFarmUnitID = unit.IDDeviceFarmUnit!.Value,
+            DeviceFarmUnitZoneName = "Zone_" + U(),
         });
         return (unit, zone);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnit_Contains_MultipleZones(DbProviderKind provider)
+    public async Task DeviceFarmUnit_Contains_MultipleZones(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone1) = await MakeUnitAndZone(tenantId);
-        var zone2 = await _repo.DeviceUnitZoneAddAsync(new DeviceUnitZone
+        var zone2 = await _repo.DeviceFarmUnitZoneAddAsync(new DeviceFarmUnitZone
         {
             TenantID = tenantId,
-            DeviceUnitID = unit.IDDeviceUnit!.Value,
-            DeviceUnitZoneName = "Zone_" + U(),
+            DeviceFarmUnitID = unit.IDDeviceFarmUnit!.Value,
+            DeviceFarmUnitZoneName = "Zone_" + U(),
         });
 
-        var zones = await _repo.DeviceUnitZonesGetAsync(unit.IDDeviceUnit!.Value);
+        var zones = await _repo.DeviceFarmUnitZonesGetAsync(unit.IDDeviceFarmUnit!.Value);
         Assert.Equal(2, zones.Count);
-        Assert.Contains(zones, z => z.IDDeviceUnitZone == zone1.IDDeviceUnitZone);
-        Assert.Contains(zones, z => z.IDDeviceUnitZone == zone2.IDDeviceUnitZone);
-        Assert.All(zones, z => Assert.Equal(unit.IDDeviceUnit, z.DeviceUnitID));
+        Assert.Contains(zones, z => z.IDDeviceFarmUnitZone == zone1.IDDeviceFarmUnitZone);
+        Assert.Contains(zones, z => z.IDDeviceFarmUnitZone == zone2.IDDeviceFarmUnitZone);
+        Assert.All(zones, z => Assert.Equal(unit.IDDeviceFarmUnit, z.DeviceFarmUnitID));
     }
 
-    // Only the shared IDDeviceUnit=0 sentinel is global; everything else must stay tenant-scoped.
+    // Only the shared IDDeviceFarmUnit=0 sentinel is global; everything else must stay tenant-scoped.
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitsGet_IsTenantScoped(DbProviderKind provider)
+    public async Task DeviceFarmUnitsGet_IsTenantScoped(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenant1, _, _) = await MakeUser(t);
@@ -1704,10 +1704,10 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (unit1, _) = await MakeUnitAndZone(tenant1);
         var (unit2, _) = await MakeUnitAndZone(tenant2);
 
-        var seenByTenant1 = await _repo.DeviceUnitsGetAsync(tenant1);
-        Assert.Contains(seenByTenant1, u => u.IDDeviceUnit == unit1.IDDeviceUnit);
-        Assert.DoesNotContain(seenByTenant1, u => u.IDDeviceUnit == unit2.IDDeviceUnit);
-        Assert.DoesNotContain(seenByTenant1, u => u.IDDeviceUnit == 0); // sentinel never listed as a real unit
+        var seenByTenant1 = await _repo.DeviceFarmUnitsGetAsync(tenant1);
+        Assert.Contains(seenByTenant1, u => u.IDDeviceFarmUnit == unit1.IDDeviceFarmUnit);
+        Assert.DoesNotContain(seenByTenant1, u => u.IDDeviceFarmUnit == unit2.IDDeviceFarmUnit);
+        Assert.DoesNotContain(seenByTenant1, u => u.IDDeviceFarmUnit == 0); // sentinel never listed as a real unit
     }
 
     // Unassigning resets both FKs to NULL without bumping ConfigVersion - pure bookkeeping, no device config change.
@@ -1720,18 +1720,18 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var d = await MakeDevice(t, tenantId);
         int originalConfigVersion = d.ConfigVersion!.Value;
 
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
 
         var assigned = await _repo.DeviceGetByIdAsync(d.IDDevice);
-        Assert.Equal(unit.IDDeviceUnit, assigned!.DeviceUnitID);
-        Assert.Equal(zone.IDDeviceUnitZone, assigned.DeviceUnitZoneID);
+        Assert.Equal(unit.IDDeviceFarmUnit, assigned!.DeviceFarmUnitID);
+        Assert.Equal(zone.IDDeviceFarmUnitZone, assigned.DeviceFarmUnitZoneID);
         Assert.Equal(originalConfigVersion + 1, assigned.ConfigVersion);
 
         await _repo.DeviceUnassignFromZoneAsync(d.IDDevice.Value);
 
         var unassigned = await _repo.DeviceGetByIdAsync(d.IDDevice);
-        Assert.Null(unassigned!.DeviceUnitID);
-        Assert.Null(unassigned.DeviceUnitZoneID);
+        Assert.Null(unassigned!.DeviceFarmUnitID);
+        Assert.Null(unassigned.DeviceFarmUnitZoneID);
         Assert.Equal(originalConfigVersion + 1, unassigned.ConfigVersion); // unchanged by the unassign
     }
 
@@ -1744,15 +1744,15 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var unassigned = await MakeDevice(t, tenantId);
         var (_, zone) = await MakeUnitAndZone(tenantId);
         var assigned = await MakeDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(assigned.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(assigned.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
 
         var fetched = await _repo.DeviceGetByIdAsync(unassigned.IDDevice);
-        Assert.Null(fetched!.DeviceUnitID);
-        Assert.Null(fetched.DeviceUnitZoneID);
+        Assert.Null(fetched!.DeviceFarmUnitID);
+        Assert.Null(fetched.DeviceFarmUnitZoneID);
         Assert.Contains(await _repo.DeviceUnassignedGetAsync(tenantId, controllerCapable: true), d => d.IDDevice == unassigned.IDDevice);
 
         var fleet = (await _repo.DeviceFleetGetAsync(tenantId)).ToList();
-        Assert.Null(fleet.Single(f => f.IDDevice == unassigned.IDDevice).DeviceUnitID);
+        Assert.Null(fleet.Single(f => f.IDDevice == unassigned.IDDevice).DeviceFarmUnitID);
         int unassignedIndex = fleet.FindIndex(f => f.IDDevice == unassigned.IDDevice);
         int assignedIndex = fleet.FindIndex(f => f.IDDevice == assigned.IDDevice);
         Assert.True(unassignedIndex < assignedIndex);
@@ -1766,7 +1766,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var (_, zone) = await MakeUnitAndZone(tenantId);
         var assigned = await MakeDevice(t, tenantId); // sensor+controller capable, per MakeDevice
         var unassigned = await MakeDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(assigned.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(assigned.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
 
         var controllerCandidates = await _repo.DeviceUnassignedGetAsync(tenantId, controllerCapable: true);
         Assert.Contains(controllerCandidates, x => x.IDDevice == unassigned.IDDevice);
@@ -1777,29 +1777,29 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitZoneHasController_TrueOnlyAfterAControllerCapableDeviceIsAssigned(DbProviderKind provider)
+    public async Task DeviceFarmUnitZoneHasController_TrueOnlyAfterAControllerCapableDeviceIsAssigned(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (_, zone) = await MakeUnitAndZone(tenantId);
         var controller = await MakeDevice(t, tenantId);
 
-        Assert.False(await _repo.DeviceUnitZoneHasControllerAsync(zone.IDDeviceUnitZone!.Value));
-        await _repo.DeviceAssignToZoneAsync(controller.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
-        Assert.True(await _repo.DeviceUnitZoneHasControllerAsync(zone.IDDeviceUnitZone!.Value));
+        Assert.False(await _repo.DeviceFarmUnitZoneHasControllerAsync(zone.IDDeviceFarmUnitZone!.Value));
+        await _repo.DeviceAssignToZoneAsync(controller.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
+        Assert.True(await _repo.DeviceFarmUnitZoneHasControllerAsync(zone.IDDeviceFarmUnitZone!.Value));
     }
 
     // Averages the LATEST reading per device per sensor type; unreported types are omitted (null, not zero).
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitDashboard_AveragesLatestReadingPerDevice_PerSensorType(DbProviderKind provider)
+    public async Task DeviceFarmUnitDashboard_AveragesLatestReadingPerDevice_PerSensorType(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
         var d1 = await MakeDevice(t, tenantId);
         var d2 = await MakeDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(d1.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
-        await _repo.DeviceAssignToZoneAsync(d2.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d1.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d2.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
 
         // d1: an older then a newer reading - only the newer one (20.0) must count. Both timestamps are relative to now (not a fixed past date) - #345's staleness cutoff would otherwise exclude them entirely.
         DateTime now = DateTime.UtcNow;
@@ -1807,22 +1807,22 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         string newer = now.AddSeconds(-10).ToString("yyyy-MM-dd HH:mm:ss");
         await _repo.SensorDataPushAsync(new JsonArray(
             new JsonObject { ["temperature"] = "10.0", ["dateCreated"] = older }),
-            d1.IDDevice!.Value, tenantId, unit.IDDeviceUnit, zone.IDDeviceUnitZone);
+            d1.IDDevice!.Value, tenantId, unit.IDDeviceFarmUnit, zone.IDDeviceFarmUnitZone);
         await _repo.SensorDataPushAsync(new JsonArray(
             new JsonObject { ["temperature"] = "20.0", ["dateCreated"] = newer }),
-            d1.IDDevice!.Value, tenantId, unit.IDDeviceUnit, zone.IDDeviceUnitZone);
+            d1.IDDevice!.Value, tenantId, unit.IDDeviceFarmUnit, zone.IDDeviceFarmUnitZone);
         // d2: reports humidity only - never sent a temperature, must not drag the temperature average down.
         await _repo.SensorDataPushAsync(new JsonArray(
             new JsonObject { ["humidity"] = "50.0", ["dateCreated"] = newer }),
-            d2.IDDevice!.Value, tenantId, unit.IDDeviceUnit, zone.IDDeviceUnitZone);
+            d2.IDDevice!.Value, tenantId, unit.IDDeviceFarmUnit, zone.IDDeviceFarmUnitZone);
 
-        var unitDashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        var unitDashboard = Assert.Single(await _repo.DeviceFarmUnitDashboardGetAsync(tenantId), u => u.IDDeviceFarmUnit == unit.IDDeviceFarmUnit);
         Assert.Equal(2, unitDashboard.DeviceCount);
         Assert.Equal(1, unitDashboard.ZoneCount);
         Assert.Equal(20.0, unitDashboard.Averages.Temperature); // only d1's latest reading, d2 never reported temperature
         Assert.Equal(50.0, unitDashboard.Averages.Humidity);    // only d2 reported humidity
 
-        var zoneDetail = await _repo.DeviceUnitZoneDashboardGetAsync(zone.IDDeviceUnitZone!.Value);
+        var zoneDetail = await _repo.DeviceFarmUnitZoneDashboardGetAsync(zone.IDDeviceFarmUnitZone!.Value);
         Assert.NotNull(zoneDetail);
         Assert.Equal(2, zoneDetail!.Devices.Count);
         Assert.Equal(20.0, zoneDetail.Averages.Temperature);
@@ -1844,46 +1844,46 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
     // A device that has never polled (LastSeenAt null) counts as offline, same as Fleet's ComputeOnline.
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitDashboard_Status_RedWhenEnabledDeviceNeverSeen(DbProviderKind provider)
+    public async Task DeviceFarmUnitDashboard_Status_RedWhenEnabledDeviceNeverSeen(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeEnabledDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
 
-        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        var dashboard = Assert.Single(await _repo.DeviceFarmUnitDashboardGetAsync(tenantId), u => u.IDDeviceFarmUnit == unit.IDDeviceFarmUnit);
         Assert.Equal(ZoneStatus.Red, dashboard.Status);
-        var zoneDashboard = Assert.Single(await _repo.DeviceUnitZoneDashboardListGetAsync(unit.IDDeviceUnit!.Value));
+        var zoneDashboard = Assert.Single(await _repo.DeviceFarmUnitZoneDashboardListGetAsync(unit.IDDeviceFarmUnit!.Value));
         Assert.Equal(ZoneStatus.Red, zoneDashboard.Status);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitDashboard_Status_GreenWhenOnlineAndNoProblems(DbProviderKind provider)
+    public async Task DeviceFarmUnitDashboard_Status_GreenWhenOnlineAndNoProblems(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeEnabledDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
         await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
 
-        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        var dashboard = Assert.Single(await _repo.DeviceFarmUnitDashboardGetAsync(tenantId), u => u.IDDeviceFarmUnit == unit.IDDeviceFarmUnit);
         Assert.Equal(ZoneStatus.Green, dashboard.Status);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitDashboard_Status_OrangeWhenOnlineButRecentProblemEvent(DbProviderKind provider)
+    public async Task DeviceFarmUnitDashboard_Status_OrangeWhenOnlineButRecentProblemEvent(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeEnabledDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
         await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
         await _repo.EventDevicePushAsync(d.IDDevice.Value, tenantId, DeviceEventType.AuthFailed, "test");
 
-        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        var dashboard = Assert.Single(await _repo.DeviceFarmUnitDashboardGetAsync(tenantId), u => u.IDDeviceFarmUnit == unit.IDDeviceFarmUnit);
         Assert.Equal(ZoneStatus.Orange, dashboard.Status);
         var alert = Assert.Single(dashboard.ProblemAlerts);
         Assert.Equal("AuthFailed", alert.EventType);
@@ -1892,52 +1892,52 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
     // Acknowledging the only problem event must clear Orange immediately, without waiting for the expiry window.
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitDashboard_Status_GreenAfterAcknowledgingOnlyProblemEvent(DbProviderKind provider)
+    public async Task DeviceFarmUnitDashboard_Status_GreenAfterAcknowledgingOnlyProblemEvent(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeEnabledDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
         await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
         await _repo.EventDevicePushAsync(d.IDDevice.Value, tenantId, DeviceEventType.AuthFailed, "test");
 
         int idEventDevice = Assert.Single(await _repo.EventDeviceGetAsync(d.IDDevice, tenantId)).IDEventDevice!.Value;
         Assert.True(await _repo.EventDeviceAcknowledgeAsync(idEventDevice, tenantId));
 
-        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        var dashboard = Assert.Single(await _repo.DeviceFarmUnitDashboardGetAsync(tenantId), u => u.IDDeviceFarmUnit == unit.IDDeviceFarmUnit);
         Assert.Equal(ZoneStatus.Green, dashboard.Status);
         Assert.Empty(dashboard.ProblemAlerts);
     }
 
     // A foreign tenant's event id must match zero rows - same ownership-lens rule as every other Device sub-resource write.
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitDashboard_Status_AcknowledgeWrongTenant_IsNoOp(DbProviderKind provider)
+    public async Task DeviceFarmUnitDashboard_Status_AcknowledgeWrongTenant_IsNoOp(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeEnabledDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
         await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
         await _repo.EventDevicePushAsync(d.IDDevice.Value, tenantId, DeviceEventType.AuthFailed, "test");
         int idEventDevice = Assert.Single(await _repo.EventDeviceGetAsync(d.IDDevice, tenantId)).IDEventDevice!.Value;
 
         Assert.False(await _repo.EventDeviceAcknowledgeAsync(idEventDevice, tenantId + 999));
 
-        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        var dashboard = Assert.Single(await _repo.DeviceFarmUnitDashboardGetAsync(tenantId), u => u.IDDeviceFarmUnit == unit.IDDeviceFarmUnit);
         Assert.Equal(ZoneStatus.Orange, dashboard.Status);
     }
 
     // Flips the shared default ServerConfig row for the test and restores it in finally, so no other test sees the change.
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitDashboard_Status_GreenWhenProblemAlertsDisabled(DbProviderKind provider)
+    public async Task DeviceFarmUnitDashboard_Status_GreenWhenProblemAlertsDisabled(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeEnabledDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
         await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
         await _repo.EventDevicePushAsync(d.IDDevice.Value, tenantId, DeviceEventType.AuthFailed, "test");
 
@@ -1947,7 +1947,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             original.ProblemEventAlertsEnabled = false;
             await _repo.ServerConfigUpdateAsync(original);
 
-            var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+            var dashboard = Assert.Single(await _repo.DeviceFarmUnitDashboardGetAsync(tenantId), u => u.IDDeviceFarmUnit == unit.IDDeviceFarmUnit);
             Assert.Equal(ZoneStatus.Green, dashboard.Status);
             Assert.Empty(dashboard.ProblemAlerts);
         }
@@ -1960,13 +1960,13 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
     // An event older than the configured ProblemEventExpiryHours stops counting, even inside the default 24h.
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitDashboard_Status_GreenWhenProblemEventOlderThanConfiguredExpiry(DbProviderKind provider)
+    public async Task DeviceFarmUnitDashboard_Status_GreenWhenProblemEventOlderThanConfiguredExpiry(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeEnabledDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
         await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
         await _repo.EventDevicePushAsync(d.IDDevice.Value, tenantId, DeviceEventType.AuthFailed, "test");
 
@@ -1983,7 +1983,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
             original.ProblemEventExpiryHours = 1;
             await _repo.ServerConfigUpdateAsync(original);
 
-            var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+            var dashboard = Assert.Single(await _repo.DeviceFarmUnitDashboardGetAsync(tenantId), u => u.IDDeviceFarmUnit == unit.IDDeviceFarmUnit);
             Assert.Equal(ZoneStatus.Green, dashboard.Status);
         }
         finally
@@ -1994,43 +1994,43 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitDashboard_Status_NoInternetEvent_DoesNotCountAsProblem(DbProviderKind provider)
+    public async Task DeviceFarmUnitDashboard_Status_NoInternetEvent_DoesNotCountAsProblem(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeEnabledDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
         await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
         await _repo.EventDevicePushAsync(d.IDDevice.Value, tenantId, DeviceEventType.NoInternet, "test");
 
-        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        var dashboard = Assert.Single(await _repo.DeviceFarmUnitDashboardGetAsync(tenantId), u => u.IDDeviceFarmUnit == unit.IDDeviceFarmUnit);
         Assert.Equal(ZoneStatus.Green, dashboard.Status);
     }
 
     // A disabled+offline device still shows a red "Offline" badge on its own row but must not redden a zone/unit nobody expects it to report into - it takes the zone/unit to Orange instead.
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitDashboard_Status_DisabledOfflineDevice_TurnsOrange_NotRed(DbProviderKind provider)
+    public async Task DeviceFarmUnitDashboard_Status_DisabledOfflineDevice_TurnsOrange_NotRed(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeDevice(t, tenantId); // MakeDevice leaves Enabled at its false default
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
 
-        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
+        var dashboard = Assert.Single(await _repo.DeviceFarmUnitDashboardGetAsync(tenantId), u => u.IDDeviceFarmUnit == unit.IDDeviceFarmUnit);
         Assert.Equal(ZoneStatus.Orange, dashboard.Status);
     }
 
     // Covers a device that WAS online and has since gone stale (LastSeenAt pushed into the past directly, since DeviceDiagnosticUpsertAsync always stamps "now") - compares Fleet vs. the zone dashboard for the same device.
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitDashboard_Status_RedWhenEnabledDeviceWentStale_MatchesFleet(DbProviderKind provider)
+    public async Task DeviceFarmUnitDashboard_Status_RedWhenEnabledDeviceWentStale_MatchesFleet(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeEnabledDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
         await _repo.DeviceDiagnosticUpsertAsync(d.IDDevice.Value, tenantId, new DeviceConfigPoll { ConfigVersion = 1 });
 
         await using (var db = _fx.NewContext(t))
@@ -2043,9 +2043,9 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         var fleet = Assert.Single(await _repo.DeviceFleetGetAsync(tenantId), f => f.IDDevice == d.IDDevice);
         Assert.False(fleet.Online, "Fleet should show this device offline");
 
-        var dashboard = Assert.Single(await _repo.DeviceUnitDashboardGetAsync(tenantId), u => u.IDDeviceUnit == unit.IDDeviceUnit);
-        var zoneDashboard = Assert.Single(await _repo.DeviceUnitZoneDashboardListGetAsync(unit.IDDeviceUnit!.Value));
-        var zoneSingle = await _repo.DeviceUnitZoneDashboardGetAsync(zone.IDDeviceUnitZone!.Value);
+        var dashboard = Assert.Single(await _repo.DeviceFarmUnitDashboardGetAsync(tenantId), u => u.IDDeviceFarmUnit == unit.IDDeviceFarmUnit);
+        var zoneDashboard = Assert.Single(await _repo.DeviceFarmUnitZoneDashboardListGetAsync(unit.IDDeviceFarmUnit!.Value));
+        var zoneSingle = await _repo.DeviceFarmUnitZoneDashboardGetAsync(zone.IDDeviceFarmUnitZone!.Value);
 
         Assert.Equal(ZoneStatus.Red, dashboard.Status);
         Assert.Equal(ZoneStatus.Red, zoneDashboard.Status);
@@ -2054,18 +2054,18 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
     // No explicit dateCreated stamps UtcNow, landing in the trend's last bucket (index 23 = current hour).
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitZoneDashboard_Trend_BucketsRecentReadingIntoCurrentHour(DbProviderKind provider)
+    public async Task DeviceFarmUnitZoneDashboard_Trend_BucketsRecentReadingIntoCurrentHour(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
 
         await _repo.SensorDataPushAsync(new JsonArray(new JsonObject { ["temperature"] = "22.5" }),
-            d.IDDevice!.Value, tenantId, unit.IDDeviceUnit, zone.IDDeviceUnitZone);
+            d.IDDevice!.Value, tenantId, unit.IDDeviceFarmUnit, zone.IDDeviceFarmUnitZone);
 
-        var zoneDetail = await _repo.DeviceUnitZoneDashboardGetAsync(zone.IDDeviceUnitZone!.Value);
+        var zoneDetail = await _repo.DeviceFarmUnitZoneDashboardGetAsync(zone.IDDeviceFarmUnitZone!.Value);
         Assert.NotNull(zoneDetail);
         Assert.Equal(22.5, zoneDetail!.Trend.Temperature[^1]);
         Assert.All(zoneDetail.Trend.Temperature.Take(zoneDetail.Trend.Temperature.Length - 1), Assert.Null);
@@ -2073,22 +2073,22 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
     // Deleting a Unit cascades its Zones and unassigns (not deletes) their devices.
     [SkippableTheory, MemberData(nameof(Providers))]
-    public async Task DeviceUnitDelete_CascadesZones_AndUnassignsDevices_WithoutDeletingThem(DbProviderKind provider)
+    public async Task DeviceFarmUnitDelete_CascadesZones_AndUnassignsDevices_WithoutDeletingThem(DbProviderKind provider)
     {
         var t = Use(provider);
         var (tenantId, _, _) = await MakeUser(t);
         var (unit, zone) = await MakeUnitAndZone(tenantId);
         var d = await MakeDevice(t, tenantId);
-        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceUnitZone!.Value);
+        await _repo.DeviceAssignToZoneAsync(d.IDDevice!.Value, zone.IDDeviceFarmUnitZone!.Value);
 
-        await _repo.DeviceUnitDeleteAsync(unit.IDDeviceUnit!.Value);
+        await _repo.DeviceFarmUnitDeleteAsync(unit.IDDeviceFarmUnit!.Value);
 
-        Assert.Null(await _repo.DeviceUnitGetByIdAsync(unit.IDDeviceUnit));
-        Assert.Null(await _repo.DeviceUnitZoneGetByIdAsync(zone.IDDeviceUnitZone));
+        Assert.Null(await _repo.DeviceFarmUnitGetByIdAsync(unit.IDDeviceFarmUnit));
+        Assert.Null(await _repo.DeviceFarmUnitZoneGetByIdAsync(zone.IDDeviceFarmUnitZone));
         var stillThere = await _repo.DeviceGetByIdAsync(d.IDDevice);
         Assert.NotNull(stillThere); // device itself is untouched
-        Assert.Null(stillThere!.DeviceUnitID);
-        Assert.Null(stillThere.DeviceUnitZoneID);
+        Assert.Null(stillThere!.DeviceFarmUnitID);
+        Assert.Null(stillThere.DeviceFarmUnitZoneID);
     }
 
     [SkippableTheory, MemberData(nameof(Providers))]
@@ -2326,12 +2326,12 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         await using (var db = _fx.NewContext(t))
         {
             db.SensorData.AddRange(
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 20, DateCreated = bucketStart.AddSeconds(10) },
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 21, DateCreated = bucketStart.AddSeconds(70) },
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 19, DateCreated = bucketStart.AddSeconds(130) },
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 20, DateCreated = bucketStart.AddSeconds(190) },
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 500, DateCreated = bucketStart.AddSeconds(250) },
-                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceUnitID = 0, DeviceUnitZoneID = 0, Temperature = 99, DateCreated = recentTimestamp });
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceFarmUnitID = 0, DeviceFarmUnitZoneID = 0, Temperature = 20, DateCreated = bucketStart.AddSeconds(10) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceFarmUnitID = 0, DeviceFarmUnitZoneID = 0, Temperature = 21, DateCreated = bucketStart.AddSeconds(70) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceFarmUnitID = 0, DeviceFarmUnitZoneID = 0, Temperature = 19, DateCreated = bucketStart.AddSeconds(130) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceFarmUnitID = 0, DeviceFarmUnitZoneID = 0, Temperature = 20, DateCreated = bucketStart.AddSeconds(190) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceFarmUnitID = 0, DeviceFarmUnitZoneID = 0, Temperature = 500, DateCreated = bucketStart.AddSeconds(250) },
+                new SensorDataRow { DeviceID = d.IDDevice!.Value, TenantID = tenantId, DeviceFarmUnitID = 0, DeviceFarmUnitZoneID = 0, Temperature = 99, DateCreated = recentTimestamp });
             await db.SaveChangesAsync();
         }
 
