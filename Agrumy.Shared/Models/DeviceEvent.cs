@@ -25,6 +25,8 @@ namespace api.Models
         RuleRejected = 15,
         // A relay-function evaluator hit a NaN sensor reading - see #368.
         SensorStale = 16,
+        // ESP.getFreeHeap() dropped below the device's own reboot threshold - see #360, replaces the old raw-failed-config-cycle-count trigger.
+        LowMemoryReboot = 17,
     }
 
     /// Body of POST /api/Device/Event; deliberately has no device/tenant identity field — the caller's apiId (see api.Security.DeviceAuth) is the only trusted source for that.
