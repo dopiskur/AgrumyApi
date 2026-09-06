@@ -76,7 +76,7 @@
 </div>
 
 @* Idempotent event-delegation script, safe to inline once per row - a page with all three function rows only wires this listener the first time it runs. *@
-<script>
+<script nonce="@Context.CspNonce()">
     if (!window.__manualActuateModeWired) {
         window.__manualActuateModeWired = true;
         document.addEventListener('change', function (e) {
