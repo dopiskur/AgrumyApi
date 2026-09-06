@@ -25,6 +25,8 @@
          ChirpStack/ChirpStackUplinkService.cs. Untested against a real broker/gateway - see its
          class remarks. -->
     <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
+    <!-- GatewayProfile.LoRaPrivateProtocol: talks to the radio-frontend board over a plain serial port - see LoRaPrivate/LoRaPrivateProtocolUplinkService.cs. -->
+    <PackageReference Include="System.IO.Ports" Version="9.0.0" />
   </ItemGroup>
 
 </Project>

@@ -265,13 +265,15 @@
 
                 <div class="tab-pane fade" id="tab-gateway" role="tabpanel">
                     <p class="text-secondary">
-                        Roadmap #147: Agrumy.Gateway forwards other devices' traffic through
-                        <code>POST /api/Gateway/Batch</code> instead of reporting its own sensors -
-                        either a local WiFi repeater (devices keep their own ApiKey, Gateway is a
-                        transparent forwarder) or a LoRa/ChirpStack gateway (devices are mapped by
-                        DevEUI on the <a asp-controller="Gateway" asp-action="Index">Gateway Devices</a>
-                        page). Disabled here means GatewayApiController.Batch rejects every call,
-                        registered gateways included.
+                        Roadmap #147/#225: Agrumy.Gateway forwards other devices' traffic through
+                        <code>POST /api/Gateway/Batch</code> instead of reporting its own sensors - a
+                        local WiFi repeater (devices keep their own ApiKey, Gateway is a transparent
+                        forwarder), a LoRa/ChirpStack gateway, or a LoRa private-protocol gateway
+                        (RadioLib raw PHY over a serial-attached radio-frontend board, no ChirpStack
+                        dependency) - the latter two map devices by DevEUI/node address on the
+                        <a asp-controller="Gateway" asp-action="Index">Gateway Devices</a> page.
+                        Disabled here means GatewayApiController.Batch rejects every call, registered
+                        gateways included.
                     </p>
                     <div class="form-check mb-3">
                         <input asp-for="GatewayEnabled" class="form-check-input" />

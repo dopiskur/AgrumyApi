@@ -24,6 +24,7 @@
     <ProjectReference Include="..\Agrumy.Api\Agrumy.Api.csproj" />
     <ProjectReference Include="..\Agrumy.Shared\Agrumy.Shared.csproj" />
     <ProjectReference Include="..\Agrumy.Web\Agrumy.Web.csproj" />
+    <ProjectReference Include="..\Agrumy.Gateway\Agrumy.Gateway.csproj" />
   </ItemGroup>
 
   <ItemGroup>

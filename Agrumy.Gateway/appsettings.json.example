@@ -24,5 +24,10 @@
     "MqttPassword": "",
     "ApplicationId": "",
     "MappingRefreshSeconds": 60
+  },
+  "LoRaPrivateProtocol": {
+    "SerialPort": "/dev/ttyUSB0",
+    "BaudRate": 115200,
+    "MappingRefreshSeconds": 60
   }
 }

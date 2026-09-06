@@ -9,6 +9,8 @@ namespace api.Models
         WiFiRepeater = 0,
         /// LoRa gateway: uplinks arrive over ChirpStack MQTT keyed by DevEUI, which Gateway maps to a device's ApiId/ApiKey via GatewayDeviceMapping before forwarding.
         LoRaGateway = 1,
+        /// LoRa gateway, private (non-LoRaWAN) protocol: uplinks arrive over a serial-attached RadioLib radio-frontend board keyed by a 16-bit node address, mapped the same way as LoRaGateway's DevEUI (GatewayDeviceMapping.DevEUI holds the address as a string here) - no ChirpStack/network-server dependency, see api.Gateway.LoRaPrivate.LoRaPrivateProtocolUplinkService.
+        LoRaPrivateProtocol = 2,
     }
 
     /// ServerConfig.GatewayMode, Global-Admin-only. Realtime forwards each entry immediately; Aggregated holds entries up to GatewayWaitWindowSeconds for a LoRa Class A device's decoupled uplink/downlink cycle - a live WiFi HTTP connection has no use for it since the caller is already blocked on the socket.

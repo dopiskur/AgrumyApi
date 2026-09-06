@@ -1,25 +1,39 @@
 @model api.ViewModels.GatewayMappingViewModel
 
 @{
-    ViewData["Title"] = "Gateway Devices - " + Model.Gateway.DeviceName + " DevEUI Mapping";
+    // LoRaPrivateProtocol reuses this exact same mapping mechanism (GatewayDeviceMapping.DevEUI holds
+    // a 16-bit node address as a decimal string instead of a 16-hex-char LoRaWAN DevEUI) - only the
+    // labels/input pattern below differ, see api.Gateway.LoRaPrivate.LoRaPrivateProtocolUplinkService.
+    bool isPrivateProtocol = Model.Gateway.GatewayProfile == api.Models.GatewayProfile.LoRaPrivateProtocol;
+    string idLabel = isPrivateProtocol ? "Node Address" : "DevEUI";
+    ViewData["Title"] = "Gateway Devices - " + Model.Gateway.DeviceName + " " + idLabel + " Mapping";
 }
 
 <div class="card mb-3">
     <div class="card-header">
-        <h3 class="card-title">@Model.Gateway.DeviceName &mdash; DevEUI Mapping</h3>
+        <h3 class="card-title">@Model.Gateway.DeviceName &mdash; @idLabel Mapping</h3>
         <div class="card-tools">
             <a asp-action="Index" class="btn btn-sm btn-secondary">Back to Gateway Devices</a>
         </div>
     </div>
     <div class="card-body">
         <p class="text-secondary">
-            Maps a LoRaWAN end-device's DevEUI to the Agrumy device whose ApiId/ApiKey this gateway
-            should use when it sees an uplink from that DevEUI (roadmap #147). Only meaningful
-            while this gateway's profile is LoRaGateway.
+            @if (isPrivateProtocol)
+            {
+                <text>Maps a LoRa private-protocol node's numeric address (0-65535) to the Agrumy device
+                whose ApiId/ApiKey this gateway should use when it sees an uplink from that address.
+                Only meaningful while this gateway's profile is LoRaPrivateProtocol.</text>
+            }
+            else
+            {
+                <text>Maps a LoRaWAN end-device's DevEUI to the Agrumy device whose ApiId/ApiKey this gateway
+                should use when it sees an uplink from that DevEUI (roadmap #147). Only meaningful
+                while this gateway's profile is LoRaGateway.</text>
+            }
         </p>
         @if (!Model.Mappings.Any())
         {
-            <p class="text-secondary fst-italic">No DevEUI mapped yet.</p>
+            <p class="text-secondary fst-italic">No @idLabel.ToLowerInvariant() mapped yet.</p>
         }
         else
         {
@@ -27,7 +41,7 @@
                 <table class="table table-hover">
                     <thead>
                         <tr>
-                            <th>DevEUI</th>
+                            <th>@idLabel</th>
                             <th>Device</th>
                             <th></th>
                         </tr>
@@ -59,9 +73,17 @@
         <form asp-action="MappingAdd" method="post" class="row g-2 align-items-end">
             <input type="hidden" name="idGatewayDevice" value="@Model.Gateway.IDDevice" />
             <div class="col-sm-4">
-                <label class="form-label" for="devEUI">DevEUI</label>
-                <input type="text" id="devEUI" name="devEUI" class="form-control font-monospace" maxlength="16"
-                       placeholder="16 hex chars" pattern="[0-9A-Fa-f]{16}" required />
+                <label class="form-label" for="devEUI">@idLabel</label>
+                @if (isPrivateProtocol)
+                {
+                    <input type="text" id="devEUI" name="devEUI" class="form-control font-monospace"
+                           placeholder="0-65535" pattern="[0-9]{1,5}" required />
+                }
+                else
+                {
+                    <input type="text" id="devEUI" name="devEUI" class="form-control font-monospace" maxlength="16"
+                           placeholder="16 hex chars" pattern="[0-9A-Fa-f]{16}" required />
+                }
             </div>
             <div class="col-sm-5">
                 <label class="form-label" for="idDevice">Device</label>

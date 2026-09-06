@@ -8,6 +8,7 @@ namespace api.Gateway
         public AgrumyServiceOptions AgrumyService { get; set; } = new();
         public GatewaySelfOptions Gateway { get; set; } = new();
         public ChirpStackOptions ChirpStack { get; set; } = new();
+        public LoRaPrivateProtocolOptions LoRaPrivateProtocol { get; set; } = new();
     }
 
     public class AgrumyServiceOptions
@@ -41,6 +42,16 @@ namespace api.Gateway
         /// ChirpStack application id the uplink/downlink topics are namespaced under (application/{ApplicationId}/device/{devEui}/event/up, .../command/down).
         public string ApplicationId { get; set; } = "";
         /// How often to re-fetch this gateway's DevEUI mapping from GET /api/Gateway/DeviceMapping.
+        public int MappingRefreshSeconds { get; set; } = 60;
+    }
+
+    /// GatewayProfile.LoRaPrivateProtocol only - a locally attached ESP32+SX126x radio-frontend board (RadioLib raw PHY, not LoRaWAN) speaks a small length-framed protocol over this serial port; see api.Gateway.LoRaPrivate.LoRaPrivateProtocolUplinkService.
+    public class LoRaPrivateProtocolOptions
+    {
+        /// Linux device path (e.g. /dev/ttyUSB0) or Windows COM port of the radio-frontend board.
+        public string SerialPort { get; set; } = "/dev/ttyUSB0";
+        public int BaudRate { get; set; } = 115200;
+        /// Same mapping-refresh cadence as ChirpStackOptions, keyed by node address (string) instead of DevEUI.
         public int MappingRefreshSeconds { get; set; } = 60;
     }
 }

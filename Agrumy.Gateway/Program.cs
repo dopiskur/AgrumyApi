@@ -2,6 +2,7 @@ using api.Models;
 using api.Gateway;
 using api.Gateway.ChirpStack;
 using api.Gateway.LocalForwarding;
+using api.Gateway.LoRaPrivate;
 using api.Gateway.Registration;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +22,10 @@ GatewayOptions gatewayOptions = builder.Configuration.Get<GatewayOptions>() ?? n
 if (gatewayOptions.Gateway.Profile == GatewayProfile.LoRaGateway)
 {
     builder.Services.AddHostedService<ChirpStackUplinkService>();
+}
+else if (gatewayOptions.Gateway.Profile == GatewayProfile.LoRaPrivateProtocol)
+{
+    builder.Services.AddHostedService<LoRaPrivateProtocolUplinkService>();
 }
 
 builder.WebHost.ConfigureKestrel(k => k.ListenAnyIP(gatewayOptions.Gateway.LocalPort)); // Profile A's own port, separate from whatever port AgrumyService itself uses
