@@ -85,7 +85,7 @@ builder.Services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();
 builder.Services.AddScoped<IDeviceRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IDeviceUnitRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<ICommandRepository, EfCommandRepository>();
-builder.Services.AddScoped<IFirmwareRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<IFirmwareRepository, EfFirmwareRepository>();
 builder.Services.AddScoped<ISensorDataRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IAuditLogRepository, EfAuditLogRepository>();
 builder.Services.AddScoped<IGatewayRepository, EfGatewayRepository>();

@@ -14,7 +14,7 @@ namespace api.Dal
                 .Where(f => f.DeviceTypeID == deviceTypeID)
                 .OrderByDescending(f => f.DateAdded)
                 .FirstOrDefaultAsync();
-            return row == null ? null : FirmwareToDto(row);
+            return row == null ? null : EfFirmwareRepository.FirmwareToDto(row);
         }
     }
 }
