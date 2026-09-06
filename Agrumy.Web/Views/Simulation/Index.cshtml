@@ -1,0 +1,41 @@
+@model List<api.Models.DeviceDto>
+
+@{
+    ViewData["Title"] = "Simulations";
+}
+
+<h1>Simulations</h1>
+<p class="text-muted">Roadmap #251 modality B - each row below is a fully virtual device: no real hardware, its readings and relay state are generated server-side every 30 seconds through the exact same API a real device uses. Rename/assign it to a Unit/Zone like any other device from its own Details page.</p>
+
+<form asp-action="Create" method="post" class="mb-3">
+    <button type="submit" class="btn btn-primary">Add virtual device</button>
+</form>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Device</th>
+            <th>Assigned zone</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var device in Model)
+        {
+            <tr>
+                <td><a asp-controller="Device" asp-action="Details" asp-route-idDevice="@device.IDDevice">@device.DeviceName</a></td>
+                <td>@(device.DeviceUnitZoneID is int ? "Assigned" : "Not assigned")</td>
+                <td>
+                    <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Delete this virtual device? Its sensor history goes with it.');">
+                        <input type="hidden" name="idDevice" value="@device.IDDevice" />
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        @if (Model.Count == 0)
+        {
+            <tr><td colspan="3" class="text-muted">No virtual devices yet.</td></tr>
+        }
+    </tbody>
+</table>

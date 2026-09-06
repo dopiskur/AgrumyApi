@@ -100,6 +100,15 @@ namespace api.Dal.Interface
         [Get("/api/Device/Type")]
         Task<IEnumerable<DeviceType>> DeviceTypeGet();
 
+        [Post("/api/Simulation/Device")]
+        Task<DeviceDto> SimulationDeviceCreate();
+
+        [Get("/api/Simulation/Device")]
+        Task<IList<int>> SimulationDeviceList();
+
+        [Delete("/api/Simulation/Device/{idDevice}")]
+        Task SimulationDeviceDelete(int idDevice);
+
         [Get("/api/Device/Simulation/{idDevice}")]
         Task<DeviceSimulation> DeviceSimulationGet(int idDevice);
 

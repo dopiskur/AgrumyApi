@@ -193,6 +193,15 @@
                                 </a>
                             </li>
                         }
+                        @if (hasAnyRole(RoleNames.SimulationManagers))
+                        {
+                            <li class="nav-item">
+                                <a asp-area="" asp-controller="Simulation" asp-action="Index" class="nav-link @navActive("Simulation")">
+                                    <i class="nav-icon bi bi-cpu-fill"></i>
+                                    <p>@Localizer["Simulations"]</p>
+                                </a>
+                            </li>
+                        }
                         @if (User.IsInRole(RoleNames.GlobalAdmin))
                         {
                             <li class="nav-item">

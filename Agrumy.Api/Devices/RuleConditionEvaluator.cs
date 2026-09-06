@@ -71,9 +71,9 @@ namespace api.Devices
             }
         }
 
-        // ---- Pure math, mirrors AgrumyFirmware's RelayLogic.cpp exactly ---------------------------------
+        // ---- Pure math, mirrors AgrumyFirmware's RelayLogic.cpp exactly - internal so api.Devices.SimulatedRelayEvaluator (roadmap #251 modality B) can reuse it for Relay-action rules without re-deriving the same formulas a third time. ---------------------------------
 
-        private static bool ComputeThresholdState(bool currentlyOn, double reading, double threshold, double hysteresis, bool turnsOnAboveThreshold)
+        internal static bool ComputeThresholdState(bool currentlyOn, double reading, double threshold, double hysteresis, bool turnsOnAboveThreshold)
         {
             if (turnsOnAboveThreshold)
             {
@@ -88,14 +88,14 @@ namespace api.Devices
             return currentlyOn; // dead zone - neither condition met, state latches
         }
 
-        private static bool ComputeIntervalState(int interval, int intervalLength, DateTime utcNow)
+        internal static bool ComputeIntervalState(int interval, int intervalLength, DateTime utcNow)
         {
             long epochSeconds = ((DateTimeOffset)DateTime.SpecifyKind(utcNow, DateTimeKind.Utc)).ToUnixTimeSeconds();
             long positionInCycle = epochSeconds % interval;
             return positionInCycle < intervalLength;
         }
 
-        private static bool ComputeScheduleState(int daysOfWeekMask, int startSeconds, int durationSeconds, int localWeekday, int localSecondsOfDay)
+        internal static bool ComputeScheduleState(int daysOfWeekMask, int startSeconds, int durationSeconds, int localWeekday, int localSecondsOfDay)
         {
             bool todayIsScheduled = (daysOfWeekMask & (1 << localWeekday)) != 0;
             return todayIsScheduled && localSecondsOfDay >= startSeconds && localSecondsOfDay < startSeconds + durationSeconds;

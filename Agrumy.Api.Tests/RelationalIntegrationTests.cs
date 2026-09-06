@@ -1509,6 +1509,29 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         Assert.Equal(60, second.Humidity);
     }
 
+    // Roadmap #251 modality B: the registry is purely internal bookkeeping - registering, listing (globally and tenant-scoped), and a delete that also nukes sensorData (unlike an ordinary device delete).
+    [SkippableTheory, MemberData(nameof(Providers))]
+    public async Task VirtualDevice_RegisterListDelete_AlsoRemovesSensorData(DbProviderKind provider)
+    {
+        var t = Use(provider);
+        var (tenantId, _, _) = await MakeUser(t);
+        var d = await MakeDevice(t, tenantId);
+        await _repo.SensorDataPushAsync(new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["temperature"] = 21.0 }),
+            d.IDDevice!.Value, tenantId, null, null);
+
+        await _repo.VirtualDeviceRegisterAsync(d.IDDevice!.Value);
+        Assert.Contains(d.IDDevice!.Value, await _repo.VirtualDeviceIdsGetAsync());
+        Assert.Contains(d.IDDevice!.Value, await _repo.VirtualDeviceIdsGetAsync(tenantId));
+        Assert.DoesNotContain(d.IDDevice!.Value, await _repo.VirtualDeviceIdsGetAsync(tenantId + 12345)); // wrong tenant
+
+        await _repo.VirtualDeviceDeleteAsync(d.IDDevice!.Value, tenantId);
+
+        Assert.Null(await _repo.DeviceGetByIdAsync(d.IDDevice));
+        await using var db = _fx.NewContext(t);
+        Assert.False(await db.SensorData.AnyAsync(s => s.DeviceID == d.IDDevice));
+        Assert.False(await db.VirtualDevices.AnyAsync(v => v.DeviceID == d.IDDevice));
+    }
+
     // DeviceFleetGetAsync must surface ControllerData without a per-device round trip - see BuildFleetStatusesAsync's relayStates dictionary.
     [SkippableTheory, MemberData(nameof(Providers))]
     public async Task DeviceFleetGet_IncludesRelayStates(DbProviderKind provider)

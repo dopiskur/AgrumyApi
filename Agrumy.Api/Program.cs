@@ -168,6 +168,17 @@ builder.Services.AddScoped<FirmwareCatalogService>();
 builder.Services.AddScoped<FirmwareCatalogRefreshEvaluator>();
 builder.Services.AddHostedService<FirmwareCatalogRefreshBackgroundService>();
 
+// Roadmap #251 modality B: BaseAddress is the server's OWN public address (Option C design - the runner calls itself over the real wire protocol, same as a real device would target ServicePoint). Falls back to the documented local dev default when WebView:ApiService isn't configured.
+builder.Services.AddHttpClient(VirtualDeviceRunnerBackgroundService.HttpClientName, (sp, client) =>
+{
+    string apiService = sp.GetRequiredService<IOptions<AgrumySettings>>().Value.ApiService is { Length: > 0 } configured
+        ? configured
+        : "http://localhost:5000";
+    client.BaseAddress = new Uri(apiService.Contains("://") ? apiService : $"https://{apiService}");
+});
+builder.Services.AddSingleton<api.Simulation.SimulatedSensorGenerator>();
+builder.Services.AddHostedService<VirtualDeviceRunnerBackgroundService>();
+
 // AgrumyMetrics is a singleton because its ConcurrentDictionary aggregate must span every request/scope, unlike the AddScoped registrations above.
 builder.Services.AddSingleton<AgrumyMetrics>();
 builder.Services

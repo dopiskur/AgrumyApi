@@ -34,6 +34,7 @@ namespace api.Dal
         public DbSet<DeviceFirmwareRow> DeviceFirmwares => Set<DeviceFirmwareRow>();
         public DbSet<DeviceDiagnosticRow> DeviceDiagnostics => Set<DeviceDiagnosticRow>();
         public DbSet<DeviceSimulationRow> DeviceSimulations => Set<DeviceSimulationRow>();
+        public DbSet<VirtualDeviceRow> VirtualDevices => Set<VirtualDeviceRow>();
         public DbSet<DeviceCommandRow> DeviceCommands => Set<DeviceCommandRow>();
         public DbSet<GatewayDeviceMappingRow> GatewayDeviceMappings => Set<GatewayDeviceMappingRow>();
         public DbSet<DeviceDiscoveryReportRow> DeviceDiscoveryReports => Set<DeviceDiscoveryReportRow>();
@@ -344,6 +345,15 @@ namespace api.Dal
                 e.ToTable("deviceSimulation");
                 e.HasKey(x => x.DeviceID);
                 e.Property(x => x.DeviceID).ValueGeneratedNever(); // 1:1 with device, same PK-is-the-FK shape as DeviceDiagnosticRow above.
+                e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
+            });
+
+            modelBuilder.Entity<VirtualDeviceRow>(e =>
+            {
+                e.ToTable("virtualDevice");
+                e.HasKey(x => x.DeviceID);
+                e.Property(x => x.DeviceID).ValueGeneratedNever(); // 1:1 with device, same PK-is-the-FK shape as DeviceDiagnosticRow/DeviceSimulationRow.
+                e.Property(x => x.DateCreated).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.HasOne<DeviceRow>().WithMany().HasForeignKey(x => x.DeviceID).OnDelete(DeleteBehavior.NoAction);
             });
 
