@@ -19,6 +19,12 @@ namespace api.Models
         SafetyLimitTripped = 12,
         // Message carries a compact core-dump summary (task/pc/cause/backtrace); full symbolication still needs firmware.elf + addr2line offline.
         Crash = 13,
+        // Wire.endTransmission() failed writing the PCF8574 relay shadow - see #365.
+        I2CFault = 14,
+        // A rule had an unrecognized/over-cap condition and was rejected whole rather than silently truncated - see #367.
+        RuleRejected = 15,
+        // A relay-function evaluator hit a NaN sensor reading - see #368.
+        SensorStale = 16,
     }
 
     /// Body of POST /api/Device/Event; deliberately has no device/tenant identity field — the caller's apiId (see api.Security.DeviceAuth) is the only trusted source for that.
