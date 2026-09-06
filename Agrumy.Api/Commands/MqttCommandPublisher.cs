@@ -1,4 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using api.Dal.Interface;
 using api.Models;
 using MQTTnet;
@@ -30,7 +33,13 @@ namespace api.Commands
 
             string topic = MqttCommandTopic.ForDevice(device.TenantID, deviceId);
             // ConditionConfigJson.Options camelCases properties and leaves ActionType as its int, matching the shape the HTTP config-poll response already sends this same type as.
-            byte[] payload = JsonSerializer.SerializeToUtf8Bytes(command, ConditionConfigJson.Options);
+            byte[] commandBytes = JsonSerializer.SerializeToUtf8Bytes(command, ConditionConfigJson.Options);
+
+            // Roadmap #363: anyone with broker credentials could otherwise command any device on any tenant (MqttUsername/Password are ServerConfig-wide, not per-device) - signing with the TARGET device's own ApiKey means forging a command needs that specific device's credential, not just broker access.
+            JsonNode commandNode = JsonNode.Parse(commandBytes)!;
+            string canonical = CanonicalString(commandNode);
+            commandNode["sig"] = ComputeSignature(canonical, device.ApiKey ?? "");
+            byte[] payload = JsonSerializer.SerializeToUtf8Bytes(commandNode);
 
             try
             {
@@ -56,6 +65,20 @@ namespace api.Commands
             {
                 logger.LogWarning(ex, "MQTT instant command push failed for device {DeviceId} - falling back to normal poll delivery.", deviceId);
             }
+        }
+
+        // Plain '|'-joined fields, not a JSON canonicalization - firmware parses idDeviceCommand/actionType as ints and expiresAt/payload as opaque strings it never reformats, so reconstructing this same string from its own parsed fields is guaranteed byte-identical without needing ArduinoJson and System.Text.Json to agree on any serialization convention.
+        internal static string CanonicalString(JsonNode command) =>
+            string.Join('|',
+                command["idDeviceCommand"]!.GetValue<int>(),
+                command["actionType"]!.GetValue<int>(),
+                command["expiresAt"]?.GetValue<string>() ?? "",
+                command["payload"]?.GetValue<string>() ?? "");
+
+        internal static string ComputeSignature(string canonical, string apiKey)
+        {
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(apiKey));
+            return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
         }
     }
 }

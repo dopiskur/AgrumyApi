@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using api.Commands;
 using api.Dal.Interface;
 using api.Models;
@@ -52,5 +54,43 @@ public class MqttCommandPublisherTests
 
         Assert.Equal(IssueCommandOutcome.AllDuplicates, result.Outcome);
         // Strict mock: PublishAsync was never set up - a deduplicated command must not publish.
+    }
+
+    // ---- #363 HMAC signing --------------------------------------------
+
+    private static JsonNode SampleCommandNode() =>
+        JsonNode.Parse(JsonSerializer.SerializeToUtf8Bytes(
+            new PendingCommand { IDDeviceCommand = 7, ActionType = CommandActionType.Reboot, ExpiresAt = new DateTime(2026, 9, 6, 12, 0, 0, DateTimeKind.Utc), Payload = "abc" },
+            ConditionConfigJson.Options))!;
+
+    [Fact]
+    public void CanonicalString_JoinsFieldsInFixedOrder()
+    {
+        string canonical = MqttCommandPublisher.CanonicalString(SampleCommandNode());
+
+        Assert.Equal($"7|{(int)CommandActionType.Reboot}|2026-09-06T12:00:00Z|abc", canonical);
+    }
+
+    [Fact]
+    public void CanonicalString_NullPayload_UsesEmptyString()
+    {
+        JsonNode node = JsonNode.Parse(JsonSerializer.SerializeToUtf8Bytes(
+            new PendingCommand { IDDeviceCommand = 7, ActionType = CommandActionType.Reboot, ExpiresAt = DateTime.UtcNow, Payload = null },
+            ConditionConfigJson.Options))!;
+
+        string canonical = MqttCommandPublisher.CanonicalString(node);
+
+        Assert.EndsWith("|", canonical);
+    }
+
+    [Fact]
+    public void ComputeSignature_IsDeterministic_AndDependsOnApiKey()
+    {
+        string sigA = MqttCommandPublisher.ComputeSignature("7|1|x|y", "device-key-a");
+        string sigA2 = MqttCommandPublisher.ComputeSignature("7|1|x|y", "device-key-a");
+        string sigB = MqttCommandPublisher.ComputeSignature("7|1|x|y", "device-key-b");
+
+        Assert.Equal(sigA, sigA2);
+        Assert.NotEqual(sigA, sigB);
     }
 }
