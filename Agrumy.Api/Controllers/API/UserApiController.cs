@@ -494,7 +494,8 @@ namespace api.Controllers.API
             }
 
             string pin = AuthenticationProvider.GetPin();
-            DateTime expiresAt = DateTime.UtcNow.AddHours(AuthenticationProvider.PinValidHours);
+            ServerConfig serverConfig = await serverConfigRepo.ServerConfigGetAsync(1);
+            DateTime expiresAt = DateTime.UtcNow.AddMinutes(serverConfig.DevicePinValidMinutes);
             await userRepository.UserSetDevicePinAsync(idUser, pin, expiresAt);
 
             return Ok(new DevicePinResult { DevicePin = pin, ExpiresAt = expiresAt });

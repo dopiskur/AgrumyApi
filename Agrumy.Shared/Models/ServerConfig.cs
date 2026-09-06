@@ -161,6 +161,10 @@ namespace api.Models
 
         [Display(Name = "From name")]
         public string EmailFromName { get; set; } = "Agrumy";
+
+        // Roadmap #372: a leaked/screen-shotted PIN (or a leaked DeviceCommand.Payload, see DeviceCommandApiController.GetCommand) is valid for this long - fixed preset {5,15,60,120,360,720,1440}, clamped by ServerConfigApiController.Update, not free-text.
+        [Display(Name = "Registration PIN validity (minutes)")]
+        public int DevicePinValidMinutes { get; set; } = 60;
     }
 
     /// The only ServerConfig field a pre-login, unauthenticated page may see - Register uses it to decide whether to show "create a new tenant" without needing the admin-only /api/ServerConfig.

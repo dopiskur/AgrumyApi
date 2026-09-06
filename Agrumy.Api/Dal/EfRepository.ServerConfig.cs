@@ -53,6 +53,7 @@ namespace api.Dal
                 EmailPort = 587,
                 EmailUseStartTls = true,
                 EmailFromName = "Agrumy",
+                DevicePinValidMinutes = 60,
             };
             db.ServerConfigs.Add(generated);
             await db.SaveChangesAsync();
@@ -117,6 +118,7 @@ namespace api.Dal
             row.EmailUsername = config.EmailUsername;
             row.EmailFromAddress = config.EmailFromAddress;
             row.EmailFromName = config.EmailFromName;
+            row.DevicePinValidMinutes = config.DevicePinValidMinutes;
             // Same "blank keeps existing" handling as MqttPassword above.
             if (!string.IsNullOrEmpty(config.EmailPassword))
             {
@@ -254,6 +256,8 @@ namespace api.Dal
             EmailFromName = string.IsNullOrWhiteSpace(r.EmailFromName) ? "Agrumy" : r.EmailFromName,
             // Never sent back to the edit form - same reasoning as MqttPassword above.
             EmailPassword = null,
+            // An older row has 0 here, which is not a usable duration - same 0-means-unset fallback as GatewayWaitWindowSeconds.
+            DevicePinValidMinutes = r.DevicePinValidMinutes == 0 ? 60 : r.DevicePinValidMinutes,
         };
     }
 }

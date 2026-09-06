@@ -9,7 +9,7 @@ namespace api.Controllers.API
 {
     /// Admin-facing create/list/delete for fully virtual devices - the actual per-tick simulation runs in api.BackgroundWorkers.VirtualDeviceRunnerBackgroundService, not here.
     [Route("/api/Simulation")]
-    public class SimulationApiController(ISimulationRepository simulationRepo, IDeviceRepository deviceRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, IHttpClientFactory httpClientFactory) : ApiControllerBase(userRepo, auditLogRepo, cache)
+    public class SimulationApiController(ISimulationRepository simulationRepo, IDeviceRepository deviceRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, IServerConfigRepository serverConfigRepo, ICache cache, IHttpClientFactory httpClientFactory) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         // Separate field, not the primary-constructor parameter directly - a parameter used both here and in the base(...) call trips CS9107 (ambiguous double-capture).
         private readonly IUserRepository users = userRepo;
@@ -30,7 +30,8 @@ namespace api.Controllers.API
             }
 
             string pin = AuthenticationProvider.GetPin();
-            await users.UserSetDevicePinAsync(callerUserId, pin, DateTime.UtcNow.AddHours(AuthenticationProvider.PinValidHours));
+            ServerConfig serverConfig = await serverConfigRepo.ServerConfigGetAsync(1);
+            await users.UserSetDevicePinAsync(callerUserId, pin, DateTime.UtcNow.AddMinutes(serverConfig.DevicePinValidMinutes));
 
             // "02" is a locally-administered MAC prefix (IEEE 802-2014 sec 8.2.2) - guaranteed to never collide with a real vendor OUI a physical device might report.
             string mac = "02" + Guid.NewGuid().ToString("N")[..10].ToUpperInvariant();

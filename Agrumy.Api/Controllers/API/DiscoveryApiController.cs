@@ -12,7 +12,7 @@ namespace api.Controllers.API
 {
     /// "Scan for new devices" - device-facing report intake, the admin scan trigger, the aggregated results list, and Register (PIN + WiFi credentials to the winning scanning device).
     [Route("/api/Discovery")]
-    public class DiscoveryApiController(IDiscoveryRepository discoveryRepo, IDeviceRepository deviceRepo, IDeviceUnitRepository deviceUnitRepo, ITenantRepository tenantRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, ICache cache, CommandQueueService commandQueue, IOptions<AgrumySettings> settings) : ApiControllerBase(userRepo, auditLogRepo, cache)
+    public class DiscoveryApiController(IDiscoveryRepository discoveryRepo, IDeviceRepository deviceRepo, IDeviceUnitRepository deviceUnitRepo, ITenantRepository tenantRepo, IUserRepository userRepo, IAuditLogRepository auditLogRepo, IServerConfigRepository serverConfigRepo, ICache cache, CommandQueueService commandQueue, IOptions<AgrumySettings> settings) : ApiControllerBase(userRepo, auditLogRepo, cache)
     {
         // Separate field, not the primary-constructor parameter directly - a parameter used both here and in the base(...) call trips CS9107 (ambiguous double-capture).
         private readonly IUserRepository users = userRepo;
@@ -239,7 +239,8 @@ namespace api.Controllers.API
             }
 
             string pin = AuthenticationProvider.GetPin();
-            DateTime pinExpiresAt = DateTime.UtcNow.AddHours(AuthenticationProvider.PinValidHours);
+            ServerConfig serverConfig = await serverConfigRepo.ServerConfigGetAsync(1);
+            DateTime pinExpiresAt = DateTime.UtcNow.AddMinutes(serverConfig.DevicePinValidMinutes);
             await users.UserSetDevicePinAsync(callerUserId, pin, pinExpiresAt);
 
             string payloadJson = JsonSerializer.Serialize(new DiscoveryProvisionPayload

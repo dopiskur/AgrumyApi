@@ -157,5 +157,6 @@ namespace api.Dal.Entities
         public string? EmailPassword { get; set; }
         public string? EmailFromAddress { get; set; }
         public string EmailFromName { get; set; } = "Agrumy";
+        public int DevicePinValidMinutes { get; set; } = 60;
     }
 }

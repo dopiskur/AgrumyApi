@@ -2673,6 +2673,51 @@ public class ApiControllerTests
         Assert.Equal(CommandStatus.Pending, ((DeviceCommand)ok.Value!).Status);
     }
 
+    /// #372: ProvisionDevice's payload carries a WiFi password/registration PIN/username in plaintext - fully redacted here, never partially masked like an apiKey.
+    [Fact]
+    public async Task GetCommand_ProvisionDevicePayload_RedactsSensitiveFields()
+    {
+        string payloadJson = System.Text.Json.JsonSerializer.Serialize(new DiscoveryProvisionPayload
+        {
+            Username = "admin@example.com",
+            Pin = "ABC123",
+            DiscoveredApMac = "AABBCCDDEEFF",
+            Ssid = "HomeWifi",
+            WifiPassword = "supersecret",
+        });
+        _repo.Setup(r => r.GetCommandByIdAsync(9)).ReturnsAsync(new DeviceCommand
+        {
+            IDDeviceCommand = 9, DeviceID = 8, ActionType = CommandActionType.ProvisionDevice, Status = CommandStatus.Pending, Payload = payloadJson,
+        });
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 1 });
+
+        var controller = NewDeviceCommandController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantDevice);
+        var result = await controller.GetCommand(9);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        string masked = ((DeviceCommand)ok.Value!).Payload!;
+        Assert.DoesNotContain("supersecret", masked);
+        Assert.DoesNotContain("ABC123", masked);
+        Assert.DoesNotContain("admin@example.com", masked);
+        Assert.Contains("[REDACTED]", masked);
+        Assert.Contains("HomeWifi", masked); // Ssid/DiscoveredApMac are not secrets - only redact what's actually sensitive
+    }
+
+    [Fact]
+    public async Task GetCommand_NoPayload_ReturnsUnchanged()
+    {
+        _repo.Setup(r => r.GetCommandByIdAsync(9)).ReturnsAsync(new DeviceCommand { IDDeviceCommand = 9, DeviceID = 8, ActionType = CommandActionType.Reboot, Status = CommandStatus.Pending, Payload = null });
+        _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 1 });
+
+        var controller = NewDeviceCommandController();
+        SetCallerRoles(controller, 1, "user", RoleNames.TenantDevice);
+        var result = await controller.GetCommand(9);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Null(((DeviceCommand)ok.Value!).Payload);
+    }
+
     [Fact]
     public async Task GetCommand_UnknownId_Returns404()
     {

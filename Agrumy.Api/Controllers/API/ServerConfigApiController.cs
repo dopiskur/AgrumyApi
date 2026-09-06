@@ -146,6 +146,12 @@ namespace api.Controllers.API
                 return BadRequest("SMTP host and From address are required to enable email notifications.");
             }
 
+            // Fixed dropdown on the Server Settings page (5/15min, 1/2/6/12/24h) - a leaked PIN's blast radius should be an admin-chosen preset, not a free-text value.
+            if (config.DevicePinValidMinutes is not (5 or 15 or 60 or 120 or 360 or 720 or 1440))
+            {
+                return BadRequest("Registration PIN validity must be one of the preset options.");
+            }
+
             config.IDServerConfig = 1; // single global row - the form never chooses this
             await serverConfigRepo.ServerConfigUpdateAsync(config);
             await WriteAuditAsync("ServerConfig.Updated", null, "ServerConfig", "1", null);

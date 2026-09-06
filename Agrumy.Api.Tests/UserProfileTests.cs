@@ -220,6 +220,8 @@ public class UserProfileTests
     public async Task DevicePinGenerate_StoresAndReturns_FreshPin_WithExpiry()
     {
         _repo.Setup(r => r.UserGetAsync(null, "me@x.com", null)).ReturnsAsync(new User { IDUser = 5, Email = "me@x.com" });
+        // Roadmap #372: validity is now ServerConfig.DevicePinValidMinutes, not the old hardcoded 24h constant.
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { DevicePinValidMinutes = 120 });
 
         string? storedPin = null;
         DateTime? storedExpiry = null;
@@ -234,7 +236,7 @@ public class UserProfileTests
         Assert.Equal(storedPin, body.DevicePin);       // the caller sees exactly what was stored
         Assert.Equal(storedExpiry, body.ExpiresAt);
         Assert.Equal(AuthenticationProvider.PinLength, body.DevicePin!.Length);
-        Assert.True(body.ExpiresAt > DateTime.UtcNow.AddHours(23)); // ~PinValidHours out
+        Assert.True(body.ExpiresAt > DateTime.UtcNow.AddMinutes(119)); // ~DevicePinValidMinutes out
     }
 
     [Fact]

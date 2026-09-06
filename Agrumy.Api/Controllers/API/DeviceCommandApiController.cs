@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using api.Commands;
 using api.Dal.Interface;
 using api.Models;
@@ -52,7 +54,47 @@ namespace api.Controllers.API
                 return NotFound();
             }
             var (_, error) = await EnsureOwnedDeviceAsync(command.DeviceID);
-            return error ?? Ok(command);
+            if (error != null)
+            {
+                return error;
+            }
+            if (MaskSensitivePayload(command.Payload) is string masked)
+            {
+                command.Payload = masked;
+            }
+            return Ok(command);
+        }
+
+        /// Roadmap #372: ProvisionDevice/UpdateWifiCredentials payloads carry a WiFi password, registration PIN, and username in plaintext (see api.Models.DiscoveryProvisionPayload/WifiUpdatePayload) - fully redacted here, not partially masked like ServiceController::maskSecret does for apiKey, since a password must never have any real character visible. Null on a non-JSON or non-sensitive payload (plain Reboot/ForceOTA commands carry none) so those pass through unchanged.
+        private static string? MaskSensitivePayload(string? payload)
+        {
+            if (string.IsNullOrEmpty(payload))
+            {
+                return null;
+            }
+            JsonObject? node;
+            try
+            {
+                node = JsonNode.Parse(payload) as JsonObject;
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+            if (node == null)
+            {
+                return null;
+            }
+            bool redacted = false;
+            foreach (string sensitiveKey in new[] { "WifiPassword", "Pin", "Username" })
+            {
+                if (node.ContainsKey(sensitiveKey))
+                {
+                    node[sensitiveKey] = "[REDACTED]";
+                    redacted = true;
+                }
+            }
+            return redacted ? node.ToJsonString() : null;
         }
 
         private Task<(Device? Device, ActionResult? Error)> EnsureOwnedDeviceAsync(int idDevice) =>

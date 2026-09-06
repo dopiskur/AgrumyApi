@@ -48,7 +48,9 @@ namespace api.Controllers.View
                                                     ? nameof(ServerConfig.EmailPort)
                                                     : ex.Body.Contains("email notifications", StringComparison.OrdinalIgnoreCase)
                                                         ? nameof(ServerConfig.EmailHost)
-                                                        : nameof(ServerConfig.FirmwareSource);
+                                                        : ex.Body.Contains("PIN validity", StringComparison.OrdinalIgnoreCase)
+                                                            ? nameof(ServerConfig.DevicePinValidMinutes)
+                                                            : nameof(ServerConfig.FirmwareSource);
                 ModelState.AddModelError(field, ex.Body);
                 return View(serverConfig);
             }

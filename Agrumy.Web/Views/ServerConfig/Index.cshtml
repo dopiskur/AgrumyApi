@@ -152,9 +152,25 @@
                         <input asp-for="PasswordMinLength" class="form-control" />
                         <span asp-validation-for="PasswordMinLength" class="text-danger"></span>
                     </div>
-                    <div class="mb-0 form-check">
+                    <div class="mb-3 form-check">
                         <input asp-for="PasswordRequireComplexity" class="form-check-input" />
                         <label asp-for="PasswordRequireComplexity" class="form-check-label"></label>
+                    </div>
+                    <p class="text-secondary">
+                        How long a device registration PIN (Fleet -&gt; Add New Device) stays valid - a
+                        leaked/screen-shotted PIN is usable for this long. Fixed presets, not free-text.
+                    </p>
+                    <div class="mb-0" style="max-width:16rem">
+                        <label asp-for="DevicePinValidMinutes" class="form-label"></label>
+                        <select asp-for="DevicePinValidMinutes" class="form-select">
+                            <option value="5">5 minutes</option>
+                            <option value="15">15 minutes</option>
+                            <option value="60">1 hour</option>
+                            <option value="120">2 hours</option>
+                            <option value="360">6 hours</option>
+                            <option value="720">12 hours</option>
+                            <option value="1440">24 hours</option>
+                        </select>
                     </div>
                 </div>
 
