@@ -252,7 +252,8 @@ public class ClassifyExceptionTests
         NullLogger<EfRepository>.Instance,
         new Mock<ICache>().Object, // ClassifyException never touches the cache - unused here
         new Mock<IAuditLogRepository>().Object,
-        new Mock<IRefreshTokenRepository>().Object);
+        new Mock<IRefreshTokenRepository>().Object,
+        new Mock<IControllerDataRepository>().Object);
 
     [Fact]
     public void PlainException_MentioningMissingTable_IsSchemaMissing()

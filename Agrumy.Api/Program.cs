@@ -90,7 +90,7 @@ builder.Services.AddScoped<ISensorDataRepository>(sp => sp.GetRequiredService<Ef
 builder.Services.AddScoped<IAuditLogRepository, EfAuditLogRepository>();
 builder.Services.AddScoped<IGatewayRepository>(sp => sp.GetRequiredService<EfRepository>());
 builder.Services.AddScoped<IDiscoveryRepository>(sp => sp.GetRequiredService<EfRepository>());
-builder.Services.AddScoped<IControllerDataRepository>(sp => sp.GetRequiredService<EfRepository>());
+builder.Services.AddScoped<IControllerDataRepository, EfControllerDataRepository>();
 builder.Services.AddScoped<ISimulationRepository>(sp => sp.GetRequiredService<EfRepository>());
 
 // Cache:Redis:ConnectionString switches to Redis; unset/empty keeps the in-process default.
