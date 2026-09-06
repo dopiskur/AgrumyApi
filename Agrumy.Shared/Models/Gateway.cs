@@ -79,4 +79,12 @@ namespace api.Models
         public string? DeviceApiKey { get; set; }
         public DateTime? DateCreated { get; set; }
     }
+
+    /// Body of POST /api/Gateway/RelayUplink (roadmap #383) - a WiFi-connected LoRaGatewayEnabled device forwards one raw, already RF-decoded private-protocol frame, letting the server do the SAME address->device resolution + envelope dispatch api.Gateway.LoRaPrivate.LoRaPrivateProtocolUplinkService does for the serial-bridge path (GatewayDeviceMapping.DevEUI holds the address as a string here too) - "gateway is a transparent forwarder", same principle as Batch/LoRaGatewayBridgeController.
+    public class GatewayRelayUplinkRequest
+    {
+        public ushort SourceAddress { get; set; }
+        /// The frame's decoded payload text - a JSON envelope like {"t":"sensor","d":[...]} exactly as the sensor node built it (Logic/LoRaPayloadLogic), untouched by the relaying gateway.
+        public string Payload { get; set; } = "";
+    }
 }

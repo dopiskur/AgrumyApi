@@ -141,4 +141,56 @@ public class GatewayApiControllerTests
 
         Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
     }
+
+    /// #383 - a LoRaGatewayEnabled device (not IsGateway) must be authorized the same as a classic Agrumy.Gateway.
+    [Fact]
+    public async Task RelayUplink_LoRaGatewayEnabledDevice_NotIsGateway_IsAuthorized()
+    {
+        var gateway = new Device { IDDevice = 1, ApiId = "node1", IsGateway = false, LoRaGatewayEnabled = true, TenantID = 1 };
+        var mappedDevice = new Device { IDDevice = 2, ApiId = "dev2", TenantID = 1 };
+        _repo.Setup(r => r.DeviceGetByApiIdAsync("node1")).ReturnsAsync(gateway);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { GatewayEnabled = true });
+        _repo.Setup(r => r.GatewayDeviceMappingsGetAsync(1)).ReturnsAsync(
+            [new GatewayDeviceMapping { IDGatewayDevice = 1, DevEUI = "42", IDDevice = 2 }]);
+        _repo.Setup(r => r.DeviceGetByIdAsync(2)).ReturnsAsync(mappedDevice);
+        _repo.Setup(r => r.EventDevicePushAsync(2, 1, DeviceEventType.NoInternet, "relayed")).ReturnsAsync(true);
+
+        var controller = NewController("node1");
+        var response = await controller.RelayUplink(new GatewayRelayUplinkRequest
+        {
+            SourceAddress = 42,
+            Payload = "{\"t\":\"event\",\"EventType\":\"NoInternet\",\"Message\":\"relayed\"}",
+        });
+
+        var result = Assert.IsType<GatewayBatchEntryResult>(Assert.IsType<OkObjectResult>(response.Result).Value);
+        Assert.True(result.Success);
+        Assert.Equal(200, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task RelayUplink_UnmappedAddress_Returns404_NeverDispatches()
+    {
+        var gateway = new Device { IDDevice = 1, ApiId = "node1", LoRaGatewayEnabled = true, TenantID = 1 };
+        _repo.Setup(r => r.DeviceGetByApiIdAsync("node1")).ReturnsAsync(gateway);
+        _repo.Setup(r => r.ServerConfigGetAsync(1)).ReturnsAsync(new ServerConfig { GatewayEnabled = true });
+        _repo.Setup(r => r.GatewayDeviceMappingsGetAsync(1)).ReturnsAsync(new List<GatewayDeviceMapping>());
+
+        var controller = NewController("node1");
+        var response = await controller.RelayUplink(new GatewayRelayUplinkRequest { SourceAddress = 99, Payload = "{\"t\":\"event\"}" });
+
+        // Strict mock: an un-set-up DeviceGetByIdAsync/dispatch call would throw, proving nothing was forwarded for an unmapped address.
+        Assert.Equal(404, Assert.IsType<GatewayBatchEntryResult>(Assert.IsType<OkObjectResult>(response.Result).Value).StatusCode);
+    }
+
+    [Fact]
+    public async Task RelayUplink_DeviceNeitherGatewayNorLoRaGatewayEnabled_Returns403()
+    {
+        var caller = new Device { IDDevice = 1, ApiId = "node1", IsGateway = false, LoRaGatewayEnabled = false, TenantID = 1 };
+        _repo.Setup(r => r.DeviceGetByApiIdAsync("node1")).ReturnsAsync(caller);
+
+        var controller = NewController("node1");
+        var response = await controller.RelayUplink(new GatewayRelayUplinkRequest { SourceAddress = 42, Payload = "{\"t\":\"event\"}" });
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(response.Result).StatusCode);
+    }
 }

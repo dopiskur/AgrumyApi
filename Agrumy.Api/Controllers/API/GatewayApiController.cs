@@ -184,6 +184,77 @@ namespace api.Controllers.API
             return Ok(await gatewayRepo.GatewayDeviceMappingsWithSecretsGetAsync(gateway!.IDDevice!.Value));
         }
 
+        /// Roadmap #383 - the WiFi-relay counterpart to LoRaGatewayBridgeController's serial link: one already RF-decoded frame, resolved against the CALLER's own GatewayDeviceMapping (address stored in DevEUI) and dispatched through the same Config/SensorData/Event/CommandAck handlers Batch uses. A small, fixed catalog (a handful of mapped nodes per gateway at most) - no reason for a per-request cache like Gateway's own client-side one.
+        [HttpPost("RelayUplink")]
+        [EnableRateLimiting("device-data")]
+        [Authorize(Policy = DeviceAuth.ApiKeyPolicy)]
+        public async Task<ActionResult<GatewayBatchEntryResult>> RelayUplink([FromBody] GatewayRelayUplinkRequest request)
+        {
+            var (gateway, error) = await GetCallerGatewayAsync();
+            if (error != null)
+            {
+                return error;
+            }
+
+            IList<GatewayDeviceMapping> mappings = await gatewayRepo.GatewayDeviceMappingsGetAsync(gateway!.IDDevice!.Value);
+            string address = request.SourceAddress.ToString();
+            GatewayDeviceMapping? mapping = mappings.FirstOrDefault(m => m.DevEUI == address);
+            if (mapping?.IDDevice is not int idDevice)
+            {
+                return Ok(new GatewayBatchEntryResult { Success = false, StatusCode = 404, Error = $"Node address {request.SourceAddress} is not mapped for this gateway." });
+            }
+            Device? device = await deviceRepo.DeviceGetByIdAsync(idDevice);
+            if (device is null)
+            {
+                return Ok(new GatewayBatchEntryResult { Success = false, StatusCode = 404, Error = "Mapped device no longer exists." });
+            }
+
+            JsonNode? envelope;
+            try
+            {
+                envelope = JsonNode.Parse(request.Payload);
+            }
+            catch (JsonException ex)
+            {
+                return Ok(new GatewayBatchEntryResult { Success = false, StatusCode = 400, Error = "Malformed payload: " + ex.Message });
+            }
+            string? entryTypeTag = envelope?["t"]?.GetValue<string>();
+            GatewayEntryType? entryType = entryTypeTag switch
+            {
+                "config" => GatewayEntryType.Config,
+                "sensor" => GatewayEntryType.SensorData,
+                "event" => GatewayEntryType.Event,
+                "ack" => GatewayEntryType.CommandAck,
+                _ => null,
+            };
+            if (entryType is null || envelope is null)
+            {
+                return Ok(new GatewayBatchEntryResult { Success = false, StatusCode = 400, Error = $"Unrecognized envelope type: {entryTypeTag}" });
+            }
+
+            // Same reasoning as LoRaPrivateProtocolUplinkService.ProcessUplinkAsync: SensorData needs an array payload, the firmware nests readings under "d".
+            JsonElement payload = entryType == GatewayEntryType.SensorData && envelope["d"] is JsonNode sensorArray
+                ? JsonDocument.Parse(sensorArray.ToJsonString()).RootElement
+                : JsonDocument.Parse(envelope.ToJsonString()).RootElement;
+
+            try
+            {
+                GatewayBatchEntryResult result = entryType switch
+                {
+                    GatewayEntryType.Config => await RunConfigAsync(device, payload),
+                    GatewayEntryType.SensorData => await RunSensorDataAsync(device, payload),
+                    GatewayEntryType.Event => await RunEventAsync(device, payload),
+                    GatewayEntryType.CommandAck => await RunCommandAckAsync(device, payload),
+                    _ => new GatewayBatchEntryResult { Success = false, StatusCode = 400, Error = $"Unrecognized envelope type: {entryTypeTag}" },
+                };
+                return Ok(result);
+            }
+            catch (JsonException ex)
+            {
+                return Ok(new GatewayBatchEntryResult { Success = false, StatusCode = 400, Error = "Malformed payload: " + ex.Message });
+            }
+        }
+
         // ---- admin (Gateway Devices page) ---------------------------------------------------
 
         [HttpGet("All")]
