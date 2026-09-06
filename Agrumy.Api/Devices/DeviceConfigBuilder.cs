@@ -44,6 +44,8 @@ namespace api.Devices
                 ServicePoint = device.ServicePoint,
                 DeviceTypeServiceID = device.DeviceTypeServiceID,
                 ServicePublicKey = device.ServicePublicKey,
+                SleepSeconds = device.SleepSeconds,
+                SleepDeep = device.SleepDeepEnabled,
                 UtcOffsetSeconds = utcOffsetSeconds,
                 ServerUtcEpoch = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 DeviceSensorEnabled = device.DeviceSensorEnabled,
