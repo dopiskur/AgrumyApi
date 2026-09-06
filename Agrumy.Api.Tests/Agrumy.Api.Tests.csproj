@@ -31,6 +31,8 @@
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- firmware<->API contract schemas, validated by ContractTests.cs -->
     <None Include="..\contracts\device-api\*.json" Link="contracts\device-api\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- shared with AgrumyFirmware's test_native_threshold_logic - see the file's own header comment -->
+    <None Update="TestVectors\threshold_vectors.csv" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

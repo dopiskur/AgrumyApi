@@ -75,16 +75,10 @@ namespace api.Devices
 
         internal static bool ComputeThresholdState(bool currentlyOn, double reading, double threshold, double hysteresis, bool turnsOnAboveThreshold)
         {
-            if (turnsOnAboveThreshold)
-            {
-                if (reading > threshold + hysteresis) { return true; }
-                if (reading <= threshold) { return false; }
-            }
-            else
-            {
-                if (reading < threshold) { return true; }
-                if (reading >= threshold + hysteresis) { return false; }
-            }
+            bool shouldTurnOn = turnsOnAboveThreshold ? reading > threshold : reading < threshold;
+            bool shouldTurnOff = turnsOnAboveThreshold ? reading <= threshold - hysteresis : reading >= threshold + hysteresis;
+            if (!currentlyOn && shouldTurnOn) { return true; }
+            if (currentlyOn && shouldTurnOff) { return false; }
             return currentlyOn; // dead zone - neither condition met, state latches
         }
 

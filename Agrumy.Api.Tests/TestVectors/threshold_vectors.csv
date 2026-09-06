@@ -1,0 +1,23 @@
+# Shared Threshold+Hysteresis test vectors for RuleConditionEvaluator.ComputeThresholdState.
+# Copied (not submoduled) from AgrumyFirmware's RelayLogic.cpp - the on-device source of truth
+# for this formula (roadmap #371). Source: AgrumyFirmware, test/test_native_threshold_logic/threshold_vectors.csv.
+# Both files must stay byte-identical - copy any added/changed row to the other repo too.
+name,currentlyOn,reading,threshold,hysteresis,turnsOnAboveThreshold,expected
+normal_off_below_threshold_turns_on,false,17,18,1,false,true
+normal_off_at_threshold_stays_off,false,18,18,1,false,false
+normal_off_in_deadzone_stays_off,false,18.5,18,1,false,false
+normal_on_in_deadzone_stays_on,true,18.5,18,1,false,true
+normal_on_just_below_upper_bound_stays_on,true,18.999,18,1,false,true
+normal_on_at_upper_bound_turns_off,true,19,18,1,false,false
+normal_on_well_above_upper_bound_turns_off,true,25,18,1,false,false
+inverted_off_above_threshold_turns_on,false,85,80,5,true,true
+inverted_off_at_threshold_stays_off,false,80,80,5,true,false
+inverted_off_in_deadzone_stays_off,false,77,80,5,true,false
+inverted_on_in_deadzone_stays_on,true,77,80,5,true,true
+inverted_on_at_lower_bound_turns_off,true,75,80,5,true,false
+inverted_on_well_below_lower_bound_turns_off,true,50,80,5,true,false
+inverted_off_just_above_threshold_turns_on_immediately,false,80.001,80,5,true,true
+inverted_on_just_below_threshold_stays_on,true,79.999,80,5,true,true
+zero_hysteresis_normal_off_at_threshold_stays_off,false,18,18,0,false,false
+zero_hysteresis_normal_off_just_below_turns_on,false,17.999,18,0,false,true
+zero_hysteresis_normal_on_at_threshold_turns_off,true,18,18,0,false,false

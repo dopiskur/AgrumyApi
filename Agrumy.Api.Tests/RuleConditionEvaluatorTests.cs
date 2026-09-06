@@ -21,7 +21,7 @@ public class RuleConditionEvaluatorTests
         new(ConditionType.Threshold, JsonSerializer.SerializeToNode(new ThresholdConditionConfig(threshold, hysteresis), ConditionConfigJson.Options), op);
 
     [Fact]
-    public void Threshold_ReadingAboveThresholdPlusHysteresis_TurnsOn()
+    public void Threshold_ReadingAboveThreshold_TurnsOn()
     {
         bool result = RuleConditionEvaluator.EvaluateRule(Rule(Threshold(30, 2)), wasRuleTrue: false, metricReading: 33, DateTime.UtcNow, 0, _ => false);
         Assert.True(result);
@@ -37,9 +37,9 @@ public class RuleConditionEvaluatorTests
     [Fact]
     public void Threshold_DeadZone_LatchesOnPreviousRuleState()
     {
-        // 31 is above threshold(30) but below threshold+hysteresis(32) - the dead zone. wasRuleTrue is the ONLY state available (no per-condition storage), so it drives the latch.
-        bool stillOn = RuleConditionEvaluator.EvaluateRule(Rule(Threshold(30, 2)), wasRuleTrue: true, metricReading: 31, DateTime.UtcNow, 0, _ => false);
-        bool staysOff = RuleConditionEvaluator.EvaluateRule(Rule(Threshold(30, 2)), wasRuleTrue: false, metricReading: 31, DateTime.UtcNow, 0, _ => false);
+        // Notification threshold direction is turnsOnAboveThreshold=true, so the dead zone sits BELOW threshold(30): (threshold-hysteresis, threshold] = (28, 30]. wasRuleTrue is the ONLY state available (no per-condition storage), so it drives the latch here.
+        bool stillOn = RuleConditionEvaluator.EvaluateRule(Rule(Threshold(30, 2)), wasRuleTrue: true, metricReading: 29, DateTime.UtcNow, 0, _ => false);
+        bool staysOff = RuleConditionEvaluator.EvaluateRule(Rule(Threshold(30, 2)), wasRuleTrue: false, metricReading: 29, DateTime.UtcNow, 0, _ => false);
         Assert.True(stillOn);
         Assert.False(staysOff);
     }
