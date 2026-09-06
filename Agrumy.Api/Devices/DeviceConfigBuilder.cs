@@ -45,6 +45,7 @@ namespace api.Devices
                 DeviceTypeServiceID = device.DeviceTypeServiceID,
                 ServicePublicKey = device.ServicePublicKey,
                 UtcOffsetSeconds = utcOffsetSeconds,
+                ServerUtcEpoch = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 DeviceSensorEnabled = device.DeviceSensorEnabled,
                 DeviceControllerEnabled = device.DeviceControllerEnabled,
                 BatteryEnabled = device.BatteryEnabled,

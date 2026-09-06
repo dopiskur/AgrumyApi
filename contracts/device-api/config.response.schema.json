@@ -19,6 +19,7 @@
     "sleepSeconds",
     "sleepDeep",
     "utcOffsetSeconds",
+    "serverUtcEpoch",
     "deviceSensorEnabled",
     "deviceControllerEnabled",
     "batteryEnabled",
@@ -119,6 +120,13 @@
         "null"
       ],
       "description": "Roadmap #39. Current UTC offset in seconds (positive east of UTC) for ServerConfig.ScheduleTimeZone, computed fresh on every response via TimeZoneHelper.GetUtcOffsetSeconds. 0 when no schedule timezone is configured. Firmware adds this to the NTP epoch and feeds the result to gmtime() to get local calendar fields with no on-device timezone database."
+    },
+    "serverUtcEpoch": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Roadmap #381. Server wall-clock (Unix seconds) at response time, sent on every poll. Firmware seeds its epoch from this value only while NTP has never synced (fully offline self-hosted install) - DeviceController::applyServerEpochFallback is a no-op once real NTP time is available."
     },
     "deviceSensorEnabled": {
       "type": [

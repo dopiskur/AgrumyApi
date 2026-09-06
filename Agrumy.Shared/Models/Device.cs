@@ -278,6 +278,9 @@ namespace api.Models
         // UTC offset (seconds, positive east) for ServerConfig.ScheduleTimeZone, computed fresh each sync so firmware needs no timezone database of its own; 0 when unconfigured.
         public int? UtcOffsetSeconds { get; set; }
 
+        // Server wall-clock (Unix seconds) as of this response, sent on every poll - lets firmware seed its epoch when NTP has never succeeded (fully offline self-hosted install), see DeviceController::applyServerEpochFallback.
+        public long? ServerUtcEpoch { get; set; }
+
         public bool? DeviceSensorEnabled { get; set; } = false;
         public bool? DeviceControllerEnabled { get; set; } = false;
         public bool? BatteryEnabled { get; set; } = false;
