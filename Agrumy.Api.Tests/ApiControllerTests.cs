@@ -1735,7 +1735,7 @@ public class ApiControllerTests
     public async Task DeviceConfigControllerUpdate_RelayMappingOnly_Persists()
     {
         _repo.Setup(r => r.DeviceGetByIdAsync(8)).ReturnsAsync(new Device { IDDevice = 8, TenantID = 0 });
-        _repo.Setup(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>())).Returns(Task.CompletedTask);
+        _repo.Setup(r => r.DeviceConfigControllerUpdateAsync(8, It.IsAny<DeviceConfigController>())).ReturnsAsync((string?)null);
 
         var controller = NewDeviceController();
         SetCaller(controller, "admin", 0);

@@ -30,7 +30,7 @@
 
 @section Scripts {
     <script src="~/js/live-refresh.js"></script>
-    <script>
+    <script nonce="@Context.CspNonce()">
         // No DataTables here (unlike Fleet) - a plain tbody innerHTML swap is enough.
         document.addEventListener('DOMContentLoaded', function () {
             startLiveRefresh({

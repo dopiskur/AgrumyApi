@@ -1,6 +1,7 @@
 @model api.ViewModels.RuleConditionFieldsModel
 @{
-    string prefix = $"Condition{Model.SlotNumber}";
+    // Conditions fold strictly left-to-right (see _RuleEditor.cshtml's remarks), so "joined by" always means "with the result of every condition before this one", not just condition 1.
+    string prefix = $"Conditions[{Model.SlotNumber - 1}]";
     bool optional = Model.SlotNumber > 1;
 }
 <fieldset class="border rounded p-2 mb-2">
@@ -8,7 +9,7 @@
     @if (optional)
     {
         <div class="mb-2">
-            <label class="form-label small mb-0">Joined with condition 1 by</label>
+            <label class="form-label small mb-0">Joined with the result so far by</label>
             <select name="@(prefix).Operator" class="form-select form-select-sm" style="width:8rem">
                 <option value="">(unused - leave condition type below empty too)</option>
                 <option value="@((int)api.Models.LogicalOperator.And)">AND</option>

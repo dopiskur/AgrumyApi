@@ -146,7 +146,7 @@
 
 @section Scripts {
     <script src="~/js/live-refresh.js"></script>
-    <script>
+    <script nonce="@Context.CspNonce()">
         document.addEventListener('DOMContentLoaded', function () {
             startLiveRefresh({
                 url: '@Url.Action("ZoneDetails", new { idDeviceUnitZone = zone.IDDeviceUnitZone })',

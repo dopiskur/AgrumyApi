@@ -188,7 +188,11 @@ namespace api.Controllers.API
                 return error;
             }
 
-            await Repo.DeviceConfigControllerUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Controller);
+            string? problem = await Repo.DeviceConfigControllerUpdateAsync(deviceUpdate.Device.IDDevice, deviceUpdate.Controller);
+            if (problem != null)
+            {
+                return BadRequest(problem);
+            }
             return true;
         }
 

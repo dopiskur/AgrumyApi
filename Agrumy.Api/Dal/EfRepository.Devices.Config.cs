@@ -44,11 +44,22 @@ namespace api.Dal
             return row == null ? null : ToDto(row);
         }
 
-        public async Task DeviceConfigControllerUpdateAsync(int? idDevice, DeviceConfigController? cfg)
+        /// Returns null on success, or a validation error message (caller returns 400) without writing anything.
+        public async Task<string?> DeviceConfigControllerUpdateAsync(int? idDevice, DeviceConfigController? cfg)
         {
             if (cfg == null)
             {
-                return;
+                return null;
+            }
+
+            var assignedSlots = cfg.Relays.Where(s => s.RelayFunction != 0).ToList();
+            if (assignedSlots.Any(s => s.Slot < 1 || s.Slot > RelaySlotLimits.MaxSlots))
+            {
+                return $"Relay slot must be between 1 and {RelaySlotLimits.MaxSlots}.";
+            }
+            if (assignedSlots.Select(s => s.Slot).Distinct().Count() != assignedSlots.Count)
+            {
+                return "Duplicate relay slot in request.";
             }
 
             // Resolve from idDevice's OWN DeviceConfigControllerID, not cfg.IDDeviceConfigController - a client-supplied id could otherwise overwrite another device's controller config.
@@ -56,6 +67,9 @@ namespace api.Dal
                 .Where(d => d.IDDevice == idDevice)
                 .Select(d => d.DeviceConfigControllerID)
                 .FirstOrDefaultAsync();
+
+            // Delete-then-insert in one transaction - a crash between the two would otherwise leave the device with zero relay slots.
+            await using var transaction = await db.Database.BeginTransactionAsync();
 
             var row = await db.DeviceConfigControllers
                 .FirstOrDefaultAsync(c => c.IDDeviceConfigController == ownConfigControllerId);
@@ -68,7 +82,7 @@ namespace api.Dal
                 await db.DeviceConfigControllerRelays
                     .Where(r => r.IDDeviceConfigController == ownConfigControllerId)
                     .ExecuteDeleteAsync();
-                foreach (DeviceRelaySlot slot in cfg.Relays.Where(s => s.RelayFunction != 0))
+                foreach (DeviceRelaySlot slot in assignedSlots)
                 {
                     db.DeviceConfigControllerRelays.Add(new DeviceConfigControllerRelayRow
                     {
@@ -86,6 +100,8 @@ namespace api.Dal
             }
 
             await db.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return null;
         }
 
         public async Task DeviceConfigSensorUpdateAsync(int? idDevice, DeviceConfigSensor? cfg)

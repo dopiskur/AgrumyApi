@@ -267,13 +267,26 @@ namespace api.Dal
                 return;
             }
 
-            await db.SensorData.Where(r => r.DateCreated < cutoffUtc).ExecuteDeleteAsync(ct);
+            // A single unbatched DELETE across a multi-million-row table holds its lock for the whole run - MySQL supports DELETE...LIMIT natively (EF's ExecuteDeleteAsync can't express it), so loop in PurgeBatchSize chunks with a short pause between them instead.
+            int deletedRows;
+            do
+            {
+                deletedRows = await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"DELETE FROM `sensorData` WHERE `DateCreated` < {cutoffUtc} LIMIT {PurgeBatchSize}", ct);
+                if (deletedRows == PurgeBatchSize)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(200), ct);
+                }
+            } while (deletedRows == PurgeBatchSize);
+
             if (shrinkAfterPurge)
             {
                 // InnoDB never shrinks its .ibd file on a plain DELETE - OPTIMIZE TABLE is the locking rebuild that actually returns space, only run when the admin opts in since it can take a long time.
                 await db.Database.ExecuteSqlRawAsync("OPTIMIZE TABLE `sensorData`;", ct);
             }
         }
+
+        private const int PurgeBatchSize = 10_000;
 
         private static DateTime BucketStart(DateTime timestamp) =>
             new(timestamp.Ticks - (timestamp.Ticks % OptimizeBucketSize.Ticks), DateTimeKind.Utc);

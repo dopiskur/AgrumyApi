@@ -422,13 +422,12 @@ namespace api.Controllers.View
         private static DeviceUnitZoneRule BuildRule(RuleFormInput input, int? idDeviceUnitZone, int? idDeviceUnit)
         {
             var conditions = new List<RuleCondition>();
-            if (ToRuleCondition(input.Condition1) is RuleCondition c1)
+            foreach (RuleConditionInput slot in input.Conditions)
             {
-                conditions.Add(c1);
-            }
-            if (ToRuleCondition(input.Condition2) is RuleCondition c2)
-            {
-                conditions.Add(c2);
+                if (ToRuleCondition(slot) is RuleCondition c)
+                {
+                    conditions.Add(c);
+                }
             }
             return new DeviceUnitZoneRule
             {
@@ -443,7 +442,7 @@ namespace api.Controllers.View
             };
         }
 
-        /// Null return means "this slot is unused" (only valid for Condition2 - the form always requires Condition1.ConditionType to be set, enforced by the [Required]-equivalent BadRequest the API itself returns if this ever produces an empty list).
+        /// Null return means "this slot is unused" - the API itself rejects an empty resulting Conditions list, so an all-empty form still gets a clear error instead of silently saving nothing.
         private static RuleCondition? ToRuleCondition(RuleConditionInput input)
         {
             if (input.ConditionType is not ConditionType type)

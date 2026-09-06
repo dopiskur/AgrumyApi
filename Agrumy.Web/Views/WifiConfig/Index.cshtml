@@ -128,7 +128,7 @@
 }
 
 @section Scripts {
-    <script>
+    <script nonce="@Context.CspNonce()">
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.wifi-password-toggle').forEach(function (button) {
                 button.addEventListener('click', function () {

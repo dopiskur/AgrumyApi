@@ -11,7 +11,7 @@
     <title>@ViewData["Title"] - Agrumy</title>
 
     <!-- Applies the visitor's saved light/dark preference before first paint, avoiding a flash of the wrong theme. -->
-    <script>
+    <script nonce="@Context.CspNonce()">
         (() => {
             'use strict';
             const root = document.documentElement;

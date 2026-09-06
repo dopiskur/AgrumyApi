@@ -52,11 +52,22 @@ namespace api.Dal
         public async Task<DeviceUnit> DeviceUnitAddAsync(DeviceUnit unit)
         {
             // IDDeviceUnit is ValueGeneratedNever - MySQL's default sql_mode treats an explicit 0 on an AUTO_INCREMENT column as "generate a new value", which would collide with the reserved IDDeviceUnit=0 sentinel (Math.Max(...,1) below keeps 0 free).
-            int nextId = Math.Max((await db.DeviceUnits.AsNoTracking().Select(u => (int?)u.IDDeviceUnit).MaxAsync() ?? 0) + 1, 1);
-            var row = new DeviceUnitRow { IDDeviceUnit = nextId, TenantID = unit.TenantID, DeviceUnitName = unit.DeviceUnitName };
-            db.DeviceUnits.Add(row);
-            await db.SaveChangesAsync();
-            return ToDtoUnit(row);
+            for (int attempt = 0; ; attempt++)
+            {
+                int nextId = Math.Max((await db.DeviceUnits.AsNoTracking().Select(u => (int?)u.IDDeviceUnit).MaxAsync() ?? 0) + 1, 1);
+                var row = new DeviceUnitRow { IDDeviceUnit = nextId, TenantID = unit.TenantID, DeviceUnitName = unit.DeviceUnitName };
+                db.DeviceUnits.Add(row);
+                try
+                {
+                    await db.SaveChangesAsync();
+                    return ToDtoUnit(row);
+                }
+                catch (DbUpdateException) when (attempt < 4)
+                {
+                    // Two concurrent adds computed the same MAX+1 - detach the failed row and retry against a freshly read max, rather than surfacing the PK collision to the caller.
+                    db.Entry(row).State = EntityState.Detached;
+                }
+            }
         }
 
         public async Task DeviceUnitUpdateAsync(DeviceUnit unit)
@@ -83,6 +94,12 @@ namespace api.Dal
                 await DeviceUnitZoneDeleteAsync(zoneId);
             }
 
+            // Unit-scope rules (DeviceUnitZoneID == null) live directly on the unit, not any of its zones - the zone loop above never touches them, so they'd otherwise survive as orphans after the unit is gone.
+            var unitRuleIds = await db.DeviceUnitZoneRules.AsNoTracking()
+                .Where(r => r.DeviceUnitID == idDeviceUnit && r.DeviceUnitZoneID == null).Select(r => r.IDDeviceUnitZoneRule).ToListAsync();
+            await db.RuleNotificationStates.Where(s => unitRuleIds.Contains(s.RuleID)).ExecuteDeleteAsync();
+            await db.DeviceUnitZoneRules.Where(r => r.DeviceUnitID == idDeviceUnit && r.DeviceUnitZoneID == null).ExecuteDeleteAsync();
+
             await db.DeviceUnits.Where(u => u.IDDeviceUnit == idDeviceUnit).ExecuteDeleteAsync();
         }
 
@@ -105,27 +122,37 @@ namespace api.Dal
 
         public async Task<DeviceUnitZone> DeviceUnitZoneAddAsync(DeviceUnitZone zone)
         {
-            // Same manual max+1 reasoning as DeviceUnitAddAsync.
-            int nextId = Math.Max((await db.DeviceUnitZones.AsNoTracking().Select(z => (int?)z.IDDeviceUnitZone).MaxAsync() ?? 0) + 1, 1);
-            var row = new DeviceUnitZoneRow
+            // Same manual max+1 reasoning, and same collision-retry, as DeviceUnitAddAsync.
+            for (int attempt = 0; ; attempt++)
             {
-                IDDeviceUnitZone = nextId,
-                TenantID = zone.TenantID,
-                DeviceUnitID = zone.DeviceUnitID,
-                DeviceUnitZoneName = zone.DeviceUnitZoneName,
-                WaterPumpMaxRunSeconds = settings.WaterPumpMaxRunSeconds,
-                WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds,
-                // No server-wide default makes sense for a specific tank's own calibration - unlike WaterPumpMaxRunSeconds above, always taken from the caller (null/unset is the correct "no tank tracking yet" state).
-                TankCapacityLiters = zone.TankCapacityLiters,
-                WaterLevelRawEmpty = zone.WaterLevelRawEmpty,
-                WaterLevelRawFull = zone.WaterLevelRawFull,
-                // Same reasoning as Tank* above - no server-wide default, always taken from the caller.
-                HeatingMaxRunSeconds = zone.HeatingMaxRunSeconds,
-                VentilationMaxRunSeconds = zone.VentilationMaxRunSeconds,
-            };
-            db.DeviceUnitZones.Add(row);
-            await db.SaveChangesAsync();
-            return ToDtoZone(row);
+                int nextId = Math.Max((await db.DeviceUnitZones.AsNoTracking().Select(z => (int?)z.IDDeviceUnitZone).MaxAsync() ?? 0) + 1, 1);
+                var row = new DeviceUnitZoneRow
+                {
+                    IDDeviceUnitZone = nextId,
+                    TenantID = zone.TenantID,
+                    DeviceUnitID = zone.DeviceUnitID,
+                    DeviceUnitZoneName = zone.DeviceUnitZoneName,
+                    WaterPumpMaxRunSeconds = settings.WaterPumpMaxRunSeconds,
+                    WaterPumpCooldownSeconds = settings.WaterPumpCooldownSeconds,
+                    // No server-wide default makes sense for a specific tank's own calibration - unlike WaterPumpMaxRunSeconds above, always taken from the caller (null/unset is the correct "no tank tracking yet" state).
+                    TankCapacityLiters = zone.TankCapacityLiters,
+                    WaterLevelRawEmpty = zone.WaterLevelRawEmpty,
+                    WaterLevelRawFull = zone.WaterLevelRawFull,
+                    // Same reasoning as Tank* above - no server-wide default, always taken from the caller.
+                    HeatingMaxRunSeconds = zone.HeatingMaxRunSeconds,
+                    VentilationMaxRunSeconds = zone.VentilationMaxRunSeconds,
+                };
+                db.DeviceUnitZones.Add(row);
+                try
+                {
+                    await db.SaveChangesAsync();
+                    return ToDtoZone(row);
+                }
+                catch (DbUpdateException) when (attempt < 4)
+                {
+                    db.Entry(row).State = EntityState.Detached;
+                }
+            }
         }
 
         public async Task DeviceUnitZoneUpdateAsync(DeviceUnitZone zone)
@@ -448,6 +475,10 @@ namespace api.Dal
                 .GroupBy(z => z.DeviceUnitID)
                 .ToDictionary(g => g.Key, g => g.Select(z => z.IDDeviceUnitZone).ToList());
 
+            // One SensorData query for every unit's zones combined, not one query per unit in the loop below - a fleet with 20+ units otherwise pulls its whole 24h trend window once per unit.
+            var zoneIdsByUnit = unitRows.ToDictionary(u => u.IDDeviceUnit, u => zonesByUnit.GetValueOrDefault(u.IDDeviceUnit) ?? []);
+            var trendsByUnit = await BuildTrendsByZoneGroupAsync(zoneIdsByUnit);
+
             var result = new List<DeviceUnitDashboard>();
             foreach (var u in unitRows)
             {
@@ -461,7 +492,7 @@ namespace api.Dal
                     DeviceCount = scoped.Count,
                     Averages = Average(scoped),
                     Status = ComputeStatus(scoped),
-                    Trend = await BuildTrendAsync(zoneIds),
+                    Trend = trendsByUnit[u.IDDeviceUnit],
                     ProblemAlerts = alerts.Where(a => a.DeviceUnitID == u.IDDeviceUnit).Select(ToDtoAlert).ToList(),
                 });
             }
@@ -479,6 +510,9 @@ namespace api.Dal
             var snapshots = await GetDeviceSnapshotsAsync(scopedDevices, expiryHours, alertsEnabled);
             var alerts = await GetProblemAlertsAsync(scopedDevices, expiryHours, alertsEnabled);
 
+            // Same batching as DeviceUnitDashboardGetAsync - one query for every zone's trend instead of one per zone in the loop below.
+            var trendsByZone = await BuildTrendsByZoneGroupAsync(zoneRows.ToDictionary(z => z.IDDeviceUnitZone, z => (List<int>)[z.IDDeviceUnitZone]));
+
             var result = new List<DeviceUnitZoneDashboard>();
             foreach (var z in zoneRows)
             {
@@ -491,7 +525,7 @@ namespace api.Dal
                     DeviceCount = scoped.Count,
                     Averages = Average(scoped, z),
                     Status = ComputeStatus(scoped),
-                    Trend = await BuildTrendAsync([z.IDDeviceUnitZone]),
+                    Trend = trendsByZone[z.IDDeviceUnitZone],
                     ProblemAlerts = alerts.Where(a => a.DeviceUnitZoneID == z.IDDeviceUnitZone).Select(ToDtoAlert).ToList(),
                 });
             }
@@ -571,6 +605,12 @@ namespace api.Dal
             return deviceLatestIds.Select(d =>
             {
                 SensorDataRow? s = d.LatestSensorDataId != null && latestById.TryGetValue(d.LatestSensorDataId.Value, out var row) ? row : null;
+                // Same window ComputeOnline uses to decide online/offline - a reading outside it is from a dead/unreachable sensor and must not silently count toward the zone/unit average or feed RuleNotificationEvaluator (which reads this same Averages value).
+                double maxReadingAgeSeconds = (d.SleepSeconds ?? 60) * DeviceFleetStatus.OfflineMissedPolls + DeviceFleetStatus.OfflineGraceSeconds;
+                if (s?.DateCreated is DateTime readingAt && (utcNow - readingAt).TotalSeconds > maxReadingAgeSeconds)
+                {
+                    s = null;
+                }
                 bool enabled = d.Enabled == true;
                 // A disabled device is expected to be silent - its offline-ness must not redden a zone/unit nobody expects it to report into.
                 bool online = !enabled || DeviceFleetStatus.ComputeOnline(d.LastSeenAt, d.SleepSeconds, utcNow);
@@ -673,6 +713,63 @@ namespace api.Dal
                 trend.Wind[bucket.Key] = rowsInBucket.Select(r => r.Wind).Average();
             }
             return trend;
+        }
+
+        /// Same 24h hourly-bucket trend as BuildTrendAsync, but for many keys (units, or zones) in one SensorData query instead of one query per key - each zone belongs to exactly one key, so results just get routed by DeviceUnitZoneID after the single fetch.
+        private async Task<Dictionary<TKey, SensorTrend>> BuildTrendsByZoneGroupAsync<TKey>(Dictionary<TKey, List<int>> zoneIdsByKey) where TKey : notnull
+        {
+            var result = zoneIdsByKey.Keys.ToDictionary(k => k, _ => new SensorTrend());
+            var keyByZoneId = new Dictionary<int, TKey>();
+            foreach (var (key, zoneIds) in zoneIdsByKey)
+            {
+                foreach (int zoneId in zoneIds)
+                {
+                    keyByZoneId[zoneId] = key;
+                }
+            }
+            if (keyByZoneId.Count == 0)
+            {
+                return result;
+            }
+
+            DateTime utcNow = DateTime.UtcNow;
+            DateTime cutoff = utcNow.AddHours(-SensorTrend.HourBuckets);
+            var zoneIdList = keyByZoneId.Keys.ToList();
+
+            var rows = await db.SensorData.AsNoTracking()
+                .Where(s => s.DeviceUnitZoneID != null && zoneIdList.Contains(s.DeviceUnitZoneID.Value) && s.DateCreated >= cutoff)
+                .Select(s => new
+                {
+                    s.DeviceUnitZoneID, s.DateCreated, s.Temperature, s.SoilTemperature, s.Humidity, s.Moisture, s.Light,
+                    s.Co2, s.Tvoc, s.Barometer, s.LiquidPH, s.RainLevel, s.WaterLevel, s.Wind,
+                })
+                .ToListAsync();
+
+            var byKeyAndBucket = rows
+                .Where(r => r.DateCreated != null)
+                .Select(r => (Key: keyByZoneId[r.DeviceUnitZoneID!.Value], Bucket: HourBucketIndex(r.DateCreated!.Value, utcNow), Row: r))
+                .Where(x => x.Bucket >= 0 && x.Bucket < SensorTrend.HourBuckets)
+                .GroupBy(x => (x.Key, x.Bucket));
+
+            foreach (var group in byKeyAndBucket)
+            {
+                var trend = result[group.Key.Key];
+                var rowsInBucket = group.Select(x => x.Row).ToList();
+                trend.Temperature[group.Key.Bucket] = rowsInBucket.Select(r => r.Temperature).Average();
+                trend.SoilTemperature[group.Key.Bucket] = rowsInBucket.Select(r => r.SoilTemperature).Average();
+                trend.Humidity[group.Key.Bucket] = rowsInBucket.Select(r => r.Humidity).Average();
+                trend.Vpd[group.Key.Bucket] = rowsInBucket.Select(r => VpdCalculator.Compute(r.Temperature, r.Humidity)).Average();
+                trend.Moisture[group.Key.Bucket] = rowsInBucket.Select(r => r.Moisture).Average();
+                trend.Light[group.Key.Bucket] = rowsInBucket.Select(r => r.Light).Average();
+                trend.Co2[group.Key.Bucket] = rowsInBucket.Select(r => r.Co2).Average();
+                trend.Tvoc[group.Key.Bucket] = rowsInBucket.Select(r => r.Tvoc).Average();
+                trend.Barometer[group.Key.Bucket] = rowsInBucket.Select(r => r.Barometer).Average();
+                trend.LiquidPH[group.Key.Bucket] = rowsInBucket.Select(r => r.LiquidPH).Average();
+                trend.RainLevel[group.Key.Bucket] = rowsInBucket.Select(r => r.RainLevel).Average();
+                trend.WaterLevel[group.Key.Bucket] = rowsInBucket.Select(r => r.WaterLevel).Average();
+                trend.Wind[group.Key.Bucket] = rowsInBucket.Select(r => r.Wind).Average();
+            }
+            return result;
         }
 
         /// 0 = the bucket ending 24h ago, 23 = the current hour - a timestamp outside the 24h window (or, defensively, in the future) falls outside [0, HourBuckets), which the caller filters out.

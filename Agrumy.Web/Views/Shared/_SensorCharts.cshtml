@@ -52,7 +52,7 @@ else
 
 <script src="~/lib/echarts/echarts.min.js"></script>
 <script src="~/js/sensor-charts.js"></script>
-<script>
+<script nonce="@Context.CspNonce()">
     const sensorPayload = @Html.Raw(safePayload);
     @foreach (var c in present)
     {

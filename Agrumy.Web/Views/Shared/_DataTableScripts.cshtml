@@ -2,7 +2,7 @@
 
 <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.min.js"></script>
 <script src="~/lib/adminlte/plugins/datatables-bs5/dataTables.bootstrap5.min.js"></script>
-<script>
+<script nonce="@Context.CspNonce()">
     document.addEventListener('DOMContentLoaded', function () {
         new DataTable(document.getElementById('@Model'), {
             paging: true,
