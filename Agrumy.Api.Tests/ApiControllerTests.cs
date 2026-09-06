@@ -1,4 +1,6 @@
+using System.IO.Compression;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using api;
 using api.BackgroundWorkers;
@@ -2427,7 +2429,7 @@ public class ApiControllerTests
         SetCaller(controller, "admin", 0); // Global admin
         var result = await controller.Export(7);
 
-        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.IsType<FileStreamResult>(result);
         Assert.NotNull(written);
         Assert.Equal("Tenant.Exported", written!.Action);
         Assert.Equal(7, written.TenantID);
@@ -2443,7 +2445,7 @@ public class ApiControllerTests
         SetCallerRoles(controller, 7, "user", RoleNames.TenantReader, RoleNames.TenantAdmin); // Tenant admin of tenant 7
         var result = await controller.Export(7);
 
-        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.IsType<FileStreamResult>(result);
         _repo.Verify(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>()), Times.Once);
     }
 
@@ -2454,8 +2456,34 @@ public class ApiControllerTests
         SetCallerRoles(controller, 7, "user", RoleNames.TenantReader, RoleNames.TenantAdmin); // Tenant admin of tenant 7, not 8
         var result = await controller.Export(8);
 
-        Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result).StatusCode);
         // Strict mock: an un-set-up TenantGetByIdAsync/AuditLogAddAsync call would throw, proving the export never ran.
+    }
+
+    /// #253: export is now a ZIP (same repackaging #124 already applies to the firmware catalog) - proves the download is a real archive with the one export.json entry TenantController.Import/LoginController.ImportSentinel expect, and that it round-trips back into an equal TenantExport.
+    [Fact]
+    public async Task TenantExport_ProducesZip_WithExportJsonEntry_ThatRoundTrips()
+    {
+        StubEmptyTenantExport(7);
+        _repo.Setup(r => r.AuditLogAddAsync(It.IsAny<AuditLogEntry>())).Returns(Task.CompletedTask);
+
+        var controller = NewTenantController();
+        SetCaller(controller, "admin", 0); // Global admin
+        var result = await controller.Export(7);
+
+        var fileResult = Assert.IsType<FileStreamResult>(result);
+        Assert.Equal("application/zip", fileResult.ContentType);
+        Assert.EndsWith(".zip", fileResult.FileDownloadName);
+
+        using var archive = new ZipArchive(fileResult.FileStream, ZipArchiveMode.Read);
+        ZipArchiveEntry? entry = archive.GetEntry(TenantExport.ExportEntryName);
+        Assert.NotNull(entry);
+
+        using StreamReader reader = new(entry!.Open());
+        TenantExport? roundTripped = JsonSerializer.Deserialize<TenantExport>(await reader.ReadToEndAsync(), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.NotNull(roundTripped);
+        Assert.Equal("Acme", roundTripped!.SourceTenantName);
+        Assert.Equal(TenantExport.CurrentFormatVersion, roundTripped.FormatVersion);
     }
 
     // Roadmap #294: IssueCommand's CreatedCommandIds had no way to check on afterward short of direct DB access.

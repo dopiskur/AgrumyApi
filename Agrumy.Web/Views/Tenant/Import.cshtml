@@ -39,15 +39,16 @@
         }
 
         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-        <form asp-action="Import" method="post">
+        <form asp-action="Import" method="post" enctype="multipart/form-data">
             <div class="mb-3">
-                <label class="form-label" for="exportFile">Export file</label>
-                <input type="file" id="exportFile" class="form-control" accept="application/json" />
-                <div class="form-text">Choose the .json file downloaded from the source server, or paste its contents below directly.</div>
+                <label class="form-label" asp-for="ExportFile">Export file</label>
+                <input type="file" asp-for="ExportFile" class="form-control" accept="application/zip" />
+                <span asp-validation-for="ExportFile" class="text-danger"></span>
+                <div class="form-text">Choose the .zip file downloaded from the source server, or paste its export.json contents below directly.</div>
             </div>
             <div class="mb-3">
                 <label asp-for="ExportJson" class="form-label"></label>
-                <textarea asp-for="ExportJson" class="form-control font-monospace" rows="10" placeholder="Paste export JSON here"></textarea>
+                <textarea asp-for="ExportJson" class="form-control font-monospace" rows="10" placeholder="Paste export.json contents here"></textarea>
                 <span asp-validation-for="ExportJson" class="text-danger"></span>
             </div>
             <div class="mb-3" style="max-width:24rem">
@@ -61,15 +62,3 @@
         </form>
     </div>
 </div>
-
-@section Scripts {
-    <script nonce="@Context.CspNonce()">
-        document.getElementById('exportFile')?.addEventListener('change', function (e) {
-            const file = e.target.files[0];
-            if (!file) { return; }
-            const reader = new FileReader();
-            reader.onload = () => { document.getElementById('ExportJson').value = reader.result; };
-            reader.readAsText(file);
-        });
-    </script>
-}

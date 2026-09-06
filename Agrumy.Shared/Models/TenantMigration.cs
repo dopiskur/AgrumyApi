@@ -30,6 +30,8 @@ namespace api.Models
     public class TenantExport
     {
         public const string CurrentFormatVersion = "1";
+        // The single entry name inside the ZIP TenantExportService.BuildExportZipAsync produces - shared here since Agrumy.Web (no reference to Agrumy.Api) also needs it to unpack an upload.
+        public const string ExportEntryName = "export.json";
         public string FormatVersion { get; set; } = CurrentFormatVersion;
         public DateTime ExportedAtUtc { get; set; }
         public string? SourceTenantName { get; set; }

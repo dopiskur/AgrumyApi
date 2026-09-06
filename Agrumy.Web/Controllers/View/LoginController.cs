@@ -218,10 +218,33 @@ namespace api.Controllers.View
                 return View(value);
             }
 
+            string exportJson;
+            if (value.ExportFile is { Length: > 0 } file)
+            {
+                try
+                {
+                    exportJson = await TenantExportZipReader.ReadExportJsonAsync(file);
+                }
+                catch (InvalidDataException)
+                {
+                    ModelState.AddModelError(nameof(value.ExportFile), $"Not a valid export ZIP - missing {TenantExport.ExportEntryName}.");
+                    return View(value);
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(value.ExportJson))
+            {
+                exportJson = value.ExportJson;
+            }
+            else
+            {
+                ModelState.AddModelError(nameof(value.ExportFile), "Choose an export .zip file, or paste its export.json contents below.");
+                return View(value);
+            }
+
             TenantExport? export;
             try
             {
-                export = JsonSerializer.Deserialize<TenantExport>(value.ExportJson ?? "", ImportJsonOptions);
+                export = JsonSerializer.Deserialize<TenantExport>(exportJson, ImportJsonOptions);
             }
             catch (JsonException ex)
             {

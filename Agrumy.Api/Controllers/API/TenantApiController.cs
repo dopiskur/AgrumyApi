@@ -133,18 +133,18 @@ namespace api.Controllers.API
 
         // ---- Export/Import --------------------------------------------------
 
-        /// SENSITIVE: carries every exported user's password hash/salt and device's ApiKey (treat like a credential bundle, never persisted server-side, built in memory and streamed straight back) - a TenantAdmin exports only their OWN tenant, Global admin any.
+        /// SENSITIVE: carries every exported user's password hash/salt and device's ApiKey (treat like a credential bundle, never persisted server-side, built in memory and streamed straight back) - a TenantAdmin exports only their OWN tenant, Global admin any. ZIP-packaged (single export.json entry, see TenantExportService.BuildExportZipAsync) - same repackaging #124 already applies to the firmware catalog.
         [Authorize(Roles = RoleNames.Admins)]
         [HttpGet("Export")]
-        public async Task<ActionResult<TenantExport>> Export(int idTenant, bool includeSensorData = false, DateTime? sensorDataSinceUtc = null)
+        public async Task<ActionResult> Export(int idTenant, bool includeSensorData = false, DateTime? sensorDataSinceUtc = null, CancellationToken cancellationToken = default)
         {
             if (!CallerIsGlobalAdmin && !(CallerHasRole(RoleNames.TenantAdmin) && CallerTenantId == idTenant))
             {
                 return StatusCode(403, "Exporting a tenant requires being its Tenant admin, or Global admin.");
             }
-            TenantExport export = await exportService.ExportAsync(idTenant, includeSensorData, sensorDataSinceUtc);
+            (Stream content, string fileName) = await exportService.BuildExportZipAsync(idTenant, includeSensorData, sensorDataSinceUtc, cancellationToken);
             await WriteAuditAsync("Tenant.Exported", idTenant, "Tenant", idTenant.ToString(), $"includeSensorData={includeSensorData}");
-            return Ok(export);
+            return File(content, "application/zip", fileName);
         }
 
         /// ByName only (see api.Models.TenantImportTarget), Global admin only - unlike Export this can create a brand-new tenant or add into one the caller doesn't administer, same bar as TenantAdd/TenantUpdate.

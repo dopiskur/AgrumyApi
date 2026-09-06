@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using api.Dal.Interface;
 using api.Models;
@@ -77,15 +76,19 @@ namespace api.Controllers.View
 
         // ---- Export/Import --------------------------------------------------
 
-        /// Streams the export as a browser download, never written to this server's disk (see TenantApiController.Export - contains password hashes, device ApiKeys); narrowed to GlobalAdmin since a Global reader must not pull credentials out.
+        /// Streams the ZIP export straight through as a browser download, never written to this server's disk (see TenantApiController.Export - contains password hashes, device ApiKeys); narrowed to GlobalAdmin since a Global reader must not pull credentials out.
         [Authorize(Roles = RoleNames.GlobalAdmin)]
         public async Task<ActionResult> Export(int idTenant, bool includeSensorData = false)
         {
-            Tenant tenant = await api.TenantGet(idTenant);
-            TenantExport export = await api.TenantExport(idTenant, includeSensorData);
-            byte[] bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(export, ExportJsonOptions));
-            string fileName = $"agrumy-tenant-{(tenant.TenantName ?? "export").ToLowerInvariant().Replace(' ', '-')}-{DateTime.UtcNow:yyyyMMdd}.json";
-            return File(bytes, "application/json", fileName);
+            HttpResponseMessage response = await api.TenantExport(idTenant, includeSensorData);
+            if (!response.IsSuccessStatusCode)
+            {
+                return StatusCode((int)response.StatusCode);
+            }
+            string downloadName = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+                ?? "agrumy-tenant-export.zip";
+            return File(await response.Content.ReadAsStreamAsync(), "application/zip", downloadName);
         }
 
         [Authorize(Roles = RoleNames.GlobalAdmin)]
@@ -101,10 +104,33 @@ namespace api.Controllers.View
                 return View(value);
             }
 
+            string exportJson;
+            if (value.ExportFile is { Length: > 0 } file)
+            {
+                try
+                {
+                    exportJson = await TenantExportZipReader.ReadExportJsonAsync(file);
+                }
+                catch (InvalidDataException)
+                {
+                    ModelState.AddModelError(nameof(value.ExportFile), $"Not a valid export ZIP - missing {TenantExport.ExportEntryName}.");
+                    return View(value);
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(value.ExportJson))
+            {
+                exportJson = value.ExportJson;
+            }
+            else
+            {
+                ModelState.AddModelError(nameof(value.ExportFile), "Choose an export .zip file, or paste its export.json contents below.");
+                return View(value);
+            }
+
             TenantExport? export;
             try
             {
-                export = JsonSerializer.Deserialize<TenantExport>(value.ExportJson ?? "", ExportJsonOptions);
+                export = JsonSerializer.Deserialize<TenantExport>(exportJson, ExportJsonOptions);
             }
             catch (JsonException ex)
             {
