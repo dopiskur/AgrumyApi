@@ -111,7 +111,7 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
         _db?.Dispose();
         _db = new AgrumyDbContext(DbOptionsFactory.Build(t!.Provider, t.ConnectionString));
         // NullCache: these tests verify query/translation correctness against the real engine, not cache behavior.
-        _repo = new EfRepository(_db, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance, new NullCache(), new EfAuditLogRepository(_db), new EfRefreshTokenRepository(_db), new EfControllerDataRepository(_db));
+        _repo = new EfRepository(_db, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance, new NullCache(), new EfAuditLogRepository(_db), new EfRefreshTokenRepository(_db), new EfControllerDataRepository(_db), new EfDiscoveryRepository(_db));
         return t;
     }
 
@@ -515,8 +515,8 @@ public sealed class RelationalIntegrationTests : IClassFixture<RelationalIntegra
 
         await using var dbA = _fx.NewContext(t);
         await using var dbB = _fx.NewContext(t);
-        var repoA = new EfRepository(dbA, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance, new NullCache(), new EfAuditLogRepository(dbA), new EfRefreshTokenRepository(dbA), new EfControllerDataRepository(dbA));
-        var repoB = new EfRepository(dbB, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance, new NullCache(), new EfAuditLogRepository(dbB), new EfRefreshTokenRepository(dbB), new EfControllerDataRepository(dbB));
+        var repoA = new EfRepository(dbA, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance, new NullCache(), new EfAuditLogRepository(dbA), new EfRefreshTokenRepository(dbA), new EfControllerDataRepository(dbA), new EfDiscoveryRepository(dbA));
+        var repoB = new EfRepository(dbB, Options.Create(new AgrumySettings()), NullLogger<EfRepository>.Instance, new NullCache(), new EfAuditLogRepository(dbB), new EfRefreshTokenRepository(dbB), new EfControllerDataRepository(dbB), new EfDiscoveryRepository(dbB));
 
         bool[] results = await Task.WhenAll(
             repoA.RefreshTokenRotateAsync(userId, oldHash, hashA, DateTime.UtcNow.AddDays(30)),

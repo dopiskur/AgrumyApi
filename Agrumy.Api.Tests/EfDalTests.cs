@@ -253,7 +253,8 @@ public class ClassifyExceptionTests
         new Mock<ICache>().Object, // ClassifyException never touches the cache - unused here
         new Mock<IAuditLogRepository>().Object,
         new Mock<IRefreshTokenRepository>().Object,
-        new Mock<IControllerDataRepository>().Object);
+        new Mock<IControllerDataRepository>().Object,
+        new Mock<IDiscoveryRepository>().Object);
 
     [Fact]
     public void PlainException_MentioningMissingTable_IsSchemaMissing()
