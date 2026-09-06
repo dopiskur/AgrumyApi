@@ -1,57 +1,16 @@
-using api.Dal.Entities;
 using api.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace api.Dal
 {
-    /// IUserRepository members: email activation - issuing/reissuing an activation token and redeeming it.
+    /// IUserRepository activation members - forwarded to the standalone EfUserRepository (roadmap #246) so IRepository's broad consumers keep working unchanged.
     internal partial class EfRepository
     {
+        public Task UserSetActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt) =>
+            userRepository.UserSetActivationTokenAsync(idUser, tokenHash, expiresAt);
 
-        public async Task UserSetActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt)
-        {
-            var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == idUser);
-            if (row is null) { return; }
+        public Task<bool> UserIssueActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt, int cooldownMinutes) =>
+            userRepository.UserIssueActivationTokenAsync(idUser, tokenHash, expiresAt, cooldownMinutes);
 
-            row.ActivationTokenHash = tokenHash;
-            row.ActivationTokenExpiresAt = expiresAt;
-            row.ActivationLastSentAt = DateTime.UtcNow;
-            await db.SaveChangesAsync();
-        }
-
-        public async Task<bool> UserIssueActivationTokenAsync(int idUser, string tokenHash, DateTime expiresAt, int cooldownMinutes)
-        {
-            var row = await db.Users.FirstOrDefaultAsync(u => u.IDUser == idUser);
-            if (row is null || row.EmailVerified)
-            {
-                return false;
-            }
-            if (row.ActivationLastSentAt is DateTime lastSent && lastSent > DateTime.UtcNow.AddMinutes(-cooldownMinutes))
-            {
-                return false; // still in cooldown
-            }
-
-            row.ActivationTokenHash = tokenHash;
-            row.ActivationTokenExpiresAt = expiresAt;
-            row.ActivationLastSentAt = DateTime.UtcNow;
-            await db.SaveChangesAsync();
-            return true;
-        }
-
-        public async Task<User?> UserActivateAsync(string tokenHash)
-        {
-            var row = await db.Users.FirstOrDefaultAsync(u => u.ActivationTokenHash == tokenHash);
-            if (row is null || row.ActivationTokenExpiresAt is null || row.ActivationTokenExpiresAt < DateTime.UtcNow)
-            {
-                return null;
-            }
-
-            row.EmailVerified = true;
-            row.ActivationTokenHash = null;
-            row.ActivationTokenExpiresAt = null;
-            await db.SaveChangesAsync();
-
-            return ToDto(row);
-        }
+        public Task<User?> UserActivateAsync(string tokenHash) => userRepository.UserActivateAsync(tokenHash);
     }
 }
